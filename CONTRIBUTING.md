@@ -1,6 +1,6 @@
-# Contributing to GEOSgcm_GridComp
+# Contributing to GEOSldas_GridComp
 
-Contributing code to GEOSgcm_GridComp should be done via a Pull Request to this repository.
+Contributing code to GEOSldas_GridComp should be done via a Pull Request to this repository.
 
 ## Contributor License Agreement (CLA)
 
