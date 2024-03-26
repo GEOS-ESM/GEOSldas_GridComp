@@ -1,3 +1,7 @@
-/@GEOSgcm_GridComp
-/GEOSgcm_GridComp
-/GEOSgcm_GridComp@
+*~
+*.swp
+*.swo
+.DS_Store
+*#
+.#*
+**/CVS/
