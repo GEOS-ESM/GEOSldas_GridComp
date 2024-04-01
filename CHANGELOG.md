@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+#### Changed
+
+- Changed lenkf.j.template to python string 
+
 -----------------------------
 
 ## [v1.0.0] - 2024-03-26
