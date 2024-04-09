@@ -701,15 +701,17 @@ EOF
        if ( $NENS == 1) set ENSID =''
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${eYEAR}/M${eMON}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
-   
-       set rstf = ${MODEL} 
-       if (-f ${rstf}${ENSID}_internal_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${eYEAR}/M${eMON}/${EXPID}.${rstf}_internal_rst.${eYEAR}${eMON}${eDAY}_${eHour}${eMin}
-          /bin/mv ${rstf}${ENSID}_internal_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${rstf}${ENSID}_internal_rst
-          /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${rstf}${ENSID}_internal_rst
-       endif
-   
+
+       set rstfs = (${MODEL} 'landice' 'landassim_obspertrseed')
+       foreach rstf ($rstfs)
+         if (-f ${rstf}${ENSID}_internal_checkpoint ) then
+           set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${eYEAR}/M${eMON}/${EXPID}.${rstf}_internal_rst.${eYEAR}${eMON}${eDAY}_${eHour}${eMin}
+           /bin/mv ${rstf}${ENSID}_internal_checkpoint $tmp_file
+           /bin/rm -f $EXPDIR/input/restart/${rstf}${ENSID}_internal_rst
+           /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${rstf}${ENSID}_internal_rst
+         endif
+       end
+
        set rstf = 'landpert'
        if (-f ${rstf}${ENSID}_internal_checkpoint ) then
           set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${eYEAR}/M${eMON}/${EXPID}.${rstf}_internal_rst.${eYEAR}${eMON}${eDAY}_${eHour}${eMin}
@@ -723,21 +725,15 @@ EOF
           /usr/bin/gzip $old_rst &
        endif
    
-       set rstf = 'landassim_obspertrseed'
-       if (-f ${rstf}${ENSID}_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${eYEAR}/M${eMON}/${EXPID}.${rstf}_rst.${eYEAR}${eMON}${eDAY}_${eHour}${eMin}
-          /bin/mv ${rstf}${ENSID}_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${rstf}${ENSID}_rst
-          /bin/ln -rs $tmp_file $EXPDIR/input/restart/${rstf}${ENSID}_rst
-       endif
    # move intermediate check point files to  output/$EXPDOMAIN/rs/$ENSDIR/Yyyyy/Mmm/ directories
    # -------------------------------------------------------------------------------------------
    
        set rstfiles1 = `ls ${MODEL}${ENSID}_internal_checkpoint.*`
        set rstfiles2 = `ls landpert${ENSID}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${ENSID}_checkpoint.*`
+       set rstfiles4 = `ls landice${ENSID}_internal_checkpoint.*`
    
-       foreach rfile ( $rstfiles1 ) 
+       foreach rfile ( $rstfiles1 $rstfiles4 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
           set TM = `echo $ThisTime | cut -c5-6` 
