@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -----------------------------
 
+## [v1.0.1] - 2024-04-10
+
+### Fixed
+
+- ldas_setup: Changed entry 'slurm' to 'slurm_pbs' to match remap_params.tpl
+
+-----------------------------
+
 ## [v1.0.0] - 2024-03-26
 
 - Inaugural version.  0-diff vs. GEOSldas v18.0.0.

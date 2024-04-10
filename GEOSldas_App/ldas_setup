@@ -860,8 +860,8 @@ class LDASsetup:
            remap_tpl = os.path.dirname(os.path.realpath(__file__)) + '/remap_params.tpl'
            config = yaml_to_config(remap_tpl)
 
-           config['slurm']['account'] = self.rqdRmInp['account']
-           config['slurm']['qos'] = 'debug'
+           config['slurm_pbs']['account'] = self.rqdRmInp['account']
+           config['slurm_pbs']['qos'] = 'debug'
 
            config['input']['surface']['catch_tilefile']  = self.in_tilefile
            config['input']['shared']['expid']            = self.rqdExeInp['RESTART_ID']
