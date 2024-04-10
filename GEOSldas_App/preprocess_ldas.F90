@@ -4,15 +4,16 @@
 
 program main
 
-  use preprocess_ldas_routines,     ONLY:    &
-       createf2g,                            &
-       createLocalTilefile,                  &
-       createLocalBC,                        &
-       createLocalVegRestart,                &
-       createLocalmwRTMRestart,              &
-       createLocalCatchRestart,              &
-       correctEase,                          &
-       convert_pert_rst,                     &
+  use preprocess_ldas_routines,     ONLY:      &
+       createf2g,                              &
+       createLocalTilefile,                    &
+       createLocalBC,                          &
+       createLocalVegRestart,                  &
+       createLocalmwRTMRestart,                &
+       createLocalCatchRestart,                &
+       write3D_nc => createLocalCatchRestart,  &
+       correctEase,                            &
+       convert_pert_rst,                       &
        optimize_latlon
   
   implicit none
@@ -41,6 +42,8 @@ program main
   character(len=512) :: new_BC
   character(len=512) :: orig_Veg
   character(len=512) :: new_veg
+  character(len=512) :: orig_irr
+  character(len=512) :: new_irr
   character(len=512) :: orig_ease
   character(len=512) :: new_ease
   character(len=512) :: f2g_file
@@ -95,6 +98,13 @@ program main
      f2g_file = arg3
 
      call  createLocalVegRestart(f2g_file, orig_veg, new_veg)      
+ 
+  else if (trim(option) == "c_localirrrst") then
+
+     orig_irr = arg1
+     new_irr  = arg2
+
+     call write3D_nc (f2g_file, orig_irr, new_irr)
 
   else if (trim(option) == "c_localmwrtmrst") then
 
