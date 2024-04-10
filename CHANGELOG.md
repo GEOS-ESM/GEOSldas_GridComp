@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+-----------------------------
+
+## [v1.0.1] - 2024-04-10
+
 ### Fixed
 
-- changed entry 'slurm' to 'slurm_pbs' to match remap_params.tpl
+- ldas_setup: Changed entry 'slurm' to 'slurm_pbs' to match remap_params.tpl
 
 -----------------------------
 
