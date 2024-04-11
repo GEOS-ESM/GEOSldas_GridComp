@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -----------------------------
 
+## [v1.0.2] - 2024-04-11
+
+### Fixed
+
+- Bugfix for state increment array referencing in update_type=13
+
+-----------------------------
+
 ## [v1.0.1] - 2024-04-10
 
 ### Fixed
