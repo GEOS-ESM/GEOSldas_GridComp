@@ -9,23 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Moved the location mepo clones `GEOSgcm_GridComp` to under `GEOSldas/src/Components` parallel
-  to `GEOSldas_GridComp` rather than inside `GEOSldas_GridComp` itself. This is to be
-  consistent with the structure of the GEOSgcm and GEOSldas components.
-
 -----------------------------
 
 ## [v1.0.2] - 2024-04-11
 
+- 0-diff vs. v1.0.1.
+
 ### Fixed
 
-- Bugfix for state increment array referencing in update_type=13
+- Bugfix for state increment array referencing in update_type=13.
 
+### Changed
+
+- Moved external `GEOSgcm_GridComp` repository to under `GEOSldas/src/Components` for
+  consistency with directory structure of GEOSgcm and GEOSadas.
+  
 -----------------------------
 
 ## [v1.0.1] - 2024-04-10
+
+- 0-diff vs. v1.0.0.
 
 ### Fixed
 
