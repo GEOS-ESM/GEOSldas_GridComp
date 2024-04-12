@@ -22,4 +22,5 @@ workflows:
           repo: GEOSldas
           checkout_fixture: true
           mepodevelop: false
+          checkout_if_exists: false
           persist_workspace: false # Needs to be true to run fv3/gcm experiment, costs extra
