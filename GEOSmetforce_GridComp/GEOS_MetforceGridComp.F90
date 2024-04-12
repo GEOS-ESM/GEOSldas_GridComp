@@ -1033,8 +1033,6 @@ contains
 
     ! Interpolate MetForcing data to the end of model integration time step
     call LDAS_TInterpForcing(                                                   &
-         tile_coord%com_lon,                                                    &
-         tile_coord%com_lat,                                                    &
          zth,                                                                   &
          internal%mf%zenav,                                                     &
          force_time_prv,                                                        &
