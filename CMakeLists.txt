@@ -1,7 +1,5 @@
 esma_set_this ()
 
-esma_add_subdirectory(GEOSgcm_GridComp)
-
 set (alldirs
   GEOSmetforce_GridComp
   GEOSlandpert_GridComp

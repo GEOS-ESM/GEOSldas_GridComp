@@ -4805,10 +4805,10 @@ contains
                    State_incr(1,:) = cat_progn( kk,:)%srfexc/scale_srfexc
                    State_incr(2,:) = cat_progn( kk,:)%rzexc /scale_rzexc
                    
-                   State_incr(4,:) = cat_progn( kk,:)%tc1   /scale_temp
-                   State_incr(5,:) = cat_progn( kk,:)%tc2   /scale_temp
-                   State_incr(6,:) = cat_progn( kk,:)%tc4   /scale_temp
-                   State_incr(7,:) = cat_progn( kk,:)%ght(1)/scale_ght1
+                   State_incr(3,:) = cat_progn( kk,:)%tc1   /scale_temp
+                   State_incr(4,:) = cat_progn( kk,:)%tc2   /scale_temp
+                   State_incr(5,:) = cat_progn( kk,:)%tc4   /scale_temp
+                   State_incr(6,:) = cat_progn( kk,:)%ght(1)/scale_ght1
                    
                 else
                    
@@ -4816,10 +4816,10 @@ contains
                    State_incr(2,:) = cat_progn( kk,:)%rzexc /scale_rzexc
                    State_incr(3,:) = cat_progn( kk,:)%catdef/scale_catdef   ! catdef in State
                    
-                   State_incr(3,:) = cat_progn( kk,:)%tc1   /scale_temp
-                   State_incr(4,:) = cat_progn( kk,:)%tc2   /scale_temp
-                   State_incr(5,:) = cat_progn( kk,:)%tc4   /scale_temp
-                   State_incr(6,:) = cat_progn( kk,:)%ght(1)/scale_ght1
+                   State_incr(4,:) = cat_progn( kk,:)%tc1   /scale_temp
+                   State_incr(5,:) = cat_progn( kk,:)%tc2   /scale_temp
+                   State_incr(6,:) = cat_progn( kk,:)%tc4   /scale_temp
+                   State_incr(7,:) = cat_progn( kk,:)%ght(1)/scale_ght1
                    
                 end if
                 
@@ -4863,10 +4863,10 @@ contains
                    cat_progn_incr(kk,:)%srfexc = State_incr(1,:)*scale_srfexc
                    cat_progn_incr(kk,:)%rzexc  = State_incr(2,:)*scale_rzexc
                    
-                   cat_progn_incr(kk,:)%tc1    = State_incr(4,:)*scale_temp
-                   cat_progn_incr(kk,:)%tc2    = State_incr(5,:)*scale_temp
-                   cat_progn_incr(kk,:)%tc4    = State_incr(6,:)*scale_temp
-                   cat_progn_incr(kk,:)%ght(1) = State_incr(7,:)*scale_ght1
+                   cat_progn_incr(kk,:)%tc1    = State_incr(3,:)*scale_temp
+                   cat_progn_incr(kk,:)%tc2    = State_incr(4,:)*scale_temp
+                   cat_progn_incr(kk,:)%tc4    = State_incr(5,:)*scale_temp
+                   cat_progn_incr(kk,:)%ght(1) = State_incr(6,:)*scale_ght1
                    
                 else
                    
@@ -4874,10 +4874,10 @@ contains
                    cat_progn_incr(kk,:)%rzexc  = State_incr(2,:)*scale_rzexc
                    cat_progn_incr(kk,:)%catdef = State_incr(3,:)*scale_catdef   ! catdef in State 
                    
-                   cat_progn_incr(kk,:)%tc1    = State_incr(3,:)*scale_temp
-                   cat_progn_incr(kk,:)%tc2    = State_incr(4,:)*scale_temp
-                   cat_progn_incr(kk,:)%tc4    = State_incr(5,:)*scale_temp
-                   cat_progn_incr(kk,:)%ght(1) = State_incr(6,:)*scale_ght1
+                   cat_progn_incr(kk,:)%tc1    = State_incr(4,:)*scale_temp
+                   cat_progn_incr(kk,:)%tc2    = State_incr(5,:)*scale_temp
+                   cat_progn_incr(kk,:)%tc4    = State_incr(6,:)*scale_temp
+                   cat_progn_incr(kk,:)%ght(1) = State_incr(7,:)*scale_ght1
                    
                 end if
                 
