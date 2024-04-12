@@ -27,6 +27,7 @@ set (scripts
    ens_forcing/regrid_forc.csh 
    ens_forcing/enpert_forc.csh
    util/config/rewind_GEOSldas.csh
+   lenkf_j_template.py
    )
 
 install (
@@ -42,7 +43,7 @@ file(GLOB rc_files  GEOSldas_*rc)
 file(GLOB nml_files LDASsa_DEFAULT*nml)
 
 install(
-   FILES ${rc_files} ${nml_files} lenkf.j.template
+   FILES ${rc_files} ${nml_files}
    DESTINATION etc
    )
 
