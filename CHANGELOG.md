@@ -9,22 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
------------------------------
-
-## [v1.0.1] - 2024-04-10
-
-### Fixed
-
-- ldas_setup: Changed entry 'slurm' to 'slurm_pbs' to match remap_params.tpl
-
------------------------------
-
-## [v1.0.0] - 2024-03-26
-
-- Inaugural version.  0-diff vs. GEOSldas v18.0.0.
-
------------------------------
-
 ### Added
 
 ### Changed
@@ -34,4 +18,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Deprecated
+
+-----------------------------
+
+## [v1.0.2] - 2024-04-12
+
+- 0-diff vs. v1.0.1.
+
+### Fixed
+
+- Bug fix for state increment array referencing in update_type=13 ([PR #26](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/26)).
+- Fixed CI for LDAS workflow ([PR #34](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/34)).
+
+### Changed
+
+- Moved external `GEOSgcm_GridComp` repository to under `GEOSldas/src/Components` for
+  consistency with directory structure of GEOSgcm and GEOSadas  ([PR #27](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/27), [PR #30](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/30)).
+- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)). 
+
+  
+-----------------------------
+
+## [v1.0.1] - 2024-04-10
+
+- 0-diff vs. v1.0.0.
+
+### Fixed
+
+- ldas_setup: Changed entry 'slurm' to 'slurm_pbs' to match remap_params.tpl ([PR #17](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/17)).
+
+-----------------------------
+
+## [v1.0.0] - 2024-03-26
+
+- Inaugural version.  0-diff vs. GEOSldas v18.0.0.
+
+-----------------------------
+
 
