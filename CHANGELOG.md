@@ -21,13 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -----------------------------
 
-## [v1.0.2] - 2024-04-11
+## [v1.0.2] - 2024-04-12
 
 - 0-diff vs. v1.0.1.
 
 ### Fixed
 
-- Bugfix for state increment array referencing in update_type=13 ([PR #26](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/26)).
+- Bug fix for state increment array referencing in update_type=13 ([PR #26](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/26)).
+- Fixed CI for LDAS workflow ([PR #34](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/34)).
 
 ### Changed
 
