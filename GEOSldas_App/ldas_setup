@@ -896,6 +896,7 @@ class LDASsetup:
         #for ens in self.ensdirs :
         catchRstFile0  = ''
         vegdynRstFile0 = ''
+        irrigationRstFile0 = ''
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
@@ -909,7 +910,7 @@ class LDASsetup:
             irrigationRstFile = ''
             pertRstFile   = ''
             print ("restart: " + self.rqdExeInp['RESTART'])
-            self.present_irrfile = glob.glob(self.rqdExeInp['BCS_PATH']+'irrigation_*.dat')  
+            self.present_irrfile = glob.glob(self.bcs_land+'irrigation_*.dat')  
             if self.rqdExeInp['RESTART'].isdigit() :
 
                 if int(self.rqdExeInp['RESTART']) == 0 or int(self.rqdExeInp['RESTART']) == 2 :
@@ -968,21 +969,21 @@ class LDASsetup:
                     vegdynRstFile0 = vegdynRstFile
             else :
                 vegdynRstFile = vegdynRstFile0
-                # irrigation restart file
-                if os.path.isfile(irrigationRstFile) :
-                    irrigationLocal = self.rstdir+ensdir +'/'+ y4m2 +'/'+self.rqdExeInp['EXP_ID']+'.irrigation_internal_rst.'+y4m2d2_h2m2
-                    if self.islocal :
-                        print ("Creating the local irrigation restart file... \n")
-                        cmd='./preprocess_ldas.x c_localirrrst '+ irrigationRstFile +' ' + irrigationLocal  
-                        print ("cmd:   " + cmd)
-                        sp.call(shlex.split(cmd))
-                    else :
-                        shutil.copy(irrigationRstFile,irrigationLocal)
+            # irrigation restart file
+            if os.path.isfile(irrigationRstFile) :
+                irrigationLocal = self.rstdir+ensdir +'/'+ y4m2 +'/'+self.rqdExeInp['EXP_ID']+'.irrigation_internal_rst.'+y4m2d2_h2m2
+                if self.islocal :
+                    print ("Creating the local irrigation restart file... \n")
+                    cmd='./preprocess_ldas.x c_localirrrst '+ irrigationRstFile +' ' + irrigationLocal  
+                    print ("cmd:   " + cmd)
+                    sp.call(shlex.split(cmd))
+                else :
+                    shutil.copy(irrigationRstFile,irrigationLocal)
 
-                    irrigationRstFile = irrigationLocal
+                irrigationRstFile = irrigationLocal
 
-                    if '0000' in ensdir :
-                        irrigationRstFile0 = irrigationRstFile
+                if '0000' in ensdir :
+                    irrigationRstFile0 = irrigationRstFile
                 else :    
                     irrigationRstFile = irrigationRstFile0
 
@@ -997,7 +998,7 @@ class LDASsetup:
             os.symlink(catchRstFile, myCatchRst)
             os.symlink(vegdynRstFile,  myVegRst)
             if os.path.isfile(irrigationRstFile):
-                os.symlink(irrigationRstFile,  myIrrRst)
+               os.symlink(irrigationRstFile,  myIrrRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,  myPertRst)
 
