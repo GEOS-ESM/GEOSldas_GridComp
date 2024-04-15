@@ -21,7 +21,7 @@ from dateutil.relativedelta import relativedelta
 from remap_utils import *
 from remap_catchANDcn  import *
 from remap_config_ldas import *
-
+from lenkf_j_template import *
 """
 This script is intended to be run from any installed directory with GEOSldas.x and ldas_setup
 (The default setup is ../install/bin)
@@ -166,9 +166,10 @@ class LDASsetup:
         assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
         _mydir = None
         self.ladas_coupling = int(self.rqdExeInp.get('LADAS_COUPLING',0))
+        self.adas_expdir =''
         if self.ladas_coupling > 0:
            assert 'ADAS_EXPDIR'  in self.rqdExeInp, " need ADAS_EXPDIR  in the input file %s" %(self.exeinpfile)
-
+           self.adas_expdir = self.rqdExeInp['ADAS_EXPDIR']
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
         if self.nens > 1:
@@ -867,8 +868,8 @@ class LDASsetup:
            remap_tpl = os.path.dirname(os.path.realpath(__file__)) + '/remap_params.tpl'
            config = yaml_to_config(remap_tpl)
 
-           config['slurm']['account'] = self.rqdRmInp['account']
-           config['slurm']['qos'] = 'debug'
+           config['slurm_pbs']['account'] = self.rqdRmInp['account']
+           config['slurm_pbs']['qos'] = 'debug'
 
            config['input']['surface']['catch_tilefile']  = self.in_tilefile
            config['input']['shared']['expid']            = self.rqdExeInp['RESTART_ID']
@@ -1349,8 +1350,6 @@ class LDASsetup:
         status = False
 
         os.chdir(self.rundir)
-        lenkf=self.blddir+'/etc/lenkf.j.template'
-        shutil.copy(lenkf,'lenkf.j')
 
         my_qos='allnccs'
         if self.GEOS_SITE == 'NAS': my_qos = 'normal'
@@ -1385,71 +1384,45 @@ class LDASsetup:
                         '.'.join([expid, 'ldas_err', myDateTime, 'txt']),
                         ]),
                 self.rundir)
-        with open(lenkf,'rt') as fin:
-            with open('lenkf.j','wt') as fout :
-                for line in fin :
-                    if self.GEOS_SITE == 'NAS':
-                       if '#SBATCH' in line:
-                         continue
-                       if 'sbatch $HOMDIR/lenkf.j' in line:
-                         continue
+        constraint='cas'
+        if self.GEOS_SITE == "NAS":
+          constraint = 'cas_ait'
+        elif self.BUILT_ON_SLES15:
+          constraint = 'mil'
+        else:
+           assert int(self.rqdRmInp['ntasks-per-node']) <= 46, 'ntasks-per-node should be <=46 for cas'
 
-                    if self.GEOS_SITE == 'NCCS':
-                       if '#PBS' in line:
-                         continue
-                       if 'qsub $HOMDIR/lenkf.j' in line:
-                         continue
+        SBATCHQSUB = 'sbatch'
+        if self.GEOS_SITE == 'NAS':
+          SBATCHQSUB = 'qsub'
 
-                    if 'MY_ACCOUNT' in line :
-                        fout.write(line.replace('MY_ACCOUNT',self.rqdRmInp['account']))
-                    elif 'MY_WALLTIME' in line :
-                        fout.write(line.replace('MY_WALLTIME',self.rqdRmInp['walltime']))
-                    elif 'MY_NODES' in line :
-                        line_ = line.replace('MY_NODES',str(self.optRmInp['nodes']))
-                        line_ = line_.replace('MY_NTASKS_PER_NODE',str(self.rqdRmInp['ntasks-per-node']))
-                        line_ = line_.replace('MY_CONSTRAINT', 'cas_ait')
-                        fout.write(line_)
-                        if self.GEOS_SITE == "NCCS" :
-                          if self.BUILT_ON_SLES15 :
-                            fout.write("#SBATCH --constraint=mil\n")
-                          else:
-                            assert int(self.rqdRmInp['ntasks-per-node']) <= 46, 'ntasks-per-node should be <=46 for cas'
-                            fout.write("#SBATCH --constraint=cas\n")
+        job_head = job_directive[self.GEOS_SITE]
+        lenkf_str= (job_head+job_body).format(
+                  SBATCHQSUB         = SBATCHQSUB,
+                  MY_ACCOUNT         = self.rqdRmInp['account'],
+                  MY_WALLTIME        = self.rqdRmInp['walltime'],
+                  MY_NODES           = str(self.optRmInp['nodes']),
+                  MY_NTASKS_PER_NODE = str(self.rqdRmInp['ntasks-per-node']),
+                  MY_CONSTRAINT      = constraint,
+                  MY_OSERVER_NODES   = str(self.optRmInp['oserver_nodes']),
+                  MY_WRITERS_NPES    = str(self.optRmInp['writers-per-node']),
+                  MY_QOS             = my_qos,
+                  MY_JOB             = my_job,
+                  MY_EXPID           = self.rqdExeInp['EXP_ID'],
+                  MY_EXPDOMAIN       = self.rqdExeInp['EXP_DOMAIN'],
+                  MY_LOGFILE         = my_logfile,
+                  MY_ERRFILE         = my_errfile,
+                  MY_MODEL           = self.catch,
+                  MY_POSTPROC_HIST   = str(self.rqdExeInp['POSTPROC_HIST']),
+                  MY_FIRST_ENS_ID    = str(self.first_ens_id),
+                  MY_LADAS_COUPLING  = str(self.ladas_coupling),
+                  MY_ENSEMBLE_FORCING= self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper(),
+                  MY_ADAS_EXPDIR     = self.adas_expdir,
+                  MY_EXPDIR          = self.exphome + '/' + self.rqdExeInp['EXP_ID']
+                  )
 
-                    elif 'MY_OSERVER_NODES' in line :
-                        fout.write(line.replace('MY_OSERVER_NODES',str(self.optRmInp['oserver_nodes'])))
-                    elif 'MY_WRITERS_NPES' in line :
-                        fout.write(line.replace('MY_WRITERS_NPES', str(self.optRmInp['writers-per-node'])))
-                    elif 'MY_QOS' in line :
-                        if 'allnccs' not in my_qos or 'normal' not in my_qos:
-                           fout.write(line.replace('MY_QOS',my_qos))
-                    elif 'MY_JOB' in line :
-                        fout.write(line.replace('MY_JOB',my_job))
-                    elif 'MY_EXPID' in line :
-                        fout.write(line.replace('MY_EXPID',self.rqdExeInp['EXP_ID']))
-                    elif 'MY_EXPDOMAIN' in line :
-                        fout.write(line.replace('MY_EXPDOMAIN',self.rqdExeInp['EXP_DOMAIN']))
-                    elif 'MY_LOGFILE' in line :
-                        fout.write(line.replace('MY_LOGFILE',my_logfile))
-                    elif 'MY_ERRFILE' in line :
-                        fout.write(line.replace('MY_ERRFILE',my_errfile))
-                    elif 'MY_MODEL' in line :
-                        fout.write(line.replace('MY_MODEL',self.catch))
-                    elif 'MY_POSTPROC_HIST' in line :
-                        fout.write(line.replace('MY_POSTPROC_HIST',str(self.rqdExeInp['POSTPROC_HIST'])))
-                    elif 'MY_FIRST_ENS_ID' in line :
-                        fout.write(line.replace('MY_FIRST_ENS_ID',str(self.first_ens_id)))
-                    elif 'MY_LADAS_COUPLING' in line :
-                        fout.write(line.replace('MY_LADAS_COUPLING',str(self.ladas_coupling)))
-                    elif 'MY_ENSEMBLE_FORCING' in line :
-                        fout.write(line.replace('MY_ENSEMBLE_FORCING',self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper()))
-                    elif 'MY_ADAS_EXPDIR' in line :
-                        if self.ladas_coupling > 0:
-                           fout.write(line.replace('MY_ADAS_EXPDIR', self.rqdExeInp['ADAS_EXPDIR']))
-                    else :
-                        my_expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
-                        fout.write(line.replace('MY_EXPDIR',my_expdir))
-
+        with open('lenkf.j','wt') as fout :
+           fout.write(lenkf_str)
         sp.call(['chmod', '755', 'lenkf.j'])
 
         expdir = '/'.join(self.rundir.rstrip('/').split('/')[:-1])
