@@ -724,12 +724,12 @@ EOF
           /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
        endif
        set rstf = 'irrigation'
-       echo ${rstf}${ENSID}_internal_checkpoint
-       if (-f ${rstf}${ENSID}_internal_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${eYEAR}/M${eMON}/${EXPID}.${rstf}_internal_rst.${eYEAR}${eMON}${eDAY}_${eHour}${eMin}
-          /bin/mv ${rstf}${ENSID}_internal_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${rstf}${ENSID}_internal_rst
-          /bin/ln -s  $tmp_file $EXPDIR/input/restart/${rstf}${ENSID}_internal_rst
+       echo ${{rstf}}${{ENSID}}_internal_checkpoint
+       if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
+          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
+          /bin/mv ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
+          /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+          /bin/ln -s  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
        endif
        set rstf = 'landpert'
        if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
@@ -757,7 +757,9 @@ EOF
        set rstfiles1 = `ls ${{MODEL}}${{ENSID}}_internal_checkpoint.*`
        set rstfiles2 = `ls landpert${{ENSID}}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${{ENSID}}_checkpoint.*`
+       set rstfiles4 = `ls irrigation${{ENSID}}_internal_checkpoint.*`
    
+
        foreach rfile ( $rstfiles1 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
@@ -786,6 +788,16 @@ EOF
           set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{TY}}/M${{TM}}/
           if (! -e $THISDIR            ) mkdir -p $THISDIR
              /bin/mv $rfile ${{THISDIR}}${{EXPID}}.landassim_obspertrseed_rst.${{ThisTime}}.nc4
+       end
+
+       foreach rfile ( $rstfiles4 )
+           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
+           set TY = `echo $ThisTime | cut -c1-4`
+           set TM = `echo $ThisTime | cut -c5-6`
+           set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{TY}}/M${{TM}}/
+           if (! -e $THISDIR            ) mkdir -p $THISDIR
+           /bin/mv $rfile ${{THISDIR}}${{EXPID}}.irrigation_internal_rst.${{ThisTime}}.nc4
+           /usr/bin/gzip ${{THISDIR}}${{EXPID}}.irrigation_internal_rst.${{ThisTime}}.nc4 &
        end
   
        @ inens ++
