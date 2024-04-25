@@ -724,6 +724,8 @@ contains
           call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
           VERIFY_(status)
        endif
+       call ESMF_UserCompSetInternalState(gcs(METFORCE(i)), 'TILE_COORD', tcwrap, status)
+       VERIFY_(status)
 
        ! exit after i=1 if using deterministic forcing
        if (.not. ensemble_forcing) exit
@@ -757,6 +759,7 @@ contains
        VERIFY_(status)
        call ESMF_UserCompSetInternalState(gcs(LANDPERT(i)), 'TILE_COORD', tcwrap, status)
        VERIFY_(status)
+       
     enddo
 
     if (land_assim .or. mwRTM) then

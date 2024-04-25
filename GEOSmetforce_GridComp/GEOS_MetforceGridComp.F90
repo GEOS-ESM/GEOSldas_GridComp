@@ -602,10 +602,12 @@ module GEOS_MetforceGridCompMod
     ! Internal private state variables
     type(T_METFORCE_STATE), pointer :: internal=>null()
     type(METFORCE_WRAP) :: wrap
+    type(TILECOORD_WRAP) :: tcwrap
     type(tile_coord_type), pointer :: tile_coord(:)=>null()
+    type(tile_coord_type), pointer :: tile_coord_tmp(:)=>null()
 
     ! Misc variables
-    integer :: nt_local, k, NUM_ENSEMBLE
+    integer :: nt_local, k, NUM_ENSEMBLE, i1, i2
     integer :: ForceDtStep
     type(met_force_type) :: mf_nodata
     logical :: MERRA_file_specs, ensemble_forcing
@@ -647,6 +649,11 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
     internal => wrap%ptr
 
+    ! Get component's internal tile_coord variable
+    call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
+    VERIFY_(status)
+    tile_coord_tmp => tcwrap%ptr%tile_coord
+
     call MAPL_Get(MAPL, LocStream=locstream)
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
@@ -666,10 +673,15 @@ module GEOS_MetforceGridCompMod
 
 
     allocate(mf%tile_coord(nt_local))
-    mf%tile_coord(:)%com_lon = TileLons
-    mf%tile_coord(:)%com_lat = TileLats
-    mf%tile_coord(:)%i_indg  = i_indg
-    mf%tile_coord(:)%j_indg  = j_indg
+    mf%tile_coord(1:NUM_LAND_TILE) = tile_coord_tmp
+    if (NUM_LANDICE_TILE > 0 ) then
+       i1 = NUM_LAND_TILE + 1
+       i2 = NUM_LAND_TILE + NUM_LANDICE_TILE
+       mf%tile_coord(i1:i2)%com_lon = TileLons(i1:i2)
+       mf%tile_coord(i1:i2)%com_lat = TileLats(i1:i2)
+       mf%tile_coord(i1:i2)%i_indg  = i_indg(i1:i2)
+       mf%tile_coord(i1:i2)%j_indg  = j_indg(i1:i2)
+    endif
 
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
          DEFAULT=0, RC=STATUS)
