@@ -72,7 +72,7 @@ module preprocess_ldas_routines
        ldas_abort,                             &
        LDAS_GENERIC_ERROR
 
-  use gFTL_StringVector
+  use gFTL2_StringVector
 
   use pFIO
 
