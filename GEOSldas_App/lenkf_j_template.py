@@ -716,7 +716,7 @@ EOF
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
    
-       set rstfs = (${{MODEL}} 'landice' 'landassim_obspertrseed')
+       set rstfs = (${{MODEL}} 'landice')
        foreach rstf ( $rstfs )
           if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
              set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
@@ -725,6 +725,14 @@ EOF
              /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
           endif
        end
+
+       set rstf = 'landassim_obspertrseed'
+       if (-f ${{rstf}}${{ENSID}}_checkpoint ) then
+         set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
+         /bin/mv ${{rstf}}${{ENSID}}_checkpoint $tmp_file
+         /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
+         /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
+       endif
 
        set rstf = 'landpert'
        if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
