@@ -607,7 +607,7 @@ module GEOS_MetforceGridCompMod
     type(tile_coord_type), pointer :: tile_coord_tmp(:)=>null()
 
     ! Misc variables
-    integer :: nt_local, k, NUM_ENSEMBLE, i1, i2
+    integer :: nt_local, k, NUM_ENSEMBLE, i1, i2, j1, j2
     integer :: ForceDtStep
     type(met_force_type) :: mf_nodata
     logical :: MERRA_file_specs, ensemble_forcing
@@ -617,7 +617,6 @@ module GEOS_MetforceGridCompMod
     integer, pointer :: i_indg(:)
     integer, pointer :: j_indg(:)
     integer, pointer :: tiletype(:)
-
     integer :: AEROSOL_DEPOSITION
     type(MAPL_LocStream) :: locstream
     character(len=ESMF_MAXSTR) :: grid_type, ENS_FORCING_STR, ens_forcing_path
@@ -671,21 +670,6 @@ module GEOS_MetforceGridCompMod
     NUM_LAND_TILE    = count(tiletype == MAPL_LAND)
     NUM_LANDICE_TILE = count(tiletype == MAPL_LANDICE)
 
-
-    allocate(mf%tile_coord(nt_local))
-    mf%tile_coord(1:NUM_LAND_TILE) = tile_coord_tmp
-    if (NUM_LANDICE_TILE > 0 ) then
-       i1 = NUM_LAND_TILE + 1
-       i2 = NUM_LAND_TILE + NUM_LANDICE_TILE
-       mf%tile_coord(i1:i2)%com_lon = TileLons(i1:i2)
-       mf%tile_coord(i1:i2)%com_lat = TileLats(i1:i2)
-       mf%tile_coord(i1:i2)%i_indg  = i_indg(i1:i2)
-       mf%tile_coord(i1:i2)%j_indg  = j_indg(i1:i2)
-    endif
-
-    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
-         DEFAULT=0, RC=STATUS)
-
     call MAPL_GetResource(MAPL, grid_type,Label="GEOSldas.GRID_TYPE:",RC=STATUS)
     VERIFY_(STATUS)
 
@@ -695,7 +679,32 @@ module GEOS_MetforceGridCompMod
        call MAPL_GridGet(agrid, globalCellCountPerDim=dims, rc=status) 
        VERIFY_(STATUS)
        im_world_cs = dims(1)
+       !change local index to global. Only cubed-sphere grid cares about the index in geting forcing
+       call ESMF_GRID_INTERIOR(agrid,I1,I2,J1,J2)
+       i_indg = i_indg + i1 -1
+       j_indg = j_indg + j1 -1
+       if (any(tile_coord_tmp%i_indg /= i_indg(1:NUM_LAND_TILE))) then
+         _FAIL('i_indg index does not match')
+       endif
+       if (any(tile_coord_tmp%j_indg /= j_indg(1:NUM_LAND_TILE))) then
+         _FAIL('j_indg index does not match')
+       endif
     endif
+
+    allocate(mf%tile_coord(nt_local))
+    mf%tile_coord(1:NUM_LAND_TILE) = tile_coord_tmp
+ 
+   if (NUM_LANDICE_TILE > 0 ) then
+       i1 = NUM_LAND_TILE + 1
+       i2 = NUM_LAND_TILE + NUM_LANDICE_TILE
+       mf%tile_coord(i1:i2)%com_lon = TileLons(i1:i2)*MAPL_RADIANS_TO_DEGREES
+       mf%tile_coord(i1:i2)%com_lat = TileLats(i1:i2)*MAPL_RADIANS_TO_DEGREES
+       mf%tile_coord(i1:i2)%i_indg  = i_indg(i1:i2)
+       mf%tile_coord(i1:i2)%j_indg  = j_indg(i1:i2)
+    endif
+
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
+         DEFAULT=0, RC=STATUS)
 
     call MAPL_GetResource(MAPL, gridname,Label="GEOSldas.GRIDNAME:",RC=STATUS)
     VERIFY_(STATUS)
