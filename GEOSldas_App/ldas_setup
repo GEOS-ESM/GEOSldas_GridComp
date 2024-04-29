@@ -1357,7 +1357,7 @@ class LDASsetup:
                   MY_EXPDOMAIN       = self.rqdExeInp['EXP_DOMAIN'],
                   MY_LOGFILE         = my_logfile,
                   MY_ERRFILE         = my_errfile,
-                  MY_MODEL           = self.catch,
+                  MY_LANDMODEL       = self.catch,
                   MY_POSTPROC_HIST   = str(self.rqdExeInp['POSTPROC_HIST']),
                   MY_FIRST_ENS_ID    = str(self.first_ens_id),
                   MY_LADAS_COUPLING  = str(self.ladas_coupling),
