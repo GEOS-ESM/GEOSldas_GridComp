@@ -2061,7 +2061,7 @@ contains
     integer :: n,typ,tmpint
     real ::  tmpreal
     integer :: avg_land,n0,local
-    integer :: i,s,e,j,k,n1,n2
+    integer :: i,s,e,j,k,n1,n2, s1, s2
     logical :: file_exist
     character(len=256):: tmpLine
     character(len=128):: gridname
@@ -2156,6 +2156,7 @@ contains
           face_land(k) = sum(landPosition(n1:n2)) 
           face(k) = nint(1.0*face_land(k)/total_land * N_proc)
           if ( face(k) == 0) face(k) = 1
+          if (face(k) > IMGLOB/2) face(k) = IMGLOB/2 ! make sure each process has at least 2 cells
        enddo
        
        ! now make sure sum(face) == N_proc
@@ -2176,63 +2177,16 @@ contains
        if (sum(face) /= N_proc) stop " wrong proc face"
        
        ! 2) each process should have average land tiles
-       
+
        ALLOCATE(JMS(N_proc))
-       allocate(local_land(N_Proc))
-       JMS = 0
-       local_land = 0
-       
-       local  = 0
-       n0     = 0
-       j = 0
-       do k=1,6
+       do k = 1, 6
           n1 = (k-1)*IMGLOB+1
           n2 = k*IMGLOB
-          
-          do i=1,60
-             rates(i) = -0.3 + i*0.01
-          enddo
-          
-          maxf=rms_cs(rates)
-          i=minloc(maxf,DIM=1)
-          rate = rates(i)
-          avg_land = ceiling(1.0*face_land(k)/face(k))
-          avg_land = avg_land - nint(rate*avg_land)
-          
-          tmpint = 0
-          j = j+face(k) 
-          forward = .true.
-          do n = n1,n2
-             tmpint=tmpint+landPosition(n)
-             if((local+1) == j .and. n < n2) cycle
-             if(n==n2) then
-                local = local + 1
-                local_land(local)=tmpint
-                JMS(local)=n-n0
-                tmpint=0
-                n0=n
-                cycle
-             endif
-             if(tmpint .ge. avg_land) then
-                local = local + 1
-                if (n-n0 == 1) forward =.true.
-                if (forward) then
-                   local_land(local)=tmpint
-                   JMS(local)=n-n0
-                   tmpint=0
-                   n0=n
-                   forward = .false.
-                else
-                   local_land(local)=tmpint - landPosition(n)
-                   JMS(local)=n-1-n0
-                   tmpint=landPosition(n)
-                   n0=n-1
-                   forward = .true.
-                endif
-            endif
-          enddo
-          local = j
+          s1 = sum(face(1:k-1)) + 1
+          s2 = sum(face(1:k))
+          call equal_partition(landPosition(n1:n2), JMS(s1:s2))
        enddo
+
        if( sum(JMS) /= JMGLOB) then
           print*, sum(JMS), JMGLOB
           stop ("wrong cs-domain distribution in the first place")
@@ -2258,7 +2212,19 @@ contains
           enddo
           j=j+face(k)
        enddo
-       
+
+       if (any(JMS <=1)) then
+          stop ("two many processors for this resolution")
+       endif
+
+       allocate(local_land(N_Proc), source = 0)
+       s1 = 1
+       do n = 1, N_proc
+          s2 = s1+JMS(n) - 1
+          local_land(n) = sum(landPosition(s1:s2))
+          s1 = s2 + 1
+       enddo
+ 
        print*,"land_distribute: ",local_land
        print*, "JMS.rc", JMS
        if( sum(JMS) /= JMGLOB) then
@@ -2606,6 +2572,74 @@ contains
       enddo
       deallocate(local_land)
     end function rms_cs
+
+    subroutine equal_partition(array, distribute)
+      integer, intent(in) :: array(:)
+      integer, intent(inout) :: distribute(:)
+      integer, allocatable :: ArraySum(:)
+      integer, allocatable :: table(:,:), partition(:,:)
+      integer :: n, k, tmp_max
+      integer :: i, j, p, best, pos
+
+      n = size(array)
+      k = size(distribute)
+      allocate(arraySum(n))
+      allocate(table(k,n), partition(k,n))
+      arraySum(1) = array(1)
+      do j = 2, n
+         arraySum(j) = arraySum(j-1) + array(j)
+      enddo
+
+      table = 0
+      partition = 0
+      do j = 1, n
+         table(1, j)     = arraySum(j)
+         partition(1,j) = j
+      enddo
+      do i =1, k
+         table(i,1)  = array(1)
+      enddo
+      do i = 2, k ! partitions
+         do j = 2, n ! array element
+
+            best = arraySum(n) + 1 ! or the max int
+           ! the ith partion in front of p
+            do p = 1, j
+               tmp_max = max(table(i-1,p), arraySum(j)-arraySum(p))
+               if (tmp_max < best) then
+                  best = tmp_max
+                  pos = p
+               endif
+            enddo
+            table(i,j) = best
+            partition(i,j) = pos
+          enddo
+      enddo
+
+      ! trace back the partition
+      j = n
+      do i = k, 2, -1
+         distribute(i) = j - partition(i,j)
+         j = partition(i,j)
+      enddo
+      distribute(1) = j
+block
+      ! verifing, sanity check
+      integer :: s1, s2
+      if (sum(distribute) /= n) stop "wrong distribution"
+      s1 = 1
+      do i =1, k
+         s2 = s1+distribute(i) -1
+         best = sum(array(s1:s2))
+         if (best > table(k,n)) print*, "hmmm, wrong"
+         s1 = s2+1
+      enddo
+end block
+
+      print*, "avarage : ", arraySum(n)/(k*1.0)
+      print*, "Worst : ", table(k,n)
+      deallocate(table, arraySum, partition)
+   end subroutine equal_partition
     
   end subroutine optimize_latlon
   

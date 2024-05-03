@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- More optimal distribution of cubed-sphere grid
+
 ### Fixed
 
 ### Removed
