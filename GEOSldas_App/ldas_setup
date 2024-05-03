@@ -1480,7 +1480,7 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#   restarts stored as follows:                            #')
     print ('#     RESTART_PATH/RESTART_ID/output/RESTART_DOMAIN/rs/    #')
     print ('#                                                          #')
-    print ('# For RESTART=0 or RESTART=M                               #')
+    print ('# For RESTART=0 or RESTART=M:                              #')
     print ('#   There is no need to specify RESTART_ID, RESTART_PATH,  #')
     print ('#   and RESTART_DOMAIN.                                    #')
     print ('#                                                          #')
