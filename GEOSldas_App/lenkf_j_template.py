@@ -545,7 +545,7 @@ while ( $counter <= ${{NUM_SGMT}} )
        set NDAYS = `cal $MM $YYYY | awk 'NF {{DAYS = $NF}}; END {{print DAYS}}'`
        
        cd $THISMONTH
-        
+       
        foreach ThisCol ($collections)
           # if monthly exists, move on to the next collection
           if (-f $EXPID.${{ThisCol}}.monthly.$YYYY$MM.nc4) continue
@@ -651,6 +651,7 @@ EOF
              endif
              continue
           endif
+   
        end # each collection
      end # each month
      cd $PWD
