@@ -91,8 +91,9 @@ class LDASsetup:
         # Instance variables
         self.exeinpfile = cmdLineArgs['exeinpfile']
         self.batinpfile = cmdLineArgs['batinpfile']
-        self.exphome = cmdLineArgs['exphome'].rstrip('/')
-        assert os.path.isdir(self.exphome) # exphome should exist
+        exphome_ = cmdLineArgs['exphome'].rstrip('/')
+        assert os.path.isdir(exphome_) # exphome should exist
+        self.exphome = os.path.abspath(exphome_)
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -507,20 +508,16 @@ class LDASsetup:
         tmp_execfyl= self.blddir+exefyl
         assert os.path.isfile(tmp_execfyl),\
             'Executable [%s] does not exist!' % tmp_execfyl
-        tmp_expid = self.rqdExeInp['EXP_ID']
-        tmp_expdir = os.path.abspath(self.exphome + '/' + self.rqdExeInp['EXP_ID'])
-        self.rundir = tmp_expdir + '/run'
-        self.inpdir = tmp_expdir + '/input'
-        self.outdir = tmp_expdir + '/output'
-        self.scratchdir = tmp_expdir + '/scratch'
-        self.blddirLn = tmp_expdir + '/build'
+        self.expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
+        self.rundir = self.expdir + '/run'
+        self.inpdir = self.expdir + '/input'
+        self.outdir = self.expdir + '/output'
+        self.scratchdir = self.expdir + '/scratch'
+        self.blddirLn = self.expdir + '/build'
         self.out_path = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']
         self.bcsdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
         self.rstdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
         self.exefyl = self.blddirLn+exefyl
-
-        tmp_expid = None
-        tmp_expdir = None
 
         my_ntasks_per_node = int(self.rqdRmInp['ntasks-per-node'])
 
@@ -1385,15 +1382,14 @@ class LDASsetup:
                   MY_LADAS_COUPLING  = str(self.ladas_coupling),
                   MY_ENSEMBLE_FORCING= self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper(),
                   MY_ADAS_EXPDIR     = self.adas_expdir,
-                  MY_EXPDIR          = self.exphome + '/' + self.rqdExeInp['EXP_ID']
+                  MY_EXPDIR          = self.expdir
                   )
 
         with open('lenkf.j','wt') as fout :
            fout.write(lenkf_str)
         sp.call(['chmod', '755', 'lenkf.j'])
 
-        expdir = '/'.join(self.rundir.rstrip('/').split('/')[:-1])
-        print ('\nExperiment directory: %s' % expdir)
+        print ('\nExperiment directory: %s' % self.expdir)
         print ()
         status = True
         return status
