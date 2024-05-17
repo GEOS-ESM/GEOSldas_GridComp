@@ -2070,6 +2070,9 @@ contains
     integer :: face(6),face_land(6)
     logical :: forward
     character(len=:), allocatable :: IMS_file, JMS_File
+    
+    character(len=*), parameter :: Iam = 'optimize_latlon'
+    character(len=400)          :: err_msg
 
     ! -----------------------------
     
@@ -2078,7 +2081,10 @@ contains
     ! get tile info
 
     inquire(file=trim(fname_tilefile),exist=file_exist)
-    if( .not. file_exist) stop ( "tile file does not exist")
+    if( .not. file_exist) then
+       err_msg = 'tile file does not exist'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
+    end if
     
     open (10, file=trim(fname_tilefile), form='formatted', action='read')
     read (10,*) N_tile
@@ -2091,7 +2097,10 @@ contains
        
        IMGLOB = N_lon                     ! e.g.,  180 for c180
        JMGLOB = N_lat                     ! e.g., 1080 for c180  (6*180=1080)
-       if(JMGLOB/6 /= IMGLOB) stop " wrong im, jm"
+       if(JMGLOB/6 /= IMGLOB) then
+          err_msg = 'wrong im, jm'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
        
        allocate(landPosition(JMGLOB))
        landPosition = 0
@@ -2146,7 +2155,7 @@ contains
           N_proc = N_proc-mod(N_proc,6)
        endif
        
-       print*, "total tiles", total_land
+       print*, "total tiles: ", total_land
        
        if(sum(landPosition) /= total_land) print*, "wrong counting of land"
        
@@ -2155,8 +2164,10 @@ contains
           n2 = k*IMGLOB
           face_land(k) = sum(landPosition(n1:n2)) 
           face(k) = nint(1.0*face_land(k)/total_land * N_proc)
-          if ( face(k) == 0) face(k) = 1
-          if (face(k) > IMGLOB/2) face(k) = IMGLOB/2 ! make sure each process has at least 2 cells
+          ! ensure each face has at least 1 process
+          if ( face(k) == 0)       face(k) = 1
+          ! ensure that the stripe for each process can be at least 2 cells wide
+          if ( face(k) > IMGLOB/2) face(k) = IMGLOB/2  
        enddo
        
        ! now make sure sum(face) == N_proc
@@ -2174,8 +2185,12 @@ contains
           enddo
        endif
        
-       if (sum(face) /= N_proc) stop " wrong proc face"
-       
+       if (sum(face) /= N_proc) then
+          err_msg = 'wrong proc face'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
+       end if
+          
+
        ! 2) each process should have average land tiles
 
        ALLOCATE(JMS(N_proc))
@@ -2189,7 +2204,8 @@ contains
 
        if( sum(JMS) /= JMGLOB) then
           print*, sum(JMS), JMGLOB
-          stop ("wrong cs-domain distribution in the first place")
+          err_msg = 'wrong cs-domain distribution in the first place'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        endif 
        ! adjust JMS.rc to make sure each processor has at least 2 grid cells in j dimension 
        ! (i.e., each proc's subdomain must include at least 2 latitude stripes;
@@ -2214,7 +2230,8 @@ contains
        enddo
 
        if (any(JMS <=1)) then
-          stop ("two many processors for this resolution")
+          err_msg = 'too many processors for this resolution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        endif
 
        allocate(local_land(N_Proc), source = 0)
@@ -2229,7 +2246,8 @@ contains
        print*, "JMS.rc", JMS
        if( sum(JMS) /= JMGLOB) then
           print*, sum(JMS), JMGLOB
-          stop ("wrong cs-domain distribution")
+          err_msg = 'wrong cs-domain distribution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        endif
        tmpint = 0
        k = 0
@@ -2241,8 +2259,11 @@ contains
           endif
        enddo
        
-       if( k /=6 ) stop ("one or more processes may accross the face")
-      
+       if( k /=6 ) then
+          err_msg = 'one or more processes may across the face'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)      
+       end if
+
        open(10,file=optimized_file,action='write')
        write(10,'(A)')    "GEOSldas.GRIDNAME:  " // trim(gridname)
        write(10,'(A)')    "GEOSldas.GRID_TYPE:  Cubed-Sphere"
@@ -2262,7 +2283,9 @@ contains
        enddo
        close(10)
        
-    else
+    else    
+       
+       ! *not* cube-sphere tile space
        
        allocate(IMS(N_Proc))
        allocate(local_land(N_Proc))
@@ -2416,8 +2439,14 @@ contains
        
        print*,"land_distribute: ",local_land
        
-       if( sum(local_land) /= total_land) stop ("wrong distribution")
-       if( sum(IMS) /= N_lon) stop ("wrong domain distribution")
+       if( sum(local_land) /= total_land) then
+          err_msg = 'wrong distribution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+       if( sum(IMS) /= N_lon) then          
+          err_msg = 'wrong domain distribution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)          
+       end if
 
        ! redistribute IMS and try to make it >=2 (may be impossible for large N_Proc)
        do i = 1, N_proc
@@ -2432,7 +2461,10 @@ contains
             IMS(n) = IMS(n)-1
           endif
        enddo
-       if( any(IMS <=1) ) stop ("Each processor must have at least 2 longitude stripes. Request fewer processors.")  
+       if( any(IMS <=1) ) then
+          err_msg = 'Each processor must have at least 2 cells in its longitude stripe. Request fewer processors.'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)          
+       end if
 
        open(10,file=optimized_file, action='write')
        write(10,'(A)')    "GEOSldas.GRID_TYPE:  LatLon"
@@ -2572,14 +2604,14 @@ contains
       enddo
       deallocate(local_land)
     end function rms_cs
-
+    
     subroutine equal_partition(array, distribute)
-      integer, intent(in) :: array(:)
+      integer, intent(in)    :: array(:)
       integer, intent(inout) :: distribute(:)
-      integer, allocatable :: ArraySum(:)
-      integer, allocatable :: table(:,:), partition(:,:)
-      integer :: n, k, tmp_max
-      integer :: i, j, p, best, pos
+      integer, allocatable   :: ArraySum(:)
+      integer, allocatable   :: table(:,:), partition(:,:)
+      integer                :: n, k, tmp_max
+      integer                :: i, j, p, best, pos
 
       n = size(array)
       k = size(distribute)
@@ -2603,7 +2635,7 @@ contains
          do j = 2, n ! array element
 
             best = arraySum(n) + 1 ! or the max int
-           ! the ith partion in front of p
+           ! the ith partition in front of p
             do p = 1, j
                tmp_max = max(table(i-1,p), arraySum(j)-arraySum(p))
                if (tmp_max < best) then
@@ -2626,7 +2658,10 @@ contains
 block
       ! verifing, sanity check
       integer :: s1, s2
-      if (sum(distribute) /= n) stop "wrong distribution"
+      if (sum(distribute) /= n) then
+         err_msg = 'wrong distribution'
+         call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)         
+      end if
       s1 = 1
       do i =1, k
          s2 = s1+distribute(i) -1
@@ -2636,8 +2671,8 @@ block
       enddo
 end block
 
-      print*, "avarage : ", arraySum(n)/(k*1.0)
-      print*, "Worst : ", table(k,n)
+      print*, "Average : ", arraySum(n)/(k*1.0)
+      print*, "Worst   : ", table(k,n)
       deallocate(table, arraySum, partition)
    end subroutine equal_partition
     
