@@ -653,8 +653,8 @@ EOF
           endif
    
        end # each collection
+       cd $PWD
      end # each month
-     cd $PWD
    endif # POSTPROC_HIST > 0
    
    #######################################################################
