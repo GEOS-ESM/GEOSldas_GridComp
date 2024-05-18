@@ -2260,7 +2260,7 @@ contains
        enddo
        
        if( k /=6 ) then
-          err_msg = 'one or more processes may across the face'
+          err_msg = 'one or more processes may have tiles from two or more faces'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)      
        end if
 
