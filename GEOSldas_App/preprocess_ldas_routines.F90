@@ -2126,6 +2126,7 @@ contains
           !tmpint,        &   ! 10
           !tmpreal,       &   ! 11
           !tmpint             ! 12  * (previously "tile_id")
+
           if(typ==MAPL_Land) then
              total_land=total_land+1
              landPosition(j) = landPosition(j)+1
@@ -2451,14 +2452,14 @@ contains
        ! redistribute IMS and try to make it >=2 (may be impossible for large N_Proc)
        do i = 1, N_proc
           if(IMS(i) == 0) then
-            n = maxloc(IMS,DIM=1)
-            IMS(i) = 1
-            IMS(n) = IMS(n)-1
+             n = maxloc(IMS,DIM=1)
+             IMS(i) = 1
+             IMS(n) = IMS(n)-1
           endif
           if(IMS(i) == 1) then
-            n = maxloc(IMS,DIM=1)
-            IMS(i) = 2
-            IMS(n) = IMS(n)-1
+             n = maxloc(IMS,DIM=1)
+             IMS(i) = 2
+             IMS(n) = IMS(n)-1
           endif
        enddo
        if( any(IMS <=1) ) then
@@ -2493,7 +2494,7 @@ contains
     
   contains 
     
-    ! ***************************************************************************
+    ! ---------------------------------------------------
     
     elemental function rms(rates) result (f)
       real :: f
@@ -2517,24 +2518,24 @@ contains
          tmpint=tmpint+landPosition(n)
          if(local == N_proc .and. n < e) cycle ! all lefteover goes to the last process
          if( n==e ) then
-             local_land(local)=tmpint
-             exit
-          endif
-
-          if( tmpint .ge. avg_land ) then
-             if (forward .or. n-n0 == 1 ) then
-                local_land(local)=tmpint
-                tmpint=0
-                n0=n
-                forward = .false.
-             else
-                local_land(local) = tmpint - landPosition(n)
-                tmpint= landPosition(n)
-                n0 = n-1
-                forward = .true.
-             endif
-             local = local + 1
-          endif
+            local_land(local)=tmpint
+            exit
+         endif
+         
+         if( tmpint .ge. avg_land ) then
+            if (forward .or. n-n0 == 1 ) then
+               local_land(local)=tmpint
+               tmpint=0
+               n0=n
+               forward = .false.
+            else
+               local_land(local) = tmpint - landPosition(n)
+               tmpint= landPosition(n)
+               n0 = n-1
+               forward = .true.
+            endif
+            local = local + 1
+         endif
       enddo
       f = 0.0
       do proc = 1, N_proc
@@ -2543,7 +2544,7 @@ contains
       deallocate(local_land)
     end function rms
     
-    ! ***************************************************************************
+    ! ---------------------------------------------------
     
     elemental function rms_cs(rates) result (f)
       real :: f
@@ -2605,6 +2606,8 @@ contains
       deallocate(local_land)
     end function rms_cs
     
+    ! ---------------------------------------------------
+
     subroutine equal_partition(array, distribute)
       integer, intent(in)    :: array(:)
       integer, intent(inout) :: distribute(:)
@@ -2635,7 +2638,7 @@ contains
          do j = 2, n ! array element
 
             best = arraySum(n) + 1 ! or the max int
-           ! the ith partition in front of p
+            ! the ith partition in front of p
             do p = 1, j
                tmp_max = max(table(i-1,p), arraySum(j)-arraySum(p))
                if (tmp_max < best) then
@@ -2645,7 +2648,7 @@ contains
             enddo
             table(i,j) = best
             partition(i,j) = pos
-          enddo
+         enddo
       enddo
 
       ! trace back the partition
@@ -2674,7 +2677,7 @@ end block
       print*, "Average : ", arraySum(n)/(k*1.0)
       print*, "Worst   : ", table(k,n)
       deallocate(table, arraySum, partition)
-   end subroutine equal_partition
+    end subroutine equal_partition
     
   end subroutine optimize_latlon
   
