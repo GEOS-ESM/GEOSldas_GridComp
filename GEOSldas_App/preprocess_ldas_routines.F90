@@ -2546,68 +2546,6 @@ contains
     
     ! ---------------------------------------------------
     
-    elemental function rms_cs(rates) result (f)
-      real :: f
-      real,intent(in) :: rates
-      integer :: tmpint,local
-      integer :: proc,n
-      integer :: avg_land
-      integer,allocatable :: local_land(:)
-      integer :: n1,n2,n0
-      logical :: forward
-
-      allocate (local_land(face(k)))
-      local_land = 0
-      avg_land = ceiling(1.0*face_land(k)/face(k))
-      avg_land = avg_land -nint(rates*avg_land)
-      if (avg_land <=0) then
-         f = face_land(k)
-         return
-      endif
-      
-      tmpint = 0
-      local = 1
-      
-      n1 = (k-1)*IMGLOB+1
-      n2 = k*IMGLOB
-      tmpint = 0
-      forward = .true.
-      n0 = n1-1
-      do n = n1,n2
-         tmpint=tmpint+landPosition(n)
-         if(local == face(k) .and. n < n2) cycle ! all lefteover goes to the last process
-         if(n==n2) then
-            local_land(local)=tmpint
-            local = local + 1
-            cycle
-         endif
-         if(tmpint .ge. avg_land) then
-            if (n -n0 == 1) forward = .true. ! if only one step, should not got backward
-            if (forward) then
-               local_land(local)=tmpint
-               tmpint=0
-               n0 = n
-               forward = .false.
-            else
-               local_land(local) = tmpint - landPosition(n)
-               tmpint = landPosition(n)
-               n0 = n-1
-               forward = .true.
-            endif
-            local = local + 1
-         endif
-      enddo
-      
-      f = 0.0
-      do proc = 1, face(k)
-         ! punish for no land tiles
-         f =max(f,1.0*abs(local_land(proc)-avg_land))
-      enddo
-      deallocate(local_land)
-    end function rms_cs
-    
-    ! ---------------------------------------------------
-
     subroutine equal_partition(array, distribute)
       integer, intent(in)    :: array(:)
       integer, intent(inout) :: distribute(:)
