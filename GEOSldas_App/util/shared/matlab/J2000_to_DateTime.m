@@ -28,11 +28,12 @@ pen = zeros(N,1);
 % Loop through elements of J2000_seconds for now.  In future, should vectorize 
 %  augment_date_time.m, is_leap_year.m, days_in_month.m, get_dofyr_pentad.m
 
+date_time_base = augment_date_time( round(J2000_seconds(1)), date_time_epoch ); 
+
 for ii = 1:N
  
   % add (rounded) J2000_seconds to date_time_epoch
-
-  date_time = augment_date_time( round(J2000_seconds), date_time_epoch ); 
+  date_time = augment_date_time( round(J2000_seconds(ii)-J2000_seconds(1)), date_time_base ); 
 
   yr( ii) = date_time.year  ;
   mm( ii) = date_time.month ;
