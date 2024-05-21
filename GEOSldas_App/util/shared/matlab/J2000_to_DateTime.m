@@ -38,7 +38,7 @@ J2000_sec_last = 0;
 
 for ii = 1:N
  
-  date_time = augment_date_time( J2000_seconds(ii) - J2000_sec_last ), date_time_last ); 
+  date_time = augment_date_time( J2000_seconds(ii) - J2000_sec_last, date_time_last ); 
 
   yr( ii) = date_time.year  ;
   mm( ii) = date_time.month ;
