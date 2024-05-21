@@ -189,7 +189,7 @@ for iorb = 1:length(L2_Ascdes)
                         % round date_time to nearest 3 hourly UTC
                         utc_t2k = round(double(L2_utc_seconds)/L2_dtstep)*L2_dtstep;
 
-                        [yr, doy, mm, dd, hr, mn] = J2000_to_DateTime( utc_t2k );
+                        [yr, mm, dd, hr, mn, ss, doy, pen] = J2000_to_DateTime( utc_t2k );
 
                         % use points for current UTC day only
                         idx = find(yr == date_time.year & mm == date_time.month & ...
