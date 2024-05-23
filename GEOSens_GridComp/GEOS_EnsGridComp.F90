@@ -2924,11 +2924,11 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(export, AVETSNOW_enavg,  'AVETSNOW' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, FRSAT_enavg,  'FRSAT' ,rc=status)
+    call MAPL_GetPointer(export, FRSAT_enavg,  'FRSAT' , alloc=.true., rc=status)   ! always allocate to support ASNOW_enavg calc below
     VERIFY_(status)
-    call MAPL_GetPointer(export, FRUST_enavg,  'FRUST' ,rc=status)
+    call MAPL_GetPointer(export, FRUST_enavg,  'FRUST' , alloc=.true., rc=status)   ! always allocate to support ASNOW_enavg calc below
     VERIFY_(status)
-    call MAPL_GetPointer(export, FRWLT_enavg,  'FRWLT' ,rc=status)
+    call MAPL_GetPointer(export, FRWLT_enavg,  'FRWLT' , alloc=.true., rc=status)   ! always allocate to support ASNOW_enavg calc below
     VERIFY_(status)
     call MAPL_GetPointer(export, SNOWMASS_enavg,  'SNOWMASS' ,rc=status)
     VERIFY_(status)
