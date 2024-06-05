@@ -2339,8 +2339,7 @@ contains
     real, dimension(:),pointer :: TPUNST,TPUNST_enavg
     real, dimension(:),pointer :: TPSAT,TPSAT_enavg
     real, dimension(:),pointer :: TPWLT,TPWLT_enavg
-    !real, dimension(:),pointer :: ASNOW,ASNOW_enavg
-    real, dimension(:),pointer :: ASNOW_enavg
+    real, dimension(:),pointer :: ASNOW,ASNOW_enavg
     real, dimension(:),pointer :: SHSNOW,SHSNOW_enavg
     real, dimension(:),pointer :: AVETSNOW,AVETSNOW_enavg
     real, dimension(:),pointer :: FRSAT,FRSAT_enavg
@@ -2633,9 +2632,8 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(import, FRWLT,  'FRWLT' ,rc=status)
     VERIFY_(status)
-    ! for offline model , there is no 'ASNOW', recompute 
-    ! call MAPL_GetPointer(import, ASNOW,  'ASNOW' ,rc=status)
-    ! VERIFY_(status)
+    call MAPL_GetPointer(import, ASNOW,  'ASNOW' ,rc=status)
+    VERIFY_(status)
     call MAPL_GetPointer(import, SNOWMASS,  'SNOWMASS' ,rc=status)
     VERIFY_(status)
     call MAPL_GetPointer(import, SNOWDP,  'SNOWDP' ,rc=status)
@@ -2924,11 +2922,11 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(export, AVETSNOW_enavg,  'AVETSNOW' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, FRSAT_enavg,  'FRSAT' , alloc=.true., rc=status)   ! always allocate to support ASNOW_enavg calc below
+    call MAPL_GetPointer(export, FRSAT_enavg,  'FRSAT' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, FRUST_enavg,  'FRUST' , alloc=.true., rc=status)   ! always allocate to support ASNOW_enavg calc below
+    call MAPL_GetPointer(export, FRUST_enavg,  'FRUST' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, FRWLT_enavg,  'FRWLT' , alloc=.true., rc=status)   ! always allocate to support ASNOW_enavg calc below
+    call MAPL_GetPointer(export, FRWLT_enavg,  'FRWLT' ,rc=status)
     VERIFY_(status)
     call MAPL_GetPointer(export, SNOWMASS_enavg,  'SNOWMASS' ,rc=status)
     VERIFY_(status)
@@ -3380,8 +3378,8 @@ contains
         TPSAT_enavg = TPSAT_enavg + TPSAT
     if(associated(TPWLT_enavg) .and. associated(TPWLT))   & 
         TPWLT_enavg = TPWLT_enavg + TPWLT
-    !if(associated(ASNOW_enavg) .and. associated(ASNOW))   & 
-    !    ASNOW_enavg = ASNOW_enavg + ASNOW
+    if(associated(ASNOW_enavg) .and. associated(ASNOW))   & 
+        ASNOW_enavg = ASNOW_enavg + ASNOW
     if(associated(SHSNOW_enavg) .and. associated(SHSNOW))   & 
         SHSNOW_enavg = SHSNOW_enavg + SHSNOW
     if(associated(AVETSNOW_enavg) .and. associated(AVETSNOW))   & 
@@ -3680,10 +3678,18 @@ contains
         if(associated(TPWLT_enavg)) TPWLT_enavg = TPWLT_enavg/NUM_ENSEMBLE
         if(associated(SHSNOW_enavg)) SHSNOW_enavg = SHSNOW_enavg/NUM_ENSEMBLE
         if(associated(AVETSNOW_enavg)) AVETSNOW_enavg = AVETSNOW_enavg/NUM_ENSEMBLE
-        if(associated(FRSAT_enavg)) FRSAT_enavg = FRSAT_enavg/NUM_ENSEMBLE
-        if(associated(FRUST_enavg)) FRUST_enavg = FRUST_enavg/NUM_ENSEMBLE
-        if(associated(FRWLT_enavg)) FRWLT_enavg = FRWLT_enavg/NUM_ENSEMBLE
-        if(associated(ASNOW_enavg)) ASNOW_enavg = max(min(1.0-(FRSAT_enavg+FRUST_enavg+FRWLT_enavg),1.0),0.0)
+        if(associated(FRSAT_enavg)) FRSAT_enavg = max(min(FRSAT_enavg/NUM_ENSEMBLE,1.0),0.0)
+        if(associated(FRUST_enavg)) FRUST_enavg = max(min(FRUST_enavg/NUM_ENSEMBLE,1.0),0.0)
+        if(associated(FRWLT_enavg)) FRWLT_enavg = max(min(FRWLT_enavg/NUM_ENSEMBLE,1.0),0.0)
+        if(associated(ASNOW_enavg)) then
+           ASNOW_enavg = max(min(1.0,ASNOW_enavg/NUM_ENSEMBLE),0.0)
+           ! If all four area fractions are calculated, try to make them sum up to 1.
+           ! Because the [0,1] range is also enforced, the following simple approach does not always
+           ! work perfectly, but it should be good enough. A more robust approach would require
+           ! many more if statements. -reichle, 5 Jun 2024
+           if(associated(FRSAT_enavg) .and. associated(FRUST_enavg) .and. associated(FRWLT_enavg))  &
+                ASNOW_enavg = max(min(1.0-(FRSAT_enavg+FRUST_enavg+FRWLT_enavg),1.0),0.0)
+        end if
         if(associated(SNOWMASS_enavg)) SNOWMASS_enavg = SNOWMASS_enavg/NUM_ENSEMBLE
         if(associated(SNOWDP_enavg)) SNOWDP_enavg = SNOWDP_enavg/NUM_ENSEMBLE
         if(associated(WET1_enavg)) WET1_enavg = WET1_enavg/NUM_ENSEMBLE
