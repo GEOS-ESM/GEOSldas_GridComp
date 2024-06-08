@@ -13,9 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- More optimal distribution of tiles on processors for cubed-sphere tile space.
+
 ### Fixed
 
+- Bug fix and improved efficiency in matlab script for generation of mwRTM_param.
+- Changed EXPDIR to absolute path for POSTPROC_HIST>0 option to work.
+
 ### Removed
+
+- Remove restart options F and G.
 
 ### Deprecated
 

@@ -20,7 +20,6 @@ from collections import OrderedDict
 from dateutil.relativedelta import relativedelta
 from remap_utils import *
 from remap_catchANDcn  import *
-from remap_config_ldas import *
 from lenkf_j_template import *
 """
 This script is intended to be run from any installed directory with GEOSldas.x and ldas_setup
@@ -92,8 +91,9 @@ class LDASsetup:
         # Instance variables
         self.exeinpfile = cmdLineArgs['exeinpfile']
         self.batinpfile = cmdLineArgs['batinpfile']
-        self.exphome = cmdLineArgs['exphome'].rstrip('/')
-        assert os.path.isdir(self.exphome) # exphome should exist
+        exphome_ = cmdLineArgs['exphome'].rstrip('/')
+        assert os.path.isdir(exphome_) # exphome should exist
+        self.exphome = os.path.abspath(exphome_)
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -516,20 +516,16 @@ class LDASsetup:
         tmp_execfyl= self.blddir+exefyl
         assert os.path.isfile(tmp_execfyl),\
             'Executable [%s] does not exist!' % tmp_execfyl
-        tmp_expid = self.rqdExeInp['EXP_ID']
-        tmp_expdir = os.path.abspath(self.exphome + '/' + self.rqdExeInp['EXP_ID'])
-        self.rundir = tmp_expdir + '/run'
-        self.inpdir = tmp_expdir + '/input'
-        self.outdir = tmp_expdir + '/output'
-        self.scratchdir = tmp_expdir + '/scratch'
-        self.blddirLn = tmp_expdir + '/build'
+        self.expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
+        self.rundir = self.expdir + '/run'
+        self.inpdir = self.expdir + '/input'
+        self.outdir = self.expdir + '/output'
+        self.scratchdir = self.expdir + '/scratch'
+        self.blddirLn = self.expdir + '/build'
         self.out_path = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']
         self.bcsdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
         self.rstdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
         self.exefyl = self.blddirLn+exefyl
-
-        tmp_expid = None
-        tmp_expdir = None
 
         my_ntasks_per_node = int(self.rqdRmInp['ntasks-per-node'])
 
@@ -889,8 +885,31 @@ class LDASsetup:
            config['output']['surface']['surflay']        = dzsf
            config['output']['surface']['wemin']          = wemin_out
 
-           config = remap_config_ldas( config, RESTART_str, self.rqdExeInp['RESTART_PATH'], self.rqdExeInp['RESTART_ID'])
-
+           if RESTART_str == "M" : # restart from merra2
+             yyyymm = int(YYYYMMDDHH[0:6])
+             merra2_expid = "d5124_m2_jan10"
+             if yyyymm < 197901 :
+                exit("Error. MERRA-2 data < 1979 not available\n")
+             elif (yyyymm < 199201):
+                merra2_expid = "d5124_m2_jan79"
+             elif (yyyymm < 200106):
+                merra2_expid = "d5124_m2_jan91"
+             elif (yyyymm < 201101):
+                merra2_expid = "d5124_m2_jan00"
+             elif (yyyymm < 202106):
+                merra2_expid = "d5124_m2_jan10"
+             # There was a rewind in MERRA2 from Jun 2021 to Sept 2021
+             elif (yyyymm < 202110):
+                merra2_expid = "d5124_m2_jun21"
+             config['input']['shared']['expid']      = merra2_expid
+             config['input']['shared']['rst_dir']    = mk_outdir+ '/merra2_tmp_'+ YYYYMMDDHH
+             config['input']['surface']['wemin']     = 26
+             config['input']['shared']['bc_base']    = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles'
+             config['input']['shared']['bc_version'] = 'GM4'
+             config['input']['shared']['agrid']      = 'C180'
+             config['input']['shared']['ogrid']      = '1440x720'
+             config['input']['shared']['omodel']     = 'data'
+           
            catch_obj = catchANDcn(config_obj = config)
            catch_obj.remap()
 
@@ -1418,15 +1437,14 @@ class LDASsetup:
                   MY_LADAS_COUPLING  = str(self.ladas_coupling),
                   MY_ENSEMBLE_FORCING= self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper(),
                   MY_ADAS_EXPDIR     = self.adas_expdir,
-                  MY_EXPDIR          = self.exphome + '/' + self.rqdExeInp['EXP_ID']
+                  MY_EXPDIR          = self.expdir
                   )
 
         with open('lenkf.j','wt') as fout :
            fout.write(lenkf_str)
         sp.call(['chmod', '755', 'lenkf.j'])
 
-        expdir = '/'.join(self.rundir.rstrip('/').split('/')[:-1])
-        print ('\nExperiment directory: %s' % expdir)
+        print ('\nExperiment directory: %s' % self.expdir)
         print ()
         status = True
         return status
@@ -1499,12 +1517,6 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('# RESTART: M                                               #')
     print ('#   Re-tile from archived MERRA-2 restart file.            #')
     print ('#                                                          #')
-    print ('# RESTART: F                                               #')
-    print ('#   Re-tile from FP (Forward Processing) restart file.     #')
-    print ('#                                                          #')
-    print ('# RESTART: G                                               #')
-    print ('#   Re-tile from any AGCM catch[cnclmxx]_internal_rst file.#')
-    print ('#                                                          #')
     print ('# -------------------------------------------------------- #')
     print ('# IMPORTANT:                                               #')
     print ('#   Except for RESTART=1, SPIN-UP is REQUIRED in almost    #')
@@ -1519,14 +1531,9 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#   restarts stored as follows:                            #')
     print ('#     RESTART_PATH/RESTART_ID/output/RESTART_DOMAIN/rs/    #')
     print ('#                                                          #')
-    print ('# For RESTART=0 or RESTART=M or RESTART=F:                 #')
+    print ('# For RESTART=0 or RESTART=M:                              #')
     print ('#   There is no need to specify RESTART_ID, RESTART_PATH,  #')
     print ('#   and RESTART_DOMAIN.                                    #')
-    print ('#                                                          #')
-    print ('# For RESTART=G:                                           #')
-    print ('#   RESTART_ID   : full_path_to_AGCM_experiment_directory  #')
-    print ('#   RESTART_PATH : full_path_of_the_AGCM_restart_file      #')
-    print ('#   RESTART_DOMAIN is NOT required.                        #')
     print ('#                                                          #')
     print ('############################################################')
     print ()
