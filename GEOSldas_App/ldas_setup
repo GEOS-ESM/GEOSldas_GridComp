@@ -1167,7 +1167,7 @@ class LDASsetup:
                 if('catchcn' in self.catch):
                    ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
                 else:
-                   # remove entries not for catch model
+                   # remove catchcn-specific entries that do not apply to catch model
                    ldasrcInp.pop('DTCN',None)
                    ldasrcInp.pop('ATM_CO2',None)
                    ldasrcInp.pop('CO2',None)
