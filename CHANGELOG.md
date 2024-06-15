@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Do not increment CO2_YEAR when it is a no-data-value. For Catchment simulations, exclude CatchCN-specific resource variables from LDAS.rc.
 - Bug fix and improved efficiency in matlab script for generation of mwRTM_param.
 - Changed EXPDIR to absolute path for POSTPROC_HIST>0 option to work.
 - Support HISTORY output of ASNOW alone from ENSAVG Gridcomp.
