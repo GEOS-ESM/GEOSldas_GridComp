@@ -5,7 +5,7 @@
 program main
 
   use preprocess_ldas_routines,     ONLY:    &
-       createf2g,                            &
+       create_mapping,                       &
        createLocalTilefile,                  &
        createLocalBC,                        &
        createLocalVegRestart,                &
@@ -71,7 +71,7 @@ program main
      SURFLAY         = trim(adjustl(arg7))
      f2g_file        = arg8
 
-     call createf2g(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file)
+     call create_mapping(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file)
      
   else if (trim(option) == "c_localtile") then
      
