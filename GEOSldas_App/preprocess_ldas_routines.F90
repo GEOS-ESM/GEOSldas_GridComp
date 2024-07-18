@@ -158,7 +158,7 @@ contains
     if( .not. c_exist) then
        print*,"no catchment definition file:" , catch_def_file
     endif
-    
+
     if (present(types)) then
       tile_types = types
     else
@@ -209,14 +209,20 @@ contains
        N_tiles_f(n)  = count(tile_coord_f%typ == tile_types(n))
     enddo
 
-    open(40,file=mapping_file,form='formatted',action='write')
-    write(40,*)N_types
-    write(40,*)tile_types
-    write(40,*)N_tiles_r ! length N_types
-    write(40,*)N_tiles_f ! length N_types
-    write(40,*)f2r
-    write(40,*)r2g
-    close(40)
+    if (any(N_tiles_r /= N_tiles_f)) then
+       print*,"writing mapping file, N_types....", N_types
+       open(40,file=mapping_file,form='formatted',action='write')
+       write(40,*)N_types
+       write(40,*)tile_types
+       write(40,*)N_tiles_r ! length N_types
+       write(40,*)N_tiles_f ! length N_types
+       write(40,*)f2r
+       write(40,*)r2g
+       close(40)
+    else
+       print*,"No mapping file is created"
+    endif
+
     if (associated(f2r)) deallocate(f2r)
     if (associated(r2g)) deallocate(r2g)
     
@@ -2045,7 +2051,7 @@ contains
 
     inquire(file=trim(fname_tilefile),exist=file_exist)
     if( .not. file_exist) then
-       err_msg = 'tile file does not exist'
+       err_msg = 'tile file does not exist: ' //trim(fname_tilefile)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
     end if
     
@@ -2842,7 +2848,7 @@ end block
     integer :: i_indg_offset, j_indg_offset, col_order
     integer :: N_tile_land, n_lon, n_lat
     logical :: ease_grid
-    integer :: typ,k,fid
+    integer :: typ,k
     integer, dimension(:), allocatable :: tile_types
 
     character(256) :: tmpline
@@ -3016,8 +3022,7 @@ end block
     close(10)
     ! i here is the number of restart nmuber including types in 'types')
     allocate(r2g, source= r2g_tmp(1:i))
-    allocate(tile_coord_r(i))
-    tile_coord_r = tile_coord(1:fid)
+    allocate(tile_coord_r, source = tile_coord(1:i))
     deallocate(tile_coord) 
     deallocate(r2g_tmp)
     ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing

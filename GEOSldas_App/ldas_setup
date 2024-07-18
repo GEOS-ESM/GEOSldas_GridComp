@@ -740,14 +740,12 @@ class LDASsetup:
         tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False) 
         cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name
 
-        print ('Creating f2g file: '+ tmp_f2g_file.name +'....\n')
+        print ('Creating f2g file if necessary: '+ tmp_f2g_file.name +'....\n')
         print ("cmd:   " + cmd)
         sp.call(shlex.split(cmd))
         # check if it is local or global
-        with open(tmp_f2g_file.name) as f2gfile :
-            head=[next(f2gfile) for x in range(2)]
-            if(head[0].strip() != head[1].strip()) :
-                self.islocal= True
+        if os.path.getsize(tmp_f2g_file.name) !=0 :
+           self.islocal= True
         #os.remove(self.domain_def.name)
 
         # update tile domain
