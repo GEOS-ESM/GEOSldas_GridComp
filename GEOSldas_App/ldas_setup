@@ -110,7 +110,7 @@ class LDASsetup:
         self.out_path   = None
         self.inpdir   = None
         self.exefyl = None
-        self.islocal = False
+        self.isZoomIn = False
         self.catch = ''
         self.has_mwrtm = False
         self.has_vegopacity = False
@@ -745,11 +745,11 @@ class LDASsetup:
         sp.call(shlex.split(cmd))
         # check if it is local or global
         if os.path.getsize(tmp_f2g_file.name) !=0 :
-           self.islocal= True
+           self.isZoomIn= True
         #os.remove(self.domain_def.name)
 
         # update tile domain
-        if self.islocal:
+        if self.isZoomIn:
             newlocalTile = tile+'.domain'
             print ("\nCreating local tile file :"+ newlocalTile)
             print ("\n by excluding land type MAPL_Land_ExcludeFromDomain=1100...\n")
@@ -778,7 +778,7 @@ class LDASsetup:
             bcstmp=bcstmp+[self.bcsdir+'/'+os.path.basename(bcf)]
         bcs=bcstmp
 
-        if self.islocal:
+        if self.isZoomIn:
            print ("Creating the boundary files for the simulation domain...\n")
            bcs_tmp=[]
            for bcf in bcs :
@@ -936,7 +936,7 @@ class LDASsetup:
             # catchment restart file
             if os.path.isfile(catchRstFile) :
                 catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                if self.islocal :
+                if self.isZoomIn :
                     print( "Creating local catchment restart file... \n")
                     cmd=self.bindir +'/preprocess_ldas.x c_localcatchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
                     print ("cmd:  "+cmd)
@@ -954,7 +954,7 @@ class LDASsetup:
             # vegdyn restart file
             if os.path.isfile(vegdynRstFile) :
                 vegdynLocal = self.rstdir+ensdir +'/'+self.rqdExeInp['EXP_ID']+'.vegdyn_internal_rst'
-                if self.islocal :
+                if self.isZoomIn :
                     print ("Creating the local veg restart file... \n")
                     cmd=self.bindir + '/preprocess_ldas.x c_localvegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
                     print ("cmd:   " + cmd)
@@ -989,7 +989,7 @@ class LDASsetup:
         if self.has_mwrtm :
            mwRTMRstFile = self.mwrtm_file
            mwRTMLocal = self.bcsdir+'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
-           if self.islocal :
+           if self.isZoomIn :
               print ("Creating the local mwRTM restart file... \n")
               cmd= self.bindir +'/preprocess_ldas.x c_localmwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
 

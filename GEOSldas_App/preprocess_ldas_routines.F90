@@ -1598,6 +1598,7 @@ contains
        if(IS_IOSTAT_END(stat)) exit
        ! extract first "integer" in "line" and put into "ty"
        read(line,*) ty
+       
        if( any( tile_types == ty)) then
           ! here g_id is (consecutive) id of the global *land* tiles
           if (f2g(f_id) /= g_id) then
@@ -1609,6 +1610,7 @@ contains
              line(n:n+3) = typ_str_exclude
           else
              f_id = f_id + 1
+             if (f_id >= size(f2g)) f_id = 1 ! just set a number to prevent over flow, it would never come back here 
           endif
        endif
        ! write "line" into the output tile file
