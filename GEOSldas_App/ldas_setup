@@ -1392,7 +1392,7 @@ class LDASsetup:
                   MY_ENSEMBLE_FORCING= self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper(),
                   MY_ADAS_EXPDIR     = self.adas_expdir,
                   MY_EXPDIR          = self.expdir,
-                  DETECTED_MPI_STACK = MPI_STACK,
+                  DETECTED_MPI_STACK = DETECTED_MPI_STACK,
                   BUILT_ON_SLES15    = BUILT_ON_SLES15
                   )
 
