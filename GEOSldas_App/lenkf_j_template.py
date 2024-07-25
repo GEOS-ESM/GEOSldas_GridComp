@@ -63,7 +63,11 @@ setenv argv
 
 source $GEOSBIN/g5_modules
 
-# OPENMPI flags 
+setenv MPI_STACK {DETECTED_MPI_STACK}
+
+if ( ${{MPI_STACK}} == "openmpi" ) then
+
+# OPENMPI flags
 # Turn off warning about TMPDIR on NFS
 setenv OMPI_MCA_shmem_mmap_enable_nfs_warning 0
 # pre-connect MPI procs on mpi_init
@@ -80,6 +84,17 @@ setenv OMPI_MCA_coll_tuned_barrier_algorithm 0
 setenv OMPI_MCA_coll_tuned_use_dynamic_rules 1
 # disable file locks
 setenv OMPI_MCA_sharedfp "^lockedfile,individual"
+
+else if ( ${{MPI_STACK}} == "intelmpi" ) then
+
+setenv BUILT_ON_SLES15 {BUILT_ON_SLES15}
+
+if ( ${{BUILT_ON_SLES15}} == TRUE ) then
+setenv I_MPI_FABRICS shm:ofi
+setenv I_MPI_OFI_PROVIDER psm3
+endif # BUILT_ON_SLES15
+
+endif # MPI_STACK
 
 # By default, ensure 0-diff across processor architecture by limiting MKL's freedom to pick algorithms.
 # As of June 2021, MKL_CBWR=AVX2 is fastest setting that works for both haswell and skylake at NCCS.
