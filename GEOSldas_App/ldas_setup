@@ -1393,7 +1393,7 @@ class LDASsetup:
                   MY_ADAS_EXPDIR     = self.adas_expdir,
                   MY_EXPDIR          = self.expdir,
                   DETECTED_MPI_STACK = DETECTED_MPI_STACK,
-                  BUILT_ON_SLES15    = BUILT_ON_SLES15
+                  BUILT_ON_SLES15    = str(BUILT_ON_SLES15).upper()
                   )
 
         with open('lenkf.j','wt') as fout :
