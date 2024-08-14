@@ -86,11 +86,12 @@ module preprocess_ldas_routines
   private
 
   public :: create_mapping
-  public :: createLocalTilefile
-  public :: createLocalBC
-  public :: createLocalCatchRestart
-  public :: createLocalVegRestart
-  public :: createLocalmwRTMRestart
+  public :: createZoominTilefile
+  public :: createZoominBC
+  public :: createZoominCatchRestart
+  public :: createZoominLandiceRestart
+  public :: createZoominVegRestart
+  public :: createZoominmwRTMRestart
   public :: correctEase
   public :: optimize_latlon
   public :: convert_pert_rst
@@ -1535,7 +1536,7 @@ contains
   
   ! ********************************************************************
   
-  subroutine createLocalTilefile(mapping_file, orig_tile, new_tile)
+  subroutine createZoominTilefile(mapping_file, orig_tile, new_tile)
     
     implicit none
     character(*), intent(in) :: mapping_file
@@ -1554,12 +1555,12 @@ contains
    
     character(len=4) :: typ_str, typ_str_exclude
  
-    character(len=*), parameter :: Iam = 'createLocalTilefile'
+    character(len=*), parameter :: Iam = 'createZoominTilefile'
     
     inquire(file=trim(orig_tile),exist=file_exist)
     if( .not. file_exist) stop ("original tile file does not exist")
     
-    ! Set default local tile file name
+    ! Set default Zoom in tile file name
     call read_mapping( mapping_file, N_types, tile_types=tile_types, N_tiles_r=N_tiles_r, N_tiles_f=N_tiles_f, f2r=f2r, r2g=r2g)
     if( all(N_tiles_r == N_tiles_f)) then
        print*, "Domain is the same, no need to create tile file..."
@@ -1602,7 +1603,7 @@ contains
        if( any( tile_types == ty)) then
           ! here g_id is (consecutive) id of the global *land* tiles
           if (f2g(f_id) /= g_id) then
-             ! if tile is not in local domain, replace ty  in "line" with 1000+ty"
+             ! if tile is not in Zoom in domain, replace ty  in "line" with 1000+ty"
              write(typ_str, '(I0)') ty
              typ_str = adjustr(typ_str)
              n=index(line, typ_str)
@@ -1620,11 +1621,11 @@ contains
     close(40)
     close(50)
     
-  end subroutine createLocalTilefile
+  end subroutine createZoominTilefile
   
   ! ********************************************************************
   
-  subroutine createLocalBC(mapping_file, orig_BC, new_BC)
+  subroutine createZoominBC(mapping_file, orig_BC, new_BC)
     
     implicit none
     character(*),intent(in) :: mapping_file
@@ -1657,11 +1658,125 @@ contains
     close(10)
     close(20)
     deallocate(tmpvec)
-  end subroutine createLocalBC
+  end subroutine createZoominBC
 
   ! ********************************************************************
-  
-  subroutine createLocalCatchRestart(mapping_file, orig_catch, new_catch)
+
+  subroutine createZoominLandiceRestart(mapping_file, orig_landice, new_landice)
+    
+    implicit none
+    character(*),intent(in):: mapping_file
+    character(*),intent(in):: orig_landice
+    character(*),intent(in):: new_landice
+    integer,parameter :: subtile=4
+    integer :: filetype, rc,i, j, ndims
+    real,allocatable :: tmp1(:)
+    type(Netcdf4_FileFormatter) :: InFmt,OutFmt
+    type(FileMetadata)        :: OutCfg
+    type(FileMetadata)        :: InCfg
+    integer                   :: dim1,dim2
+    type(StringVariableMap), pointer :: variables
+    type(Variable), pointer :: var
+    type(StringVariableMapIterator) :: var_iter
+    type(StringVector), pointer :: var_dimensions
+    character(len=:), pointer :: vname,dname
+    integer :: n, N_landicer, N_landicef, N_types, r_starts, f_starts
+
+    integer,dimension(:),allocatable :: f2r, r2g, f2r_landice, tile_types, N_tiles_r, N_tiles_f
+    logical :: have_landice
+ 
+    call read_mapping( mapping_file, N_types, tile_types=tile_types, N_tiles_r=N_tiles_r, N_tiles_f=N_tiles_f, f2r=f2r, r2g=r2g)
+
+    have_landice = .false.
+    do n = 1, N_types
+      if (tile_types(n) == MAPL_LANDICE) then
+        have_landice = .true.
+        N_landicef =  N_tiles_f(n) 
+        N_landicer =  N_tiles_r(n) 
+        exit
+      endif
+    enddo
+    if ( .not. have_landice)   return
+    if (N_landicer == N_landicef) return
+    
+    r_starts = sum(N_tiles_r(1:n-1))
+    f_starts = sum(N_tiles_f(1:n-1))
+
+    f2r_landice = f2r( f_starts+1: f_starts+N_landicef)
+    f2r_landice = f2r_landice - r_starts
+
+    allocate(tmp1(N_landicer))
+    
+    ! check file type
+    
+    call MAPL_NCIOGetFileType(orig_landice, filetype,rc=rc)
+    
+    if (filetype /= 0) then
+      print*, "Does not support binary landice restart"
+    else
+       
+       ! filetype = 0 : nc4 output file will also be nc4
+       
+       call InFmt%open(trim(orig_landice), pFIO_READ,rc=rc)
+       InCfg  = InFmt%read(rc=rc)
+       OutCfg = InCfg
+       
+       call OutCfg%modify_dimension('tile', size(f2r_landice), rc=rc)
+       
+       call OutFmt%create(trim(new_landice),rc=rc)
+       call OutFmt%write(OutCfg,rc=rc)
+       
+       variables => InCfg%get_variables()
+       var_iter = variables%begin()
+       do while (var_iter /= variables%end())
+          
+          vname => var_iter%key()
+          var => var_iter%value()
+          var_dimensions => var%get_dimensions()
+          
+          ndims = var_dimensions%size()
+          
+          if (trim(vname) =='time') then
+             call var_iter%next()
+             cycle
+          endif
+          
+          if (ndims == 1) then
+             call MAPL_VarRead (InFmt,vname,tmp1)
+             call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_landice))
+          else if (ndims == 2) then
+             
+             dname => var%get_ith_dimension(2)
+             dim1=InCfg%get_dimension(dname)
+             do j=1,dim1
+                call MAPL_VarRead ( InFmt,vname,tmp1 ,offset1=j)
+                call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_landice),offset1=j)
+             enddo
+          else if (ndims == 3) then
+
+             dname => var%get_ith_dimension(2)
+             dim1=InCfg%get_dimension(dname)
+             dname => var%get_ith_dimension(3)
+             dim2=InCfg%get_dimension(dname)
+             do i=1,dim2
+                do j=1,dim1
+                   call MAPL_VarRead ( InFmt,vname,tmp1 ,offset1=j,offset2=i)
+                   call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_landice) ,offset1=j,offset2=i)
+                enddo
+             enddo
+          end if
+          call var_iter%next()
+          
+       enddo
+       call inFmt%close(rc=rc)
+       call OutFmt%close(rc=rc)
+    end if ! file type nc4
+    print*, "done create Zoom in landice restart"
+  end subroutine createZoominLandIceRestart
+ 
+! ***************************************
+ 
+  subroutine createZoominCatchRestart(mapping_file, orig_catch, new_catch)
     
     implicit none
     character(*),intent(in):: mapping_file
@@ -1791,12 +1906,12 @@ contains
        call inFmt%close(rc=rc)
        call OutFmt%close(rc=rc)
     end if ! file type nc4
-    print*, "done create local catchment restart"
-  end subroutine createLocalCatchRestart
+    print*, "done create Zoom in catchment restart"
+  end subroutine createZoominCatchRestart
 
   ! ********************************************************************
   
-  subroutine createLocalmwRTMRestart(mapping_file, orig_mwrtm, new_mwrtm)
+  subroutine createZoominmwRTMRestart(mapping_file, orig_mwrtm, new_mwrtm)
     
     implicit none
     character(*),intent(in):: mapping_file
@@ -1847,11 +1962,11 @@ contains
     call inFmt%close(rc=rc)
     call OutFmt%close(rc=rc)
     
-  end subroutine createLocalmwRTMRestart
+  end subroutine createZoominmwRTMRestart
   
   ! ********************************************************************
   
-  subroutine createLocalVegRestart(mapping_file, orig_veg, new_veg)
+  subroutine createZoominVegRestart(mapping_file, orig_veg, new_veg)
     
     implicit none
     character(*),intent(in):: mapping_file
@@ -1929,7 +2044,7 @@ contains
        deallocate(tmp)
     endif
     
-  end subroutine createLocalVegRestart
+  end subroutine createZoominVegRestart
   
   ! ********************************************************************
   

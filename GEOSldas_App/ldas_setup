@@ -752,8 +752,8 @@ class LDASsetup:
         if self.isZoomIn:
             newlocalTile = tile+'.domain'
             print ("\nCreating local tile file :"+ newlocalTile)
-            print ("\n by excluding land type MAPL_Land_ExcludeFromDomain=1100...\n")
-            cmd = self.bindir +'/preprocess_ldas.x c_localtile ' + tile + ' ' + newlocalTile + ' '+ tmp_f2g_file.name
+            print ("\nExcluding tiles not in the domain by adding 1000 to the type ...\n")
+            cmd = self.bindir +'/preprocess_ldas.x zoomin_tile ' + tile + ' ' + newlocalTile + ' '+ tmp_f2g_file.name
             print ("cmd:   " + cmd)
             sp.call(shlex.split(cmd))
             short_tile=short_tile +'.domain'
@@ -782,7 +782,7 @@ class LDASsetup:
            print ("Creating the boundary files for the simulation domain...\n")
            bcs_tmp=[]
            for bcf in bcs :
-               cmd = self.bindir +'/preprocess_ldas.x c_localbc ' + bcf + ' '+ bcf+'.domain' + ' '+ tmp_f2g_file.name
+               cmd = self.bindir +'/preprocess_ldas.x zoomin_bc ' + bcf + ' '+ bcf+'.domain' + ' '+ tmp_f2g_file.name
                print ("cmd:   " + cmd)
                sp.call(shlex.split(cmd))
                bcs_tmp=bcs_tmp+[bcf+'.domain']
@@ -910,6 +910,7 @@ class LDASsetup:
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
             myCatchRst = myRstDir+'/'+self.catch +ensid +'_internal_rst'
+            myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
             myVegRst   = myRstDir+'/'+'vegdyn'+ensid +'_internal_rst'
             myPertRst  = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
 
@@ -938,7 +939,7 @@ class LDASsetup:
                 catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
                 if self.isZoomIn :
                     print( "Creating local catchment restart file... \n")
-                    cmd=self.bindir +'/preprocess_ldas.x c_localcatchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
+                    cmd=self.bindir +'/preprocess_ldas.x zoomin_catchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
                     print ("cmd:  "+cmd)
                     sp.call(shlex.split(cmd))
                 else :
@@ -956,7 +957,7 @@ class LDASsetup:
                 vegdynLocal = self.rstdir+ensdir +'/'+self.rqdExeInp['EXP_ID']+'.vegdyn_internal_rst'
                 if self.isZoomIn :
                     print ("Creating the local veg restart file... \n")
-                    cmd=self.bindir + '/preprocess_ldas.x c_localvegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
+                    cmd=self.bindir + '/preprocess_ldas.x zoomin_vegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
                     print ("cmd:   " + cmd)
                     sp.call(shlex.split(cmd))
                 else :
@@ -969,6 +970,24 @@ class LDASsetup:
             else :
                 vegdynRstFile = vegdynRstFile0
 
+            landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
+            if os.path.isfile(landiceRstFile) :
+               landiceLocal = self.rstdir+ensdir +'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst'
+               if self.isZoomIn :
+                  print ("Creating coom in landice restart file... \n")
+                  cmd=self.bindir + '/preprocess_ldas.x zoomin_landicerst '+ landiceRstFile +' ' + landiceLocal + ' '+ tmp_f2g_file.name
+                  print ("cmd:   " + cmd)
+                  sp.call(shlex.split(cmd))
+               else :
+                  shutil.copy(landiceRstFile,landiceLocal)
+
+               landiceRstFile = landiceLocal
+
+               if '0000' in ensdir :
+                  landiceRstFile0 = landiceRstFile
+            else :
+                landiceRstFile = landiceRstFile0
+            
             if (self.has_geos_pert and self.perturb == 1) :
                 pertRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
                 pertLocal   = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
@@ -979,6 +998,7 @@ class LDASsetup:
             print ('vegdynRstFile: ' +  vegdynRstFile)
             os.symlink(catchRstFile, myCatchRst)
             os.symlink(vegdynRstFile,  myVegRst)
+            os.symlink(landiceRstFile,  myLandiceRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,  myPertRst)
 
@@ -991,7 +1011,7 @@ class LDASsetup:
            mwRTMLocal = self.bcsdir+'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
            if self.isZoomIn :
               print ("Creating the local mwRTM restart file... \n")
-              cmd= self.bindir +'/preprocess_ldas.x c_localmwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
+              cmd= self.bindir +'/preprocess_ldas.x zoomin_mwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
 
               print ("cmd:   " + cmd)
               sp.call(shlex.split(cmd))

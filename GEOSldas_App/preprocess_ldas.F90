@@ -6,11 +6,12 @@ program main
 
   use preprocess_ldas_routines,     ONLY:    &
        create_mapping,                       &
-       createLocalTilefile,                  &
-       createLocalBC,                        &
-       createLocalVegRestart,                &
-       createLocalmwRTMRestart,              &
-       createLocalCatchRestart,              &
+       createZoominTilefile,                  &
+       createZoominBC,                        &
+       createZoominVegRestart,                &
+       createZoominmwRTMRestart,              &
+       createZoominCatchRestart,              &
+       createZoominLandiceRestart,              &
        correctEase,                          &
        convert_pert_rst,                     &
        optimize_latlon
@@ -46,6 +47,8 @@ program main
   character(len=512) :: f2g_file
   character(len=12 ) :: ymdhm
   character(len=12 ) :: SURFLAY
+  character(len=:), allocatable :: new_r, orig_r
+
   
   call get_command_argument(1,option)
   call get_command_argument(2,arg1)
@@ -73,44 +76,52 @@ program main
 
      call create_mapping(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file)
      
-  else if (trim(option) == "c_localtile") then
+  else if (trim(option) == "zoomin_tile") then
      
      orig_tile  = arg1
      new_tile   = arg2
      f2g_file   = arg3
-     call createLocalTilefile(f2g_file, orig_tile,new_tile)
+     call createZoominTilefile(f2g_file, orig_tile,new_tile)
      
-  else if (trim(option) == "c_localbc" ) then
+  else if (trim(option) == "zoomin_bc" ) then
      
      orig_BC  = arg1
      new_BC   = arg2
      f2g_file = arg3
 
-     call createLocalBC(f2g_file, orig_BC, new_BC)
+     call createZoominBC(f2g_file, orig_BC, new_BC)
      
-  else if (trim(option) == "c_localvegrst") then
+  else if (trim(option) == "zoomin_vegrst") then
 
      orig_veg = arg1
      new_veg  = arg2
      f2g_file = arg3
 
-     call  createLocalVegRestart(f2g_file, orig_veg, new_veg)      
+     call  createZoominVegRestart(f2g_file, orig_veg, new_veg)      
 
-  else if (trim(option) == "c_localmwrtmrst") then
+  else if (trim(option) == "zoomin_mwrtmrst") then
 
      orig_rtm = arg1
      new_rtm  = arg2
      f2g_file = arg3
 
-     call  createLocalmwRTMRestart(f2g_file, orig_rtm, new_rtm)      
+     call  createZoominmwRTMRestart(f2g_file, orig_rtm, new_rtm)      
 
-  else if (trim(option) == "c_localcatchrst") then
+  else if (trim(option) == "zoomin_catchrst") then
 
      orig_catch = arg1
      new_catch  = arg2
      f2g_file   = arg3
 
-     call createLocalCatchRestart(f2g_file, orig_catch, new_catch)
+     call createZoominCatchRestart(f2g_file, orig_catch, new_catch)
+
+  else if (trim(option) == "zoomin_landicerst") then
+
+     orig_r = trim(arg1)
+     new_r  = trim(arg2)
+     f2g_file   = trim(arg3)
+
+     call createZoominLandiceRestart(f2g_file, orig_r, new_r)
 
   else if (trim(option)=="correctease") then
 
