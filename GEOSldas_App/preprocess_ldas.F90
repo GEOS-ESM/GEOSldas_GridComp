@@ -6,12 +6,13 @@ program main
 
   use preprocess_ldas_routines,     ONLY:    &
        create_mapping,                       &
-       createZoominTilefile,                  &
-       createZoominBC,                        &
-       createZoominVegRestart,                &
-       createZoominmwRTMRestart,              &
-       createZoominCatchRestart,              &
-       createZoominLandiceRestart,              &
+       createZoominTilefile,                 &
+       createZoominBC,                       &
+       createZoominVegRestart,               &
+       createZoominmwRTMRestart,             &
+       createZoominCatchRestart,             &
+       createZoominLandiceRestart,           &
+       createZoominRestart,                  &
        correctEase,                          &
        convert_pert_rst,                     &
        optimize_latlon
@@ -27,6 +28,7 @@ program main
   character(len=512) :: arg6
   character(len=512) :: arg7
   character(len=512) :: arg8
+  character(len=512) :: arg9
   
   character(len=512) :: orig_tile
   character(len=512) :: new_tile
@@ -47,8 +49,9 @@ program main
   character(len=512) :: f2g_file
   character(len=12 ) :: ymdhm
   character(len=12 ) :: SURFLAY
-  character(len=:), allocatable :: new_r, orig_r
-
+  character(len=:), allocatable :: new_r, orig_r, tile_types
+  integer :: from, to, n, i, Length
+  integer, allocatable :: types_(:)
   
   call get_command_argument(1,option)
   call get_command_argument(2,arg1)
@@ -59,6 +62,7 @@ program main
   call get_command_argument(7,arg6)
   call get_command_argument(8,arg7)
   call get_command_argument(9,arg8)
+  call get_command_argument(10,arg9)
   
   if( trim(option) == "c_f2g") then
 
@@ -73,8 +77,27 @@ program main
      ymdhm           = trim(adjustl(arg6))
      SURFLAY         = trim(adjustl(arg7))
      f2g_file        = arg8
-
-     call create_mapping(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file)
+     tile_types      = trim(arg9)
+     n = 1
+     Length = len(tile_types)
+     do i = 1, Length
+       if (tile_types(i:i) == '_') n = n+1
+     enddo 
+     allocate(types_(n))
+     from = 0
+     to   = 1
+     n    = 1
+     do while (to <= Length)
+       if (tile_types(to:to) == "_") then
+         read (unit=tile_types(from+1:to-1),fmt=*) types_(n)
+         n = n + 1
+         from = to
+       endif
+       to = to + 1
+     enddo
+     read (unit=tile_types(from+1:to-1),fmt=*) types_(n)
+     print*, types_
+     call create_mapping(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file, types_)
      
   else if (trim(option) == "zoomin_tile") then
      
@@ -113,7 +136,7 @@ program main
      new_catch  = arg2
      f2g_file   = arg3
 
-     call createZoominCatchRestart(f2g_file, orig_catch, new_catch)
+     call createZoominRestart(f2g_file, orig_catch, new_catch, 100)
 
   else if (trim(option) == "zoomin_landicerst") then
 
@@ -121,7 +144,7 @@ program main
      new_r  = trim(arg2)
      f2g_file   = trim(arg3)
 
-     call createZoominLandiceRestart(f2g_file, orig_r, new_r)
+     call createZoominRestart(f2g_file, orig_r, new_r, 20)
 
   else if (trim(option)=="correctease") then
 

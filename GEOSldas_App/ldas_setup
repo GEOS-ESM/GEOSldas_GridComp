@@ -127,6 +127,7 @@ class LDASsetup:
         self.bcs_land = ''
         self.bcs_geom = ''
         self.bcs_landshared = ''
+        self.tile_types =''
 
         # ------
         # Read exe input file which is required to set up the dir
@@ -158,6 +159,9 @@ class LDASsetup:
         if self.verbose:
             print ('\nInputs from execfile:\n')
             _printdict(self.rqdExeInp)
+
+        tile_types = {'LAND':'100', 'LANDICE':'20'}
+        self.tile_types = [tile_types[x.strip().upper()] for x in self.rqdExeInp.get('TILE_TYPES','LAND').split(',')]
 
         # nens is an integer and =1 for model run
         self.nens         =    int(self.rqdExeInp['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
@@ -738,11 +742,11 @@ class LDASsetup:
 
 
         tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False) 
-        cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name
+        cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name + ' ' + '_'.join(self.tile_types) 
 
         print ('Creating f2g file if necessary: '+ tmp_f2g_file.name +'....\n')
         print ("cmd:   " + cmd)
-        sp.call(shlex.split(cmd))
+        sp.call(shlex.split(cmd)) 
         # check if it is local or global
         if os.path.getsize(tmp_f2g_file.name) !=0 :
            self.isZoomIn= True
@@ -750,14 +754,14 @@ class LDASsetup:
 
         # update tile domain
         if self.isZoomIn:
-            newlocalTile = tile+'.domain'
-            print ("\nCreating local tile file :"+ newlocalTile)
+            newZoominTile = tile+'.domain'
+            print ("\nCreating local tile file :"+ newZoominTile)
             print ("\nExcluding tiles not in the domain by adding 1000 to the type ...\n")
-            cmd = self.bindir +'/preprocess_ldas.x zoomin_tile ' + tile + ' ' + newlocalTile + ' '+ tmp_f2g_file.name
+            cmd = self.bindir +'/preprocess_ldas.x zoomin_tile ' + tile + ' ' + newZoominTile + ' '+ tmp_f2g_file.name
             print ("cmd:   " + cmd)
             sp.call(shlex.split(cmd))
             short_tile=short_tile +'.domain'
-            tile = newlocalTile
+            tile = newZoominTile
 
         myTile=self.inpdir+'/tile.data'
         os.symlink(tile,myTile)
@@ -972,7 +976,7 @@ class LDASsetup:
 
             landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
             if os.path.isfile(landiceRstFile) :
-               landiceLocal = self.rstdir+ensdir +'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst'
+               landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
                if self.isZoomIn :
                   print ("Creating coom in landice restart file... \n")
                   cmd=self.bindir + '/preprocess_ldas.x zoomin_landicerst '+ landiceRstFile +' ' + landiceLocal + ' '+ tmp_f2g_file.name
@@ -998,7 +1002,9 @@ class LDASsetup:
             print ('vegdynRstFile: ' +  vegdynRstFile)
             os.symlink(catchRstFile, myCatchRst)
             os.symlink(vegdynRstFile,  myVegRst)
-            os.symlink(landiceRstFile,  myLandiceRst)
+            if ('LANDICE' in self.tile_types) :
+                print("LANDICE in the types")
+                os.symlink(landiceRstFile,  myLandiceRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,  myPertRst)
 

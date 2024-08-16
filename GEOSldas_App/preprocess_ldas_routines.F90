@@ -89,6 +89,7 @@ module preprocess_ldas_routines
   public :: createZoominTilefile
   public :: createZoominBC
   public :: createZoominCatchRestart
+  public :: createZoominRestart
   public :: createZoominLandiceRestart
   public :: createZoominVegRestart
   public :: createZoominmwRTMRestart
@@ -161,12 +162,25 @@ contains
     endif
 
     if (present(types)) then
-      tile_types = types
+      ! reorder tile types so it matches the tile file
+      allocate(tile_types(size(types)))
+      n = 1
+      if (any(types == MAPL_LAND)) then
+         tile_types(n) = MAPL_LAND
+         n = n+1
+      endif
+      if (any(types == MAPL_LAKE)) then
+         tile_types(n) = MAPL_LAKE
+         n = n+1
+      endif
+      if (any(types == MAPL_LANDICE)) then
+         tile_types(n) = MAPL_LANDICE
+      endif
     else
       tile_types = [MAPL_LAND]
     endif
     
-    call LDAS_read_til_file(orig_tile,catch_def_file, tile_grid_g, tile_coord_r, r2g, N_catg, types)
+    call LDAS_read_til_file(orig_tile,catch_def_file, tile_grid_g, tile_coord_r, r2g, N_catg, tile_types)
     
     ! include and exclude files are absolute
     if(d_exist) then
@@ -189,7 +203,7 @@ contains
          trim(out_path), 'exp_domain ', trim(exp_id),                 &
          minlon, minlat, maxlon, maxlat,                              &
          f2r, tile_coord_f,                                &
-         tile_grid_f)
+         tile_grid_f, types=types)
    
     N_catf  = count(tile_coord_f(:)%typ == MAPL_LAND)
 
@@ -1775,6 +1789,114 @@ contains
   end subroutine createZoominLandIceRestart
  
 ! ***************************************
+  subroutine createZoominRestart(mapping_file, orig_rst, new_rst, tile_type)
+    
+    implicit none
+    character(*),intent(in):: mapping_file
+    character(*),intent(in):: orig_rst
+    character(*),intent(in):: new_rst
+    integer, intent(in)    :: tile_type
+    integer :: istat, filetype, rc,i, j, ndims
+    real,allocatable :: tmp1(:)
+    type(Netcdf4_FileFormatter) :: InFmt,OutFmt
+    type(FileMetadata)        :: OutCfg
+    type(FileMetadata)        :: InCfg
+    integer                   :: dim1,dim2
+    type(StringVariableMap), pointer :: variables
+    type(Variable), pointer :: var
+    type(StringVariableMapIterator) :: var_iter
+    type(StringVector), pointer :: var_dimensions
+    character(len=:), pointer :: vname,dname
+    integer ::n, N_r, N_f, N_types, r_starts, f_starts
+    integer,dimension(:),allocatable :: f2r, r2g, f2r_, tile_types, N_tiles_r, N_tiles_f
+   
+    call read_mapping( mapping_file, N_types, tile_types=tile_types, N_tiles_r=N_tiles_r, N_tiles_f=N_tiles_f, f2r=f2r, r2g=r2g)
+
+    do n = 1, N_types
+      if (tile_types(n) == tile_type) then
+        N_f =  N_tiles_f(n)
+        N_r =  N_tiles_r(n)
+        exit
+      endif
+    enddo
+
+    if (N_r == N_f) return
+
+    r_starts = sum(N_tiles_r(1:n-1))
+    f_starts = sum(N_tiles_f(1:n-1))
+
+    f2r_ = f2r( f_starts+1: f_starts+N_f)
+    f2r_ = f2r_ - r_starts
+
+    allocate(tmp1(N_r))
+    
+    ! check file type
+    
+    call MAPL_NCIOGetFileType(orig_rst, filetype,rc=rc)
+    
+    if (filetype /= 0) then
+       print*, "Do not support binary restart"
+    else
+       
+       ! filetype = 0 : nc4 output file will also be nc4
+       
+       call InFmt%open(trim(orig_rst), pFIO_READ,rc=rc)
+       InCfg  = InFmt%read(rc=rc)
+       OutCfg = InCfg
+       
+       call OutCfg%modify_dimension('tile', size(f2r_), rc=rc)
+       
+       call OutFmt%create(trim(new_rst),rc=rc)
+       call OutFmt%write(OutCfg,rc=rc)
+       
+       variables => InCfg%get_variables()
+       var_iter = variables%begin()
+       do while (var_iter /= variables%end())
+          
+          vname => var_iter%key()
+          var => var_iter%value()
+          var_dimensions => var%get_dimensions()
+          
+          ndims = var_dimensions%size()
+          
+          if (trim(vname) =='time') then
+             call var_iter%next()
+             cycle
+          endif
+          
+          if (ndims == 1) then
+             call MAPL_VarRead (InFmt,vname,tmp1)
+             call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_))
+          else if (ndims == 2) then
+             
+             dname => var%get_ith_dimension(2)
+             dim1=InCfg%get_dimension(dname)
+             do j=1,dim1
+                call MAPL_VarRead ( InFmt,vname,tmp1 ,offset1=j)
+                call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_),offset1=j)
+             enddo
+             
+          else if (ndims == 3) then
+             
+             dname => var%get_ith_dimension(2)
+             dim1=InCfg%get_dimension(dname)
+             dname => var%get_ith_dimension(3)
+             dim2=InCfg%get_dimension(dname)
+             do i=1,dim2
+                do j=1,dim1
+                   call MAPL_VarRead ( InFmt,vname,tmp1 ,offset1=j,offset2=i)
+                   call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_) ,offset1=j,offset2=i)
+                enddo
+             enddo
+             
+          end if
+          call var_iter%next()
+       enddo
+       call inFmt%close(rc=rc)
+       call OutFmt%close(rc=rc)
+    end if ! file type nc4
+    print*, "done create Zoom in restart of type", tile_type
+  end subroutine createZoominRestart
  
   subroutine createZoominCatchRestart(mapping_file, orig_catch, new_catch)
     
