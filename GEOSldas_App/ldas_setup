@@ -910,6 +910,7 @@ class LDASsetup:
         #for ens in self.ensdirs :
         catchRstFile0  = ''
         vegdynRstFile0 = ''
+        landiceRstFile0 = ''
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
