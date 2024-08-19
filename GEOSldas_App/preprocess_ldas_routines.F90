@@ -200,7 +200,7 @@ contains
          trim(out_path), 'exp_domain ', trim(exp_id),                 &
          minlon, minlat, maxlon, maxlat,                              &
          f2r, tile_coord_f,                                &
-         tile_grid_f, types=types)
+         tile_grid_f)
    
     N_catf  = count(tile_coord_f(:)%typ == MAPL_LAND)
 
@@ -344,7 +344,7 @@ contains
          exclude_path, exclude_file, include_path, include_file,         &
          work_path, exp_domain, exp_id,                                  &
          minlon, minlat, maxlon, maxlat,                                 &
-         f2r, tile_coord_f, tile_grid_f, types )
+         f2r, tile_coord_f, tile_grid_f )
       
       ! Set up modeling domain and determine index vectors mapping from the
       ! domain to global catchment space.
@@ -413,7 +413,6 @@ contains
       type(tile_coord_type), dimension(:), pointer :: tile_coord_f ! output
       
       type(grid_def_type),   intent(out)           :: tile_grid_f
-      integer, dimension(:), intent(in), optional  :: types
 
       ! locals 
       
@@ -444,14 +443,8 @@ contains
       !
       ! try reading *domain.txt, *tilecoord.txt, and *tilegrids.txt files 
       
-      !call io_domain_files( 'r', work_path, exp_id, &
-      !     N_tile_f, f2g, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
-      rc = -1
-      if (present(types)) then
-        tile_types = types
-      else
-        tile_types = [MAPL_LAND]
-      endif
+      call io_domain_files( 'r', work_path, exp_id, &
+           N_tile_f, f2r, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
       
       if (rc==0) then        ! read was successful
          
@@ -563,8 +556,8 @@ contains
          
          tmp_grid_def = tile_grid_g  ! cannot use intent(in) tile_grid_g w/ io_domain_files
          
-         !call io_domain_files( 'w', work_path, exp_id, &
-         !     N_tile_f, f2g, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
+         call io_domain_files( 'w', work_path, exp_id, &
+              N_tile_f, f2r, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
          
       end if   ! domain/tilecoord/tilegrids files exist
       
@@ -1622,7 +1615,7 @@ contains
              line(n:n+3) = typ_str_exclude
           else
              f_id = f_id + 1
-             if (f_id >= size(f2g)) f_id = 1 ! just set a number to prevent over flow, it would never come back here 
+             if (f_id > size(f2g)) f_id = 1 ! just set a number to prevent over flow, it would never come back here 
           endif
        endif
        ! write "line" into the output tile file
