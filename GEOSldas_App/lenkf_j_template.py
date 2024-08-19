@@ -792,19 +792,18 @@ EOF
    # update cap_restart
    # ##################
    
-   set CO2LINE = `grep -n -m 1 "CO2_YEAR" $HOMDIR/LDAS.rc | cut -d':' -f1`
+   set CO2_BEFORE = `grep CO2_YEAR: LDAS.rc | cut -d':' -f2`
    
-   if ( $CO2LINE >= 1 ) then
+   if ( $CO2_BEFORE >= 1 ) then
    
        # Update reference year for Carbon Tracker CO2
        ##############################################
        
-       set CO2_BEFORE = `sed -n "${{CO2LINE}}p;d" LDAS.rc | cut -d':' -f2`
        set CAP_BEFORE = `head -1 $HOMDIR/cap_restart | cut -c1-4` 
        @ DY = $CAP_BEFORE - $CO2_BEFORE
        @ CO2_AFTER = `head -1 cap_restart | cut -c1-4` - $DY
-       set CO2UPDATE = "CO2_YEAR: $CO2_AFTER"
-       sed -i "${{CO2LINE}} s|.*|$CO2UPDATE|" LDAS.rc
+       set CO2UPDATE = `echo "CO2_YEAR:  "$CO2_AFTER`
+       sed -i "/CO2_YEAR:/c\\$CO2UPDATE" LDAS.rc
        /bin/rm -f $HOMDIR//LDAS.rc
        /bin/cp -p LDAS.rc $HOMDIR/LDAS.rc
    endif
