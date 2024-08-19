@@ -9,9 +9,6 @@ program main
        createZoominTilefile,                 &
        createZoominBC,                       &
        createZoominVegRestart,               &
-       createZoominmwRTMRestart,             &
-       createZoominCatchRestart,             &
-       createZoominLandiceRestart,           &
        createZoominRestart,                  &
        correctEase,                          &
        convert_pert_rst,                     &
@@ -128,7 +125,7 @@ program main
      new_rtm  = arg2
      f2g_file = arg3
 
-     call  createZoominmwRTMRestart(f2g_file, orig_rtm, new_rtm)      
+     call  createZoominRestart(f2g_file, orig_rtm, new_rtm, 100)      
 
   else if (trim(option) == "zoomin_catchrst") then
 
