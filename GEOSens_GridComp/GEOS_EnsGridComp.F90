@@ -1597,6 +1597,24 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC                         ,&
+    LONG_NAME          = 'CN_autotrophic_respiration' ,&
+    UNITS              = 'kg m-2 s-1'                ,&
+    SHORT_NAME         = 'CNAR'                      ,&
+    DIMS               = MAPL_DimsTileOnly           ,&
+    VLOCATION          = MAPL_VLocationNone          ,&
+                                           RC=STATUS  )
+  VERIFY_(STATUS)
+
+  call MAPL_AddExportSpec(GC                         ,&
+    LONG_NAME          = 'CN_heterotrophic_respiration' ,&
+    UNITS              = 'kg m-2 s-1'                ,&
+    SHORT_NAME         = 'CNHR'                      ,&
+    DIMS               = MAPL_DimsTileOnly           ,&
+    VLOCATION          = MAPL_VLocationNone          ,&
+                                           RC=STATUS  )
+  VERIFY_(STATUS)
+
+  call MAPL_AddExportSpec(GC                         ,&
     LONG_NAME          = 'CN_net_ecosystem_exchange' ,&
     UNITS              = 'kg m-2 s-1'                ,&
     SHORT_NAME         = 'CNNEE'                     ,&
@@ -2435,6 +2453,8 @@ contains
     real, dimension(:), pointer :: CNNPP,    CNNPP_enavg
     real, dimension(:), pointer :: CNGPP,    CNGPP_enavg
     real, dimension(:), pointer :: CNSR,      CNSR_enavg
+    real, dimension(:), pointer :: CNAR,      CNAR_enavg
+    real, dimension(:), pointer :: CNHR,      CNHR_enavg
     real, dimension(:), pointer :: CNNEE,    CNNEE_enavg
     real, dimension(:), pointer :: CNXSMR,  CNXSMR_enavg
     real, dimension(:), pointer :: CNADD,    CNADD_enavg
@@ -2807,6 +2827,8 @@ contains
     call MAPL_GetPointer(import, CNNPP  ,   'CNNPP' ,   notFoundOK=.true.,  _RC)
     call MAPL_GetPointer(import, CNGPP  ,   'CNGPP' ,   notFoundOK=.true.,  _RC)
     call MAPL_GetPointer(import, CNSR   ,   'CNSR'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import, CNAR   ,   'CNAR'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import, CNHR   ,   'CNHR'  ,   notFoundOK=.true.,  _RC)
     call MAPL_GetPointer(import, CNNEE  ,   'CNNEE' ,   notFoundOK=.true.,  _RC)
     call MAPL_GetPointer(import, CNXSMR ,   'CNXSMR',   notFoundOK=.true.,  _RC)
     call MAPL_GetPointer(import, CNADD  ,   'CNADD' ,   notFoundOK=.true.,  _RC)
@@ -3107,6 +3129,8 @@ contains
     call MAPL_GetPointer(export,   CNNPP_enavg  ,   'CNNPP' , _RC)
     call MAPL_GetPointer(export,   CNGPP_enavg  ,   'CNGPP' , _RC)
     call MAPL_GetPointer(export,    CNSR_enavg  ,   'CNSR'  , _RC)
+    call MAPL_GetPointer(export,    CNAR_enavg  ,   'CNAR'  , _RC)
+    call MAPL_GetPointer(export,    CNHR_enavg  ,   'CNHR'  , _RC)
     call MAPL_GetPointer(export,   CNNEE_enavg  ,   'CNNEE' , _RC)
     call MAPL_GetPointer(export,   CNXSMR_enavg ,   'CNXSMR', _RC)
     call MAPL_GetPointer(export,   CNADD_enavg  ,   'CNADD' , _RC)
@@ -3270,6 +3294,8 @@ contains
         if(associated(    CNNPP_enavg))      CNNPP_enavg = 0.0
         if(associated(    CNGPP_enavg))      CNGPP_enavg = 0.0
         if(associated(     CNSR_enavg))       CNSR_enavg = 0.0
+        if(associated(     CNAR_enavg))       CNAR_enavg = 0.0
+        if(associated(     CNHR_enavg))       CNHR_enavg = 0.0
         if(associated(    CNNEE_enavg))      CNNEE_enavg = 0.0
         if(associated(    CNXSMR_enavg))    CNXSMR_enavg = 0.0
         if(associated(    CNADD_enavg))      CNADD_enavg = 0.0
@@ -3567,6 +3593,8 @@ contains
     if(associated(  CNNPP_enavg) .and. associated( CNNPP))  CNNPP_enavg =  CNNPP_enavg +  CNNPP
     if(associated(  CNGPP_enavg) .and. associated( CNGPP))  CNGPP_enavg =  CNGPP_enavg +  CNGPP
     if(associated(   CNSR_enavg) .and. associated(  CNSR))   CNSR_enavg =   CNSR_enavg +   CNSR
+    if(associated(   CNAR_enavg) .and. associated(  CNAR))   CNAR_enavg =   CNAR_enavg +   CNAR
+    if(associated(   CNHR_enavg) .and. associated(  CNHR))   CNHR_enavg =   CNHR_enavg +   CNHR
     if(associated(  CNNEE_enavg) .and. associated( CNNEE))  CNNEE_enavg =  CNNEE_enavg +  CNNEE
     if(associated(  CNXSMR_enavg).and. associated( CNXSMR))CNXSMR_enavg =  CNXSMR_enavg+ CNXSMR
     if(associated(  CNADD_enavg) .and. associated( CNADD))  CNADD_enavg =  CNADD_enavg +  CNADD
@@ -3795,6 +3823,8 @@ contains
         if(associated(   CNNPP_enavg))     CNNPP_enavg =    CNNPP_enavg/NUM_ENSEMBLE
         if(associated(   CNGPP_enavg))     CNGPP_enavg =    CNGPP_enavg/NUM_ENSEMBLE
         if(associated(    CNSR_enavg))      CNSR_enavg =     CNSR_enavg/NUM_ENSEMBLE
+        if(associated(    CNAR_enavg))      CNAR_enavg =     CNAR_enavg/NUM_ENSEMBLE
+        if(associated(    CNHR_enavg))      CNHR_enavg =     CNHR_enavg/NUM_ENSEMBLE
         if(associated(   CNNEE_enavg))     CNNEE_enavg =    CNNEE_enavg/NUM_ENSEMBLE
         if(associated(   CNXSMR_enavg))   CNXSMR_enavg =   CNXSMR_enavg/NUM_ENSEMBLE
         if(associated(   CNADD_enavg))     CNADD_enavg =    CNADD_enavg/NUM_ENSEMBLE
