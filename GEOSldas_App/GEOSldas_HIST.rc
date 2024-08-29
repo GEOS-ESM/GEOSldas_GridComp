@@ -202,6 +202,7 @@ COLLECTIONS:
 >>>HIST_CATCHCN<<<        'WATSOI'   , 'GridComp'  ,
 >>>HIST_CATCHCN<<<        'ICESOI'   , 'GridComp'  ,
 >>>HIST_IRRIG<<<          'SPRINKLERRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'FURROWRATE'  , 'IRRIGATION'  ,
 >>>HIST_IRRIG<<<          'FLOODRATE'  , 'IRRIGATION'  ,
 >>>HIST_IRRIG<<<          'DRIPRATE'  , 'IRRIGATION'  ,
                                ::
@@ -307,6 +308,7 @@ COLLECTIONS:
 >>>HIST_CATCHCN<<<        'WATSOI'   , 'GridComp'  ,
 >>>HIST_CATCHCN<<<        'ICESOI'   , 'GridComp'  ,
 >>>HIST_IRRIG<<<          'SPRINKLERRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'FURROWRATE'  , 'IRRIGATION'  ,
 >>>HIST_IRRIG<<<          'FLOODRATE'  , 'IRRIGATION'  ,
 >>>HIST_IRRIG<<<          'DRIPRATE'  , 'IRRIGATION'  ,
                                ::
