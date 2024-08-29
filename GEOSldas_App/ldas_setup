@@ -1003,7 +1003,7 @@ class LDASsetup:
             print ('vegdynRstFile: ' +  vegdynRstFile)
             os.symlink(catchRstFile, myCatchRst)
             os.symlink(vegdynRstFile,  myVegRst)
-            if ('LANDICE' in self.tile_types) :
+            if ('20' in self.tile_types) :
                 print("LANDICE in the types")
                 os.symlink(landiceRstFile,  myLandiceRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
@@ -1214,6 +1214,9 @@ class LDASsetup:
 
                 rstkey=[catch_,'VEGDYN']
                 rstval=[self.catch,'vegdyn']
+                if '20' in self.tile_types:
+                  rstkey.append('LANDICE')
+                  rstval.append('landice')
 
                 if self.has_mwrtm :
                    keyn='LANDASSIM_INTERNAL_RESTART_FILE'
@@ -1248,7 +1251,10 @@ class LDASsetup:
                 keyn = catch_ + '_INTERNAL_CHECKPOINT_FILE'
                 valn = self.catch+tmpl_+'_internal_checkpoint'
                 ldasrcInp[keyn]= valn
-
+                keyn = 'LANDICE_INTERNAL_CHECKPOINT_FILE'
+                valn = 'landice'+tmpl_+'_internal_checkpoint'
+                if '20' in self.tile_types :
+                   ldasrcInp[keyn]= valn
                 # specify LANDPERT restart file
                 if (self.perturb == 1):
                     keyn = 'LANDPERT_INTERNAL_RESTART_FILE'

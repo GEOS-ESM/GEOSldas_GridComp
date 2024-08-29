@@ -87,7 +87,7 @@ contains
     character(len=ESMF_MAXSTR) :: Iam
     character(len=ESMF_MAXSTR) :: comp_name
     character(len=ESMF_MAXSTR) :: ensid_string,childname
-    character(len=ESMF_MAXSTR) :: LAND_ASSIM_STR, mwRTM_file, ENS_FORCING_STR, WITH_LANDICE_STR
+    character(len=ESMF_MAXSTR) :: LAND_ASSIM_STR, mwRTM_file, ENS_FORCING_STR, TILE_TYPES_STR
     integer                    :: ens_id_width
     ! Local variables
     type(T_TILECOORD_STATE), pointer :: tcinternal
@@ -158,11 +158,11 @@ contains
     VERIFY_(STATUS)
     land_assim = (trim(LAND_ASSIM_STR) /= 'NO')
 
-    call MAPL_GetResource ( MAPL, WITH_LANDICE_STR, Label="WITH_LANDICE:", DEFAULT="NO", RC=STATUS)
+    call MAPL_GetResource ( MAPL, TILE_TYPES_STR, Label="TILE_TYPES:", DEFAULT="LAND", RC=STATUS)
     VERIFY_(STATUS)
-    WITH_LANDICE_STR =  ESMF_UtilStringUpperCase(WITH_LANDICE_STR, rc=STATUS)
+    TILE_TYPES_STR =  ESMF_UtilStringUpperCase(TILE_TYPES_STR, rc=STATUS)
     VERIFY_(STATUS)
-    with_landice = (trim(WITH_LANDICE_STR) /= 'NO')
+    with_landice = (index(TILE_TYPES_STR, 'LANDICE') /= 0)
 
     call MAPL_GetResource ( MAPL, mwRTM_file, Label="LANDASSIM_INTERNAL_RESTART_FILE:", DEFAULT='', RC=STATUS)
     VERIFY_(STATUS)
@@ -373,9 +373,8 @@ contains
     character(len=ESMF_MAXSTR) :: LAND_PARAMS 
     character(len=ESMF_MAXSTR) :: grid_type 
 
-    integer :: total_nt, land_nt_local, i, j
-    real, pointer :: LandTileLats(:)
-    real, pointer :: LandTileLons(:)
+    integer :: i, j, k, n
+    integer :: total_nt, local_nt, tile_id
     integer, pointer :: local_id(:)
     real(ESMF_KIND_R8), pointer     :: centerX(:,:)
     real(ESMF_KIND_R8), pointer     :: centerY(:,:)
@@ -391,7 +390,7 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord_f => null()
 
     integer,dimension(:),pointer :: f2g
-    integer :: N_catf
+    integer :: N_f ! number of tiles in full domain
     integer :: LSM_CHOICE
 
     type(grid_def_type) :: tile_grid_g, pert_grid_g
@@ -586,46 +585,53 @@ contains
     ! -get-tile-information-from-land's-locstream-
     call MAPL_LocStreamGet(                                                     &
          land_locstream,                                                        &
-         NT_LOCAL=land_nt_local,                                                &
-         TILELATS=LandTileLats,                                                 &
-         TILELONS=LandTileLons,                                                 &
-         LOCAL_ID=local_id    ,                                                 &
+         NT_LOCAL=local_nt,                                                     &
+         LOCAL_ID=local_id,                                                     &
          rc=status                                                              &
          )
     VERIFY_(status)
-
+    if (with_landice) then
+       call MAPL_LocStreamGet(                                                   &
+           force_locstream,                                                      &
+           NT_LOCAL=local_nt,                                                    &
+           LOCAL_ID=local_id,                                                    &
+           rc=status                                                             &
+           )
+       VERIFY_(status)
+    endif
+    
     ! -get-component's-internal-state-
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
     VERIFY_(status)
     tcinternal => tcwrap%ptr
     ! -allocate-memory-for-tile-coord-
-    allocate(tcinternal%tile_coord(land_nt_local), stat=status)
+    allocate(tcinternal%tile_coord(local_nt), stat=status)
     VERIFY_(status)
-    allocate(tcinternal%l2f(land_nt_local))
+    allocate(tcinternal%l2f(local_nt))
     VERIFY_(status)
-    
 
     call MAPL_GetResource ( MAPL, out_path, Label="OUT_PATH:", DEFAULT="./", RC=STATUS)
     call MAPL_GetResource ( MAPL, exp_id, Label="EXP_ID:", DEFAULT="./", RC=STATUS)
 
     call init_MPI_types()
     
-    call MPI_Reduce(land_nt_local,total_nt,1,MPI_INT,MPI_SUM,0,mpicomm,mpierr);
+    call MPI_AllReduce(local_nt,total_nt,1,MPI_INT,MPI_SUM,mpicomm,mpierr);
 
     decomf = get_io_filename(trim(out_path), trim(exp_id), 'ldas_domdecomp', date_time=start_time, &
              dir_name='rc_out', file_ext='.txt')
 
+
     if (IamRoot) then
-       call io_domain_files('r',trim(out_path), trim(exp_id),N_catf,f2g,tile_coord_f,tile_grid_g,tile_grid_f,RC)
+       call io_domain_files('r',trim(out_path), trim(exp_id),N_f,f2g,tile_coord_f,tile_grid_g,tile_grid_f,RC)
        ! WY notes: f2g == tile_coord_f%tile_id
        deallocate(f2g)
-       print*, "Number of tiles: ", N_catf
-       if(N_catf /= total_nt) then
+       print*, "Number of tiles: ", N_f
+       if(N_f /= total_nt) then
          print*, "total_nt = ", total_nt
          stop "tiles number not equal"
        endif
        open(10,file= trim(decomf), action='write')
-       write(10,*) N_catf
+       write(10,*) N_f
        close(10)
        call io_grid_def_type('w', logunit, tile_grid_f, 'tile_grid_f')
 
@@ -647,12 +653,12 @@ contains
           ! arrive here when tile_grid_g is cube-sphere and pert_grid_g is lat/lon after call to get_pert_grid() above
  
           !1) get pert_i_indg, pert_j_indg for tiles in (full) domain relative to pert_grid_g
-          do i = 1, N_catf
+          do i = 1, N_f
              call get_ij_ind_from_latlon(pert_grid_g,tile_coord_f(i)%com_lat,tile_coord_f(i)%com_lon, &
               tile_coord_f(i)%pert_i_indg,tile_coord_f(i)%pert_j_indg)
           enddo
           !2) determine pert_grid_f
-          pert_grid_f = get_minExtent_grid(N_catf, tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg, &
+          pert_grid_f = get_minExtent_grid(N_f, tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg, &
                tile_coord_f%min_lon, tile_coord_f%min_lat, tile_coord_f%max_lon, tile_coord_f%max_lat, &
                pert_grid_g)
 
@@ -666,34 +672,37 @@ contains
        endif
     endif
     
-    call MPI_BCAST(N_catf,1,MPI_INTEGER,0,mpicomm,mpierr)
-    if (.not. IamRoot) allocate(tile_coord_f(N_catf))
-
-    call MPI_BCAST(tile_coord_f,N_catf,    MPI_tile_coord_type,0,mpicomm, mpierr)
+    if (.not. IamRoot) allocate(tile_coord_f(total_nt))
+    call MPI_Barrier(mpicomm, mpierr)
+    call MPI_BCAST(tile_coord_f, total_nt, MPI_tile_coord_type,0,mpicomm, mpierr)
     call MPI_BCAST(pert_grid_g, 1,         MPI_grid_def_type,  0,mpicomm, mpierr)
     call MPI_BCAST(pert_grid_f, 1,         MPI_grid_def_type,  0,mpicomm, mpierr)
     call MPI_BCAST(tile_grid_g, 1,         MPI_grid_def_type,  0,mpicomm, mpierr)
 
     block
-      integer, allocatable :: f2tile_id(:), tile_id2f(:)
-      integer :: max_id
-      allocate(f2tile_id(N_catf))
-      f2tile_id = tile_coord_f%tile_id
-
-      max_id = maxval(f2tile_id)
-      allocate(tile_id2f(max_id),source = 0)
-      do i = 1, N_catf
-         tile_id2f(f2tile_id(i)) = i
+      i = 1
+      j = 0
+      do k = 1, local_nt
+         do n = i, total_nt
+            tile_id = tile_coord_f(n)%tile_id
+            if (local_id(k) == tile_id) then
+               tcinternal%l2f(k) = n
+               i = n + 1
+               j = j + 1
+               exit
+            endif
+         enddo
       enddo
-      tcinternal%l2f = tile_id2f(local_id)
+      if (j /= local_nt) then
+        stop "tile distributtion is wrong. cannot find the right tile"
+      endif
       tcinternal%tile_coord = tile_coord_f(tcinternal%l2f)
-      deallocate(f2tile_id, tile_id2f)
     end block
 
     do i = 0, numprocs-1
       if( i == myid) then
          open(10,file= trim(decomf), action='write',position='append')
-         do j = 1, land_nt_local
+         do j = 1, local_nt
             write(10,*) local_id(j), myid
          enddo
          close(10)
@@ -703,7 +712,7 @@ contains
 
     allocate(tcinternal%tile_coord_f,source = tile_coord_f)
     
-    pert_grid_l = get_minExtent_grid(land_nt_local,                             &
+    pert_grid_l = get_minExtent_grid(local_nt,                             &
          tcinternal%tile_coord%pert_i_indg, tcinternal%tile_coord%pert_j_indg,   &
          tcinternal%tile_coord%min_lon,     tcinternal%tile_coord%min_lat,       &
          tcinternal%tile_coord%max_lon,     tcinternal%tile_coord%max_lat,       &

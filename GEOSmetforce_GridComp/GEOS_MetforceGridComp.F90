@@ -59,7 +59,6 @@ module GEOS_MetforceGridCompMod
      ! Met forcing data
      type(met_force_type), pointer, contiguous :: DataPrv(:)
      type(met_force_type), pointer, contiguous :: DataNxt(:)
-     type(tile_coord_type),pointer, contiguous :: tile_coord(:)
   end type T_MET_FORCING
 
   ! Internal state and its wrapper
@@ -604,18 +603,15 @@ module GEOS_MetforceGridCompMod
     type(METFORCE_WRAP) :: wrap
     type(TILECOORD_WRAP) :: tcwrap
     type(tile_coord_type), pointer :: tile_coord(:)=>null()
-    type(tile_coord_type), pointer :: tile_coord_tmp(:)=>null()
 
     ! Misc variables
-    integer :: nt_local, k, NUM_ENSEMBLE, i1, i2, j1, j2
+    integer :: locat_nt, k, NUM_ENSEMBLE, i1, i2, j1, j2
     integer :: ForceDtStep
     type(met_force_type) :: mf_nodata
     logical :: MERRA_file_specs, ensemble_forcing
     logical :: backward_looking_fluxes  
     real, pointer :: TileLats(:)
     real, pointer :: TileLons(:)
-    integer, pointer :: i_indg(:)
-    integer, pointer :: j_indg(:)
     integer, pointer :: tiletype(:)
     integer :: AEROSOL_DEPOSITION
     type(MAPL_LocStream) :: locstream
@@ -651,17 +647,15 @@ module GEOS_MetforceGridCompMod
     ! Get component's internal tile_coord variable
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
     VERIFY_(status)
-    tile_coord_tmp => tcwrap%ptr%tile_coord
+    tile_coord => tcwrap%ptr%tile_coord
 
     call MAPL_Get(MAPL, LocStream=locstream)
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
          locstream,                                                             &
-         NT_LOCAL=nt_local,                                                     &
-         TILELATS=TileLats,                                                 &
-         TILELONS=TileLons,                                                 &
-         LOCAL_I =i_indg,                                                       &
-         LOCAL_J =j_indg,                                                       &
+         NT_LOCAL=locat_nt,                                                     &
+         TILELATS=TileLats,                                                     &
+         TILELONS=TileLons,                                                     &
          TILETYPE=tiletype,                                                     &
          rc=status                                                              &
          )
@@ -679,28 +673,6 @@ module GEOS_MetforceGridCompMod
        call MAPL_GridGet(agrid, globalCellCountPerDim=dims, rc=status) 
        VERIFY_(STATUS)
        im_world_cs = dims(1)
-       !change local index to global. Only cubed-sphere grid cares about the index in geting forcing
-       call ESMF_GRID_INTERIOR(agrid,I1,I2,J1,J2)
-       i_indg = i_indg + i1 -1
-       j_indg = j_indg + j1 -1
-       if (any(tile_coord_tmp%i_indg /= i_indg(1:NUM_LAND_TILE))) then
-         _FAIL('i_indg index does not match')
-       endif
-       if (any(tile_coord_tmp%j_indg /= j_indg(1:NUM_LAND_TILE))) then
-         _FAIL('j_indg index does not match')
-       endif
-    endif
-
-    allocate(mf%tile_coord(nt_local))
-    mf%tile_coord(1:NUM_LAND_TILE) = tile_coord_tmp
- 
-   if (NUM_LANDICE_TILE > 0 ) then
-       i1 = NUM_LAND_TILE + 1
-       i2 = NUM_LAND_TILE + NUM_LANDICE_TILE
-       mf%tile_coord(i1:i2)%com_lon = TileLons(i1:i2)*MAPL_RADIANS_TO_DEGREES
-       mf%tile_coord(i1:i2)%com_lat = TileLats(i1:i2)*MAPL_RADIANS_TO_DEGREES
-       mf%tile_coord(i1:i2)%i_indg  = i_indg(i1:i2)
-       mf%tile_coord(i1:i2)%j_indg  = j_indg(i1:i2)
     endif
 
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
@@ -744,12 +716,12 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
     ! -allocate-memory-for-metforcing-data-
     mf_nodata = nodata_generic
-    allocate(mf%DataPrv(nt_local), source=mf_nodata, stat=status)
+    allocate(mf%DataPrv(locat_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
-    allocate(mf%DataNxt(nt_local), source=mf_nodata, stat=status)
+    allocate(mf%DataNxt(locat_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
     ! -allocate-memory-for-avg-zenith-angle
-    allocate(mf%zenav(nt_local), source=nodata_generic, stat=status)
+    allocate(mf%zenav(locat_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
     call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
@@ -767,7 +739,6 @@ module GEOS_MetforceGridCompMod
     endif
     ! Put MetForcing in Ldas' pvt internal state
     internal%mf = mf
-    tile_coord => internal%mf%tile_coord
     ! Create alarm for MetForcing
     ! -create-nonsticky-alarm-
     MetForcingAlarm = ESMF_AlarmCreate(                                         &
@@ -792,7 +763,7 @@ module GEOS_MetforceGridCompMod
          ForceDtStep,                                                           &
          internal%mf%Path,                                                      &
          internal%mf%Tag,                                                       &
-         nt_local,                                                              &
+         locat_nt,                                                              &
          tile_coord,                                                            &
          internal%mf%hinterp,                                                   &
          AEROSOL_DEPOSITION,                                                    &
@@ -864,11 +835,12 @@ module GEOS_MetforceGridCompMod
 
     ! Private internal state variables
     type(T_METFORCE_STATE), pointer :: internal=>null()
-    type(METFORCE_WRAP) :: wrap
+    type(METFORCE_WRAP)  :: wrap
+    type(TILECOORD_WRAP) :: tcwrap ! LDAS' tile_coord variable
     type(tile_coord_type), pointer :: tile_coord(:)
 
     ! Misc variables
-    integer :: nt_local ! number of tiles in local PE
+    integer :: locat_nt ! number of tiles in local PE
     integer :: comm
     logical :: IAmRoot
     integer :: fdtstep
@@ -947,9 +919,8 @@ module GEOS_MetforceGridCompMod
     call ESMF_UserCompGetInternalState(gc, 'METFORCE_state', wrap, status)
     VERIFY_(status)
     internal => wrap%ptr
-    tile_coord => internal%mf%tile_coord
  
-   call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
          DEFAULT=1, RC=STATUS)
 
     ! Get number of tiles, tile lats/lons from LocStream
@@ -957,7 +928,7 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
          locstream,                                                             &
-         NT_LOCAL=nt_local,                                                &
+         NT_LOCAL=locat_nt,                                                &
          TILELATS=TileLats,                                                 &
          TILELONS=TileLons,                                                 &
          rc=status                                                              &
@@ -968,11 +939,11 @@ module GEOS_MetforceGridCompMod
     call MAPL_Get(MAPL, orbit=orbit)
 
     ! Allocate memory for zenith angle
-    allocate(zth(nt_local), source=nodata_generic, stat=status)
+    allocate(zth(locat_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
-    allocate(slr(nt_local), source=nodata_generic, stat=status)
+    allocate(slr(locat_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
-    allocate(zth_tmp(nt_local), source=nodata_generic, stat=status)
+    allocate(zth_tmp(locat_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
 
     ! Convert forcing time interval to seconds
@@ -981,6 +952,11 @@ module GEOS_MetforceGridCompMod
     ! MetForcing alarm
     call ESMF_ClockGetAlarm(clock, 'MetForcing', MetForcingAlarm, rc=status)
     VERIFY_(status)
+
+   ! Get component's internal tile_coord variable
+    call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
+    VERIFY_(status)
+    tile_coord => tcwrap%ptr%tile_coord
 
 
     ! Time stamp of next model step
@@ -1014,7 +990,7 @@ module GEOS_MetforceGridCompMod
             fdtstep,                                                            &
             internal%mf%Path,                                                   &
             internal%mf%Tag,                                                    &
-            nt_local,                                                      &
+            locat_nt,                                                      &
             tile_coord,                                                         &
             internal%mf%hinterp,                                                &
             AEROSOL_DEPOSITION,                                                 &
@@ -1032,10 +1008,10 @@ module GEOS_MetforceGridCompMod
 
        ! -compute-average-zenith-angle-over-daylight-part-of-forcing-interval-
        call MAPL_SunGetInsolation(                                              &
-            TileLons,                                                       &
-            TileLats,                                                       &
+            TileLons,                                                           &
+            TileLats,                                                           &
             orbit,                                                              &
-            zth_tmp,                                                                &
+            zth_tmp,                                                            &
             slr,                                                                &
             currTime=internal%mf%TimePrv,                                       &
             INTV=internal%mf%ntrvl,                                             &
@@ -1049,7 +1025,7 @@ module GEOS_MetforceGridCompMod
       !          dayOfYear=DAY_OF_YEAR, RC=STATUS)
       ! VERIFY_(STATUS) 
 
-      ! call zenith(DAY_OF_YEAR,SEC_OF_DAY,fdtstep,ModelTimeStep,nt_local,tile_coord%com_lon,                                                    &
+      ! call zenith(DAY_OF_YEAR,SEC_OF_DAY,fdtstep,ModelTimeStep,locat_nt,tile_coord%com_lon,                                                    &
       !         tile_coord%com_lat,internal%mf%zenav)
 
 
@@ -1065,8 +1041,8 @@ module GEOS_MetforceGridCompMod
 
     ! Compute zenith angle at the next time step
     call MAPL_SunGetInsolation(                                                 &
-         TileLons,                                                          &
-         TileLats,                                                          &
+         TileLons,                                                              &
+         TileLats,                                                              &
          orbit,                                                                 &
          zth_tmp,                                                               &
          slr,                                                                   &
@@ -1081,7 +1057,7 @@ module GEOS_MetforceGridCompMod
     !call ESMF_TimeGet(ModelTimeNxt, YY=YEAR, S=SEC_OF_DAY, &
     !          dayOfYear=DAY_OF_YEAR, RC=STATUS)
     !VERIFY_(STATUS)
-    !do n=1, nt_local
+    !do n=1, locat_nt
     !  call solar(tile_coord(n)%com_lon,tile_coord(n)%com_lat, DAY_OF_YEAR,SEC_OF_DAY,zth(n),slr(n))
     !enddo
 
@@ -1104,7 +1080,7 @@ module GEOS_MetforceGridCompMod
 
     ! Allocate memory for interpolated MetForcing data
     mf_nodata = nodata_generic
-    allocate(mfDataNtp(nt_local), source=mf_nodata, stat=status)
+    allocate(mfDataNtp(locat_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
 
     ! Interpolate MetForcing data to the end of model integration time step
