@@ -103,6 +103,8 @@ program main
 
      orig_irr = arg1
      new_irr  = arg2
+     f2g_file = arg3
+
 
      call write3D_nc (f2g_file, orig_irr, new_irr)
 

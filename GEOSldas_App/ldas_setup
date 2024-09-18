@@ -994,7 +994,8 @@ class LDASsetup:
                 irrigationLocal = self.rstdir+ensdir +'/'+ y4m2 +'/'+self.rqdExeInp['EXP_ID']+'.irrigation_internal_rst.'+y4m2d2_h2m2
                 if self.islocal :
                     print ("Creating the local irrigation restart file... \n")
-                    cmd='./preprocess_ldas.x c_localirrrst '+ irrigationRstFile +' ' + irrigationLocal  
+                    cmd='./preprocess_ldas.x c_localirrrst '+ irrigationRstFile +' ' + irrigationLocal + ' '+ tmp_f2g_file.name
+
                     print ("cmd:   " + cmd)
                     sp.call(shlex.split(cmd))
                 else :
