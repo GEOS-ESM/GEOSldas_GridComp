@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - More optimal distribution of tiles on processors for cubed-sphere tile space.
+- Ifdef'd out HDF4 reader code in `GEOSlandassim_GridComp/clsm_ensupd_read_obs.F90` due to lack of HDF4 Fortran
+  support.
 
 ### Fixed
 
@@ -43,9 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Moved external `GEOSgcm_GridComp` repository to under `GEOSldas/src/Components` for
   consistency with directory structure of GEOSgcm and GEOSadas  ([PR #27](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/27), [PR #30](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/30)).
-- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)). 
+- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)).
 
-  
+
 -----------------------------
 
 ## [v1.0.1] - 2024-04-10
