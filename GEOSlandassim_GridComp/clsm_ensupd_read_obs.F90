@@ -5125,6 +5125,11 @@ contains
 
   ! *****************************************************************
 
+! NOTE: This code uses HDF4. HDF4 currently does not support
+!       building Fortran interfaces due to bugs. For now we
+!       comment out the code that uses HDF4 but keep it in
+!       the code base for future reference.
+#if 0
   subroutine read_obs_MODIS_SCF(                                   &
        date_time, dtstep_assim, N_catd, tile_coord,                &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,        &
@@ -5576,6 +5581,7 @@ contains
 
 
   end subroutine read_obs_MODIS_SCF
+#endif
 
   ! *******************************************************************************************************
 
@@ -5650,6 +5656,11 @@ contains
 
   ! *****************************************************************
 
+! NOTE: This code uses HDF4. HDF4 currently does not support
+!       building Fortran interfaces due to bugs. For now we
+!       comment out the code that uses HDF4 but keep it in
+!       the code base for future reference.
+#if 0
   subroutine read_MODIS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
        N_good_data, CMG_lon, CMG_lat, CMG_SCF )
 
@@ -6031,6 +6042,7 @@ contains
     deallocate(Snow_Spatial_QA)
 
   end subroutine read_MODIS_SCF_hdf
+#endif
 
   ! *****************************************************************
 
@@ -8459,6 +8471,11 @@ contains
 
     select case (trim(this_obs_param%descr))
 
+! NOTE: This code uses HDF4. HDF4 currently does not support
+!       building Fortran interfaces due to bugs. For now we
+!       comment out the code that uses HDF4 but keep it in
+!       the code base for future reference.
+#if 0
     case ('ae_l2_sm_a', 'ae_l2_sm_d')
 
        call read_obs_ae_l2_sm(                                        &
@@ -8478,7 +8495,7 @@ contains
                tmp_obs, tmp_std_obs )
 
        end if
-
+#endif
 
     case ('ae_sm_LPRM_a_C', 'ae_sm_LPRM_d_C', 'ae_sm_LPRM_a_X', 'ae_sm_LPRM_d_X' )
 
@@ -8706,6 +8723,11 @@ contains
 
        end if
 
+! NOTE: This code uses HDF4. HDF4 currently does not support
+!       building Fortran interfaces due to bugs. For now we
+!       comment out the code that uses HDF4 but keep it in
+!       the code base for future reference.
+#if 0
     case ('MOD10C1','MYD10C1')
 
        call read_obs_MODIS_SCF(                                       &
@@ -8713,6 +8735,7 @@ contains
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
+#endif
 
     case('SMAP_L1C_Tbh_A',     'SMAP_L1C_Tbv_A',        &
          'SMAP_L1C_Tbh_D',     'SMAP_L1C_Tbv_D',        &
