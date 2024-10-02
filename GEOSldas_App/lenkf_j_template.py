@@ -67,32 +67,32 @@ setenv MPI_STACK {DETECTED_MPI_STACK}
 
 if ( ${{MPI_STACK}} == "openmpi" ) then
 
-# OPENMPI flags
-# Turn off warning about TMPDIR on NFS
-setenv OMPI_MCA_shmem_mmap_enable_nfs_warning 0
-# pre-connect MPI procs on mpi_init
-setenv OMPI_MCA_mpi_preconnect_all 1
-setenv OMPI_MCA_coll_tuned_bcast_algorithm 7
-setenv OMPI_MCA_coll_tuned_scatter_algorithm 2
-setenv OMPI_MCA_coll_tuned_reduce_scatter_algorithm 3
-setenv OMPI_MCA_coll_tuned_allreduce_algorithm 3
-setenv OMPI_MCA_coll_tuned_allgather_algorithm 4
-setenv OMPI_MCA_coll_tuned_allgatherv_algorithm 3
-setenv OMPI_MCA_coll_tuned_gather_algorithm 1
-setenv OMPI_MCA_coll_tuned_barrier_algorithm 0
-# required for a tuned flag to be effective
-setenv OMPI_MCA_coll_tuned_use_dynamic_rules 1
-# disable file locks
-setenv OMPI_MCA_sharedfp "^lockedfile,individual"
+    # OPENMPI flags
+    # Turn off warning about TMPDIR on NFS
+    setenv OMPI_MCA_shmem_mmap_enable_nfs_warning 0
+    # pre-connect MPI procs on mpi_init
+    setenv OMPI_MCA_mpi_preconnect_all 1
+    setenv OMPI_MCA_coll_tuned_bcast_algorithm 7
+    setenv OMPI_MCA_coll_tuned_scatter_algorithm 2
+    setenv OMPI_MCA_coll_tuned_reduce_scatter_algorithm 3
+    setenv OMPI_MCA_coll_tuned_allreduce_algorithm 3
+    setenv OMPI_MCA_coll_tuned_allgather_algorithm 4
+    setenv OMPI_MCA_coll_tuned_allgatherv_algorithm 3
+    setenv OMPI_MCA_coll_tuned_gather_algorithm 1
+    setenv OMPI_MCA_coll_tuned_barrier_algorithm 0
+    # required for a tuned flag to be effective
+    setenv OMPI_MCA_coll_tuned_use_dynamic_rules 1
+    # disable file locks
+    setenv OMPI_MCA_sharedfp "^lockedfile,individual"
 
 else if ( ${{MPI_STACK}} == "intelmpi" ) then
 
-setenv BUILT_ON_SLES15 {BUILT_ON_SLES15}
+    setenv BUILT_ON_SLES15 {BUILT_ON_SLES15}
 
-if ( ${{BUILT_ON_SLES15}} == TRUE ) then
-setenv I_MPI_FABRICS shm:ofi
-setenv I_MPI_OFI_PROVIDER psm3
-endif # BUILT_ON_SLES15
+    if ( ${{BUILT_ON_SLES15}} == TRUE ) then
+        setenv I_MPI_FABRICS shm:ofi
+        setenv I_MPI_OFI_PROVIDER psm3
+    endif # BUILT_ON_SLES15
 
 endif # MPI_STACK
 
