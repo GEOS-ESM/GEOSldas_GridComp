@@ -102,7 +102,7 @@ setenv RUN_CMD "$GEOSBIN/esma_mpirun -np "
 
 setenv    HOMDIR         $EXPDIR/run/
 setenv    SCRDIR         $EXPDIR/scratch
-setenv    MODEL          {MY_MODEL}
+setenv    LANDMODEL      {MY_LANDMODEL}
 setenv    MYNAME         `finger $USER | cut -d: -f3 | head -1`
 setenv    POSTPROC_HIST  {MY_POSTPROC_HIST}
 
@@ -716,14 +716,24 @@ EOF
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
    
-       set rstf = ${{MODEL}} 
-       if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
-          /bin/mv ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
-          /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+       set rstfs = (${{LANDMODEL}} 'landice')
+       foreach rstf ( $rstfs )
+          if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
+             set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
+             /bin/mv ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
+             /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+             /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+          endif
+       end
+
+       set rstf = 'landassim_obspertrseed'
+       if (-f ${{rstf}}${{ENSID}}_checkpoint ) then
+         set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
+         /bin/mv ${{rstf}}${{ENSID}}_checkpoint $tmp_file
+         /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
+         /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
        endif
-   
+
        set rstf = 'landpert'
        if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
           set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
@@ -737,28 +747,22 @@ EOF
           /usr/bin/gzip $old_rst &
        endif
    
-       set rstf = 'landassim_obspertrseed'
-       if (-f ${{rstf}}${{ENSID}}_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
-          /bin/mv ${{rstf}}${{ENSID}}_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
-          /bin/ln -rs $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
-       endif
    # move intermediate check point files to  output/$EXPDOMAIN/rs/$ENSDIR/Yyyyy/Mmm/ directories
    # -------------------------------------------------------------------------------------------
    
-       set rstfiles1 = `ls ${{MODEL}}${{ENSID}}_internal_checkpoint.*`
+       set rstfiles1 = `ls ${{LANDMODEL}}${{ENSID}}_internal_checkpoint.*`
        set rstfiles2 = `ls landpert${{ENSID}}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${{ENSID}}_checkpoint.*`
+       set rstfiles4 = `ls landice${{ENSID}}_internal_checkpoint.*`
    
-       foreach rfile ( $rstfiles1 ) 
+       foreach rfile ( $rstfiles1 $rstfiles4 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
           set TM = `echo $ThisTime | cut -c5-6` 
           set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{TY}}/M${{TM}}/
           if (! -e $THISDIR            ) mkdir -p $THISDIR
-          /bin/mv $rfile ${{THISDIR}}${{EXPID}}.${{MODEL}}_internal_rst.${{ThisTime}}.nc4
-          /usr/bin/gzip ${{THISDIR}}${{EXPID}}.${{MODEL}}_internal_rst.${{ThisTime}}.nc4 &
+          /bin/mv $rfile ${{THISDIR}}${{EXPID}}.${{LANDMODEL}}_internal_rst.${{ThisTime}}.nc4
+          /usr/bin/gzip ${{THISDIR}}${{EXPID}}.${{LANDMODEL}}_internal_rst.${{ThisTime}}.nc4 &
        end
        
        foreach rfile ( $rstfiles2 ) 

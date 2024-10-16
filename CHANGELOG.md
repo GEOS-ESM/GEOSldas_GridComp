@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added landice grid comp
+
 ### Changed
 
 - More optimal distribution of tiles on processors for cubed-sphere tile space.
