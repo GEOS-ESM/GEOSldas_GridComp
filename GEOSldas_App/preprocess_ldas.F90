@@ -47,8 +47,7 @@ program main
   character(len=12 ) :: ymdhm
   character(len=12 ) :: SURFLAY
   character(len=:), allocatable :: new_r, orig_r, tile_types
-  integer :: from, to, n, i, Length
-  integer, allocatable :: types_(:)
+  integer, allocatable :: int_types(:)
   
   call get_command_argument(1,option)
   call get_command_argument(2,arg1)
@@ -74,27 +73,10 @@ program main
      ymdhm           = trim(adjustl(arg6))
      SURFLAY         = trim(adjustl(arg7))
      f2g_file        = arg8
-     tile_types      = trim(arg9)
-     n = 1
-     Length = len(tile_types)
-     do i = 1, Length
-       if (tile_types(i:i) == '_') n = n+1
-     enddo 
-     allocate(types_(n))
-     from = 0
-     to   = 1
-     n    = 1
-     do while (to <= Length)
-       if (tile_types(to:to) == "_") then
-         read (unit=tile_types(from+1:to-1),fmt=*) types_(n)
-         n = n + 1
-         from = to
-       endif
-       to = to + 1
-     enddo
-     read (unit=tile_types(from+1:to-1),fmt=*) types_(n)
-     print*, types_
-     call create_mapping(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file, types_)
+
+     call get_tile_types(trim(arg9), int_types)  
+
+     call create_mapping(orig_tile,domain_def_file,trim(out_path),catch_def_file,trim(exp_id),ymdhm, SURFLAY, f2g_file, int_types)
      
   else if (trim(option) == "zoomin_tile") then
      
@@ -159,15 +141,41 @@ program main
      
   else if (trim(option) == "optimize") then
      
-      
-     call optimize_latlon(arg1,arg2, arg3, arg4)
+     call get_tile_types(trim(arg5), int_types) 
+     call optimize_latlon(arg1,arg2, arg3, arg4, int_types)
      
   else
      
      print*, " wrong preprocess option:",option
      
   end if
-  
+
+contains
+
+  subroutine get_tile_types(str_types, int_types)
+    character(*), intent(in) :: str_types
+    integer, allocatable, intent(out) :: int_types(:)
+    integer :: n, Length, from, to, i
+    n = 1
+    Length = len(str_types)
+    do i = 1, Length
+      if (str_types(i:i) == '_') n = n+1
+    enddo
+    allocate(int_types(n))
+    from = 0
+    to   = 1
+    n    = 1
+    do while (to <= Length)
+      if (str_types(to:to) == "_") then
+         read (unit=str_types(from+1:to-1),fmt=*) int_types(n)
+         n = n + 1
+         from = to
+      endif
+      to = to + 1
+    enddo
+    read (unit=tile_types(from+1:to-1),fmt=*) int_types(n)
+  end subroutine get_tile_types 
+
 end program main
 
 ! ====================== EOF =======================================================

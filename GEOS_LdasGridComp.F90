@@ -20,7 +20,7 @@ module GEOS_LdasGridCompMod
   use LDAS_TileCoordType, only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType, only: grid_def_type, io_grid_def_type, operator (==)
   use LDAS_TileCoordRoutines, only: get_minExtent_grid, get_ij_ind_from_latlon, io_domain_files
-  use LDAS_ConvertMod, only: esmf2ldas
+  use LDAS_ConvertMod, only: esmf2ldas, string2tile_types
   use LDAS_PertRoutinesMod, only: get_pert_grid
   use LDAS_ensdrv_functions,ONLY:  get_io_filename 
   use LDAS_DateTimeMod,ONLY: date_time_type
@@ -62,6 +62,7 @@ module GEOS_LdasGridCompMod
   logical :: mwRTM
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
   logical :: with_landice
+  logical :: with_land
 contains
 
   !BOP
@@ -89,6 +90,7 @@ contains
     character(len=ESMF_MAXSTR) :: ensid_string,childname
     character(len=ESMF_MAXSTR) :: LAND_ASSIM_STR, mwRTM_file, ENS_FORCING_STR, TILE_TYPES_STR
     integer                    :: ens_id_width
+    character(10), allocatable :: tile_types(:)
     ! Local variables
     type(T_TILECOORD_STATE), pointer :: tcinternal
     type(TILECOORD_WRAP) :: tcwrap
@@ -152,21 +154,37 @@ contains
     VERIFY_(STATUS)
     ensemble_forcing = (trim(ENS_FORCING_STR) == 'YES')
 
+    call MAPL_GetResource ( MAPL, TILE_TYPES_STR, Label="TILE_TYPES:", DEFAULT="LAND", RC=STATUS)
+    VERIFY_(STATUS)
+    TILE_TYPES_STR =  ESMF_UtilStringUpperCase(TILE_TYPES_STR, rc=STATUS)
+    VERIFY_(STATUS)
+    call string2tile_types(TILE_TYPES_STR, tile_types)
+    with_landice = .false.
+    with_land    = .false.
+!    with_lake    = .false.
+    do i = 1, size(tile_types)
+       if (trim(tile_types(i)) == 'LANDICE') with_landice = .true.
+       if (trim(tile_types(i)) == 'LAND')    with_land    = .true.
+!       if (trim(tile_types(i)) == 'LAKE')    with_lake    = .true.
+    enddo
+
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
     LAND_ASSIM_STR =  ESMF_UtilStringUpperCase(LAND_ASSIM_STR, rc=STATUS)
     VERIFY_(STATUS)
     land_assim = (trim(LAND_ASSIM_STR) /= 'NO')
 
-    call MAPL_GetResource ( MAPL, TILE_TYPES_STR, Label="TILE_TYPES:", DEFAULT="LAND", RC=STATUS)
-    VERIFY_(STATUS)
-    TILE_TYPES_STR =  ESMF_UtilStringUpperCase(TILE_TYPES_STR, rc=STATUS)
-    VERIFY_(STATUS)
-    with_landice = (index(TILE_TYPES_STR, 'LANDICE') /= 0)
+    if (land_assim .and. .not. with_land) then
+       _ASSERT( .false., "No land for land assimilation")
+    endif
 
     call MAPL_GetResource ( MAPL, mwRTM_file, Label="LANDASSIM_INTERNAL_RESTART_FILE:", DEFAULT='', RC=STATUS)
     VERIFY_(STATUS)
     mwRTM = ( len_trim(mwRTM_file) /= 0 )
+    if (mwRTM .and. .not. with_land) then
+       print*, "No land for assimilation, no mwRTM file is necessary"
+       mwRTM = .false.
+    endif
 
     call MAPL_GetResource ( MAPL, LSM_CHOICE, Label="LSM_CHOICE:", DEFAULT=1, RC=STATUS)
     if (LSM_CHOICE /=1 ) then
@@ -179,7 +197,7 @@ contains
        allocate(METFORCE(1))
     endif
 
-    allocate(LAND(NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
+    if (with_land)    allocate(LAND(NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
     if (with_landice) allocate(LANDICE(NUM_ENSEMBLE))
 
     ! ens_id_with = 2 + number of digits = total number of chars in ensid_string ("_eXXXX")
@@ -214,13 +232,15 @@ contains
 
        call get_ensid_string(ensid_string, ens_id, ens_id_width, NUM_ENSEMBLE)
 
-       childname='LANDPERT'//trim(ensid_string)
-       LANDPERT(i) = MAPL_AddChild(gc, name=childname, ss=LandPertSetServices, rc=status)
-       VERIFY_(status)
+       if (with_land) then
+          childname='LANDPERT'//trim(ensid_string)
+          LANDPERT(i) = MAPL_AddChild(gc, name=childname, ss=LandPertSetServices, rc=status)
+          VERIFY_(status)
 
-       childname='LAND'//trim(ensid_string)
-       LAND(i) = MAPL_AddChild(gc, name=childname, ss=LandSetServices, rc=status)
-       VERIFY_(status)
+          childname='LAND'//trim(ensid_string)
+          LAND(i) = MAPL_AddChild(gc, name=childname, ss=LandSetServices, rc=status)
+          VERIFY_(status)
+       endif 
 
        if (with_landice) then
           childname='LANDICE'//trim(ensid_string)
@@ -229,70 +249,72 @@ contains
        endif
     enddo
 
-    ENSAVG    = MAPL_AddChild(gc, name='ENSAVG', ss=EnsSetServices, rc=status)
-    VERIFY_(status)
+    if (with_land) then
+       ENSAVG    = MAPL_AddChild(gc, name='ENSAVG', ss=EnsSetServices, rc=status)
+       VERIFY_(status)
     
-    if(land_assim .or. mwRTM ) then
-       LANDASSIM = MAPL_AddChild(gc, name='LANDASSIM', ss=LandAssimSetServices, rc=status)
-       VERIFY_(status)
-    endif
-
-    ! Connections
-    do i=1,NUM_ENSEMBLE
-       k = 1
-       if ( ensemble_forcing ) k = i
-    ! -LANDPERT-feeds-LAND's-imports-
-       call MAPL_AddConnectivity(                                                  &
-            gc,                                                                    &
-            SRC_NAME = ['TApert         ', 'QApert         ', 'UUpert         ',   &
-                        'UWINDLMTILEpert', 'VWINDLMTILEpert', 'PCUpert        ',   &
-                        'PLSpert        ', 'SNOpert        ', 'DRPARpert      ',   &
-                        'DFPARpert      ', 'DRNIRpert      ', 'DFNIRpert      ',   &
-                        'DRUVRpert      ', 'DFUVRpert      ', 'LWDNSRFpert    '],  &
-            SRC_ID = LANDPERT(i),                                                  &
-            DST_NAME = ['TA         ', 'QA         ', 'UU         ', 'UWINDLMTILE',&
-                        'VWINDLMTILE', 'PCU        ', 'PLS        ', 'SNO        ',&
-                        'DRPAR      ', 'DFPAR      ', 'DRNIR      ', 'DFNIR      ',&
-                        'DRUVR      ', 'DFUVR      ', 'LWDNSRF    '],              &
-            DST_ID = LAND(i),                                                      &
-            rc = status                                                            &
-            )
+       if(land_assim .or. mwRTM ) then
+          LANDASSIM = MAPL_AddChild(gc, name='LANDASSIM', ss=LandAssimSetServices, rc=status)
           VERIFY_(status)
+       endif
 
-    ! -LAND-feeds-LANDPERT's-imports-
-       call MAPL_AddConnectivity(                                                                  &
-            gc,                                                                                    &
-            SRC_NAME =  ['TC     ','CATDEF ','RZEXC  ','SRFEXC ','WESNN1 ','WESNN2 ','WESNN3 ',    &
-               'GHTCNT1','GHTCNT2','GHTCNT3','GHTCNT4','GHTCNT5','GHTCNT6',                        &
-               'HTSNNN1','HTSNNN2','HTSNNN3','SNDZN1 ','SNDZN2 ','SNDZN3 '],                       &
-            SRC_ID = LAND(i),                                                                      &
-            DST_NAME =     ['TCPert     ','CATDEFPert ','RZEXCPert  ','SRFEXCPert ','WESNN1Pert ', &
-              'WESNN2Pert ','WESNN3Pert ','GHTCNT1Pert','GHTCNT2Pert',                             &
-              'GHTCNT3Pert','GHTCNT4Pert','GHTCNT5Pert','GHTCNT6Pert',                             &
-              'HTSNNN1Pert','HTSNNN2Pert','HTSNNN3Pert','SNDZN1Pert ',                             &
-              'SNDZN2Pert ','SNDZN3Pert '],                                                        &
-            DST_ID = LANDPERT(i),                                                                  &
-            rc = status                                                                            &
-            )
-       VERIFY_(status)
-    enddo
+       ! Connections
+       do i=1,NUM_ENSEMBLE
+          k = 1
+          if ( ensemble_forcing ) k = i
+       ! -LANDPERT-feeds-LAND's-imports-
+          call MAPL_AddConnectivity(                                                  &
+               gc,                                                                    &
+               SRC_NAME = ['TApert         ', 'QApert         ', 'UUpert         ',   &
+                           'UWINDLMTILEpert', 'VWINDLMTILEpert', 'PCUpert        ',   &
+                           'PLSpert        ', 'SNOpert        ', 'DRPARpert      ',   &
+                           'DFPARpert      ', 'DRNIRpert      ', 'DFNIRpert      ',   &
+                           'DRUVRpert      ', 'DFUVRpert      ', 'LWDNSRFpert    '],  &
+               SRC_ID = LANDPERT(i),                                                  &
+               DST_NAME = ['TA         ', 'QA         ', 'UU         ', 'UWINDLMTILE',&
+                           'VWINDLMTILE', 'PCU        ', 'PLS        ', 'SNO        ',&
+                           'DRPAR      ', 'DFPAR      ', 'DRNIR      ', 'DFNIR      ',&
+                           'DRUVR      ', 'DFUVR      ', 'LWDNSRF    '],              &
+               DST_ID = LAND(i),                                                      &
+               rc = status                                                            &
+               )
+             VERIFY_(status)
 
-    if(land_assim .or. mwRTM) then
-       ! -LAND-feeds-LANDASSIM's-imports-
-       ! Catchment model parameters from first LAND ens member, assumes no parameter perturbations!
-       call MAPL_AddConnectivity(                                                                  &
-            gc,                                                                                    &
-            SHORT_NAME = ['POROS ', 'COND  ','PSIS  ','BEE   ','WPWET ','GNU   ','VGWMAX',         &
-                          'BF1   ', 'BF2   ','BF3   ','CDCR1 ','CDCR2 ','ARS1  ',                  &
-                          'ARS2  ', 'ARS3  ','ARA1  ','ARA2  ','ARA3  ','ARA4  ',                  &
-                          'ARW1  ', 'ARW2  ','ARW3  ','ARW4  ','TSA1  ','TSA2  ','TSB1  ',         &
-                          'TSB2  ', 'ATAU  ','BTAU  ','ITY   ','Z2CH  ' ],                         &
-            SRC_ID = LAND(1),                                                                      &  ! Note (1) !
-            DST_ID = LANDASSIM,                                                                    &
-            rc = status                                                                            &
-            )
-       VERIFY_(status)
-    endif
+       ! -LAND-feeds-LANDPERT's-imports-
+          call MAPL_AddConnectivity(                                                                  &
+               gc,                                                                                    &
+               SRC_NAME =  ['TC     ','CATDEF ','RZEXC  ','SRFEXC ','WESNN1 ','WESNN2 ','WESNN3 ',    &
+                  'GHTCNT1','GHTCNT2','GHTCNT3','GHTCNT4','GHTCNT5','GHTCNT6',                        &
+                  'HTSNNN1','HTSNNN2','HTSNNN3','SNDZN1 ','SNDZN2 ','SNDZN3 '],                       &
+               SRC_ID = LAND(i),                                                                      &
+               DST_NAME =     ['TCPert     ','CATDEFPert ','RZEXCPert  ','SRFEXCPert ','WESNN1Pert ', &
+                 'WESNN2Pert ','WESNN3Pert ','GHTCNT1Pert','GHTCNT2Pert',                             &
+                 'GHTCNT3Pert','GHTCNT4Pert','GHTCNT5Pert','GHTCNT6Pert',                             &
+                 'HTSNNN1Pert','HTSNNN2Pert','HTSNNN3Pert','SNDZN1Pert ',                             &
+                 'SNDZN2Pert ','SNDZN3Pert '],                                                        &
+               DST_ID = LANDPERT(i),                                                                  &
+               rc = status                                                                            &
+               )
+          VERIFY_(status)
+       enddo
+
+       if(land_assim .or. mwRTM) then
+          ! -LAND-feeds-LANDASSIM's-imports-
+          ! Catchment model parameters from first LAND ens member, assumes no parameter perturbations!
+          call MAPL_AddConnectivity(                                                                  &
+               gc,                                                                                    &
+               SHORT_NAME = ['POROS ', 'COND  ','PSIS  ','BEE   ','WPWET ','GNU   ','VGWMAX',         &
+                             'BF1   ', 'BF2   ','BF3   ','CDCR1 ','CDCR2 ','ARS1  ',                  &
+                             'ARS2  ', 'ARS3  ','ARA1  ','ARA2  ','ARA3  ','ARA4  ',                  &
+                             'ARW1  ', 'ARW2  ','ARW3  ','ARW4  ','TSA1  ','TSA2  ','TSB1  ',         &
+                             'TSB2  ', 'ATAU  ','BTAU  ','ITY   ','Z2CH  ' ],                         &
+               SRC_ID = LAND(1),                                                                      &  ! Note (1) !
+               DST_ID = LANDASSIM,                                                                    &
+               rc = status                                                                            &
+               )
+          VERIFY_(status)
+       endif
+    end if !with_land
 
     call MAPL_TimerAdd(gc, name="Initialize", rc=status)
     VERIFY_(status)
@@ -406,6 +428,7 @@ contains
     real :: DT, DT_Solar
     type(ESMF_Alarm) :: SolarAlarm
     type(ESMF_TimeInterval) :: Solar_DT
+    integer, allocatable :: mask(:)
 
     ! Begin...
 
@@ -541,8 +564,6 @@ contains
          )
     VERIFY_(status)
 
-    call MAPL_TimerOff(MAPL, "-LocStreamCreate")
-
     ! Get children and their im/ex states from MAPL obj
     call MAPL_Get(MAPL, GCS=gcs, GCNAMES=gcnames, rc=status)
     VERIFY_(status)
@@ -550,26 +571,19 @@ contains
     ! Create LAND's locstreams as subset of Surface locstream
     ! and add it to the children's MAPL objects
 
-    call MAPL_TimerOn(MAPL, "-LocStreamCreate")
-    call MAPL_LocStreamCreate(                                                  &
-         land_locstream,                                                        &
-         surf_locstream,                                                        &
-         name=gcnames(LAND(1)),                                                 &
-         mask=[MAPL_LAND],                                                      &
-         rc=status                                                              &
-         )
-    VERIFY_(status)
+    if (with_land) then
+       call MAPL_LocStreamCreate(                                                  &
+          land_locstream,                                                        &
+          surf_locstream,                                                        &
+          name=gcnames(LAND(1)),                                                 &
+          mask=[MAPL_LAND],                                                      &
+          rc=status                                                              &
+          )
+       VERIFY_(status)
+       mask =[MAPL_LAND]
+    endif
 
     if (with_landice) then
-       call MAPL_LocStreamCreate(                                                &
-          force_locstream,                                                       &
-          surf_locstream,                                                        &
-          name=gcnames(METFORCE(1)),                                             &
-          mask=[MAPL_LAND, MAPL_LANDICE],                                        &
-          rc=status                                                              &
-         )
-       VERIFY_(status)
-
        call MAPL_LocStreamCreate(                                                &
           landice_locstream,                                                     &
           surf_locstream,                                                        &
@@ -578,27 +592,28 @@ contains
           rc=status                                                              &
          )
        VERIFY_(status)
+       mask = [mask, MAPL_LANDICE]
     endif
+
+    call MAPL_LocStreamCreate(                                                &
+         force_locstream,                                                     &
+         surf_locstream,                                                      &
+         name=gcnames(METFORCE(1)),                                           &
+         mask=mask,                                                           &
+         rc=status                                                            &
+        )
+    VERIFY_(status)
 
     call MAPL_TimerOff(MAPL, "-LocStreamCreate")
     ! Convert LAND's LocStream to LDAS' tile_coord and save it in the GridComp
     ! -get-tile-information-from-land's-locstream-
-    call MAPL_LocStreamGet(                                                     &
-         land_locstream,                                                        &
-         NT_LOCAL=local_nt,                                                     &
-         LOCAL_ID=local_id,                                                     &
-         rc=status                                                              &
-         )
+    call MAPL_LocStreamGet(                                                   &
+        force_locstream,                                                      &
+        NT_LOCAL=local_nt,                                                    &
+        LOCAL_ID=local_id,                                                    &
+        rc=status                                                             &
+        )
     VERIFY_(status)
-    if (with_landice) then
-       call MAPL_LocStreamGet(                                                   &
-           force_locstream,                                                      &
-           NT_LOCAL=local_nt,                                                    &
-           LOCAL_ID=local_id,                                                    &
-           rc=status                                                             &
-           )
-       VERIFY_(status)
-    endif
     
     ! -get-component's-internal-state-
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
@@ -726,13 +741,8 @@ contains
     do i = 1, NUM_ENSEMBLE
        call MAPL_GetObjectFromGC(gcs(METFORCE(i)), CHILD_MAPL, rc=status)
        VERIFY_(status) ! CHILD = METFORCE
-       if ( with_landice) then
-          call MAPL_Set(CHILD_MAPL, LocStream=force_locstream, rc=status)
-          VERIFY_(status)
-       else
-          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
-          VERIFY_(status)
-       endif
+       call MAPL_Set(CHILD_MAPL, LocStream=force_locstream, rc=status)
+       VERIFY_(status)
        call ESMF_UserCompSetInternalState(gcs(METFORCE(i)), 'TILE_COORD', tcwrap, status)
        VERIFY_(status)
 
@@ -740,16 +750,31 @@ contains
        if (.not. ensemble_forcing) exit
     enddo
 
-    call MAPL_GetObjectFromGC(gcs(ENSAVG), CHILD_MAPL, rc=status)
-    VERIFY_(status) ! CHILD = ens_avg
-    call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
-    VERIFY_(status)
-
-    do i = 1,NUM_ENSEMBLE
-       call MAPL_GetObjectFromGC(gcs(LAND(i)), CHILD_MAPL, rc=status)
-       VERIFY_(status)
+    if ( with_land) then
+       call MAPL_GetObjectFromGC(gcs(ENSAVG), CHILD_MAPL, rc=status)
+       VERIFY_(status) ! CHILD = ens_avg
        call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
        VERIFY_(status)
+    endif
+
+    do i = 1,NUM_ENSEMBLE
+       if (with_land) then 
+          call MAPL_GetObjectFromGC(gcs(LAND(i)), CHILD_MAPL, rc=status)
+          VERIFY_(status)
+          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+          VERIFY_(status)
+
+          call MAPL_GetObjectFromGC(gcs(LANDPERT(i)), CHILD_MAPL, rc=status)
+          VERIFY_(status) ! CHILD = LANDPERT
+          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+          VERIFY_(status)
+
+          ! Add LAND's tile_coord to children's GridComps
+          call ESMF_UserCompSetInternalState(gcs(LAND(i)), 'TILE_COORD', tcwrap, status)
+          VERIFY_(status)
+          call ESMF_UserCompSetInternalState(gcs(LANDPERT(i)), 'TILE_COORD', tcwrap, status)
+          VERIFY_(status)
+       endif
 
        if (with_landice) then
           call MAPL_GetObjectFromGC(gcs(LANDICE(i)), CHILD_MAPL, rc=status)
@@ -757,21 +782,10 @@ contains
           call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
           VERIFY_(status)
        endif
-
-       call MAPL_GetObjectFromGC(gcs(LANDPERT(i)), CHILD_MAPL, rc=status)
-       VERIFY_(status) ! CHILD = LANDPERT
-       call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
-       VERIFY_(status)
-
-       ! Add LAND's tile_coord to children's GridComps
-       call ESMF_UserCompSetInternalState(gcs(LAND(i)), 'TILE_COORD', tcwrap, status)
-       VERIFY_(status)
-       call ESMF_UserCompSetInternalState(gcs(LANDPERT(i)), 'TILE_COORD', tcwrap, status)
-       VERIFY_(status)
        
     enddo
 
-    if (land_assim .or. mwRTM) then
+    if (land_assim .or. mwRTM ) then
        call MAPL_GetObjectFromGC(gcs(LANDASSIM), CHILD_MAPL, rc=status)
        VERIFY_(status) 
        call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
@@ -807,7 +821,6 @@ contains
     if ( IamRoot) call echo_clsm_ensdrv_glob_param()
     if ( IamRoot) call echo_catch_constants(logunit)
     if ( IamRoot) call StieglitzSnow_echo_constants(logunit)
-
 
     ! Turn timer off
     call MAPL_TimerOff(MAPL, "Initialize")
@@ -905,27 +918,28 @@ contains
        call ESMF_TimePrint(ModelTimeCur, options='string', rc=status)
        VERIFY_(status)
     end if
-    
+
     !phase2 initialization ( executed once)
     !adjust mean of perturbed forcing or Progn
-    do i  = 1,NUM_ENSEMBLE
-       igc = LANDPERT(i)
-       call MAPL_TimerOn(MAPL, gcnames(igc))
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
-       VERIFY_(status)
-       call MAPL_TimerOff(MAPL, gcnames(igc))
-    enddo
+    if (with_land) then
+       do i  = 1,NUM_ENSEMBLE
+          igc = LANDPERT(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          VERIFY_(status)
+          call MAPL_TimerOff(MAPL, gcnames(igc))
+       enddo
 
-    ! Run children GridComps (in order)
-    ! Generate raw perturbed force and progn
-    do i  = 1,NUM_ENSEMBLE
-       igc = LANDPERT(i)
-       call MAPL_TimerOn(MAPL, gcnames(igc))
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
-       VERIFY_(status)
-       call MAPL_TimerOff(MAPL, gcnames(igc))
-    enddo
-
+       ! Run children GridComps (in order)
+       ! Generate raw perturbed force and progn
+       do i  = 1,NUM_ENSEMBLE
+          igc = LANDPERT(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
+          VERIFY_(status)
+          call MAPL_TimerOff(MAPL, gcnames(igc))
+       enddo
+    endif ! with_land
 
     do i = 1, NUM_ENSEMBLE
        igc = METFORCE(i)
@@ -944,10 +958,13 @@ contains
        igc = METFORCE(k)
        call MAPL_TimerOn(MAPL, gcnames(igc))
 
-       call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAND(i)),       clock=clock, phase=2, userRC=status)
-       VERIFY_(status)
-       call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDPERT(i)),   clock=clock, phase=3, userRC=status)
-       VERIFY_(status)
+       if (with_land) then
+          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAND(i)),       clock=clock, phase=2, userRC=status)
+          VERIFY_(status)
+          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDPERT(i)),   clock=clock, phase=3, userRC=status)
+          VERIFY_(status)
+       endif
+
        if (with_landice) then
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDICE(i)),  clock=clock, phase=4, userRC=status)
           VERIFY_(status)
@@ -957,29 +974,31 @@ contains
 
     do i  = 1,NUM_ENSEMBLE
 
-       !ApplyForcePert
-       igc = LANDPERT(i)
-       call MAPL_TimerOn(MAPL, gcnames(igc))
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=3, userRC=status)
-       VERIFY_(status)
-       call MAPL_TimerOff(MAPL, gcnames(igc))
-
-       ! Use landpert's output as the input to calculate the ensemble average forcing
-       ! W.J note: So far it is only for the Catchment model. 
-       ! To make CatchmentCN work with assim, the export from landgrid and catchmentCN grid need to be modified.  
-       if ( LSM_CHOICE == 1 ) then
-          call ESMF_GridCompRun(gcs(ENSAVG), importState=gex(igc), exportState=gex(ENSAVG), clock=clock,phase=1, userRC=status)
+       if (with_land) then
+          !ApplyForcePert
+          igc = LANDPERT(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=3, userRC=status)
           VERIFY_(status)
-       endif
+          call MAPL_TimerOff(MAPL, gcnames(igc))
 
-       ! Run the land model
-       igc = LAND(i)
-       call MAPL_TimerOn(MAPL, gcnames(igc))
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
-       VERIFY_(status)
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
-       VERIFY_(status)
-       call MAPL_TimerOff(MAPL, gcnames(igc))
+          ! Use landpert's output as the input to calculate the ensemble average forcing
+          ! W.J note: So far it is only for the Catchment model. 
+          ! To make CatchmentCN work with assim, the export from landgrid and catchmentCN grid need to be modified.  
+          if ( LSM_CHOICE == 1 ) then
+             call ESMF_GridCompRun(gcs(ENSAVG), importState=gex(igc), exportState=gex(ENSAVG), clock=clock,phase=1, userRC=status)
+             VERIFY_(status)
+          endif
+
+          ! Run the land model
+          igc = LAND(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          VERIFY_(status)
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
+          VERIFY_(status)
+          call MAPL_TimerOff(MAPL, gcnames(igc))
+       endif ! with_land
 
        if (with_landice) then
           igc = LANDICE(i)
@@ -989,42 +1008,43 @@ contains
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
-       endif
+       endif ! with_land_ice
 
-       ! ApplyPrognPert - moved: now before calculating ensemble average that is picked up by land analysis and HISTORY; reichle 28 May 2020 
-       igc = LANDPERT(i)
-       call MAPL_TimerOn(MAPL, gcnames(igc))
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=4, userRC=status)
-       VERIFY_(status)
-       call MAPL_TimerOff(MAPL, gcnames(igc))
-
-       ! Use LAND's output as the input to calculate the ensemble average
-       igc = LAND(i)
-       if (LSM_CHOICE == 1) then
-          ! collect cat_param
-          ens_id = i-1 + FIRST_ENS_ID ! id start form FIRST_ENS_ID
-          call get_ensid_string(ensid_string, ens_id, ens_id_width, NUM_ENSEMBLE)  
-
-          member_name = 'CATCH'//trim(ensid_string)//"_Exports"
-
-          call ESMF_StateGet(gex(igc), trim(member_name), member_export, _RC)
-          call ESMF_StateGet(gex(igc), "Z2CH", field, _RC)
-          call ESMF_StateAddReplace(member_export, [field],_RC)
-          call ESMF_StateGet(gex(igc), "LAI", field, _RC)
-          call ESMF_StateAddReplace(member_export, [field],_RC)
-
-          call ESMF_GridCompRun(gcs(ENSAVG), importState=member_export, exportState=gex(ENSAVG), clock=clock,phase=3, userRC=status)
+       if (with_land) then
+          ! ApplyPrognPert - moved: now before calculating ensemble average that is picked up by land analysis and HISTORY; reichle 28 May 2020 
+          igc = LANDPERT(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=4, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(ENSAVG), importState=member_export, exportState=gex(ENSAVG), clock=clock,phase=2, userRC=status)
-          VERIFY_(status)
+          call MAPL_TimerOff(MAPL, gcnames(igc))
 
-          if( mwRTM ) then
-             ! Calculate ensemble-average L-band Tb using LAND's output (add up and normalize after last member has been added)
-             call ESMF_GridCompRun(gcs(LANDASSIM), importState=member_export, exportState=gex(LANDASSIM), clock=clock,phase=3, userRC=status)
+          ! Use LAND's output as the input to calculate the ensemble average
+          igc = LAND(i)
+          if (LSM_CHOICE == 1) then
+             ! collect cat_param
+             ens_id = i-1 + FIRST_ENS_ID ! id start form FIRST_ENS_ID
+             call get_ensid_string(ensid_string, ens_id, ens_id_width, NUM_ENSEMBLE)  
+
+             member_name = 'CATCH'//trim(ensid_string)//"_Exports"
+
+             call ESMF_StateGet(gex(igc), trim(member_name), member_export, _RC)
+             call ESMF_StateGet(gex(igc), "Z2CH", field, _RC)
+             call ESMF_StateAddReplace(member_export, [field],_RC)
+             call ESMF_StateGet(gex(igc), "LAI", field, _RC)
+             call ESMF_StateAddReplace(member_export, [field],_RC)
+
+             call ESMF_GridCompRun(gcs(ENSAVG), importState=member_export, exportState=gex(ENSAVG), clock=clock,phase=3, userRC=status)
              VERIFY_(status)
-          endif
-       endif
+             call ESMF_GridCompRun(gcs(ENSAVG), importState=member_export, exportState=gex(ENSAVG), clock=clock,phase=2, userRC=status)
+             VERIFY_(status)
 
+             if( mwRTM ) then
+                ! Calculate ensemble-average L-band Tb using LAND's output (add up and normalize after last member has been added)
+                call ESMF_GridCompRun(gcs(LANDASSIM), importState=member_export, exportState=gex(LANDASSIM), clock=clock,phase=3, userRC=status)
+                VERIFY_(status)
+             endif
+          endif
+        endif ! with_land
     enddo
 
     if ( mwRTM .and. LSM_CHOICE == 1 ) then

@@ -128,6 +128,8 @@ class LDASsetup:
         self.bcs_geom = ''
         self.bcs_landshared = ''
         self.tile_types =''
+        self.with_land   = False
+        self.with_landice = False
 
         # ------
         # Read exe input file which is required to set up the dir
@@ -162,6 +164,10 @@ class LDASsetup:
 
         tile_types = {'LAND':'100', 'LANDICE':'20'}
         self.tile_types = [tile_types[x.strip().upper()] for x in self.rqdExeInp.get('TILE_TYPES','LAND').split(',')]
+        if "100" in self.tile_types :
+          self.with_land = True
+        if "20" in self.tile_types :
+          self.with_landice = True
 
         # nens is an integer and =1 for model run
         self.nens         =    int(self.rqdExeInp['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
@@ -272,46 +278,49 @@ class LDASsetup:
            self.rqdExeInp['RESTART_PATH'] = self.rqdExeInp['RESTART_PATH']+'/'
 
         # make sure catchment and vegdyn restart files ( at least one for each) exist
-        if 'CATCH_DEF_FILE' not in self.rqdExeInp:
-            self.rqdExeInp['CATCH_DEF_FILE']= self.bcs_land + 'clsm/catchment.def'
-        assert os.path.isfile(self.rqdExeInp['CATCH_DEF_FILE']),"[%s] file does not exist " % self.rqdExeInp['CATCH_DEF_FILE']
+        if 'CATCH_DEF_FILE' not in self.rqdExeInp :
+           self.rqdExeInp['CATCH_DEF_FILE']= self.bcs_land + 'clsm/catchment.def'
+        if (self.with_land) :
+           assert os.path.isfile(self.rqdExeInp['CATCH_DEF_FILE']),"[%s] file does not exist " % self.rqdExeInp['CATCH_DEF_FILE']
 
         self.rqdExeInp['RST_FROM_GLOBAL'] = 1
-        if self.rqdExeInp['RESTART'].isdigit() :
-            if int(self.rqdExeInp['RESTART']) == 1 :
-                _numg = int(linecache.getline(self.rqdExeInp['CATCH_DEF_FILE'], 1).strip())
-                _numd = _numg
-                ldas_domain = self.rqdExeInp['RESTART_PATH']+ \
-                              self.rqdExeInp['RESTART_ID'] + \
-                              '/output/'+self.rqdExeInp['RESTART_DOMAIN']+'/rc_out/'+self.rqdExeInp['RESTART_ID']+'.ldas_domain.txt'
-                if os.path.isfile(ldas_domain) :
-                    _numd = int(linecache.getline(ldas_domain, 1).strip())
+        # skip checking. It is users' reponsibility to make it right!
+        #if self.rqdExeInp['RESTART'].isdigit() :
+        #    if int(self.rqdExeInp['RESTART']) == 1 :
+        #        _numg = int(linecache.getline(self.rqdExeInp['CATCH_DEF_FILE'], 1).strip())
+        #        _numd = _numg
+        #        ldas_domain = self.rqdExeInp['RESTART_PATH']+ \
+        #                      self.rqdExeInp['RESTART_ID'] + \
+        #                      '/output/'+self.rqdExeInp['RESTART_DOMAIN']+'/rc_out/'+self.rqdExeInp['RESTART_ID']+'.ldas_domain.txt'
+        #        if os.path.isfile(ldas_domain) :
+        #            _numd = int(linecache.getline(ldas_domain, 1).strip())
+        #
+        #            if _numg != _numd :
+        #                self.rqdExeInp['RST_FROM_GLOBAL'] = 0
 
-                    if _numg != _numd :
-                        self.rqdExeInp['RST_FROM_GLOBAL'] = 0
-
-        self.rqdExeInp['LNFM_FILE'] = ''
-        if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
-            self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
-            self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
-            self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
-            tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
-            if (len(tmp_) ==1) :
-               self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-            self.rqdExeInp['NDVI_FILE'] = glob.glob(self.bcs_land + 'ndvi_clim_*.data')[0]
-            self.rqdExeInp['NIRDF_FILE']= glob.glob(self.bcs_land + 'nirdf_*.dat')[0]
-            self.rqdExeInp['VISDF_FILE']= glob.glob(self.bcs_land + 'visdf_*.dat')[0]
-        else :
-            inpdir=self.rqdExeInp['RESTART_PATH']+self.rqdExeInp['RESTART_ID']+'/input/'
-            self.rqdExeInp['TILING_FILE'] =os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
-            self.rqdExeInp['GRN_FILE']=    os.path.realpath(glob.glob(inpdir+'green*data')[0])
-            self.rqdExeInp['LAI_FILE']=    os.path.realpath(glob.glob(inpdir+'lai*data')[0])
-            tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
-            if (len(tmp_) == 1) :
-               self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-            self.rqdExeInp['NDVI_FILE']=    os.path.realpath(glob.glob(inpdir+'ndvi*data')[0])
-            self.rqdExeInp['NIRDF_FILE']=  os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
-            self.rqdExeInp['VISDF_FILE']=  os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
+        if self.with_land :
+           self.rqdExeInp['LNFM_FILE'] = ''
+           if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
+              self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
+              self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
+              self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
+              tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+              if (len(tmp_) ==1) :
+                 self.rqdExeInp['LNFM_FILE'] = tmp_[0]
+              self.rqdExeInp['NDVI_FILE'] = glob.glob(self.bcs_land + 'ndvi_clim_*.data')[0]
+              self.rqdExeInp['NIRDF_FILE']= glob.glob(self.bcs_land + 'nirdf_*.dat')[0]
+              self.rqdExeInp['VISDF_FILE']= glob.glob(self.bcs_land + 'visdf_*.dat')[0]
+           else :
+              inpdir=self.rqdExeInp['RESTART_PATH']+self.rqdExeInp['RESTART_ID']+'/input/'
+              self.rqdExeInp['TILING_FILE'] =os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
+              self.rqdExeInp['GRN_FILE']=    os.path.realpath(glob.glob(inpdir+'green*data')[0])
+              self.rqdExeInp['LAI_FILE']=    os.path.realpath(glob.glob(inpdir+'lai*data')[0])
+              tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+              if (len(tmp_) == 1) :
+                 self.rqdExeInp['LNFM_FILE'] = tmp_[0]
+              self.rqdExeInp['NDVI_FILE']=    os.path.realpath(glob.glob(inpdir+'ndvi*data')[0])
+              self.rqdExeInp['NIRDF_FILE']=  os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
+              self.rqdExeInp['VISDF_FILE']=  os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
 
         if self.rqdExeInp['RESTART'].isdigit() :
             if int(self.rqdExeInp['RESTART']) == 2 :
@@ -328,7 +337,7 @@ class LDASsetup:
                       in_tilefiles_ = glob.glob(inpdir+'/*.til')
                 self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
-                if os.path.isfile(ldas_domain) :
+                if os.path.isfile(ldas_domain) and self.with_land :
                     _numd = int(linecache.getline(ldas_domain, 1).strip())
                     self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
                     self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
@@ -353,7 +362,8 @@ class LDASsetup:
         if  int(self.rqdExeInp['LSM_CHOICE']) == 2 :
             self.catch = 'catchcnclm40'
 
-        assert int(self.rqdExeInp['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
+        if self.with_land: 
+           assert int(self.rqdExeInp['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
 
         if 'POSTPROC_HIST' not in self.rqdExeInp:
             self.rqdExeInp['POSTPROC_HIST'] = 0
@@ -391,7 +401,7 @@ class LDASsetup:
         self.domain_def.close()
 
         # make sure bcs files exist
-        if self.rqdExeInp['RESTART'].isdigit() :
+        if self.rqdExeInp['RESTART'].isdigit() and self.with_land :
             if int(self.rqdExeInp['RESTART']) >= 1 :
                 y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
                 y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
@@ -439,9 +449,9 @@ class LDASsetup:
                 self.in_tilefile = None
 
         # DEAL WITH mwRTM input from exec
-        self.assim = True if self.rqdExeInp.get('LAND_ASSIM', 'NO').upper() == 'YES' else False
+        self.assim = True if self.rqdExeInp.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
         # verify mwrtm file
-        if 'MWRTM_PATH' in self.rqdExeInp :
+        if 'MWRTM_PATH' in self.rqdExeInp and self.with_land :
            self.rqdExeInp['MWRTM_PATH'] = self.rqdExeInp['MWRTM_PATH']+'/'+ self.rqdExeInp['BCS_RESOLUTION']+'/'
            mwrtm_param_file_ = self.rqdExeInp['MWRTM_PATH']+'mwRTM_param.nc4'
            vegopacity_file_  = self.rqdExeInp['MWRTM_PATH']+'vegopacity.bin'
@@ -766,47 +776,47 @@ class LDASsetup:
         myTile=self.inpdir+'/tile.data'
         os.symlink(tile,myTile)
 
-
-        bcs=[self.rqdExeInp['GRN_FILE'],
-             self.rqdExeInp['LAI_FILE'],
-             self.rqdExeInp['NDVI_FILE'],
-             self.rqdExeInp['NIRDF_FILE'],
-             self.rqdExeInp['VISDF_FILE'] ]
-        if (self.rqdExeInp['LNFM_FILE'] != ''):
-           bcs += [self.rqdExeInp['LNFM_FILE']]
-        if (self.has_vegopacity):
-           bcs += [self.rqdExeInp['VEGOPACITY_FILE']]
-        bcstmp=[]
-        for bcf in bcs :
-            shutil.copy(bcf, self.bcsdir+'/')
-            bcstmp=bcstmp+[self.bcsdir+'/'+os.path.basename(bcf)]
-        bcs=bcstmp
-
-        if self.isZoomIn:
-           print ("Creating the boundary files for the simulation domain...\n")
-           bcs_tmp=[]
+        if self.with_land:
+           bcs=[self.rqdExeInp['GRN_FILE'],
+                self.rqdExeInp['LAI_FILE'],
+                self.rqdExeInp['NDVI_FILE'],
+                self.rqdExeInp['NIRDF_FILE'],
+                self.rqdExeInp['VISDF_FILE'] ]
+           if (self.rqdExeInp['LNFM_FILE'] != ''):
+              bcs += [self.rqdExeInp['LNFM_FILE']]
+           if (self.has_vegopacity):
+              bcs += [self.rqdExeInp['VEGOPACITY_FILE']]
+           bcstmp=[]
            for bcf in bcs :
-               cmd = self.bindir +'/preprocess_ldas.x zoomin_bc ' + bcf + ' '+ bcf+'.domain' + ' '+ tmp_f2g_file.name
-               print ("cmd:   " + cmd)
-               sp.call(shlex.split(cmd))
-               bcs_tmp=bcs_tmp+[bcf+'.domain']
-           bcs=bcs_tmp
+               shutil.copy(bcf, self.bcsdir+'/')
+               bcstmp=bcstmp+[self.bcsdir+'/'+os.path.basename(bcf)]
+           bcs=bcstmp
+
+           if self.isZoomIn:
+              print ("Creating the boundary files for the simulation domain...\n")
+              bcs_tmp=[]
+              for bcf in bcs :
+                  cmd = self.bindir +'/preprocess_ldas.x zoomin_bc ' + bcf + ' '+ bcf+'.domain' + ' '+ tmp_f2g_file.name
+                  print ("cmd:   " + cmd)
+                  sp.call(shlex.split(cmd))
+                  bcs_tmp=bcs_tmp+[bcf+'.domain']
+              bcs=bcs_tmp
 
 
-        # link BC
-        print ("linking bcs...")
-        bcnames=['green','lai','ndvi','nirdf','visdf']
-        if (self.rqdExeInp['LNFM_FILE'] != ''):
-           bcnames += ['lnfm']
-        if (self.has_vegopacity):
-           bcnames += ['vegopacity']
-        for bcln,bc in zip(bcnames,bcs) :
-           myBC=self.inpdir+'/'+bcln+'.data'
-           os.symlink(bc,myBC)
+           # link BC
+           print ("linking bcs...")
+           bcnames=['green','lai','ndvi','nirdf','visdf']
+           if (self.rqdExeInp['LNFM_FILE'] != ''):
+              bcnames += ['lnfm']
+           if (self.has_vegopacity):
+              bcnames += ['vegopacity']
+           for bcln,bc in zip(bcnames,bcs) :
+              myBC=self.inpdir+'/'+bcln+'.data'
+              os.symlink(bc,myBC)
 
-        if ("catchcn" in self.catch):
-           os.symlink(self.bcs_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
-                       self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
+           if ("catchcn" in self.catch):
+              os.symlink(self.bcs_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
+                          self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
 
         # create and link restart
         print ("Creating and linking restart...")
@@ -849,7 +859,7 @@ class LDASsetup:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        if (RESTART_str != '1'):
+        if (RESTART_str != '1' and self.with_land):
            bcs_path = self.rqdExeInp['BCS_PATH']
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
            bc_base    = os.path.dirname(bcs_path)
@@ -940,7 +950,7 @@ class LDASsetup:
                 catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
 
             # catchment restart file
-            if os.path.isfile(catchRstFile) :
+            if os.path.isfile(catchRstFile and self.with_land) :
                 catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
                 if self.isZoomIn :
                     print( "Creating local catchment restart file... \n")
@@ -958,7 +968,7 @@ class LDASsetup:
                 catchRstFile = catchRstFile0
 
             # vegdyn restart file
-            if os.path.isfile(vegdynRstFile) :
+            if os.path.isfile(vegdynRstFile and self.with_land) :
                 vegdynLocal = self.rstdir+ensdir +'/'+self.rqdExeInp['EXP_ID']+'.vegdyn_internal_rst'
                 if self.isZoomIn :
                     print ("Creating the local veg restart file... \n")
@@ -976,7 +986,7 @@ class LDASsetup:
                 vegdynRstFile = vegdynRstFile0
 
             landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-            if os.path.isfile(landiceRstFile) :
+            if os.path.isfile(landiceRstFile and self.with_landice) :
                landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
                if self.isZoomIn :
                   print ("Creating coom in landice restart file... \n")
@@ -999,19 +1009,21 @@ class LDASsetup:
                 shutil.copy(pertRstFile,pertLocal)
                 pertRstFile = pertLocal
 
-            print ('catchRstFile: ' +  catchRstFile)
-            print ('vegdynRstFile: ' +  vegdynRstFile)
-            os.symlink(catchRstFile, myCatchRst)
-            os.symlink(vegdynRstFile,  myVegRst)
-            if ('20' in self.tile_types) :
-                print("LANDICE in the types")
+            if self.with_land :
+               print ('catchRstFile: ' +  catchRstFile)
+               print ('vegdynRstFile: ' +  vegdynRstFile)
+               os.symlink(catchRstFile, myCatchRst)
+               os.symlink(vegdynRstFile,  myVegRst)
+            if self.with_landice :
+               print("link landice restart: " + myLandiceRst)
                 os.symlink(landiceRstFile,  myLandiceRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,  myPertRst)
 
         # catch_param restar file
         catch_param_file = self.bcsdir+'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
-        assert os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file
+        if self.with_land:
+           assert os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file
 
         if self.has_mwrtm :
            mwRTMRstFile = self.mwrtm_file
@@ -1089,7 +1101,7 @@ class LDASsetup:
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
         print  ("Optimizing... decomposition of processes.... \n")
-        cmd = self.bindir + '/preprocess_ldas.x optimize '+ self.inpdir+'/tile.data '+ str(self.rqdRmInp['ntasks_model']) + ' ' + optimized_distribution_file.name + ' ' + self.rundir
+        cmd = self.bindir + '/preprocess_ldas.x optimize '+ self.inpdir+'/tile.data '+ str(self.rqdRmInp['ntasks_model']) + ' ' + optimized_distribution_file.name + ' ' + self.rundir + ' ' + '_'.join(self.tile_types)
         print ("cmd:   " + cmd)
         print ("IMS.rc or JMS.rc would be generated on " + self.rundir)
         sp.call(shlex.split(cmd))
@@ -1183,38 +1195,42 @@ class LDASsetup:
                    tmpl_='%s'
                 if self.perturb == 1:
                    ldasrcInp['PERTURBATIONS'] ='1'
-                bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
-                bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
-                for key, val in zip(bckey,bcval):
-                   keyn = key+'_FILE'
-                   valn = val+'.data'
-                   ldasrcInp[keyn]= valn
-                if('catchcn' in self.catch):
-                   ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
-                else:
-                   # remove catchcn-specific entries that do not apply to catch model
-                   ldasrcInp.pop('DTCN',None)
-                   ldasrcInp.pop('ATM_CO2',None)
-                   ldasrcInp.pop('CO2',None)
-                   ldasrcInp.pop('CO2_YEAR',None)
-                   ldasrcInp.pop('PRESCRIBE_DVG',None)
+                rstkey =[]
+                rstval =[]
+                if self.with_land :
+                   bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
+                   bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
+                   for key, val in zip(bckey,bcval):
+                      keyn = key+'_FILE'
+                      valn = val+'.data'
+                      ldasrcInp[keyn]= valn
+                   if('catchcn' in self.catch):
+                      ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
+                   else:
+                      # remove catchcn-specific entries that do not apply to catch model
+                      ldasrcInp.pop('DTCN',None)
+                      ldasrcInp.pop('ATM_CO2',None)
+                      ldasrcInp.pop('CO2',None)
+                      ldasrcInp.pop('CO2_YEAR',None)
+                      ldasrcInp.pop('PRESCRIBE_DVG',None)
 
                 # create restart item in RC
-                catch_ = self.catch.upper()
+                   catch_ = self.catch.upper()
 
-                if catch_+'_INTERNAL_RESTART_TYPE' in ldasrcInp :
-                    # avoid duplicate
-                    del ldasrcInp[ catch_ +'_INTERNAL_RESTART_TYPE']
-                if catch_+'_INTERNAL_CHECKPOINT_TYPE' in ldasrcInp :
-                    # avoid duplicate
-                    del ldasrcInp[ catch_ +'_INTERNAL_CHECKPOINT_TYPE']
-                if 'VEGDYN_INTERNAL_RESTART_TYPE' in ldasrcInp :
-                    # avoid duplicate
-                    del ldasrcInp['VEGDYN_INTERNAL_RESTART_TYPE']
+                   if catch_+'_INTERNAL_RESTART_TYPE' in ldasrcInp :
+                      # avoid duplicate
+                      del ldasrcInp[ catch_ +'_INTERNAL_RESTART_TYPE']
+                   if catch_+'_INTERNAL_CHECKPOINT_TYPE' in ldasrcInp :
+                      # avoid duplicate
+                      del ldasrcInp[ catch_ +'_INTERNAL_CHECKPOINT_TYPE']
+                   if 'VEGDYN_INTERNAL_RESTART_TYPE' in ldasrcInp :
+                      # avoid duplicate
+                      del ldasrcInp['VEGDYN_INTERNAL_RESTART_TYPE']
 
-                rstkey=[catch_,'VEGDYN']
-                rstval=[self.catch,'vegdyn']
-                if '20' in self.tile_types:
+                   rstkey.append(catch_).append('VEGDYN')
+                   rstval.append(self.catch).append('vegdyn')
+
+                if self.with_landice:
                   rstkey.append('LANDICE')
                   rstval.append('landice')
 
@@ -1248,12 +1264,14 @@ class LDASsetup:
                     ldasrcInp[keyn]= valn
 
                 # checkpoint file and its type
-                keyn = catch_ + '_INTERNAL_CHECKPOINT_FILE'
-                valn = self.catch+tmpl_+'_internal_checkpoint'
-                ldasrcInp[keyn]= valn
-                keyn = 'LANDICE_INTERNAL_CHECKPOINT_FILE'
-                valn = 'landice'+tmpl_+'_internal_checkpoint'
-                if '20' in self.tile_types :
+                if self.with_land :
+                   keyn = catch_ + '_INTERNAL_CHECKPOINT_FILE'
+                   valn = self.catch+tmpl_+'_internal_checkpoint'
+                   ldasrcInp[keyn]= valn
+
+                if self.with_landice :
+                   keyn = 'LANDICE_INTERNAL_CHECKPOINT_FILE'
+                   valn = 'landice'+tmpl_+'_internal_checkpoint'
                    ldasrcInp[keyn]= valn
                 # specify LANDPERT restart file
                 if (self.perturb == 1):

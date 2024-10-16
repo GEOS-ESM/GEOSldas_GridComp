@@ -1938,7 +1938,7 @@ contains
   ! NY:     N_proc                1
   !         JMS.rc                IMS.rc
   
-  subroutine optimize_latlon(fname_tilefile, N_proc_string, optimized_file, run_dir)
+  subroutine optimize_latlon(fname_tilefile, N_proc_string, optimized_file, run_dir, types)
     
     implicit none
     
@@ -1946,17 +1946,17 @@ contains
     character(*), intent(in) :: N_proc_string   ! *string* w/ no. of processors (or tasks), excl. OSERVER tasks
     character(*), intent(in) :: optimized_file  
     character(*), intent(in) :: run_dir  
-        
+    integer, optional, intent(in) :: types(:)    
     ! local variables
     integer :: N_proc
     integer :: N_tile,N_lon,N_lat,N_grid
-    integer,allocatable :: landPosition(:)
+    integer,allocatable :: tilePosition(:)
     integer,allocatable :: IMS(:),JMS(:)
-    integer,allocatable :: local_land(:)
-    integer :: total_land
+    integer,allocatable :: local_tile(:)
+    integer :: total_tile
     integer :: n,typ,tmpint
     real ::  tmpreal
-    integer :: avg_land,n0,local
+    integer :: avg_tile,n0,local
     integer :: i,s,e,j,k,n1,n2, s1, s2
     logical :: file_exist
     character(len=256):: tmpLine
@@ -1966,7 +1966,7 @@ contains
     integer :: face(6),face_land(6)
     logical :: forward
     character(len=:), allocatable :: IMS_file, JMS_File
-    
+    integer, allocatable :: tile_types(:)    
     character(len=*), parameter :: Iam = 'optimize_latlon'
     character(len=400)          :: err_msg
 
@@ -1975,6 +1975,11 @@ contains
     read (N_proc_string,*) N_proc   ! input is string for historical reasons...
     
     ! get tile info
+    if (present(types)) then
+       tile_types = types
+    else
+       tile_types = [MAPL_LAND]
+    endif
 
     inquire(file=trim(fname_tilefile),exist=file_exist)
     if( .not. file_exist) then
@@ -1998,9 +2003,9 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
        
-       allocate(landPosition(JMGLOB))
-       landPosition = 0
-       total_land   = 0
+       allocate(tilePosition(JMGLOB))
+       tilePosition = 0
+       total_tile   = 0
        
        if(N_grid==2) then
           read (10,*)          ! some string describing ocean grid                   (?)
@@ -2023,27 +2028,24 @@ contains
           !tmpreal,       &   ! 11
           !tmpint             ! 12  * (previously "tile_id")
 
-          if(typ==MAPL_Land) then
-             total_land=total_land+1
-             landPosition(j) = landPosition(j)+1
+          if(any (tile_types == typ)) then
+             total_tile=total_tile+1
+             tilePosition(j) = tilePosition(j)+1
           endif
           
           ! assume all land tiles are at the beginning
           ! UNSAFE ASSUMPTION! - reichle, 2 Aug 2020
-          
-          if (typ/=MAPL_Land .and. typ/=MAPL_Land + MAPL_ExcludeFromDomain) then   ! exit if not land
-             
-             if (logit) then
-                write (logunit,*) 'WARNING: Encountered first non-land tile in *.til file.'
-                write (logunit,*) '         Stop reading *.til file under the assumption that'
-                write (logunit,*) '           land tiles are first in *.til file.'
-                write (logunit,*) '         This is NOT a safe assumption beyond Icarus-NLv[x] tile spaces!!'
-             end if
-             
-             exit ! assuming land comes first in the til file
-             
-          end if
-          
+          if (all (tile_types == MAPL_LAND)) then
+            if (typ/=MAPL_Land .and. typ/=MAPL_Land + MAPL_ExcludeFromDomain) then   ! exit if not land
+               if (logit) then
+                  write (logunit,*) 'WARNING: Encountered first non-land tile in *.til file.'
+                  write (logunit,*) '         Stop reading *.til file under the assumption that'
+                  write (logunit,*) '           land tiles are first in *.til file.'
+                  write (logunit,*) '         This is NOT a safe assumption beyond Icarus-NLv[x] tile spaces!!'
+               end if
+               exit ! assuming land comes first in the til file
+            end if
+          endif
        enddo
        close(10)
        
@@ -2052,15 +2054,15 @@ contains
           N_proc = N_proc-mod(N_proc,6)
        endif
        
-       print*, "total tiles: ", total_land
+       print*, "total tiles: ", total_tile
        
-       if(sum(landPosition) /= total_land) print*, "wrong counting of land"
+       if(sum(tilePosition) /= total_tile) print*, "wrong counting of land"
        
        do k=1,6
           n1 = (k-1)*IMGLOB+1
           n2 = k*IMGLOB
-          face_land(k) = sum(landPosition(n1:n2)) 
-          face(k) = nint(1.0*face_land(k)/total_land * N_proc)
+          face_land(k) = sum(tilePosition(n1:n2)) 
+          face(k) = nint(1.0*face_land(k)/total_tile * N_proc)
           ! ensure each face has at least 1 process
           if ( face(k) == 0)       face(k) = 1
           ! ensure that the stripe for each process can be at least 2 cells wide
@@ -2096,7 +2098,7 @@ contains
           n2 = k*IMGLOB
           s1 = sum(face(1:k-1)) + 1
           s2 = sum(face(1:k))
-          call equal_partition(landPosition(n1:n2), JMS(s1:s2))
+          call equal_partition(tilePosition(n1:n2), JMS(s1:s2))
        enddo
 
        if( sum(JMS) /= JMGLOB) then
@@ -2131,15 +2133,15 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        endif
 
-       allocate(local_land(N_Proc), source = 0)
+       allocate(local_tile(N_Proc), source = 0)
        s1 = 1
        do n = 1, N_proc
           s2 = s1+JMS(n) - 1
-          local_land(n) = sum(landPosition(s1:s2))
+          local_tile(n) = sum(tilePosition(s1:s2))
           s1 = s2 + 1
        enddo
  
-       print*,"land_distribute: ",local_land
+       print*,"tile_distribute: ",local_tile
        print*, "JMS.rc", JMS
        if( sum(JMS) /= JMGLOB) then
           print*, sum(JMS), JMGLOB
@@ -2185,9 +2187,9 @@ contains
        ! *not* cube-sphere tile space
        
        allocate(IMS(N_Proc))
-       allocate(local_land(N_Proc))
+       allocate(local_tile(N_Proc))
        IMS=0
-       local_land = 0
+       local_tile = 0
        
        ! NOTE:
        !  There is a bug in at least some EASE *.til files through at least Icarus-NLv4.
@@ -2224,10 +2226,10 @@ contains
           s=1
           e=N_lon
        endif
-       allocate(landPosition(s:e))
+       allocate(tilePosition(s:e))
        
-       landPosition=0
-       total_land= 0
+       tilePosition=0
+       total_tile= 0
        
        ! 1) read through tile file, put the land tile into the N_lon of bucket
        
@@ -2237,9 +2239,9 @@ contains
             tmpreal,       &   !  3
             tmpreal,       &   !  4
             i                  !  5
-       if(typ==MAPL_Land) then
-          total_land=total_land+1
-          landPosition(i) = landPosition(i)+1
+       if (any(tile_types == typ)) then
+          total_tile=total_tile+1
+          tilePosition(i) = tilePosition(i)+1
        endif
        
        do n = 2,N_tile
@@ -2256,32 +2258,30 @@ contains
           !tmpint,        &   ! 10
           !tmpreal,       &   ! 11
           !tmpint             ! 12  * (previously "tile_id")
-          if(typ==MAPL_Land) then
-             total_land=total_land+1
-             landPosition(i) = landPosition(i)+1
+          if (any(tile_types == typ)) then
+             total_tile=total_tile+1
+             tilePosition(i) = tilePosition(i)+1
           endif
           
           ! assume all land tiles are at the beginning
           ! UNSAFE ASSUMPTION! - reichle, 2 Aug 2020
           
-          if (typ/=MAPL_Land .and. typ/=MAPL_Land + MAPL_ExcludeFromDomain) then   ! exit if not land
-             
-             if (logit) then
-                write (logunit,*) 'WARNING: Encountered first non-land tile in *.til file.'
-                write (logunit,*) '         Stop reading *.til file under the assumption that'
-                write (logunit,*) '           land tiles are first in *.til file.'
-                write (logunit,*) '         This is NOT a safe assumption beyond Icarus-NLv[x] tile spaces!!'
-             end if
-             
-             exit ! assuming land comes first in the til file
-             
-          end if
-          
+          if (all (tile_types == MAPL_LAND)) then
+            if (typ/=MAPL_Land .and. typ/=MAPL_Land + MAPL_ExcludeFromDomain ) then   ! exit if not land
+               if (logit) then
+                  write (logunit,*) 'WARNING: Encountered first non-land tile in *.til file.'
+                  write (logunit,*) '         Stop reading *.til file under the assumption that'
+                  write (logunit,*) '           land tiles are first in *.til file.'
+                  write (logunit,*) '         This is NOT a safe assumption beyond Icarus-NLv[x] tile spaces!!'
+               end if
+               exit ! assuming land comes first in the til file
+            endif
+          endif
        enddo
        
        close(10)
        
-       if(sum(landPosition) /= total_land) print*, "wrong counting of land"
+       if(sum(tilePosition) /= total_tile) print*, "wrong counting of land"
        
        do n=1,60
           rates(n) = -0.3 + (n-1)*0.01
@@ -2293,39 +2293,39 @@ contains
        
        ! 2) each process should have average land tiles
        
-       avg_land = ceiling(1.0*total_land/N_proc)
-       print*,"avg_land",avg_land
+       avg_tile = ceiling(1.0*total_tile/N_proc)
+       print*,"avg_tile",avg_tile
        
-       ! rate is used to readjust the avg_land
+       ! rate is used to readjust the avg_tile
        ! in case that the last processors don't have any land tiles,
        ! we can increase ther rates
        
-       avg_land = avg_land - nint(rate*avg_land)
-       print*,"re adjust the avg_land",avg_land
+       avg_tile = avg_tile - nint(rate*avg_tile)
+       print*,"re adjust the avg_tile",avg_tile
        tmpint = 0
        local = 1
        n0 = s-1
        forward = .true.
        do n=s,e
-          tmpint=tmpint+landPosition(n)
+          tmpint=tmpint+tilePosition(n)
           if(local == N_proc .and. n < e) cycle ! all lefteover goes to the last process
           if( n==e ) then
-             local_land(local)=tmpint
+             local_tile(local)=tmpint
              IMS(local)=n-n0
              exit
           endif
 
-          if( tmpint .ge. avg_land ) then
+          if( tmpint .ge. avg_tile ) then
              if (forward .or. n-n0 == 1 ) then
-                local_land(local)=tmpint
+                local_tile(local)=tmpint
                 IMS(local)=n-n0
                 tmpint=0
                 n0=n
                 forward = .false.
              else
-                local_land(local) = tmpint - landPosition(n)
+                local_tile(local) = tmpint - tilePosition(n)
                 IMS(local)=(n-1)-n0
-                tmpint= landPosition(n)
+                tmpint= tilePosition(n)
                 n0 = n-1
                 forward = .true.
              endif
@@ -2334,9 +2334,9 @@ contains
        enddo
        print*,"rms rate: ", rms(rate)
        
-       print*,"land_distribute: ",local_land
+       print*,"tile_distribute: ",local_tile
        
-       if( sum(local_land) /= total_land) then
+       if( sum(local_tile) /= total_tile) then
           err_msg = 'wrong distribution'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
@@ -2397,36 +2397,36 @@ contains
       real,intent(in) :: rates
       integer :: tmpint,local
       integer :: n0,proc,n
-      integer :: avg_land
-      integer,allocatable :: local_land(:)
+      integer :: avg_tile
+      integer,allocatable :: local_tile(:)
       logical :: forward
  
-      allocate (local_land(N_proc))
-      local_land = 0
-      avg_land = ceiling(1.0*total_land/N_proc)
-      avg_land = avg_land -nint(rates*avg_land)
+      allocate (local_tile(N_proc))
+      local_tile = 0
+      avg_tile = ceiling(1.0*total_tile/N_proc)
+      avg_tile = avg_tile -nint(rates*avg_tile)
 
       forward = .true.      
       tmpint = 0
       local = 1
       n0 = s-1
       do n=s,e
-         tmpint=tmpint+landPosition(n)
+         tmpint=tmpint+tilePosition(n)
          if(local == N_proc .and. n < e) cycle ! all lefteover goes to the last process
          if( n==e ) then
-            local_land(local)=tmpint
+            local_tile(local)=tmpint
             exit
          endif
          
-         if( tmpint .ge. avg_land ) then
+         if( tmpint .ge. avg_tile ) then
             if (forward .or. n-n0 == 1 ) then
-               local_land(local)=tmpint
+               local_tile(local)=tmpint
                tmpint=0
                n0=n
                forward = .false.
             else
-               local_land(local) = tmpint - landPosition(n)
-               tmpint= landPosition(n)
+               local_tile(local) = tmpint - tilePosition(n)
+               tmpint= tilePosition(n)
                n0 = n-1
                forward = .true.
             endif
@@ -2435,9 +2435,9 @@ contains
       enddo
       f = 0.0
       do proc = 1, N_proc
-         f =max(f,1.0*abs(local_land(proc)-avg_land))
+         f =max(f,1.0*abs(local_tile(proc)-avg_tile))
       enddo
-      deallocate(local_land)
+      deallocate(local_tile)
     end function rms
     
     ! ---------------------------------------------------
