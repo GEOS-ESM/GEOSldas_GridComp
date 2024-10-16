@@ -570,7 +570,7 @@ contains
 
     ! Create LAND's locstreams as subset of Surface locstream
     ! and add it to the children's MAPL objects
-
+    allocate(mask(0))
     if (with_land) then
        call MAPL_LocStreamCreate(                                                  &
           land_locstream,                                                        &
@@ -580,7 +580,7 @@ contains
           rc=status                                                              &
           )
        VERIFY_(status)
-       mask =[MAPL_LAND]
+       mask =[mask,MAPL_LAND]
     endif
 
     if (with_landice) then
