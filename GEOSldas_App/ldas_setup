@@ -298,29 +298,28 @@ class LDASsetup:
         #            if _numg != _numd :
         #                self.rqdExeInp['RST_FROM_GLOBAL'] = 0
 
-        if self.with_land :
-           self.rqdExeInp['LNFM_FILE'] = ''
-           if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
-              self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
-              self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
-              self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
-              tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
-              if (len(tmp_) ==1) :
-                 self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-              self.rqdExeInp['NDVI_FILE'] = glob.glob(self.bcs_land + 'ndvi_clim_*.data')[0]
-              self.rqdExeInp['NIRDF_FILE']= glob.glob(self.bcs_land + 'nirdf_*.dat')[0]
-              self.rqdExeInp['VISDF_FILE']= glob.glob(self.bcs_land + 'visdf_*.dat')[0]
-           else :
-              inpdir=self.rqdExeInp['RESTART_PATH']+self.rqdExeInp['RESTART_ID']+'/input/'
-              self.rqdExeInp['TILING_FILE'] =os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
-              self.rqdExeInp['GRN_FILE']=    os.path.realpath(glob.glob(inpdir+'green*data')[0])
-              self.rqdExeInp['LAI_FILE']=    os.path.realpath(glob.glob(inpdir+'lai*data')[0])
-              tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
-              if (len(tmp_) == 1) :
-                 self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-              self.rqdExeInp['NDVI_FILE']=    os.path.realpath(glob.glob(inpdir+'ndvi*data')[0])
-              self.rqdExeInp['NIRDF_FILE']=  os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
-              self.rqdExeInp['VISDF_FILE']=  os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
+        self.rqdExeInp['LNFM_FILE'] = ''
+        if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
+           self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
+           self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
+           self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
+           tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+           if (len(tmp_) ==1) :
+              self.rqdExeInp['LNFM_FILE'] = tmp_[0]
+           self.rqdExeInp['NDVI_FILE'] = glob.glob(self.bcs_land + 'ndvi_clim_*.data')[0]
+           self.rqdExeInp['NIRDF_FILE']= glob.glob(self.bcs_land + 'nirdf_*.dat')[0]
+           self.rqdExeInp['VISDF_FILE']= glob.glob(self.bcs_land + 'visdf_*.dat')[0]
+        else :
+           inpdir=self.rqdExeInp['RESTART_PATH']+self.rqdExeInp['RESTART_ID']+'/input/'
+           self.rqdExeInp['TILING_FILE'] =os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
+           self.rqdExeInp['GRN_FILE']=    os.path.realpath(glob.glob(inpdir+'green*data')[0])
+           self.rqdExeInp['LAI_FILE']=    os.path.realpath(glob.glob(inpdir+'lai*data')[0])
+           tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+           if (len(tmp_) == 1) :
+              self.rqdExeInp['LNFM_FILE'] = tmp_[0]
+           self.rqdExeInp['NDVI_FILE']=    os.path.realpath(glob.glob(inpdir+'ndvi*data')[0])
+           self.rqdExeInp['NIRDF_FILE']=  os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
+           self.rqdExeInp['VISDF_FILE']=  os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
 
         if self.rqdExeInp['RESTART'].isdigit() :
             if int(self.rqdExeInp['RESTART']) == 2 :
@@ -337,7 +336,7 @@ class LDASsetup:
                       in_tilefiles_ = glob.glob(inpdir+'/*.til')
                 self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
-                if os.path.isfile(ldas_domain) and self.with_land :
+                if os.path.isfile(ldas_domain):
                     _numd = int(linecache.getline(ldas_domain, 1).strip())
                     self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
                     self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
@@ -950,7 +949,7 @@ class LDASsetup:
                 catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
 
             # catchment restart file
-            if os.path.isfile(catchRstFile and self.with_land) :
+            if os.path.isfile(catchRstFile) and self.with_land :
                 catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
                 if self.isZoomIn :
                     print( "Creating local catchment restart file... \n")
@@ -968,7 +967,7 @@ class LDASsetup:
                 catchRstFile = catchRstFile0
 
             # vegdyn restart file
-            if os.path.isfile(vegdynRstFile and self.with_land) :
+            if os.path.isfile(vegdynRstFile) and self.with_land :
                 vegdynLocal = self.rstdir+ensdir +'/'+self.rqdExeInp['EXP_ID']+'.vegdyn_internal_rst'
                 if self.isZoomIn :
                     print ("Creating the local veg restart file... \n")
@@ -986,7 +985,7 @@ class LDASsetup:
                 vegdynRstFile = vegdynRstFile0
 
             landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-            if os.path.isfile(landiceRstFile and self.with_landice) :
+            if os.path.isfile(landiceRstFile) and self.with_landice :
                landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
                if self.isZoomIn :
                   print ("Creating coom in landice restart file... \n")
@@ -1016,7 +1015,7 @@ class LDASsetup:
                os.symlink(vegdynRstFile,  myVegRst)
             if self.with_landice :
                print("link landice restart: " + myLandiceRst)
-                os.symlink(landiceRstFile,  myLandiceRst)
+               os.symlink(landiceRstFile,  myLandiceRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,  myPertRst)
 
@@ -1227,8 +1226,10 @@ class LDASsetup:
                       # avoid duplicate
                       del ldasrcInp['VEGDYN_INTERNAL_RESTART_TYPE']
 
-                   rstkey.append(catch_).append('VEGDYN')
-                   rstval.append(self.catch).append('vegdyn')
+                   rstkey.append(catch_)
+                   rstkey.append('VEGDYN')
+                   rstval.append(self.catch)
+                   rstval.append('vegdyn')
 
                 if self.with_landice:
                   rstkey.append('LANDICE')

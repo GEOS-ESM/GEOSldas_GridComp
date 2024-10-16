@@ -46,7 +46,7 @@ program main
   character(len=512) :: f2g_file
   character(len=12 ) :: ymdhm
   character(len=12 ) :: SURFLAY
-  character(len=:), allocatable :: new_r, orig_r, tile_types
+  character(len=:), allocatable :: new_r, orig_r
   integer, allocatable :: int_types(:)
   
   call get_command_argument(1,option)
@@ -173,7 +173,7 @@ contains
       endif
       to = to + 1
     enddo
-    read (unit=tile_types(from+1:to-1),fmt=*) int_types(n)
+    read (unit=str_types(from+1:to-1),fmt=*) int_types(n)
   end subroutine get_tile_types 
 
 end program main
