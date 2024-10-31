@@ -3524,6 +3524,7 @@ contains
     real, dimension(     N_catd)          :: SWE_ensavg
     real, dimension(     N_catd)          :: tp1_ensavg
     real, dimension(     N_catd)          :: asnow_ensavg
+    real, dimension(     N_catd)          :: swe_incr_ensavg    
 
     type(obs_param_type)                  :: this_obs_param
    
@@ -3537,7 +3538,7 @@ contains
     real, dimension(N_snow)               :: tpsn, fice_snow_vec                      ! for snow model relayer
     real, dimension(N_snow,N_constit)     :: rconstit
 
-    logical :: found_Tb_obs
+    logical                               :: found_Tb_obs, unique, has_asnow
 
 ! -----------------------------------------------------------------------
 
@@ -4690,31 +4691,228 @@ contains
        
        if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc obs'
        
-       N_select_varnames  = 0
-       
-       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'Tb') then
+      N_select_varnames = 0
+
+      do ii = 1, N_obs_param
+         unique = .true.
+         do jj = 1, N_select_varnames
+            if (trim(obs_param(ii)%varname) == trim(select_varnames(jj))) then
+               unique = .false.
+               exit
+            end if
+         end do
+         if (unique) then
             N_select_varnames = N_select_varnames + 1
-            select_varnames(N_select_varnames) = 'Tb'
-            exit     
+            select_varnames(N_select_varnames) = trim(obs_param(ii)%varname)
          end if
-       end do
-         
-       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'sfmc') then
-            N_select_varnames = N_select_varnames + 1
-            select_varnames(N_select_varnames) = 'sfmc'
+      end do
+
+      ! Check if we potentially have snow fraction observations by looking for 'asnow' in select_varnames
+
+      do ii = 1, N_select_varnames
+         if (trim(select_varnames(ii)) == 'asnow') then
+            has_asnow = .true.
             exit
          end if
-       end do
+      end do
 
-       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'sfds') then
-            N_select_varnames = N_select_varnames + 1
-            select_varnames(N_select_varnames) = 'sfds'
-            exit 
-         end if  
-       end do
+      ! If we have snow fraction observations, we need to calculate the increments for the snow layers
+
+      if (has_asnow) then
+
+         if (logit) write (logunit, *) 'get 1d snow increments (Toure et al. 2018 empirical gain); snow cover fraction obs'
+       
+         ! ensure that max SWE increment parameter is less than WEMIN; larger increments make no sense because
+         ! at SWE=WEMIN, the tile is fully snow covered (asnow=1)
+         
+         if (SCF_ANA_MAXINCRSWE>WEMIN)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'must use SCF_ANA_MAXINCRSWE<=WEMIN')
+         
+         ! identify the obs species of interest       
+         
+         N_select_varnames  = 1      
+         
+         select_varnames(1) = 'asnow'
+         
+         call get_select_species(                                           &
+              N_select_varnames, select_varnames(1:N_select_varnames),      &
+              N_obs_param, obs_param, N_select_species, select_species )
+         
+         allocate(select_tilenum(1))
+         
+         swe_incr = 0.   ! total SWE increment; initialize to NO CHANGE
+         swe_incr_ensavg = 0.  ! total SWE ensemble average increment; initialize to NO CHANGE
+         
+         ! loop through tiles and compute increments
+         
+         do kk=1,N_catd
+            
+            ! find observations for tile kk
+            
+            select_tilenum(1) = l2f(kk)
+            
+            call get_ind_obs(                                           &
+                 N_obs,            Observations,                        &
+                 1,                select_tilenum,                      &
+                 N_select_species, select_species(1:N_select_species),  &
+                 N_selected_obs,   ind_obs )
+            
+            if (N_selected_obs > 0) then
+               
+               ! average in case there are multiple "asnow" obs (e.g., from MODIS and VIIRS)
+               
+               tmp_obs = sum(Observations(ind_obs(1:N_selected_obs))%obs)
+               
+               if (N_selected_obs > 1)  tmp_obs = tmp_obs/real(N_selected_obs)
+               
+               do n_e=1,N_ens  ! compute analysis separately for each ensemble member
+                  
+                  ! 1. Diagnose model forecast snow cover area fraction and total SWE
+                  
+                  asnow_fcst  = asnow(kk,n_e)
+                  swe_fcst    = sum(cat_progn(kk,n_e)%wesn(1:N_snow))
+                  
+                  ! 2. Calculate SWE increment based on modified eq 1 of Toure et al (2018)
+                  
+                  if     (asnow_fcst .lt. tmp_obs * SCF_ANA_ALPHA) then
+                     
+                     ! ADD SNOW:    Forecast SCF is less than observed SCF (after "bias" adjustment with alpha)
+                     
+                     swe_incr(kk,n_e) = SCF_ANA_MAXINCRSWE * (tmp_obs - asnow_fcst/SCF_ANA_ALPHA)
+                     
+                  elseif (tmp_obs .lt. SCF_ANA_BETA) then
+                     
+                     ! REMOVE SNOW: Simulated SCF is greater than observed SCF (after "bias" adjustment)
+                     !                and observed SCF is less than beta threshold
+                     
+                     swe_incr(kk,n_e) = (-1.) *  SCF_ANA_MAXINCRSWE * asnow_fcst * (1. - tmp_obs/SCF_ANA_BETA)
+                     
+                  else 
+                     
+                     cycle  ! NO CHANGE, skip rest of increment calcs and go straight to next ens member 
+                     
+                  endif  ! (Toure et al. 2018 Equation 1)
+                  
+                  ! 3. Derive SWE, snow heat content, and snow depth increments for each layer from total SWE increment 
+                  
+                  swe_ana   = max(swe_fcst + swe_incr(kk,n_e), 0.0)    ! total SWE after analysis
+                   
+                  call StieglitzSnow_calc_asnow( swe_ana, asnow_ana )  ! asnow after analysis
+                  
+                  if (swe_fcst>=StieglitzSnow_MINSWE) then
+                     swe_ratio = swe_ana / swe_fcst 
+                  else
+                     swe_ratio = MAPL_UNDEF  ! swe_ratio unreliable; set to MAPL_UNDEF to expose inadvertent use
+                  end if
+                  
+                  ! loop through snow layers and compute SWE, snow heat content, and snow depth analysis for each layer
+                  
+                  do isnow=1,N_snow
+                     
+                     if     (asnow_ana == 0.0) then  
+                        
+                        ! no snow in analysis, remove all snow
+                        
+                        tmp_wesn(kk,n_e,isnow) = 0.0
+                        tmp_htsn(kk,n_e,isnow) = 0.0
+                        tmp_sndz(kk,n_e,isnow) = 0.0 
+                        
+                     elseif (swe_fcst < StieglitzSnow_MINSWE) then
+                        
+                        ! too little snow in forecast, use generic properties for added snow
+                        
+                        tmp_wesn(kk,n_e,isnow) = swe_ana / N_snow                           ! distribute SWE evenly across layers
+  
+                        ! assign heat content for snow at 0 deg C and without liquid water content (100% frozen) 
+                        ! (based on StieglitzSnow: htsn = (CPW*tsnow - fice*MAPL_ALHF)*swe )
+  
+                        tmp_htsn(kk,n_e,isnow) = (0.0 - MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
+  
+                        ! assign snow depth consistent with density of freshly fallen snow (must have SCF_ANA_MAXINCRSWE<=WEMIN)
+  
+                        tmp_sndz(kk,n_e,isnow) = (WEMIN / RHOFS) / N_snow                   
+                        
+                     else
+                        
+                        ! snow in forecast and analysis, derive properties of analysis snow from properties of forecast snow
+                        
+                        ! update SWE:
+                        
+                        tmp_wesn(kk,n_e,isnow) = cat_progn(kk,n_e)%wesn(isnow) * swe_ratio
+  
+                        ! update snow heat content (keep snow temperature constant):
+  
+                        call StieglitzSnow_calc_tpsnow( cat_progn(kk,n_e)%htsn(isnow), cat_progn(kk,n_e)%wesn(isnow),  &
+                             snow_temp, fice_snow, log_dum, log_dum2, .false. )
+                        
+                        tmp_htsn(kk,n_e,isnow) = (StieglitzSnow_CPW*snow_temp - fice_snow*MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
+                        
+                        ! update snow depth: 
+  
+                        if (asnow_ana < 1. .and. asnow_fcst < 1.) then
+                           
+                           ! keep snow depth constant when less than full snow cover in fcst and ana
+                           
+                           tmp_sndz(kk,n_e,isnow) = cat_progn(kk,n_e)%sndz(isnow)  
+                           
+                        else
+                           
+                           ! compute analysis snow depth by keeping snow density constant
+                           !
+                           ! in this case, it is possible that either asnow_fcst<1 or asnow_ana<1;
+                           ! when computing density or depth, make sure that SWE value (which is per unit area) is 
+                           ! adjusted to reflect SWE value (per unit area) in the snow-covered fraction of the tile
+                           
+                           ! i) diagnose (layer-specific) forecast snow density 
+                           
+                           snow_dens = ( cat_progn(kk,n_e)%wesn(isnow)/asnow_fcst ) / cat_progn(kk,n_e)%sndz(isnow) 
+                           
+                           ! ii) diagnose analysis snow depth using forecast density
+  
+                           tmp_sndz(kk,n_e,isnow) = ( tmp_wesn(kk,n_e,isnow)/asnow_ana ) / snow_dens
+                           
+                        end if
+                        
+                     end if
+                     
+                  end do  ! isnow=1,N_snow (compute SWE, snow heat content, and snow depth analysis for each layer)
+                  
+                  ! 4. Relayer to balance the snow column (call with optional args for adjustment of htsnn)
+                  
+                  call StieglitzSnow_relayer( N_snow, N_constit,    &
+                       MAPL_LAND, CATCH_SNOW_DZPARAM,               &
+                       tmp_htsn(kk,n_e,1:N_snow),                   &
+                       tmp_wesn(kk,n_e,1:N_snow),                   &
+                       tmp_sndz(kk,n_e,1:N_snow),                   &
+                       rconstit, tpsn, fice_snow_vec             )
+                  
+                  ! print the old and new swe, heat content and snow density
+                  
+                  !if (logit) write (logunit, *) &
+                  !     'fcst_wesn = ', cat_progn(kk, n_e)%wesn(1:N_snow), &
+                  !     'tmp_wesn  = ', tmp_wesn( kk,n_e,       1:N_snow), &
+                  !     'fcst_htsn = ', cat_progn(kk, n_e)%htsn(1:N_snow), &
+                  !     'tmp_htsn  = ', tmp_htsn( kk, n_e,      1:N_snow), &
+                  !     'fcst_sndz = ', cat_progn(kk, n_e)%sndz(1:N_snow), &
+                  !     'tmp_sndz  = ', tmp_sndz( kk ,n_e,      1:N_snow), & 
+                  !     '--------------------------------------'
+                  
+                  ! 5. Diagnose increments 
+                  
+                  cat_progn_incr(kk,n_e)%wesn(1:N_snow) = tmp_wesn(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%wesn(1:N_snow)
+                  cat_progn_incr(kk,n_e)%htsn(1:N_snow) = tmp_htsn(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%htsn(1:N_snow)
+                  cat_progn_incr(kk,n_e)%sndz(1:N_snow) = tmp_sndz(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%sndz(1:N_snow)
+                  
+               end do   ! n_e=1,N_ens
+               
+            end if      ! if (N_selected_obs > 0)
+            
+         end do         ! kk=1,N_catd
+
+      end if            ! if (has_asnow)
+
+      ! Calculate swe_incr_ensavg as the average of the ensemble members to add to check if tile is snow-free
+
+      swe_incr_ensavg = sum(swe_incr, dim=2) / real(N_ens)
        
        ! Will get all species associated with Tb or sfds observations
        
@@ -4738,8 +4936,9 @@ contains
           
           ! compute increments only for snow-free and non-frozen tiles
           
-          if ( (SWE_ensavg(kk) < SWE_threshold) .and.            &
-               (tp1_ensavg(kk) > tp1_threshold)       ) then  
+          if ( (SWE_ensavg(kk) < SWE_threshold)      .and.               &
+               (swe_incr_ensavg(kk) < SWE_threshold) .and.               &
+               (tp1_ensavg(kk) > tp1_threshold) )    then  
              
              ! find observations within halo around tile kk
              
