@@ -20,8 +20,7 @@ from collections import OrderedDict
 from dateutil.relativedelta import relativedelta
 from remap_utils import *
 from remap_catchANDcn  import *
-from remap_config_ldas import *
-
+from lenkf_j_template import *
 """
 This script is intended to be run from any installed directory with GEOSldas.x and ldas_setup
 (The default setup is ../install/bin)
@@ -92,8 +91,9 @@ class LDASsetup:
         # Instance variables
         self.exeinpfile = cmdLineArgs['exeinpfile']
         self.batinpfile = cmdLineArgs['batinpfile']
-        self.exphome = cmdLineArgs['exphome'].rstrip('/')
-        assert os.path.isdir(self.exphome) # exphome should exist
+        exphome_ = cmdLineArgs['exphome'].rstrip('/')
+        assert os.path.isdir(exphome_) # exphome should exist
+        self.exphome = os.path.abspath(exphome_)
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -166,9 +166,10 @@ class LDASsetup:
         assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
         _mydir = None
         self.ladas_coupling = int(self.rqdExeInp.get('LADAS_COUPLING',0))
+        self.adas_expdir =''
         if self.ladas_coupling > 0:
            assert 'ADAS_EXPDIR'  in self.rqdExeInp, " need ADAS_EXPDIR  in the input file %s" %(self.exeinpfile)
-
+           self.adas_expdir = self.rqdExeInp['ADAS_EXPDIR']
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
         if self.nens > 1:
@@ -507,20 +508,16 @@ class LDASsetup:
         tmp_execfyl= self.blddir+exefyl
         assert os.path.isfile(tmp_execfyl),\
             'Executable [%s] does not exist!' % tmp_execfyl
-        tmp_expid = self.rqdExeInp['EXP_ID']
-        tmp_expdir = os.path.abspath(self.exphome + '/' + self.rqdExeInp['EXP_ID'])
-        self.rundir = tmp_expdir + '/run'
-        self.inpdir = tmp_expdir + '/input'
-        self.outdir = tmp_expdir + '/output'
-        self.scratchdir = tmp_expdir + '/scratch'
-        self.blddirLn = tmp_expdir + '/build'
+        self.expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
+        self.rundir = self.expdir + '/run'
+        self.inpdir = self.expdir + '/input'
+        self.outdir = self.expdir + '/output'
+        self.scratchdir = self.expdir + '/scratch'
+        self.blddirLn = self.expdir + '/build'
         self.out_path = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']
         self.bcsdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
         self.rstdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
         self.exefyl = self.blddirLn+exefyl
-
-        tmp_expid = None
-        tmp_expdir = None
 
         my_ntasks_per_node = int(self.rqdRmInp['ntasks-per-node'])
 
@@ -740,7 +737,7 @@ class LDASsetup:
            wemin_out = self.rqdExeInp['WEMIN_OUT']
 
 
-        tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False) 
+        tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False)
         cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name
 
         print ('Creating f2g file: '+ tmp_f2g_file.name +'....\n')
@@ -880,7 +877,30 @@ class LDASsetup:
            config['output']['surface']['surflay']        = dzsf
            config['output']['surface']['wemin']          = wemin_out
 
-           config = remap_config_ldas( config, RESTART_str, self.rqdExeInp['RESTART_PATH'], self.rqdExeInp['RESTART_ID'])
+           if RESTART_str == "M" : # restart from merra2
+             yyyymm = int(YYYYMMDDHH[0:6])
+             merra2_expid = "d5124_m2_jan10"
+             if yyyymm < 197901 :
+                exit("Error. MERRA-2 data < 1979 not available\n")
+             elif (yyyymm < 199201):
+                merra2_expid = "d5124_m2_jan79"
+             elif (yyyymm < 200106):
+                merra2_expid = "d5124_m2_jan91"
+             elif (yyyymm < 201101):
+                merra2_expid = "d5124_m2_jan00"
+             elif (yyyymm < 202106):
+                merra2_expid = "d5124_m2_jan10"
+             # There was a rewind in MERRA2 from Jun 2021 to Sept 2021
+             elif (yyyymm < 202110):
+                merra2_expid = "d5124_m2_jun21"
+             config['input']['shared']['expid']      = merra2_expid
+             config['input']['shared']['rst_dir']    = mk_outdir+ '/merra2_tmp_'+ YYYYMMDDHH
+             config['input']['surface']['wemin']     = 26
+             config['input']['shared']['bc_base']    = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles'
+             config['input']['shared']['bc_version'] = 'GM4'
+             config['input']['shared']['agrid']      = 'C180'
+             config['input']['shared']['ogrid']      = '1440x720'
+             config['input']['shared']['omodel']     = 'data'
 
            catch_obj = catchANDcn(config_obj = config)
            catch_obj.remap()
@@ -1146,6 +1166,13 @@ class LDASsetup:
                    ldasrcInp[keyn]= valn
                 if('catchcn' in self.catch):
                    ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
+                else:
+                   # remove catchcn-specific entries that do not apply to catch model
+                   ldasrcInp.pop('DTCN',None)
+                   ldasrcInp.pop('ATM_CO2',None)
+                   ldasrcInp.pop('CO2',None)
+                   ldasrcInp.pop('CO2_YEAR',None)
+                   ldasrcInp.pop('PRESCRIBE_DVG',None)
 
                 # create restart item in RC
                 catch_ = self.catch.upper()
@@ -1294,8 +1321,6 @@ class LDASsetup:
         status = False
 
         os.chdir(self.rundir)
-        lenkf=self.blddir+'/etc/lenkf.j.template'
-        shutil.copy(lenkf,'lenkf.j')
 
         my_qos='allnccs'
         if self.GEOS_SITE == 'NAS': my_qos = 'normal'
@@ -1330,75 +1355,52 @@ class LDASsetup:
                         '.'.join([expid, 'ldas_err', myDateTime, 'txt']),
                         ]),
                 self.rundir)
-        with open(lenkf,'rt') as fin:
-            with open('lenkf.j','wt') as fout :
-                for line in fin :
-                    if self.GEOS_SITE == 'NAS':
-                       if '#SBATCH' in line:
-                         continue
-                       if 'sbatch $HOMDIR/lenkf.j' in line:
-                         continue
+        constraint='cas'
+        if self.GEOS_SITE == "NAS":
+          constraint = 'cas_ait'
+        elif self.BUILT_ON_SLES15:
+          constraint = 'mil'
+        else:
+           assert int(self.rqdRmInp['ntasks-per-node']) <= 46, 'ntasks-per-node should be <=46 for cas'
 
-                    if self.GEOS_SITE == 'NCCS':
-                       if '#PBS' in line:
-                         continue
-                       if 'qsub $HOMDIR/lenkf.j' in line:
-                         continue
+        SBATCHQSUB = 'sbatch'
+        if self.GEOS_SITE == 'NAS':
+          SBATCHQSUB = 'qsub'
 
-                    if 'MY_ACCOUNT' in line :
-                        fout.write(line.replace('MY_ACCOUNT',self.rqdRmInp['account']))
-                    elif 'MY_WALLTIME' in line :
-                        fout.write(line.replace('MY_WALLTIME',self.rqdRmInp['walltime']))
-                    elif 'MY_NODES' in line :
-                        line_ = line.replace('MY_NODES',str(self.optRmInp['nodes']))
-                        line_ = line_.replace('MY_NTASKS_PER_NODE',str(self.rqdRmInp['ntasks-per-node']))
-                        line_ = line_.replace('MY_CONSTRAINT', 'cas_ait')
-                        fout.write(line_)
-                        if self.GEOS_SITE == "NCCS" :
-                          if self.BUILT_ON_SLES15 :
-                            fout.write("#SBATCH --constraint=mil\n")
-                          else:
-                            assert int(self.rqdRmInp['ntasks-per-node']) <= 46, 'ntasks-per-node should be <=46 for cas'
-                            fout.write("#SBATCH --constraint=cas\n")
+        DETECTED_MPI_STACK = "@MPI_STACK@"
 
-                    elif 'MY_OSERVER_NODES' in line :
-                        fout.write(line.replace('MY_OSERVER_NODES',str(self.optRmInp['oserver_nodes'])))
-                    elif 'MY_WRITERS_NPES' in line :
-                        fout.write(line.replace('MY_WRITERS_NPES', str(self.optRmInp['writers-per-node'])))
-                    elif 'MY_QOS' in line :
-                        if 'allnccs' not in my_qos or 'normal' not in my_qos:
-                           fout.write(line.replace('MY_QOS',my_qos))
-                    elif 'MY_JOB' in line :
-                        fout.write(line.replace('MY_JOB',my_job))
-                    elif 'MY_EXPID' in line :
-                        fout.write(line.replace('MY_EXPID',self.rqdExeInp['EXP_ID']))
-                    elif 'MY_EXPDOMAIN' in line :
-                        fout.write(line.replace('MY_EXPDOMAIN',self.rqdExeInp['EXP_DOMAIN']))
-                    elif 'MY_LOGFILE' in line :
-                        fout.write(line.replace('MY_LOGFILE',my_logfile))
-                    elif 'MY_ERRFILE' in line :
-                        fout.write(line.replace('MY_ERRFILE',my_errfile))
-                    elif 'MY_MODEL' in line :
-                        fout.write(line.replace('MY_MODEL',self.catch))
-                    elif 'MY_POSTPROC_HIST' in line :
-                        fout.write(line.replace('MY_POSTPROC_HIST',str(self.rqdExeInp['POSTPROC_HIST'])))
-                    elif 'MY_FIRST_ENS_ID' in line :
-                        fout.write(line.replace('MY_FIRST_ENS_ID',str(self.first_ens_id)))
-                    elif 'MY_LADAS_COUPLING' in line :
-                        fout.write(line.replace('MY_LADAS_COUPLING',str(self.ladas_coupling)))
-                    elif 'MY_ENSEMBLE_FORCING' in line :
-                        fout.write(line.replace('MY_ENSEMBLE_FORCING',self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper()))
-                    elif 'MY_ADAS_EXPDIR' in line :
-                        if self.ladas_coupling > 0:
-                           fout.write(line.replace('MY_ADAS_EXPDIR', self.rqdExeInp['ADAS_EXPDIR']))
-                    else :
-                        my_expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
-                        fout.write(line.replace('MY_EXPDIR',my_expdir))
+        job_head = job_directive[self.GEOS_SITE]
+        lenkf_str= (job_head+job_body).format(
+                  SBATCHQSUB         = SBATCHQSUB,
+                  MY_ACCOUNT         = self.rqdRmInp['account'],
+                  MY_WALLTIME        = self.rqdRmInp['walltime'],
+                  MY_NODES           = str(self.optRmInp['nodes']),
+                  MY_NTASKS_PER_NODE = str(self.rqdRmInp['ntasks-per-node']),
+                  MY_CONSTRAINT      = constraint,
+                  MY_OSERVER_NODES   = str(self.optRmInp['oserver_nodes']),
+                  MY_WRITERS_NPES    = str(self.optRmInp['writers-per-node']),
+                  MY_QOS             = my_qos,
+                  MY_JOB             = my_job,
+                  MY_EXPID           = self.rqdExeInp['EXP_ID'],
+                  MY_EXPDOMAIN       = self.rqdExeInp['EXP_DOMAIN'],
+                  MY_LOGFILE         = my_logfile,
+                  MY_ERRFILE         = my_errfile,
+                  MY_MODEL           = self.catch,
+                  MY_POSTPROC_HIST   = str(self.rqdExeInp['POSTPROC_HIST']),
+                  MY_FIRST_ENS_ID    = str(self.first_ens_id),
+                  MY_LADAS_COUPLING  = str(self.ladas_coupling),
+                  MY_ENSEMBLE_FORCING= self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper(),
+                  MY_ADAS_EXPDIR     = self.adas_expdir,
+                  MY_EXPDIR          = self.expdir,
+                  DETECTED_MPI_STACK = DETECTED_MPI_STACK,
+                  BUILT_ON_SLES15    = str(self.BUILT_ON_SLES15).upper()
+                  )
 
+        with open('lenkf.j','wt') as fout :
+           fout.write(lenkf_str)
         sp.call(['chmod', '755', 'lenkf.j'])
 
-        expdir = '/'.join(self.rundir.rstrip('/').split('/')[:-1])
-        print ('\nExperiment directory: %s' % expdir)
+        print ('\nExperiment directory: %s' % self.expdir)
         print ()
         status = True
         return status
@@ -1471,12 +1473,6 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('# RESTART: M                                               #')
     print ('#   Re-tile from archived MERRA-2 restart file.            #')
     print ('#                                                          #')
-    print ('# RESTART: F                                               #')
-    print ('#   Re-tile from FP (Forward Processing) restart file.     #')
-    print ('#                                                          #')
-    print ('# RESTART: G                                               #')
-    print ('#   Re-tile from any AGCM catch[cnclmxx]_internal_rst file.#')
-    print ('#                                                          #')
     print ('# -------------------------------------------------------- #')
     print ('# IMPORTANT:                                               #')
     print ('#   Except for RESTART=1, SPIN-UP is REQUIRED in almost    #')
@@ -1491,14 +1487,9 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#   restarts stored as follows:                            #')
     print ('#     RESTART_PATH/RESTART_ID/output/RESTART_DOMAIN/rs/    #')
     print ('#                                                          #')
-    print ('# For RESTART=0 or RESTART=M or RESTART=F:                 #')
+    print ('# For RESTART=0 or RESTART=M:                              #')
     print ('#   There is no need to specify RESTART_ID, RESTART_PATH,  #')
     print ('#   and RESTART_DOMAIN.                                    #')
-    print ('#                                                          #')
-    print ('# For RESTART=G:                                           #')
-    print ('#   RESTART_ID   : full_path_to_AGCM_experiment_directory  #')
-    print ('#   RESTART_PATH : full_path_of_the_AGCM_restart_file      #')
-    print ('#   RESTART_DOMAIN is NOT required.                        #')
     print ('#                                                          #')
     print ('############################################################')
     print ()
