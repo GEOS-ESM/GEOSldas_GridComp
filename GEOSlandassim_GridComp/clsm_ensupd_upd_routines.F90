@@ -4689,7 +4689,6 @@ contains
        !
        ! amfox+rreichle, 26 Feb 2024
        
-       if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc obs'
        
       N_select_varnames = 0
 
@@ -4757,7 +4756,9 @@ contains
                  N_selected_obs,   ind_obs )
             
             if (N_selected_obs > 0) then
-               
+     
+               write(*,*) 'Doing snow DA'
+          
                ! average in case there are multiple "asnow" obs (e.g., from MODIS and VIIRS)
                
                tmp_obs = sum(Observations(ind_obs(1:N_selected_obs))%obs)
@@ -4795,7 +4796,9 @@ contains
                   ! 3. Derive SWE, snow heat content, and snow depth increments for each layer from total SWE increment 
                   
                   swe_ana   = max(swe_fcst + swe_incr(kk,n_e), 0.0)    ! total SWE after analysis
-                   
+                  
+                  write (*,*) 'swe_incr(kk,n_e): ',swe_incr(kk,n_e)
+      
                   call StieglitzSnow_calc_asnow( swe_ana, asnow_ana )  ! asnow after analysis
                   
                   if (swe_fcst>=StieglitzSnow_MINSWE) then
@@ -4915,12 +4918,40 @@ contains
       swe_incr_ensavg = sum(swe_incr, dim=2) / real(N_ens)
        
        ! Will get all species associated with Tb or sfds observations
+      
+       N_select_varnames  = 0
        
+       do ii = 1,N_obs_param
+         if (trim(obs_param(ii)%varname) == 'Tb') then
+            N_select_varnames = N_select_varnames + 1
+            select_varnames(N_select_varnames) = 'Tb'
+            exit     
+         end if
+       end do
+         
+       do ii = 1,N_obs_param
+         if (trim(obs_param(ii)%varname) == 'sfmc') then
+            N_select_varnames = N_select_varnames + 1
+            select_varnames(N_select_varnames) = 'sfmc'
+            exit
+         end if
+       end do
+
+       do ii = 1,N_obs_param
+         if (trim(obs_param(ii)%varname) == 'sfds') then
+            N_select_varnames = N_select_varnames + 1
+            select_varnames(N_select_varnames) = 'sfds'
+            exit 
+         end if  
+       end do
+
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )         
        
        ! Determine which species are Tb
+
+       if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc obs'
        
        call get_select_species(1, 'Tb', N_obs_param, obs_param, N_select_species_Tb, select_species_Tb )
        
@@ -4962,6 +4993,8 @@ contains
                   N_selected_obs,   ind_obs )
              
              if (N_selected_obs>0) then
+
+             write(*,*) 'Doing SM DA'
 
                 ! Determine if Tb observations are present
                 
@@ -5079,6 +5112,8 @@ contains
                    cat_progn_incr(kk,:)%ght(1) = State_incr(7,:)*scale_ght1
                    
                 end if
+
+                   write (*,*) 'State_incr: ', State_incr(1,1)
                 
              end if
              

@@ -1396,7 +1396,21 @@ contains
              
              cat_progn(n,n_e)%ght(1) = &
                   cat_progn(n,n_e)%ght(1) + cat_progn_incr(n,n_e)%ght(1)
-             
+            
+              do ii=1,N_snow   ! for each snow layer
+                 
+                 cat_progn(n,n_e)%wesn(ii) =                                         &
+                      cat_progn(n,n_e)%wesn(ii) + cat_progn_incr(n,n_e)%wesn(ii)
+                 
+                 cat_progn(n,n_e)%sndz(ii) =                                         &
+                      cat_progn(n,n_e)%sndz(ii) + cat_progn_incr(n,n_e)%sndz(ii)
+                 
+                 cat_progn(n,n_e)%htsn(ii) =                                         &
+                      cat_progn(n,n_e)%htsn(ii) + cat_progn_incr(n,n_e)%htsn(ii)
+                 
+              end do
+
+ 
           end do
        end do
 
