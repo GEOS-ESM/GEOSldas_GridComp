@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -----------------------------
 
-## [v1.0.3] - 2024-11-05
+## [v1.1.0] - 2024-11-05
 
 - 0-diff vs. v1.0.2 except for data assimilation in cube-sphere tile space ([PR #41](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/41)).
 
