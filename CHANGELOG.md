@@ -13,9 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- More optimal distribution of tiles on processors for cubed-sphere tile space.
+- Updates to scripting to allow for Intel MPI
+
 ### Fixed
 
+- Do not increment CO2_YEAR when it is a no-data-value. For Catchment simulations, exclude CatchCN-specific resource variables from LDAS.rc.
+- Bug fix and improved efficiency in matlab script for generation of mwRTM_param.
+- Changed EXPDIR to absolute path for POSTPROC_HIST>0 option to work.
+- Support HISTORY output of ASNOW alone from ENSAVG Gridcomp.
+
 ### Removed
+
+- Remove restart options F and G.
 
 ### Deprecated
 
@@ -34,9 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Moved external `GEOSgcm_GridComp` repository to under `GEOSldas/src/Components` for
   consistency with directory structure of GEOSgcm and GEOSadas  ([PR #27](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/27), [PR #30](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/30)).
-- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)). 
+- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)).
 
-  
+
 -----------------------------
 
 ## [v1.0.1] - 2024-04-10

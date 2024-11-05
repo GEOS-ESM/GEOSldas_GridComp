@@ -2061,7 +2061,7 @@ contains
     integer :: n,typ,tmpint
     real ::  tmpreal
     integer :: avg_land,n0,local
-    integer :: i,s,e,j,k,n1,n2
+    integer :: i,s,e,j,k,n1,n2, s1, s2
     logical :: file_exist
     character(len=256):: tmpLine
     character(len=128):: gridname
@@ -2070,6 +2070,9 @@ contains
     integer :: face(6),face_land(6)
     logical :: forward
     character(len=:), allocatable :: IMS_file, JMS_File
+    
+    character(len=*), parameter :: Iam = 'optimize_latlon'
+    character(len=400)          :: err_msg
 
     ! -----------------------------
     
@@ -2078,7 +2081,10 @@ contains
     ! get tile info
 
     inquire(file=trim(fname_tilefile),exist=file_exist)
-    if( .not. file_exist) stop ( "tile file does not exist")
+    if( .not. file_exist) then
+       err_msg = 'tile file does not exist'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
+    end if
     
     open (10, file=trim(fname_tilefile), form='formatted', action='read')
     read (10,*) N_tile
@@ -2091,7 +2097,10 @@ contains
        
        IMGLOB = N_lon                     ! e.g.,  180 for c180
        JMGLOB = N_lat                     ! e.g., 1080 for c180  (6*180=1080)
-       if(JMGLOB/6 /= IMGLOB) stop " wrong im, jm"
+       if(JMGLOB/6 /= IMGLOB) then
+          err_msg = 'wrong im, jm'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
        
        allocate(landPosition(JMGLOB))
        landPosition = 0
@@ -2117,6 +2126,7 @@ contains
           !tmpint,        &   ! 10
           !tmpreal,       &   ! 11
           !tmpint             ! 12  * (previously "tile_id")
+
           if(typ==MAPL_Land) then
              total_land=total_land+1
              landPosition(j) = landPosition(j)+1
@@ -2146,7 +2156,7 @@ contains
           N_proc = N_proc-mod(N_proc,6)
        endif
        
-       print*, "total tiles", total_land
+       print*, "total tiles: ", total_land
        
        if(sum(landPosition) /= total_land) print*, "wrong counting of land"
        
@@ -2155,7 +2165,10 @@ contains
           n2 = k*IMGLOB
           face_land(k) = sum(landPosition(n1:n2)) 
           face(k) = nint(1.0*face_land(k)/total_land * N_proc)
-          if ( face(k) == 0) face(k) = 1
+          ! ensure each face has at least 1 process
+          if ( face(k) == 0)       face(k) = 1
+          ! ensure that the stripe for each process can be at least 2 cells wide
+          if ( face(k) > IMGLOB/2) face(k) = IMGLOB/2  
        enddo
        
        ! now make sure sum(face) == N_proc
@@ -2173,69 +2186,27 @@ contains
           enddo
        endif
        
-       if (sum(face) /= N_proc) stop " wrong proc face"
-       
+       if (sum(face) /= N_proc) then
+          err_msg = 'wrong proc face'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
+       end if
+          
+
        ! 2) each process should have average land tiles
-       
+
        ALLOCATE(JMS(N_proc))
-       allocate(local_land(N_Proc))
-       JMS = 0
-       local_land = 0
-       
-       local  = 0
-       n0     = 0
-       j = 0
-       do k=1,6
+       do k = 1, 6
           n1 = (k-1)*IMGLOB+1
           n2 = k*IMGLOB
-          
-          do i=1,60
-             rates(i) = -0.3 + i*0.01
-          enddo
-          
-          maxf=rms_cs(rates)
-          i=minloc(maxf,DIM=1)
-          rate = rates(i)
-          avg_land = ceiling(1.0*face_land(k)/face(k))
-          avg_land = avg_land - nint(rate*avg_land)
-          
-          tmpint = 0
-          j = j+face(k) 
-          forward = .true.
-          do n = n1,n2
-             tmpint=tmpint+landPosition(n)
-             if((local+1) == j .and. n < n2) cycle
-             if(n==n2) then
-                local = local + 1
-                local_land(local)=tmpint
-                JMS(local)=n-n0
-                tmpint=0
-                n0=n
-                cycle
-             endif
-             if(tmpint .ge. avg_land) then
-                local = local + 1
-                if (n-n0 == 1) forward =.true.
-                if (forward) then
-                   local_land(local)=tmpint
-                   JMS(local)=n-n0
-                   tmpint=0
-                   n0=n
-                   forward = .false.
-                else
-                   local_land(local)=tmpint - landPosition(n)
-                   JMS(local)=n-1-n0
-                   tmpint=landPosition(n)
-                   n0=n-1
-                   forward = .true.
-                endif
-            endif
-          enddo
-          local = j
+          s1 = sum(face(1:k-1)) + 1
+          s2 = sum(face(1:k))
+          call equal_partition(landPosition(n1:n2), JMS(s1:s2))
        enddo
+
        if( sum(JMS) /= JMGLOB) then
           print*, sum(JMS), JMGLOB
-          stop ("wrong cs-domain distribution in the first place")
+          err_msg = 'wrong cs-domain distribution in the first place'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        endif 
        ! adjust JMS.rc to make sure each processor has at least 2 grid cells in j dimension 
        ! (i.e., each proc's subdomain must include at least 2 latitude stripes;
@@ -2258,12 +2229,26 @@ contains
           enddo
           j=j+face(k)
        enddo
-       
+
+       if (any(JMS <=1)) then
+          err_msg = 'too many processors for this resolution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       endif
+
+       allocate(local_land(N_Proc), source = 0)
+       s1 = 1
+       do n = 1, N_proc
+          s2 = s1+JMS(n) - 1
+          local_land(n) = sum(landPosition(s1:s2))
+          s1 = s2 + 1
+       enddo
+ 
        print*,"land_distribute: ",local_land
        print*, "JMS.rc", JMS
        if( sum(JMS) /= JMGLOB) then
           print*, sum(JMS), JMGLOB
-          stop ("wrong cs-domain distribution")
+          err_msg = 'wrong cs-domain distribution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        endif
        tmpint = 0
        k = 0
@@ -2275,8 +2260,11 @@ contains
           endif
        enddo
        
-       if( k /=6 ) stop ("one or more processes may accross the face")
-      
+       if( k /=6 ) then
+          err_msg = 'one or more processes may have tiles from two or more faces'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)      
+       end if
+
        open(10,file=optimized_file,action='write')
        write(10,'(A)')    "GEOSldas.GRIDNAME:  " // trim(gridname)
        write(10,'(A)')    "GEOSldas.GRID_TYPE:  Cubed-Sphere"
@@ -2296,7 +2284,9 @@ contains
        enddo
        close(10)
        
-    else
+    else    
+       
+       ! *not* cube-sphere tile space
        
        allocate(IMS(N_Proc))
        allocate(local_land(N_Proc))
@@ -2450,23 +2440,32 @@ contains
        
        print*,"land_distribute: ",local_land
        
-       if( sum(local_land) /= total_land) stop ("wrong distribution")
-       if( sum(IMS) /= N_lon) stop ("wrong domain distribution")
+       if( sum(local_land) /= total_land) then
+          err_msg = 'wrong distribution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+       if( sum(IMS) /= N_lon) then          
+          err_msg = 'wrong domain distribution'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)          
+       end if
 
        ! redistribute IMS and try to make it >=2 (may be impossible for large N_Proc)
        do i = 1, N_proc
           if(IMS(i) == 0) then
-            n = maxloc(IMS,DIM=1)
-            IMS(i) = 1
-            IMS(n) = IMS(n)-1
+             n = maxloc(IMS,DIM=1)
+             IMS(i) = 1
+             IMS(n) = IMS(n)-1
           endif
           if(IMS(i) == 1) then
-            n = maxloc(IMS,DIM=1)
-            IMS(i) = 2
-            IMS(n) = IMS(n)-1
+             n = maxloc(IMS,DIM=1)
+             IMS(i) = 2
+             IMS(n) = IMS(n)-1
           endif
        enddo
-       if( any(IMS <=1) ) stop ("Each processor must have at least 2 longitude stripes. Request fewer processors.")  
+       if( any(IMS <=1) ) then
+          err_msg = 'Each processor must have at least 2 cells in its longitude stripe. Request fewer processors.'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)          
+       end if
 
        open(10,file=optimized_file, action='write')
        write(10,'(A)')    "GEOSldas.GRID_TYPE:  LatLon"
@@ -2495,7 +2494,7 @@ contains
     
   contains 
     
-    ! ***************************************************************************
+    ! ---------------------------------------------------
     
     elemental function rms(rates) result (f)
       real :: f
@@ -2519,24 +2518,24 @@ contains
          tmpint=tmpint+landPosition(n)
          if(local == N_proc .and. n < e) cycle ! all lefteover goes to the last process
          if( n==e ) then
-             local_land(local)=tmpint
-             exit
-          endif
-
-          if( tmpint .ge. avg_land ) then
-             if (forward .or. n-n0 == 1 ) then
-                local_land(local)=tmpint
-                tmpint=0
-                n0=n
-                forward = .false.
-             else
-                local_land(local) = tmpint - landPosition(n)
-                tmpint= landPosition(n)
-                n0 = n-1
-                forward = .true.
-             endif
-             local = local + 1
-          endif
+            local_land(local)=tmpint
+            exit
+         endif
+         
+         if( tmpint .ge. avg_land ) then
+            if (forward .or. n-n0 == 1 ) then
+               local_land(local)=tmpint
+               tmpint=0
+               n0=n
+               forward = .false.
+            else
+               local_land(local) = tmpint - landPosition(n)
+               tmpint= landPosition(n)
+               n0 = n-1
+               forward = .true.
+            endif
+            local = local + 1
+         endif
       enddo
       f = 0.0
       do proc = 1, N_proc
@@ -2545,67 +2544,78 @@ contains
       deallocate(local_land)
     end function rms
     
-    ! ***************************************************************************
+    ! ---------------------------------------------------
     
-    elemental function rms_cs(rates) result (f)
-      real :: f
-      real,intent(in) :: rates
-      integer :: tmpint,local
-      integer :: proc,n
-      integer :: avg_land
-      integer,allocatable :: local_land(:)
-      integer :: n1,n2,n0
-      logical :: forward
+    subroutine equal_partition(array, distribute)
+      integer, intent(in)    :: array(:)
+      integer, intent(inout) :: distribute(:)
+      integer, allocatable   :: ArraySum(:)
+      integer, allocatable   :: table(:,:), partition(:,:)
+      integer                :: n, k, tmp_max
+      integer                :: i, j, p, best, pos
 
-      allocate (local_land(face(k)))
-      local_land = 0
-      avg_land = ceiling(1.0*face_land(k)/face(k))
-      avg_land = avg_land -nint(rates*avg_land)
-      if (avg_land <=0) then
-         f = face_land(k)
-         return
-      endif
-      
-      tmpint = 0
-      local = 1
-      
-      n1 = (k-1)*IMGLOB+1
-      n2 = k*IMGLOB
-      tmpint = 0
-      forward = .true.
-      n0 = n1-1
-      do n = n1,n2
-         tmpint=tmpint+landPosition(n)
-         if(local == face(k) .and. n < n2) cycle ! all lefteover goes to the last process
-         if(n==n2) then
-            local_land(local)=tmpint
-            local = local + 1
-            cycle
-         endif
-         if(tmpint .ge. avg_land) then
-            if (n -n0 == 1) forward = .true. ! if only one step, should not got backward
-            if (forward) then
-               local_land(local)=tmpint
-               tmpint=0
-               n0 = n
-               forward = .false.
-            else
-               local_land(local) = tmpint - landPosition(n)
-               tmpint = landPosition(n)
-               n0 = n-1
-               forward = .true.
-            endif
-            local = local + 1
-         endif
+      n = size(array)
+      k = size(distribute)
+      allocate(arraySum(n))
+      allocate(table(k,n), partition(k,n))
+      arraySum(1) = array(1)
+      do j = 2, n
+         arraySum(j) = arraySum(j-1) + array(j)
       enddo
-      
-      f = 0.0
-      do proc = 1, face(k)
-         ! punish for no land tiles
-         f =max(f,1.0*abs(local_land(proc)-avg_land))
+
+      table = 0
+      partition = 0
+      do j = 1, n
+         table(1, j)     = arraySum(j)
+         partition(1,j) = j
       enddo
-      deallocate(local_land)
-    end function rms_cs
+      do i =1, k
+         table(i,1)  = array(1)
+      enddo
+      do i = 2, k ! partitions
+         do j = 2, n ! array element
+
+            best = arraySum(n) + 1 ! or the max int
+            ! the ith partition in front of p
+            do p = 1, j
+               tmp_max = max(table(i-1,p), arraySum(j)-arraySum(p))
+               if (tmp_max < best) then
+                  best = tmp_max
+                  pos = p
+               endif
+            enddo
+            table(i,j) = best
+            partition(i,j) = pos
+         enddo
+      enddo
+
+      ! trace back the partition
+      j = n
+      do i = k, 2, -1
+         distribute(i) = j - partition(i,j)
+         j = partition(i,j)
+      enddo
+      distribute(1) = j
+block
+      ! verifing, sanity check
+      integer :: s1, s2
+      if (sum(distribute) /= n) then
+         err_msg = 'wrong distribution'
+         call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)         
+      end if
+      s1 = 1
+      do i =1, k
+         s2 = s1+distribute(i) -1
+         best = sum(array(s1:s2))
+         if (best > table(k,n)) print*, "hmmm, wrong"
+         s1 = s2+1
+      enddo
+end block
+
+      print*, "Average : ", arraySum(n)/(k*1.0)
+      print*, "Worst   : ", table(k,n)
+      deallocate(table, arraySum, partition)
+    end subroutine equal_partition
     
   end subroutine optimize_latlon
   
