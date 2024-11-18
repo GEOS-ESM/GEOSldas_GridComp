@@ -4896,10 +4896,12 @@ contains
                                    ! 1d snow analysis (Toure et al. 2018 empirical gain); snow cover fraction obs
        
        ! this case is a combination of cases 11 and 13
-      ! first, obs_param%varname is checked to determine if snow and/or soil moisture obs are potentially in the analysis
-      ! then, if in the analysis the species ID is determined for each type of soil moisture observation
-      ! if snow observations are in the analysis, the species ID is determined and the snow analysis is performed
-      ! finally, if soil moisture observations are in the analysis, the soil moisture analysis is performed
+       ! 1. obs_param%varname is checked to determine if snow and/or soil moisture obs are potentially in the analysis
+       ! 2. if sm obs are in the analysis the species ID is determined for each type
+       ! 3. if snow observations are in the analysis, their species ID is determined 
+       ! 4. start looping through all the tiles 
+       ! 5. if snow obs are in the analysis, check for snow obs with each tile, and if found perform the snow analysis
+       ! 6. if sm obs are in the analysis, check for SM obs around each tile, and if found perform sm analysis
        
        ! in the case of the snow analysis: 
        ! update each tile separately using all observations associated with that tile
