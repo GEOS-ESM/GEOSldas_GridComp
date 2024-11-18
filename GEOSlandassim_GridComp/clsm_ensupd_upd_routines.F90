@@ -4893,9 +4893,20 @@ contains
          ! ----------------------------------  
 
     case (14) select_update_type   ! 3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds obs
+                                   ! 1d snow analysis (Toure et al. 2018 empirical gain); snow cover fraction obs
        
+       ! this case is a combination of cases 11 and 13
+      ! first, obs_param%varname is checked to determine if snow and/or soil moisture obs are potentially in the analysis
+      ! then, if in the analysis the species ID is determined for each type of soil moisture observation
+      ! if snow observations are in the analysis, the species ID is determined and the snow analysis is performed
+      ! finally, if soil moisture observations are in the analysis, the soil moisture analysis is performed
+       
+       ! in the case of the snow analysis: 
+       ! update each tile separately using all observations associated with that tile
+       ! loops through ensemble members and compute analysis separately for each ensemble member
+
+       ! in the case of the 3d soil moisture/Tskin/ght(1) analysis: 
        ! update each tile separately using all observations within customized halo around each tile
-       !
        ! state vector differs for each tile depending on assimilated obs and soil type 
        !
        ! obs             | soil    | N_state | state vector
@@ -4941,13 +4952,11 @@ contains
             has_asnow = .true.
             exit 
          end if  
-       end do      
+      end do      
 
       ! If we have any of the soil moisture observtions we need to get the species ID
 
-      if (N_select_varnames > 0) then  ! We have soil moisture observations
-
-         if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc obs'
+      if (has_Tb .or. has_sfmc .or. has_sfds) then   ! We have soil moisture observations
 
          call get_select_species(                                        &
            N_select_varnames, select_varnames(1:N_select_varnames),      &
@@ -4982,27 +4991,28 @@ contains
          swe_incr = 0.   ! total SWE increment; initialize to NO CHANGE
          swe_incr_ensavg = 0.  ! total SWE ensemble average increment; initialize to NO CHANGE
 
-         call get_select_species(1, 'asnow', N_obs_param, obs_param, N_select_species_asnow, select_species_asnow )      
+         call get_select_species(1, 'asnow', N_obs_param, obs_param, N_select_species_asnow, select_species_asnow )
+
       end if
-         ! loop through tiles and compute increments
+
+      ! loop through tiles and compute increments
          
       do kk=1,N_catd
 
          if (has_asnow) then
          
-            ! find observations for tile kk
+            ! find snow observations for tile kk
             
             select_tilenum(1) = l2f(kk)
             
-            call get_ind_obs(                                           &
-                  N_obs,            Observations,                        &
-                  1,                select_tilenum,                      &
-                  N_select_species_asnow, select_species_asnow(1:N_select_species_asnow),  &
+            call get_ind_obs(                                      &
+                  N_obs,      Observations,                        &
+                  1,          select_tilenum,                      &
+                  N_select_species_asnow,                          &
+                  select_species_asnow(1:N_select_species_asnow),  &
                   N_selected_obs,   ind_obs )
             
             if (N_selected_obs > 0) then
-      
-               write(*,*) 'Doing snow DA'
             
                ! average in case there are multiple "asnow" obs (e.g., from MODIS and VIIRS)
                
@@ -5041,8 +5051,6 @@ contains
                   ! 3. Derive SWE, snow heat content, and snow depth increments for each layer from total SWE increment 
                   
                   swe_ana   = max(swe_fcst + swe_incr(kk,n_e), 0.0)    ! total SWE after analysis
-                  
-                  write (*,*) 'swe_incr(kk,n_e): ',swe_incr(kk,n_e)
       
                   call StieglitzSnow_calc_asnow( swe_ana, asnow_ana )  ! asnow after analysis
                   
@@ -5160,13 +5168,15 @@ contains
 
           swe_incr_ensavg(kk) = sum((swe_incr(kk,:))) / real(N_ens)
 
-          if (N_select_species > 0) then  ! We have soil moisture observations
+         if (has_Tb .or. has_sfmc .or. has_sfds) then  ! Have soil moisture observations
+
+            if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc obs'
        
             N_state = 2    ! initialize (always have srfexc and rzexc in state vector)
             
             ! compute increments only for snow-free and non-frozen tiles
             
-            if ( (SWE_ensavg(kk) < SWE_threshold)      .and.               &
+            if (  (SWE_ensavg(kk) < SWE_threshold)      .and.               &
                   (swe_incr_ensavg(kk) < SWE_threshold) .and.               &
                   (tp1_ensavg(kk) > tp1_threshold) )    then  
                
@@ -5185,15 +5195,13 @@ contains
                halo_minlat = max(halo_minlat, -90.)
                halo_maxlat = min(halo_maxlat,  90.)
                
-               call get_ind_obs_lat_lon_box(                               &
-                     N_obs,            Observations,                        &
+               call get_ind_obs_lat_lon_box(                                &
+                     N_obs, Observations,                                   &
                      halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,    &
                      N_select_species, select_species(1:N_select_species),  &
                      N_selected_obs,   ind_obs )
                
                if (N_selected_obs>0) then
-
-               write(*,*) 'Doing SM DA'
 
                   ! Determine if Tb observations are present
                   
@@ -5262,7 +5270,7 @@ contains
                   call assemble_obs_cov( N_selected_obs, N_obs_param, obs_param, &
                         Observations(ind_obs(1:N_selected_obs)), Obs_cov )
                   
-                  call enkf_increments(                                        &
+                  call enkf_increments(                                         &
                         N_state, N_selected_obs, N_ens,                         &
                         Observations(ind_obs(1:N_selected_obs)),                &
                         Obs_pred(ind_obs(1:N_selected_obs),:),                  &
@@ -5311,14 +5319,12 @@ contains
                      cat_progn_incr(kk,:)%ght(1) = State_incr(7,:)*scale_ght1
                      
                   end if
-
-                     write (*,*) 'State_incr: ', State_incr(1,1)
                   
-               end if   ! if (N_selected_obs > 0)
+               end if  ! if (N_selected_obs > 0)
                
             end if     ! thresholds
 
-         end if        ! if (N_select_species > 0)
+         end if        ! if (have soil moisture observations)
           
       end do ! kk=1,N_catd
        
