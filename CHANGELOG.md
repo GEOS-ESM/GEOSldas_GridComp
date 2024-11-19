@@ -13,8 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+### Deprecated
+
+-----------------------------
+
+## [v1.1.0] - 2024-11-05
+
+- 0-diff vs. v1.0.2 except for data assimilation in cube-sphere tile space ([PR #41](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/41)).
+
+### Changed
+
 - More optimal distribution of tiles on processors for cubed-sphere tile space.
-- Updates to scripting to allow for Intel MPI
+- Updates to scripting to allow for Intel MPI.
 
 ### Fixed
 
@@ -26,8 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Remove restart options F and G.
-
-### Deprecated
 
 -----------------------------
 
