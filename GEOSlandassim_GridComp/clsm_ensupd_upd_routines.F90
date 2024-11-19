@@ -4675,7 +4675,7 @@ contains
        end do         ! kk=1,N_catd
        
        ! ----------------------------------
-
+  
       case (13) select_update_type   ! 3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds obs
        
          ! update each tile separately using all observations within customized halo around each tile
