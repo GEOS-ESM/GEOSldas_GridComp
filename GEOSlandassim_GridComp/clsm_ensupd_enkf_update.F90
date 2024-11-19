@@ -1433,7 +1433,7 @@ contains
       !  or catdef=0 in update_type 10 or 13 when tile has mineral soil)
 
       if (logit) write (logunit,*) &
-            'apply_enkf_increments(): applying soil moisture and Tskin/ght1 increments'
+            'apply_enkf_increments(): applying soil moisture, Tskin/ght1 and snow increments'
       
       do n=1,N_catd
          do n_e=1,N_ens
