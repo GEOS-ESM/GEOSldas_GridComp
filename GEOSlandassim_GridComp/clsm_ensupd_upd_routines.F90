@@ -4918,12 +4918,12 @@ contains
        ! sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
        ! sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
-       ! amfox+rreichle, 26 Feb 2024
+       ! amfox+rreichle, Dec 2024
 
       ! Figure out what types of observtion we have
        
       do ii = 1,N_obs_param
-        if (trim(obs_param(ii)%varname) == 'Tb') then
+        if (trim(obs_param(ii)%varname) == 'Tb' .and. obs_param(ii)%assim) then
            N_select_varnames = N_select_varnames + 1
            select_varnames(N_select_varnames) = 'Tb'
            has_Tb = .true.
@@ -4932,7 +4932,7 @@ contains
       end do
         
       do ii = 1,N_obs_param
-        if (trim(obs_param(ii)%varname) == 'sfmc') then
+        if (trim(obs_param(ii)%varname) == 'sfmc' .and. obs_param(ii)%assim) then
            N_select_varnames = N_select_varnames + 1
            select_varnames(N_select_varnames) = 'sfmc'
            has_sfmc = .true.
@@ -4941,7 +4941,7 @@ contains
       end do
 
       do ii = 1,N_obs_param
-        if (trim(obs_param(ii)%varname) == 'sfds') then
+        if (trim(obs_param(ii)%varname) == 'sfds' .and. obs_param(ii)%assim) then
            N_select_varnames = N_select_varnames + 1
            select_varnames(N_select_varnames) = 'sfds'
            has_sfds = .true.
@@ -4950,7 +4950,7 @@ contains
       end do
 
       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'asnow') then
+         if (trim(obs_param(ii)%varname) == 'asnow' .and. obs_param(ii)%assim) then
             has_asnow = .true.
             exit 
          end if  
