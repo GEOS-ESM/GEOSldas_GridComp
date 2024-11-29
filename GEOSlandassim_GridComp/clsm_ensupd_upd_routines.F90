@@ -4964,7 +4964,7 @@ contains
                'update_type not consistent with obs_param%assim==.false. for all asnow/Tb/sfmc/sfds species '    &
                // '(may be intentional for "innovations" run, i.e., with obs_param%innov==.true.)'
 
-          call ldas_warn(LDAS_GENERIC_ERROR, Iam,            &
+          call ldas_warn(LDAS_GENERIC_ERROR, Iam, err_msg)
                
           
        end if
