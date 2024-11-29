@@ -3507,6 +3507,7 @@ contains
     integer, dimension(:,:,:), pointer    :: tile_num_in_cell_ij    => null()
 
     character(len=*),  parameter          :: Iam = 'cat_enkf_increments'
+    character(len=400)                    :: err_msg
 
     real, dimension(     N_catd)          :: r_x, tmp_dlon
     real                                  :: r_y, tmp_dlat
@@ -3541,6 +3542,8 @@ contains
     real, dimension(N_snow,N_constit)     :: rconstit
 
     logical                               :: found_Tb_obs
+
+
 
 ! -----------------------------------------------------------------------
 
@@ -4957,8 +4960,12 @@ contains
        
        if     ( N_select_species_asnow==0 .and. N_select_species_smTb==0 ) then
           
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam,                                                             &
-               'update_type inconsistent with obs_param%assim==.false. for all asnow/Tb/sfmc/sfds species')
+          err_msg =                                                                                              &
+               'update_type not consistent with obs_param%assim==.false. for all asnow/Tb/sfmc/sfds species '    &
+               // '(may be intentional for "innovations" run, i.e., with obs_param%innov==.true.)'
+
+          call ldas_warn(LDAS_GENERIC_ERROR, Iam,            &
+               
           
        end if
        
