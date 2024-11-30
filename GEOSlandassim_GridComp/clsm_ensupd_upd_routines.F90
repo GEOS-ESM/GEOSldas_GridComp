@@ -4911,7 +4911,7 @@ contains
        !
        ! -------------------------------------------------------------------------------------------------------
 
-       if (logit) write (logunit, *) 'get increments: update_type = ', select_update_type
+       if (logit) write (logunit, *) 'get increments: update_type = ', update_type
        
        ! determine species of assimilated obs associated with snow analysis
        
