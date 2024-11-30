@@ -1407,11 +1407,7 @@ contains
 
        cat_progn_has_changed = .true.
 
-       if (select_update_type==10) then
-          
-          check_snow            = .false.  ! turn off for now to maintain 0-diff w/ SMAP Tb DA test case
-
-       end if
+       if (update_type==10) check_snow = .false.  ! turn off for now to maintain 0-diff w/ SMAP Tb DA test case
 
        ! ------------------------------------------------------------------
 
