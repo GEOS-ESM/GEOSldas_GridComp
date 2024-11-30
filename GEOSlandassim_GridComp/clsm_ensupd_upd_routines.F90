@@ -135,6 +135,7 @@ module clsm_ensupd_upd_routines
 
   use LDAS_ExceptionsMod,               ONLY:     &
        ldas_abort,                                &
+       ldas_warn,                                 &
        LDAS_GENERIC_ERROR
   
   use enkf_general,                     ONLY:     &
