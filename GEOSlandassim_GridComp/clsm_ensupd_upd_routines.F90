@@ -4951,12 +4951,9 @@ contains
        
        call get_select_species(1, 'Tb', N_obs_param, obs_param, N_select_species_Tb, select_species_Tb )
        
-       if (N_select_species_smTb>0) then
-          
-          if (logit) write (logunit, *) '- get 1d snow increments (Toure et al. 2018 empirical gain); snow cover fraction obs'
+       if ((N_select_species_smTb>0) .and. logit) &
+            write (logunit, *) '- get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds obs'
  
-       end if
-
        ! check consistency of update_type and obs_param%assim config
        
        if     ( N_select_species_asnow==0 .and. N_select_species_smTb==0 ) then
