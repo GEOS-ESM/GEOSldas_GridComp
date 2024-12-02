@@ -1765,12 +1765,12 @@ contains
        
        ! Check that str_date_time only contains numeric characters
 
-        do ii = 1, len(str_date_time)
-           if (ichar(str_date_time(ii:ii)) < ichar('0') .or. ichar(str_date_time(ii:ii)) > ichar('9')) then
-               err_msg = 'The date-time string parsed from the ASCAT observation filename contains non-numeric characters'
-               call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-           end if
-        end do
+       do ii = 1, len(trim(str_date_time))
+          if (ichar(str_date_time(ii:ii)) < ichar('0') .or. ichar(str_date_time(ii:ii)) > ichar('9')) then
+              err_msg = 'The date-time string parsed from the ASCAT observation filename contains non-numeric characters'
+              call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          end if
+       end do
    
        read(str_date_time( 1: 4), *) date_time_tmp%year
        read(str_date_time( 5: 6), *) date_time_tmp%month
