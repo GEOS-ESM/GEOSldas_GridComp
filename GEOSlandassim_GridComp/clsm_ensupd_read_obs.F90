@@ -1667,7 +1667,7 @@ contains
 
     ! --------------------
 
-    character(100), dimension(2*N_fnames_max)   :: fname_list  ! max 2 days of files
+    character(200), dimension(2*N_fnames_max)   :: fname_list  ! max 2 days of files
 
     real,      dimension(:),     allocatable    :: tmp1_obs, tmp1_lat, tmp1_lon
     real*8,    dimension(:),     allocatable    :: tmp1_jtime
@@ -1747,19 +1747,47 @@ contains
        ! Are we in the required assimilation window?
        !
        ! e.g. Y2019/M07/M01-ASCA-ASCSMO02-NA-5.0-20190702075700.000000000Z-20190702084627-1350204.bfr
+       !      Y2024/M02/W_XX-EUMETSAT-Darmstadt,SOUNDING+SATELLITE,METOPC+ASCAT_C_EUMR_20240229095700_27567_eps_o_250_ssm_l2.bin
        !
-       !      12345678901234567890123456789012345678901234567890123456789012345678901234567890 
-       !               1         2         3         4         5         6         7
+       !      123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890 
+       !               1         2         3         4         5         6         7         8         9         10        11        12
 
-       str_date_time = tmpfname(36:49)
-      
+       ! Check if tmpfname contains "ASCA-ASCSMO02" or "W_XX-EUMETSAT", error if neither
+
+       if (index(tmpfname, "ASCA-ASCSMO02") /= 0) then
+           str_date_time = tmpfname(36:49)
+       else if (index(tmpfname, "W_XX-EUMETSAT") /= 0) then
+           str_date_time = tmpfname(74:87)
+       else
+           err_msg = 'Unknown ASCAT observation filename format'
+           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+       
+       ! Check that str_date_time only contains numeric characters
+
+        do ii = 1, len(str_date_time)
+           if (ichar(str_date_time(ii:ii)) < ichar('0') .or. ichar(str_date_time(ii:ii)) > ichar('9')) then
+               err_msg = 'The date-time string parsed from the ASCAT observation filename contains non-numeric characters'
+               call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+           end if
+        end do
+   
        read(str_date_time( 1: 4), *) date_time_tmp%year
        read(str_date_time( 5: 6), *) date_time_tmp%month
        read(str_date_time( 7: 8), *) date_time_tmp%day
        read(str_date_time( 9:10), *) date_time_tmp%hour
        read(str_date_time(11:12), *) date_time_tmp%min
        read(str_date_time(13:14), *) date_time_tmp%sec
+
+       ! Check if date_time_tmp%year and date_time_tmp%month and date_time_tmp%day are valid
        
+       if (date_time_tmp%year < 1900 .or. date_time_tmp%year > 2100 .or. &
+          date_time_tmp%month < 1 .or. date_time_tmp%month > 12 .or. &
+          date_time_tmp%day < 1 .or. date_time_tmp%day > 31) then
+          err_msg = 'A valid date-time string has not been successfully parsed from the ASCAT observation filename'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if      
+ 
        if ( datetime_lt_refdatetime( date_time_low_fname, date_time_tmp ) .and.          &
             datetime_le_refdatetime( date_time_tmp,       date_time_up  )       ) then 
 
@@ -6132,7 +6160,7 @@ contains
     character(100)       :: dset_name_lon,  dset_name_lat
     character(100)       :: dset_name_time, dset_name_ft, dset_name_ft_qual_flag
 
-    character(100), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
+    character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
     integer,        dimension(7)                   :: dset_size
     integer,        dimension(N_fnames_max)        :: N_obs_kept
@@ -6839,7 +6867,7 @@ contains
     character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1
     character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2
 
-    character(100), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
+    character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
     integer,        dimension(7)                   :: dset_size
     integer,        dimension(N_fnames_max)        :: N_obs_kept
@@ -8167,7 +8195,7 @@ contains
 
     integer,                          intent(out) :: N_fnames
 
-    character(100), dimension(N_max), intent(out) :: fname_list
+    character(200), dimension(N_max), intent(out) :: fname_list
     
     integer, optional,                intent(in)  :: obs_dir_hier
     
@@ -8176,7 +8204,7 @@ contains
     character(300)       :: fname
     character(200)       :: fpath_tmp
     character( 80)       :: fname_tmp
-    character( 80)       :: tmpstr80
+    character(200)       :: tmpstr200
 
     character( 14)       :: YYYYMMDDdir
     character( 10)       :: YYYYMMdir
@@ -8225,7 +8253,7 @@ contains
     
     do while (istat==0)
        
-       read(10,*,iostat=istat) tmpstr80
+       read(10, '(A)',iostat=istat) tmpstr200
        
        if (istat==0) then
           
@@ -8238,7 +8266,7 @@ contains
 
           ! preface file names with "Yyyyy/Mmm/Ddd" (default)
           
-          fname_list(ii) = YYYYMMDDdir // trim(tmpstr80)
+          fname_list(ii) = YYYYMMDDdir // trim(tmpstr200)
           
           if (present(obs_dir_hier)) then
              
@@ -8246,7 +8274,7 @@ contains
                 
                 ! preface file names with "Yyyyy/Mmm"
                 
-                fname_list(ii) = YYYYMMdir // trim(tmpstr80)
+                fname_list(ii) = YYYYMMdir // trim(tmpstr200)
                 
              else
                 
