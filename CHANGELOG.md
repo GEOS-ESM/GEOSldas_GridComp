@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New update_type for joint 3d soil moisture and 1d snow analysis (Tb+sfmc+sfds+SCF obs)
+
 ### Changed
 
 ### Fixed

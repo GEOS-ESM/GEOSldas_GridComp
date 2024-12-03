@@ -135,6 +135,7 @@ module clsm_ensupd_upd_routines
 
   use LDAS_ExceptionsMod,               ONLY:     &
        ldas_abort,                                &
+       ldas_warn,                                 &
        LDAS_GENERIC_ERROR
   
   use enkf_general,                     ONLY:     &
@@ -3478,7 +3479,8 @@ contains
 
     integer :: n, n_e, kk, ii, jj
     
-    integer :: N_state_max, N_state, N_selected_obs, N_select_varnames, N_select_species, N_select_species_Tb
+    integer :: N_state_max, N_state, N_selected_obs, N_select_varnames
+    integer :: N_select_species, N_select_species_smTb, N_select_species_Tb, N_select_species_asnow
     
     real    :: halo_minlon, halo_maxlon, halo_minlat, halo_maxlat
     real    :: tmp_minlon,  tmp_maxlon,  tmp_minlat,  tmp_maxlat
@@ -3495,7 +3497,8 @@ contains
     
     real, allocatable, dimension(:)       :: State_lon, State_lat
 
-    integer,       dimension(N_obs_param) :: select_species, select_species_Tb  ! alloc max possible length
+    integer,       dimension(N_obs_param) :: select_species                                                ! alloc max possible length
+    integer,       dimension(N_obs_param) :: select_species_smTb, select_species_Tb, select_species_asnow  ! alloc max possible length
 
     character(40), dimension(N_obs_param) :: select_varnames ! alloc max possible length
     
@@ -3505,6 +3508,7 @@ contains
     integer, dimension(:,:,:), pointer    :: tile_num_in_cell_ij    => null()
 
     character(len=*),  parameter          :: Iam = 'cat_enkf_increments'
+    character(len=400)                    :: err_msg
 
     real, dimension(     N_catd)          :: r_x, tmp_dlon
     real                                  :: r_y, tmp_dlat
@@ -3524,6 +3528,7 @@ contains
     real, dimension(     N_catd)          :: SWE_ensavg
     real, dimension(     N_catd)          :: tp1_ensavg
     real, dimension(     N_catd)          :: asnow_ensavg
+    real, dimension(     N_catd)          :: swe_incr_ensavg
 
     type(obs_param_type)                  :: this_obs_param
    
@@ -3537,7 +3542,9 @@ contains
     real, dimension(N_snow)               :: tpsn, fice_snow_vec                      ! for snow model relayer
     real, dimension(N_snow,N_constit)     :: rconstit
 
-    logical :: found_Tb_obs
+    logical                               :: found_Tb_obs
+
+
 
 ! -----------------------------------------------------------------------
 
@@ -3558,11 +3565,19 @@ contains
     
     ! more initializations
 
-    N_select_varnames = 0
-    N_select_species  = 0
+    N_select_varnames      = 0
 
-    select_varnames   = ''
-    select_species    = -8888  ! intentionally differs from init in get_select_species()
+    N_select_species       = 0
+    N_select_species_smTb  = 0  
+    N_select_species_Tb    = 0  
+    N_select_species_asnow = 0
+
+    select_varnames        = ''
+
+    select_species         = -8888     ! intentionally differs from init in get_select_species()
+    select_species_smTb    = -8888  
+    select_species_Tb      = -8888  
+    select_species_asnow   = -8888
     
     ! ----------------------------------------------------------------------
     !
@@ -3737,6 +3752,8 @@ contains
           
        end do
        
+       ! ----------------------------------------------------------------------------------------------------------------------  
+
     case (2) select_update_type   ! 3d soil moisture analysis; sfmc+sfds obs
        
        ! update each tile separately using all observations within 
@@ -3826,7 +3843,7 @@ contains
           
        end do
        
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
               
     case (3) select_update_type   ! 1d Tskin analysis; tskin obs
        
@@ -3897,7 +3914,7 @@ contains
           
        end do
        
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
 
     case (4,5) select_update_type   ! 1d Tskin/ght(1) analysis; tskin obs 
        
@@ -3971,7 +3988,7 @@ contains
           
        end do
 
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
 
     case (6) select_update_type   ! 1d soil moisture/Tskin/ght(1) analysis; Tb obs
 
@@ -4050,7 +4067,7 @@ contains
 
        end do
        
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
 
     case (7) select_update_type   ! 3d Tskin/ght(1) analysis; tskin obs 
        
@@ -4141,7 +4158,7 @@ contains
           
        end do
 
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
        
     case (8,10) select_update_type   ! 3d soil moisture/Tskin/ght(1) analysis; Tb obs
 
@@ -4299,7 +4316,7 @@ contains
           
        end do
 
-       ! ----------------------------------       
+       ! ----------------------------------------------------------------------------------------------------------------------  
 
     case (9) select_update_type   ! 1d Tskin/ght(1) analysis; FT obs
        
@@ -4480,7 +4497,7 @@ contains
           
        end do
 
-       ! ----------------------------------       
+       ! ----------------------------------------------------------------------------------------------------------------------  
        
     case (11) select_update_type  ! 1d snow analysis (Toure et al. 2018 empirical gain); snow cover fraction obs
        
@@ -4671,8 +4688,434 @@ contains
           
        end do         ! kk=1,N_catd
        
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
 
+    case (12) select_update_type   !   3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds obs
+                                   ! & 1d snow analysis (Toure et al. 2018 empirical gain); snow cover fraction obs
+       
+       ! update_type 12 is a combination of update_type 11 and update_type 13:
+       !
+       ! Loop through tiles, first apply 1d snow update, then apply 3d soil moisture update.
+       !
+       ! 1d snow analysis: 
+       !   Update each tile separately using all observations associated with the tile.
+       !   Loop through ensemble members and compute analysis separately for each ensemble member.
+       !
+       ! 3d soil moisture/Tskin/ght(1) analysis: 
+       !   Update each tile separately using all observations within customized halo around the tile.
+       !   State vector of each tile depends on assimilated obs and soil type.
+       !
+       !   obs             | soil    | N_state | state vector
+       !   ----------------------------------------------------------------------
+       !   sfcm/sfds only  | mineral |     2   | srfexc, rzexc
+       !   sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
+       !   sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       !   sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       !
+       ! amfox+rreichle, Dec 2024
+       !
+       ! -------------------------------------------------------------------------------------------------------
+
+       if (logit) write (logunit, *) 'get increments: update_type = ', update_type
+       
+       ! determine species of assimilated obs associated with snow analysis
+       
+       call get_select_species(1, 'asnow', N_obs_param, obs_param, N_select_species_asnow, select_species_asnow )
+       
+       if (N_select_species_asnow>0) then
+          
+          if (logit) write (logunit, *) '- get 1d snow increments (Toure et al. 2018 empirical gain); snow cover fraction obs'
+          
+          ! ensure that max SWE increment parameter is less than WEMIN; larger increments make no sense because
+          ! at SWE=WEMIN, the tile is fully snow covered (asnow=1)
+          
+          if (SCF_ANA_MAXINCRSWE>WEMIN)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'must use SCF_ANA_MAXINCRSWE<=WEMIN')
+          
+          allocate(select_tilenum(1))
+          
+          swe_incr        = 0.   ! total SWE increment; initialize to NO CHANGE
+          swe_incr_ensavg = 0.   ! total SWE ensemble average increment; initialize to NO CHANGE
+         
+          
+       end if
+       
+       ! determine species of assimilated obs associated with soil moisture (+Tskin/ght(1)) analysis:
+       
+       N_select_varnames  = 3
+       
+       select_varnames(1) = 'Tb'
+       select_varnames(2) = 'sfmc'
+       select_varnames(3) = 'sfds'
+       
+       call get_select_species(                                                    &
+            N_select_varnames, select_varnames(1:N_select_varnames),               &
+            N_obs_param, obs_param, N_select_species_smTb, select_species_smTb )         
+       
+       ! determine which species are Tb, if any
+       
+       call get_select_species(1, 'Tb', N_obs_param, obs_param, N_select_species_Tb, select_species_Tb )
+       
+       if ((N_select_species_smTb>0) .and. logit) &
+            write (logunit, *) '- get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds obs'
+ 
+       ! check consistency of update_type and obs_param%assim config
+       
+       if     ( N_select_species_asnow==0 .and. N_select_species_smTb==0 ) then
+          
+          err_msg =                                                                                              &
+               'update_type not consistent with obs_param%assim==.false. for all asnow/Tb/sfmc/sfds species '    &
+               // '(may be intentional for "innovations" run, i.e., with obs_param%innov==.true.)'
+
+          call ldas_warn(LDAS_GENERIC_ERROR, Iam, err_msg)
+               
+          
+       end if
+       
+       ! allocate State_*
+
+       N_state_max = 7
+       
+       allocate( State_incr(N_state_max,N_ens)) 
+       allocate( State_lon( N_state_max      ))
+       allocate( State_lat( N_state_max      ))
+       
+       ! ----------------------------------------------------
+       !
+       ! loop through tiles and compute increments
+       
+       do kk=1,N_catd
+          
+          if (N_select_species_asnow>0) then     ! assimilate snow observations
+             
+             ! find snow observations for tile kk
+             
+             select_tilenum(1) = l2f(kk)
+             
+             call get_ind_obs(                                     &
+                  N_obs,      Observations,                        &
+                  1,          select_tilenum,                      &
+                  N_select_species_asnow,                          &
+                  select_species_asnow(1:N_select_species_asnow),  &
+                  N_selected_obs,   ind_obs )
+             
+             if (N_selected_obs > 0) then
+                
+                ! average in case there are multiple "asnow" obs (e.g., from MODIS and VIIRS)
+                
+                tmp_obs = sum(Observations(ind_obs(1:N_selected_obs))%obs)
+                
+                if (N_selected_obs > 1)  tmp_obs = tmp_obs/real(N_selected_obs)
+                
+                do n_e=1,N_ens  ! compute analysis separately for each ensemble member
+                   
+                   ! 1. Diagnose model forecast snow cover area fraction and total SWE
+                   
+                   asnow_fcst  = asnow(kk,n_e)
+                   swe_fcst    = sum(cat_progn(kk,n_e)%wesn(1:N_snow))
+                   
+                   ! 2. Calculate SWE increment based on modified eq 1 of Toure et al (2018)
+                   
+                   if     (asnow_fcst .lt. tmp_obs * SCF_ANA_ALPHA) then
+                      
+                      ! ADD SNOW:    Forecast SCF is less than observed SCF (after "bias" adjustment with alpha)
+                      
+                      swe_incr(kk,n_e) = SCF_ANA_MAXINCRSWE * (tmp_obs - asnow_fcst/SCF_ANA_ALPHA)
+                      
+                   elseif (tmp_obs .lt. SCF_ANA_BETA) then
+                      
+                      ! REMOVE SNOW: Simulated SCF is greater than observed SCF (after "bias" adjustment)
+                      !                and observed SCF is less than beta threshold
+                      
+                      swe_incr(kk,n_e) = (-1.) *  SCF_ANA_MAXINCRSWE * asnow_fcst * (1. - tmp_obs/SCF_ANA_BETA)
+                      
+                   else 
+                      
+                      cycle  ! NO CHANGE, skip rest of increment calcs and go straight to next ens member 
+                      
+                   endif  ! (Toure et al. 2018 Equation 1)
+                   
+                   ! 3. Derive SWE, snow heat content, and snow depth increments for each layer from total SWE increment 
+                   
+                   swe_ana   = max(swe_fcst + swe_incr(kk,n_e), 0.0)    ! total SWE after analysis
+                   
+                   call StieglitzSnow_calc_asnow( swe_ana, asnow_ana )  ! asnow after analysis
+                   
+                   if (swe_fcst>=StieglitzSnow_MINSWE) then
+                      swe_ratio = swe_ana / swe_fcst 
+                   else
+                      swe_ratio = MAPL_UNDEF  ! swe_ratio unreliable; set to MAPL_UNDEF to expose inadvertent use
+                   end if
+                   
+                   ! loop through snow layers and compute SWE, snow heat content, and snow depth analysis for each layer
+                   
+                   do isnow=1,N_snow
+                      
+                      if     (asnow_ana == 0.0) then  
+                         
+                         ! no snow in analysis, remove all snow
+                         
+                         tmp_wesn(kk,n_e,isnow) = 0.0
+                         tmp_htsn(kk,n_e,isnow) = 0.0
+                         tmp_sndz(kk,n_e,isnow) = 0.0 
+                         
+                      elseif (swe_fcst < StieglitzSnow_MINSWE) then
+                         
+                         ! too little snow in forecast, use generic properties for added snow
+                         
+                         tmp_wesn(kk,n_e,isnow) = swe_ana / N_snow                           ! distribute SWE evenly across layers
+                         
+                         ! assign heat content for snow at 0 deg C and without liquid water content (100% frozen) 
+                         ! (based on StieglitzSnow: htsn = (CPW*tsnow - fice*MAPL_ALHF)*swe )
+                         
+                         tmp_htsn(kk,n_e,isnow) = (0.0 - MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
+                         
+                         ! assign snow depth consistent with density of freshly fallen snow (must have SCF_ANA_MAXINCRSWE<=WEMIN)
+                         
+                         tmp_sndz(kk,n_e,isnow) = (WEMIN / RHOFS) / N_snow                   
+                         
+                      else
+                         
+                         ! snow in forecast and analysis, derive properties of analysis snow from properties of forecast snow
+                         
+                         ! update SWE:
+                         
+                         tmp_wesn(kk,n_e,isnow) = cat_progn(kk,n_e)%wesn(isnow) * swe_ratio
+                         
+                         ! update snow heat content (keep snow temperature constant):
+                         
+                         call StieglitzSnow_calc_tpsnow( cat_progn(kk,n_e)%htsn(isnow), cat_progn(kk,n_e)%wesn(isnow),  &
+                              snow_temp, fice_snow, log_dum, log_dum2, .false. )
+                         
+                         tmp_htsn(kk,n_e,isnow) = (StieglitzSnow_CPW*snow_temp - fice_snow*MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
+                         
+                         ! update snow depth: 
+                         
+                         if (asnow_ana < 1. .and. asnow_fcst < 1.) then
+                            
+                            ! keep snow depth constant when less than full snow cover in fcst and ana
+                            
+                            tmp_sndz(kk,n_e,isnow) = cat_progn(kk,n_e)%sndz(isnow)  
+                            
+                         else
+                            
+                            ! compute analysis snow depth by keeping snow density constant
+                            !
+                            ! in this case, it is possible that either asnow_fcst<1 or asnow_ana<1;
+                            ! when computing density or depth, make sure that SWE value (which is per unit area) is 
+                            ! adjusted to reflect SWE value (per unit area) in the snow-covered fraction of the tile
+                            
+                            ! i) diagnose (layer-specific) forecast snow density 
+                            
+                            snow_dens = ( cat_progn(kk,n_e)%wesn(isnow)/asnow_fcst ) / cat_progn(kk,n_e)%sndz(isnow) 
+                            
+                            ! ii) diagnose analysis snow depth using forecast density
+                            
+                            tmp_sndz(kk,n_e,isnow) = ( tmp_wesn(kk,n_e,isnow)/asnow_ana ) / snow_dens
+                            
+                         end if
+                         
+                      end if
+                      
+                   end do  ! isnow=1,N_snow (compute SWE, snow heat content, and snow depth analysis for each layer)
+                   
+                   ! 4. Relayer to balance the snow column (call with optional args for adjustment of htsnn)
+                   
+                   call StieglitzSnow_relayer( N_snow, N_constit,    &
+                        MAPL_LAND, CATCH_SNOW_DZPARAM,               &
+                        tmp_htsn(kk,n_e,1:N_snow),                   &
+                        tmp_wesn(kk,n_e,1:N_snow),                   &
+                        tmp_sndz(kk,n_e,1:N_snow),                   &
+                        rconstit, tpsn, fice_snow_vec             )
+                   
+                   ! print the old and new swe, heat content and snow density
+                   
+                   !if (logit) write (logunit, *) &
+                   !     'fcst_wesn = ', cat_progn(kk, n_e)%wesn(1:N_snow), &
+                   !     'tmp_wesn  = ', tmp_wesn( kk,n_e,       1:N_snow), &
+                   !     'fcst_htsn = ', cat_progn(kk, n_e)%htsn(1:N_snow), &
+                   !     'tmp_htsn  = ', tmp_htsn( kk, n_e,      1:N_snow), &
+                   !     'fcst_sndz = ', cat_progn(kk, n_e)%sndz(1:N_snow), &
+                   !     'tmp_sndz  = ', tmp_sndz( kk ,n_e,      1:N_snow), & 
+                   !     '--------------------------------------'
+                   
+                   ! 5. Diagnose increments 
+                   
+                   cat_progn_incr(kk,n_e)%wesn(1:N_snow) = tmp_wesn(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%wesn(1:N_snow)
+                   cat_progn_incr(kk,n_e)%htsn(1:N_snow) = tmp_htsn(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%htsn(1:N_snow)
+                   cat_progn_incr(kk,n_e)%sndz(1:N_snow) = tmp_sndz(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%sndz(1:N_snow)
+                   
+                end do   ! n_e=1,N_ens
+                
+             end if      ! if (N_selected_obs > 0)
+             
+          end if         ! if (N_select_species_asnow>0)     [assimilate snow observations for tile kk]
+          
+          ! Calculate swe_incr_ensavg as the average of the ensemble members to add to check if tile is snow-free
+          
+          swe_incr_ensavg(kk) = sum((swe_incr(kk,:))) / real(N_ens)
+          
+          ! ------------------------------------------------------------------------------------------
+
+          if (N_select_species_smTb>0) then    ! assimilate soil moisture observations
+             
+             N_state = 2                       ! initialize (always have srfexc and rzexc in state vector)
+             
+             ! compute increments only for snow-free and non-frozen tiles
+             
+             if ( (SWE_ensavg(kk) < SWE_threshold)      .and.               &
+                  (swe_incr_ensavg(kk) < SWE_threshold) .and.               &
+                  (tp1_ensavg(kk) > tp1_threshold) )    then  
+                
+                ! find observations within halo around tile kk
+                
+                halo_minlon = tile_coord(kk)%com_lon - xcompact
+                halo_maxlon = tile_coord(kk)%com_lon + xcompact
+                halo_minlat = tile_coord(kk)%com_lat - ycompact
+                halo_maxlat = tile_coord(kk)%com_lat + ycompact
+                
+                ! simple approach to dateline issue (cut halo back to at most -180:180, -90:90)
+                ! - reichle, 28 May 2013
+                
+                halo_minlon = max(halo_minlon,-180.)
+                halo_maxlon = min(halo_maxlon, 180.)
+                halo_minlat = max(halo_minlat, -90.)
+                halo_maxlat = min(halo_maxlat,  90.)
+                
+                call get_ind_obs_lat_lon_box(                                              &
+                     N_obs, Observations,                                                  &
+                     halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,                   &
+                     N_select_species_smTb, select_species_smTb(1:N_select_species_smTb),  &
+                     N_selected_obs,   ind_obs )
+                
+                if (N_selected_obs>0) then
+                   
+                   ! Determine if Tb observations are present
+                   
+                   found_Tb_obs = .false.
+                   
+                   do ii = 1,N_select_species_Tb
+                      do jj = 1,N_selected_obs
+                         if (select_species_Tb(ii) == Observations(ind_obs(jj))%species) then
+                            found_Tb_obs = .true.
+                            exit
+                         end if
+                      end do
+                      if (found_Tb_obs) exit
+                   end do
+                   
+                   ! if Tb_obs are present, add tc[X] and ght(1) to state vector
+                   
+                   if (found_Tb_obs)                                   N_state = N_state + 4
+                   
+                   ! for peatland tile, add catdef to state vector
+                   
+                   if (cat_param(kk)%poros>=PEATCLSM_POROS_THRESHOLD)  N_state = N_state + 1
+                   
+                   ! assemble State_minus
+                   ! (on  input, cat_progn contains cat_progn_minus)
+                   
+                   if     ( N_state==2 ) then 
+                      
+                      State_incr(1,:) = cat_progn( kk,:)%srfexc/scale_srfexc
+                      State_incr(2,:) = cat_progn( kk,:)%rzexc /scale_rzexc
+                      
+                   elseif ( N_state==3 ) then 
+                      
+                      State_incr(1,:) = cat_progn( kk,:)%srfexc/scale_srfexc
+                      State_incr(2,:) = cat_progn( kk,:)%rzexc /scale_rzexc
+                      State_incr(3,:) = cat_progn( kk,:)%catdef/scale_catdef   ! catdef in State
+                      
+                   elseif ( N_state==6 ) then
+                      
+                      State_incr(1,:) = cat_progn( kk,:)%srfexc/scale_srfexc
+                      State_incr(2,:) = cat_progn( kk,:)%rzexc /scale_rzexc
+                      
+                      State_incr(3,:) = cat_progn( kk,:)%tc1   /scale_temp
+                      State_incr(4,:) = cat_progn( kk,:)%tc2   /scale_temp
+                      State_incr(5,:) = cat_progn( kk,:)%tc4   /scale_temp
+                      State_incr(6,:) = cat_progn( kk,:)%ght(1)/scale_ght1
+                      
+                   else
+                      
+                      State_incr(1,:) = cat_progn( kk,:)%srfexc/scale_srfexc
+                      State_incr(2,:) = cat_progn( kk,:)%rzexc /scale_rzexc
+                      State_incr(3,:) = cat_progn( kk,:)%catdef/scale_catdef   ! catdef in State
+                      
+                      State_incr(4,:) = cat_progn( kk,:)%tc1   /scale_temp
+                      State_incr(5,:) = cat_progn( kk,:)%tc2   /scale_temp
+                      State_incr(6,:) = cat_progn( kk,:)%tc4   /scale_temp
+                      State_incr(7,:) = cat_progn( kk,:)%ght(1)/scale_ght1
+                      
+                   end if
+                   
+                   State_lon(   :) = tile_coord(kk  )%com_lon
+                   State_lat(   :) = tile_coord(kk  )%com_lat
+                   
+                   allocate(Obs_cov(N_selected_obs,N_selected_obs))
+                   
+                   call assemble_obs_cov( N_selected_obs, N_obs_param, obs_param,  &
+                        Observations(ind_obs(1:N_selected_obs)), Obs_cov )
+                   
+                   call enkf_increments(                                        &
+                        N_state, N_selected_obs, N_ens,                         &
+                        Observations(ind_obs(1:N_selected_obs)),                &
+                        Obs_pred(ind_obs(1:N_selected_obs),:),                  &
+                        Obs_pert(ind_obs(1:N_selected_obs),:),                  &
+                        Obs_cov,                                                &
+                        State_incr(1:N_state,:),                                &
+                        State_lon( 1:N_state  ),                                &
+                        State_lat( 1:N_state  ),                                &
+                        xcompact, ycompact,                                     &
+                        fcsterr_inflation_fac )             
+                   
+                   deallocate(Obs_cov)
+                   
+                   ! assemble cat_progn increments
+                   
+                   if     ( N_state==2 ) then
+                      
+                      cat_progn_incr(kk,:)%srfexc = State_incr(1,:)*scale_srfexc
+                      cat_progn_incr(kk,:)%rzexc  = State_incr(2,:)*scale_rzexc
+                      
+                   elseif ( N_state==3 ) then
+                      
+                      cat_progn_incr(kk,:)%srfexc = State_incr(1,:)*scale_srfexc
+                      cat_progn_incr(kk,:)%rzexc  = State_incr(2,:)*scale_rzexc
+                      cat_progn_incr(kk,:)%catdef = State_incr(3,:)*scale_catdef   ! catdef in State                 
+                      
+                   elseif ( N_state==6 ) then
+                      
+                      cat_progn_incr(kk,:)%srfexc = State_incr(1,:)*scale_srfexc
+                      cat_progn_incr(kk,:)%rzexc  = State_incr(2,:)*scale_rzexc
+                      
+                      cat_progn_incr(kk,:)%tc1    = State_incr(3,:)*scale_temp
+                      cat_progn_incr(kk,:)%tc2    = State_incr(4,:)*scale_temp
+                      cat_progn_incr(kk,:)%tc4    = State_incr(5,:)*scale_temp
+                      cat_progn_incr(kk,:)%ght(1) = State_incr(6,:)*scale_ght1
+                      
+                   else
+                      
+                      cat_progn_incr(kk,:)%srfexc = State_incr(1,:)*scale_srfexc
+                      cat_progn_incr(kk,:)%rzexc  = State_incr(2,:)*scale_rzexc
+                      cat_progn_incr(kk,:)%catdef = State_incr(3,:)*scale_catdef   ! catdef in State 
+                      
+                      cat_progn_incr(kk,:)%tc1    = State_incr(4,:)*scale_temp
+                      cat_progn_incr(kk,:)%tc2    = State_incr(5,:)*scale_temp
+                      cat_progn_incr(kk,:)%tc4    = State_incr(6,:)*scale_temp
+                      cat_progn_incr(kk,:)%ght(1) = State_incr(7,:)*scale_ght1
+                      
+                   end if
+                   
+                end if  ! if (N_selected_obs > 0)
+                
+             end if     ! thresholds
+             
+          end if        ! if (N_select_species_smTb>0)     [assimilate soil moisture observations for tile kk]
+          
+       end do           ! kk=1,N_catd
+       
+       ! ----------------------------------------------------------------------------------------------------------------------  
+       
     case (13) select_update_type   ! 3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds obs
        
        ! update each tile separately using all observations within customized halo around each tile
@@ -4688,35 +5131,15 @@ contains
        !
        ! amfox+rreichle, 26 Feb 2024
        
-       if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc obs'
+       if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds obs'
        
-       N_select_varnames  = 0
-       
-       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'Tb') then
-            N_select_varnames = N_select_varnames + 1
-            select_varnames(N_select_varnames) = 'Tb'
-            exit     
-         end if
-       end do
-         
-       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'sfmc') then
-            N_select_varnames = N_select_varnames + 1
-            select_varnames(N_select_varnames) = 'sfmc'
-            exit
-         end if
-       end do
+       ! Get all species associated with *assimilated* Tb, sfmc, and sfds observations
 
-       do ii = 1,N_obs_param
-         if (trim(obs_param(ii)%varname) == 'sfds') then
-            N_select_varnames = N_select_varnames + 1
-            select_varnames(N_select_varnames) = 'sfds'
-            exit 
-         end if  
-       end do
+       N_select_varnames  = 3
        
-       ! Will get all species associated with Tb or sfds observations
+       select_varnames(1) = 'Tb'
+       select_varnames(2) = 'sfmc'
+       select_varnames(3) = 'sfds'
        
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
@@ -4885,9 +5308,9 @@ contains
              
           end if     ! thresholds
           
-       end do
+       end do        ! kk=1,N_catd
        
-       ! ----------------------------------
+       ! ----------------------------------------------------------------------------------------------------------------------  
        
     case default
        
@@ -4919,9 +5342,18 @@ contains
        N_select_varnames, select_varnames, N_obs_param, obs_param,     &
        N_select_species, select_species )
     
-    ! find out obs species ID numbers ("obs_param%species") that correspond 
-    !  to a set of obs species variables names ("obs_param%varname")
-    ! - reichle, 16 Oct 2014
+    ! find out obs species ID numbers ("obs_param%species") that correspond to a set of
+    !   obs variables names ("obs_param%varname") with obs_param(species)%assim==.true.
+    
+    ! original version -- reichle, 16 Oct 2014
+    !
+    ! added constraint obs_param%assim==.true.
+    !   --> excludes obs species that are categorically not assimilated (per obs_param);
+    !   before this change, this constraint was applied at a later stage of 
+    !     selecting the assimilated obs;
+    !   with this change, N_select_species==0 can be used to check if 
+    !     any obs with select_varnames are assimilated.
+    ! -reichle, 29 Nov 2024
 
     implicit none
     
@@ -4951,7 +5383,7 @@ contains
 
        do ii=1,N_obs_param
           
-          if (any(trim(obs_param(ii)%varname)==select_varnames)) then
+          if ( any(trim(obs_param(ii)%varname)==select_varnames) .and. obs_param(ii)%assim ) then
              
              kk = kk+1
              
@@ -5012,9 +5444,7 @@ contains
     ! locals
     
     integer :: i, k
-    
-   
- 
+     
     ! --------------------------------------------------------------
     
     if (N_select_species==0 .and. N_select_tilenum==0) then
@@ -5085,7 +5515,7 @@ contains
   
   
   ! **********************************************************************
-  
+
   subroutine get_ind_obs_assim( N_obs, assim_flag, N_obs_assim, ind_obs_assim )
     
     ! loop through Observations%assim and construct an index vector that maps to
@@ -5459,7 +5889,7 @@ contains
             Iam // '(): reset for 1d update_type: ycompact = ', ycompact
        if (logit) write (logunit,*)
        
-    case (2,7,8,10,13)  ! "3d" updates, check consistency of xcompact, ycompact
+    case (2,7,8,10,12,13)  ! "3d" updates, check consistency of xcompact, ycompact
        
        ! check xcompact/ycompact against corr scales of model error
        
