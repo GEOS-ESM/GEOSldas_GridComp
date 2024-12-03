@@ -9,11 +9,10 @@
 !                7 May 2021 - removed "dtstep_assim" and "centered_update"; replaced with MAPL
 !                             resource parameters "LANDASSIM_DT" and "LANDASSIM_T0" (in LDAS.rc)
 !
-! --------------------------------------------------------------------
+! ----------------------------------------------------------------------
 
 &ens_upd_inputs			
 	
-		
 ! ----------------------------------------------------------------------
 !
 ! update type - for details see subroutine cat_enkf_update()
@@ -23,18 +22,23 @@
 !
 !   # = no longer supported
 !
-!   update_type =  0: NO assimilation, NO bias correction 
-! # update_type =  1: 1d soil moisture analysis;                                             sfmc obs
-! # update_type =  2: 3d soil moisture analysis;                                             sfmc obs
-!   update_type =  3: 1d Tskin (assim incr NOT applied, use w/ bias corr) analysis;          Tskin obs
-!   update_type =  4: 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr) analysis;  Tskin obs
-!   update_type =  5: 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr) analysis;     Tskin obs
-!   update_type =  6: 1d soil moisture/Tskin/ght(1);                                         TB obs
-!   update_type =  7: 3d Tskin/ght1 update;                                                  Tskin obs 
-!   update_type =  8: 3d soil moisture/Tskin/ght(1);                                         TB obs
-!   update_type =  9: 1d Tskin/ght1 update;                                                  FT obs
-!   update_type = 10: 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile;       TB obs
-!   update_type = 13: 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile;       sfmc and TB obs
+!   update_type | analysis state vector                                            | assimilated obs
+!   -------------------------------------------------------------------------------------------------
+!        0      | NO assimilation, NO bias correction                              | n/a
+!     #  1      | 1d soil moisture                                                 | sfmc
+!     #  2      | 3d soil moisture                                                 | sfmc
+!        3      | 1d Tskin (assim incr NOT applied, use w/ bias corr)              | Tskin
+!        4      | 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr)      | Tskin
+!        5      | 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr)         | Tskin
+!        6      | 1d soil moisture/Tskin/ght(1)                                    | Tb
+!        7      | 3d Tskin/ght1 update                                             | Tskin 
+!        8      | 3d soil moisture/Tskin/ght(1)                                    | Tb
+!        9      | 1d Tskin/ght1 update                                             | FT
+!       10      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | Tb
+!       11      | 1d snow analysis (Toure et al. 2018 empirical gain)              | SCF
+!       12      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb, SCF
+!               |   & 1d snow analysis (Toure et al. 2018 empirical gain)          | 
+!       13      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb
 
 update_type = 0
 

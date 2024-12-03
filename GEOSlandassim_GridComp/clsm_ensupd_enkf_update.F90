@@ -1339,6 +1339,8 @@ contains
 
        cat_progn_has_changed = .false.
 
+       ! ------------------------------------------------------------------
+
     case (4,7) select_update_type  ! Tskin/ght1 update
 
        if (logit) write (logunit,*) &
@@ -1361,12 +1363,16 @@ contains
 
        cat_progn_has_changed = .true.
 
+       ! ------------------------------------------------------------------
+
     case (5) select_update_type    ! Tskin/ght1 update
 
        if (logit) write (logunit,*) &
             'apply_enkf_increments(): NOT applying Tskin/ght1 increments'
 
        cat_progn_has_changed = .false.
+
+       ! ------------------------------------------------------------------
 
     case (6,8,9,10,13) select_update_type    ! soil moisture and temperature update
 
@@ -1395,20 +1401,23 @@ contains
                   cat_progn(n,n_e)%tc4    + cat_progn_incr(n,n_e)%tc4
              
              cat_progn(n,n_e)%ght(1) = &
-                  cat_progn(n,n_e)%ght(1) + cat_progn_incr(n,n_e)%ght(1)
-             
+                  cat_progn(n,n_e)%ght(1) + cat_progn_incr(n,n_e)%ght(1) 
           end do
        end do
 
        cat_progn_has_changed = .true.
 
-       check_snow            = .false.  ! turn off for now to maintain 0-diff w/ SMAP Tb DA test case
+       if (update_type==10) check_snow = .false.  ! turn off for now to maintain 0-diff w/ SMAP Tb DA test case
 
-    case(11) select_update_type ! empirical MODIS SCF update
+       ! ------------------------------------------------------------------
+
+    case(11) select_update_type    ! snow update
        
-       do n=1,N_catd       ! for each tile
+       if (logit) write (logunit,*) 'apply_enkf_increments(): applying snow increments'
+
+       do n=1,N_catd          ! for each tile
           
-          do n_e=1,N_ens    ! for each ensemble member 
+          do n_e=1,N_ens      ! for each ensemble member 
              
              do ii=1,N_snow   ! for each snow layer
                 
@@ -1427,6 +1436,57 @@ contains
        
        cat_progn_has_changed = .true.
 
+       ! ------------------------------------------------------------------
+
+   case (12) select_update_type    ! soil moisture, temperature, and snow update
+
+      ! some of the increments fields below may be zero by design 
+      ! (e.g., tc[X]=ght(1)=0 in update_type=13 when only sfmc or sfds obs are assimilated;
+      !  or catdef=0 in update_type 10 or 13 when tile has mineral soil)
+
+      if (logit) write (logunit,*) &
+            'apply_enkf_increments(): applying soil moisture, Tskin/ght1 and snow increments'
+      
+      do n=1,N_catd
+         do n_e=1,N_ens
+            
+            cat_progn(n,n_e)%srfexc = &
+                  cat_progn(n,n_e)%srfexc + cat_progn_incr(n,n_e)%srfexc
+            cat_progn(n,n_e)%rzexc = &
+                  cat_progn(n,n_e)%rzexc  + cat_progn_incr(n,n_e)%rzexc
+            cat_progn(n,n_e)%catdef = &
+                  cat_progn(n,n_e)%catdef + cat_progn_incr(n,n_e)%catdef
+            
+            cat_progn(n,n_e)%tc1 = &
+                  cat_progn(n,n_e)%tc1    + cat_progn_incr(n,n_e)%tc1
+            cat_progn(n,n_e)%tc2 = &
+                  cat_progn(n,n_e)%tc2    + cat_progn_incr(n,n_e)%tc2
+            cat_progn(n,n_e)%tc4 = &
+                  cat_progn(n,n_e)%tc4    + cat_progn_incr(n,n_e)%tc4
+            
+            cat_progn(n,n_e)%ght(1) = &
+                  cat_progn(n,n_e)%ght(1) + cat_progn_incr(n,n_e)%ght(1)
+            
+            do ii=1,N_snow   ! for each snow layer
+               
+               cat_progn(n,n_e)%wesn(ii) =                                         &
+                    cat_progn(n,n_e)%wesn(ii) + cat_progn_incr(n,n_e)%wesn(ii)
+               
+               cat_progn(n,n_e)%sndz(ii) =                                         &
+                    cat_progn(n,n_e)%sndz(ii) + cat_progn_incr(n,n_e)%sndz(ii)
+               
+               cat_progn(n,n_e)%htsn(ii) =                                         &
+                    cat_progn(n,n_e)%htsn(ii) + cat_progn_incr(n,n_e)%htsn(ii)
+               
+            end do
+            
+         end do
+      end do
+
+      cat_progn_has_changed = .true.
+
+      ! ------------------------------------------------------------------
+      
     case default
 
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown update_type')
