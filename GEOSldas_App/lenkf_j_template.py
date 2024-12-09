@@ -454,7 +454,7 @@ while ( $counter <= ${{NUM_SGMT}} )
       set rc = -1
       echo GEOSldas Run Status: $rc
       echo "ERROR: GEOSldas run FAILED, exit without post-processing"
-      exit
+      exit $rc
    endif
     
    
