@@ -2158,7 +2158,13 @@ obs_param_nml(48)%xcorr          = 0.1875
 obs_param_nml(48)%ycorr          = 0.1875
 obs_param_nml(48)%adapt          = 0
 
-! --------------------------------------------------------------------
+! --------------------------------------------------------------------------------------------------------------
+!
+! ASCAT_MET[X]_SM soil moisture observations from EUMETSAT
+!
+! Leave %name blank.  Provide text files that contain file names via %flistpath and %flistname.
+!
+! -------------------
 !
 !  49 = ASCAT_META_SM (ASCAT soil moisture ascending and descending orbits)
 !
@@ -2182,7 +2188,7 @@ obs_param_nml(49)%nodata         = -9999.
 obs_param_nml(49)%varname        = 'sfds'
 obs_param_nml(49)%units          = '%'
 obs_param_nml(49)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/ASCAT_EUMETSAT/Metop_A/'
-obs_param_nml(49)%name           = 'M02-ASCA-ASCSMO02'
+obs_param_nml(49)%name           = ''
 obs_param_nml(49)%maskpath       = ''
 obs_param_nml(49)%maskname       = ''
 obs_param_nml(49)%scalepath      = ''
@@ -2221,7 +2227,7 @@ obs_param_nml(50)%nodata         = -9999.
 obs_param_nml(50)%varname        = 'sfds'
 obs_param_nml(50)%units          = '%'
 obs_param_nml(50)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/ASCAT_EUMETSAT/Metop_B/'
-obs_param_nml(50)%name           = 'M01-ASCA-ASCSMO02'
+obs_param_nml(50)%name           = ''
 obs_param_nml(50)%maskpath       = ''
 obs_param_nml(50)%maskname       = ''
 obs_param_nml(50)%scalepath      = ''
@@ -2260,7 +2266,7 @@ obs_param_nml(51)%nodata         = -9999.
 obs_param_nml(51)%varname        = 'sfds'
 obs_param_nml(51)%units          = '%'
 obs_param_nml(51)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/ASCAT_EUMETSAT/Metop_C/'
-obs_param_nml(51)%name           = 'M03-ASCA-ASCSMO02'
+obs_param_nml(51)%name           = ''
 obs_param_nml(51)%maskpath       = ''
 obs_param_nml(51)%maskname       = ''
 obs_param_nml(51)%scalepath      = ''
