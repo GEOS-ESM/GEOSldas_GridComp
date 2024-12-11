@@ -2158,7 +2158,13 @@ obs_param_nml(48)%xcorr          = 0.1875
 obs_param_nml(48)%ycorr          = 0.1875
 obs_param_nml(48)%adapt          = 0
 
-! --------------------------------------------------------------------
+! --------------------------------------------------------------------------------------------------------------
+!
+! ASCAT_MET[X]_SM soil moisture observations from EUMETSAT
+!
+! Leave %name blank.  Provide text files that contain file names via %flistpath and %flistname.
+!
+! -------------------
 !
 !  49 = ASCAT_META_SM (ASCAT soil moisture ascending and descending orbits)
 !

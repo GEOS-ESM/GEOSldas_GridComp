@@ -1741,34 +1741,41 @@ contains
     N_tmp = 0   
     
     do kk = 1,N_fnames
-
+       
        tmpfname = fname_list(kk)
-
+       
        ! Are we in the required assimilation window?
+       !
+       ! NOTE: EUMETSAT changed the file name template sometime in 2023 or 2024.  
+       !       There was no change to the file contents.
+       !       Files from the original download (through data day ~1 Jun 2023) have 
+       !       the original file name template ("M0[X]-ASCA..."), more recently downloaded 
+       !       files have the revised template ("W_XX-EUMETSAT...").  
+       !       This reader accommodates both templates:
        !
        ! e.g. Y2019/M07/M01-ASCA-ASCSMO02-NA-5.0-20190702075700.000000000Z-20190702084627-1350204.bfr
        !      Y2024/M02/W_XX-EUMETSAT-Darmstadt,SOUNDING+SATELLITE,METOPC+ASCAT_C_EUMR_20240229095700_27567_eps_o_250_ssm_l2.bin
        !
        !      123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890 
        !               1         2         3         4         5         6         7         8         9         10        11        12
-
-       ! Check if tmpfname contains "ASCA-ASCSMO02" or "W_XX-EUMETSAT", error if neither
-
+       
+       ! check if tmpfname contains "ASCA-ASCSMO02" or "W_XX-EUMETSAT", error if neither
+       
        if (index(tmpfname, "ASCA-ASCSMO02") /= 0) then
-           str_date_time = tmpfname(36:49)
+          str_date_time = tmpfname(36:49)
        else if (index(tmpfname, "W_XX-EUMETSAT") /= 0) then
-           str_date_time = tmpfname(74:87)
+          str_date_time = tmpfname(74:87)
        else
-           err_msg = 'Unknown ASCAT observation filename format'
-           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          err_msg = 'Unknown ASCAT observation file name format'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
        
-       ! Check that str_date_time only contains numeric characters
-
+       ! check if str_date_time only contains numeric characters
+       
        do ii = 1, len(trim(str_date_time))
           if (ichar(str_date_time(ii:ii)) < ichar('0') .or. ichar(str_date_time(ii:ii)) > ichar('9')) then
-              err_msg = 'The date-time string parsed from the ASCAT observation filename contains non-numeric characters'
-              call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+             err_msg = 'Date-time string parsed from ASCAT sm obs file name contains non-numeric characters'
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
           end if
        end do
    
@@ -1779,15 +1786,15 @@ contains
        read(str_date_time(11:12), *) date_time_tmp%min
        read(str_date_time(13:14), *) date_time_tmp%sec
 
-       ! Check if date_time_tmp%year and date_time_tmp%month and date_time_tmp%day are valid
+       ! check if year, month, and day are valid
        
-       if (date_time_tmp%year < 1900 .or. date_time_tmp%year > 2100 .or. &
-          date_time_tmp%month < 1 .or. date_time_tmp%month > 12 .or. &
-          date_time_tmp%day < 1 .or. date_time_tmp%day > 31) then
-          err_msg = 'A valid date-time string has not been successfully parsed from the ASCAT observation filename'
+       if ( date_time_tmp%year  < 2007 .or. date_time_tmp%year  > 2100 .or.                     &
+            date_time_tmp%month <    1 .or. date_time_tmp%month >   12 .or.                     &
+            date_time_tmp%day   <    1 .or. date_time_tmp%day   >   31                ) then
+          err_msg = 'Could not parse valid date-time string from ASCAT obs file name'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       end if      
- 
+       end if
+       
        if ( datetime_lt_refdatetime( date_time_low_fname, date_time_tmp ) .and.          &
             datetime_le_refdatetime( date_time_tmp,       date_time_up  )       ) then 
 
