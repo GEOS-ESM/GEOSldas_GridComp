@@ -152,7 +152,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC                  ,&
-    LONG_NAME          = 'interception_reservoir_capac',&
+    LONG_NAME          = 'vegetation_interception_water_storage',&
     UNITS              = 'kg m-2'                    ,&
     SHORT_NAME         = 'CAPAC'                     ,&
 !    FRIENDLYTO         = trim(COMP_NAME)             ,&
@@ -459,7 +459,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'runoff_flux'               ,&
+    LONG_NAME          = 'runoff_total_flux'               ,&
     UNITS              = 'kg m-2 s-1'                ,&
     SHORT_NAME         = 'RUNOFF'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -468,7 +468,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'interception_loss_energy_flux',&
+    LONG_NAME          = 'interception_loss_latent_heat_flux',&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'EVPINT'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -477,7 +477,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'baresoil_evap_energy_flux' ,&
+    LONG_NAME          = 'baresoil_evaporation_latent_heat_flux' ,&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'EVPSOI'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -486,7 +486,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'transpiration_energy_flux' ,&
+    LONG_NAME          = 'transpiration_latent_heat_flux' ,&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'EVPVEG'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -495,7 +495,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'snow_ice_evaporation_energy_flux',&
+    LONG_NAME          = 'snowpack_evaporation_latent_heat_flux',&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'EVPICE'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -514,7 +514,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'totoal soil moisture'      ,&
+    LONG_NAME          = 'total_soil_moisture'      ,&
     UNITS              = 'kg m-2'                    ,&
     SHORT_NAME         = 'WATSOI'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -532,7 +532,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'snowpack_evaporation_energy_flux',&
+    LONG_NAME          = 'snowpack_evaporation_latent_heat_flux',&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'EVPSNO'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -540,7 +540,7 @@ contains
                                            RC=STATUS  )
   VERIFY_(STATUS)
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'baseflow_flux'             ,&
+    LONG_NAME          = 'baseflow_flux_land'        ,&
     UNITS              = 'kg m-2 s-1'                ,&
     SHORT_NAME         = 'BASEFLOW'                  ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -567,7 +567,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'surface_outgoing_longwave_flux',&
+    LONG_NAME          = 'surface_emitted_longwave_flux',&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'HLWUP'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -595,7 +595,7 @@ contains
 
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'total_latent_energy_flux'  ,&
+    LONG_NAME          = 'total_latent_heat_flux_consistent_with_evaporation_from_turbulence'  ,&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'HLATN'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -649,7 +649,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'ave_catchment_temp_incl_snw',&
+    LONG_NAME          = 'surface_temperature_of_land_incl_snow',&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TPSURF'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -658,7 +658,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'ave_catchment_temp_incl_snw_ensstd',&
+    LONG_NAME          = 'surface_temperature_of_land_incl_snow_ensstd',&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TPSURF_ENSSTD'             ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -667,7 +667,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'temperature_top_snow_layer',&
+    LONG_NAME          = 'surface_temperature_of_snow_on_land',&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TPSNOW'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -676,7 +676,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'temperature_unsaturated_zone',&
+    LONG_NAME          = 'surface_temperature_of_unsaturated_zone',&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TPUNST'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -685,7 +685,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'temperature_saturated_zone',&
+    LONG_NAME          = 'surface_temperature_of_saturated_zone',&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TPSAT'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -694,7 +694,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'temperature_wilted_zone'   ,&
+    LONG_NAME          = 'surface_temperature_of_wilting_zone'   ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TPWLT'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -703,7 +703,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'fractional_area_of_land_snowcover',&
+    LONG_NAME          = 'fractional_area_of_snow_on_land',&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'ASNOW'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -766,7 +766,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'snow_depth'                ,&
+    LONG_NAME          = 'snow_depth_within_snow_covered_area_fraction_on_land'                ,&
     UNITS              = 'm'                         ,&
     SHORT_NAME         = 'SNOWDP'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -775,7 +775,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'surface_soil_wetness'      ,&
+    LONG_NAME          = 'soil_wetness_surface'      ,&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'WET1'                      ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -784,7 +784,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'root_zone_soil_wetness'    ,&
+    LONG_NAME          = 'soil_wetness_rootzone'     ,&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'WET2'                      ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -793,7 +793,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'ave_prof_soil__moisture'   ,&
+    LONG_NAME          = 'soil_wetness_profile'      ,&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'WET3'                      ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -802,7 +802,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'water_surface_layer'       ,&
+    LONG_NAME          = 'soil_moisture_surface'     ,&
     UNITS              = 'm3 m-3'                    ,&
     SHORT_NAME         = 'WCSF'                      ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -811,7 +811,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'water_surface_layer_ensstd' ,&
+    LONG_NAME          = 'soil_moisture_surface_ensstd' ,&
     UNITS              = 'm3 m-3'                    ,&
     SHORT_NAME         = 'WCSF_ENSSTD'               ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -820,7 +820,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'water_root_zone'           ,&
+    LONG_NAME          = 'soil_moisture_rootzone'    ,&
     UNITS              = 'm3 m-3'                    ,&
     SHORT_NAME         = 'WCRZ'                      ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -829,7 +829,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'water_root_zone_ensstd'    ,&
+    LONG_NAME          = 'soil_moisture_rootzone_ensstd' ,&
     UNITS              = 'm3 m-3'                    ,&
     SHORT_NAME         = 'WCRZ_ENSSTD'               ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -839,7 +839,7 @@ contains
 
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'water_ave_prof'            ,&
+    LONG_NAME          = 'soil_moisture_profile'     ,&
     UNITS              = 'm3 m-3'                    ,&
     SHORT_NAME         = 'WCPR'                      ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -848,7 +848,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'water_ave_prof_ensstd'     ,&
+    LONG_NAME          = 'soil_moisture_profile_ensstd'     ,&
     UNITS              = 'm3 m-3'                    ,&
     SHORT_NAME         = 'WCPR_ENSSTD'               ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -857,7 +857,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_1' ,&
+    LONG_NAME          = 'soil_temperature_layer_1'  ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL1TILE'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -866,7 +866,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_1_ensstd' ,&
+    LONG_NAME          = 'soil_temperature_layer_1_ensstd' ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL1TILE_ENSSTD'         ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -875,7 +875,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_2' ,&
+    LONG_NAME          = 'soil_temperature_layer_2'  ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL2TILE'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -884,7 +884,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_3' ,&
+    LONG_NAME          = 'soil_temperature_layer_3'  ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL3TILE'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -893,7 +893,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_4' ,&
+    LONG_NAME          = 'soil_temperature_layer_4'  ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL4TILE'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -902,7 +902,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_5' ,&
+    LONG_NAME          = 'soil_temperature_layer_5'  ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL5TILE'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -911,7 +911,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_temperatures_layer_6' ,&
+    LONG_NAME          = 'soil_temperature_layer_6'  ,&
     UNITS              = 'K'                         ,&
     SHORT_NAME         = 'TSOIL6TILE'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -929,7 +929,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'surface_albedo_visible_beam',&
+    LONG_NAME          = 'surface_reflectivity_visible_beam',&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'ALBVR'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -938,7 +938,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'surface_albedo_visible_diffuse',&
+    LONG_NAME          = 'surface_reflectivity_visible_diffuse',&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'ALBVF'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -947,7 +947,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'surface_albedo_near_infrared_beam',&
+    LONG_NAME          = 'surface_reflectivity_near_infrared_beam',&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'ALBNR'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -956,7 +956,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'surface_albedo_near_infrared_diffuse',&
+    LONG_NAME          = 'surface_reflectivity_near_infrared_diffuse',&
     UNITS              = '1'                         ,&
     SHORT_NAME         = 'ALBNF'                     ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -1238,7 +1238,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'EVLAND',                    &
-    LONG_NAME          = 'Evaporation_land',          &
+    LONG_NAME          = 'total_evapotranspiration_land',          &
     UNITS              = 'kg m-2 s-1',                &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1265,7 +1265,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'DRPARLAND',                 &
-    LONG_NAME          = 'surface_downwelling_par_beam_flux', &
+    LONG_NAME          = 'surface_downwelling_PAR_beam_flux', &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1274,7 +1274,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'DFPARLAND',                 &
-    LONG_NAME          = 'surface_downwelling_par_diffuse_flux', &
+    LONG_NAME          = 'surface_downwelling_PAR_diffuse_flux', &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1292,8 +1292,8 @@ contains
 
 
   call MAPL_AddExportSpec(GC,                    &
-    SHORT_NAME         = 'SWNETSNOW',                    &
-    LONG_NAME          = 'Net_shortwave_snow',        &
+    SHORT_NAME         = 'SWNETSNOW',                 &
+    LONG_NAME          = 'Net_shortwave_flux_snow',   &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1303,7 +1303,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'LWUPSNOW',                    &
-    LONG_NAME          = 'Net_longwave_snow',         &
+    LONG_NAME          = 'surface_emitted_longwave_flux_snow',         &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1312,7 +1312,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'LWDNSNOW',                    &
-    LONG_NAME          = 'Net_longwave_snow',         &
+    LONG_NAME          = 'surface_absorbed_longwave_flux_snow',         &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1377,7 +1377,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'SWLAND',                    &
-    LONG_NAME          = 'Net_shortwave_land',        &
+    LONG_NAME          = 'Net_shortwave_flux_land',   &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1386,7 +1386,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'SWDOWNLAND',                &
-    LONG_NAME          = 'Incident_shortwave_land',   &
+    LONG_NAME          = 'Incident_shortwave_flux_land',   &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1396,7 +1396,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'LWLAND',                    &
-    LONG_NAME          = 'Net_longwave_land',         &
+    LONG_NAME          = 'Net_longwave_flux_land',    &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1406,7 +1406,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'GHLAND',                    &
-    LONG_NAME          = 'Ground_heating_land',       &
+    LONG_NAME          = 'Ground_heating_flux_land',  &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1415,7 +1415,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'GHTSKIN',                   &
-    LONG_NAME          = 'Ground_heating_skin_temp',  &
+    LONG_NAME          = 'Ground_heating_flux_for_skin_temp_land',  &
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1434,7 +1434,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'TWLAND',                    &
-    LONG_NAME          = 'Avail_water_storage_land',  &
+    LONG_NAME          = 'total_water_storage_land',  &
     UNITS              = 'kg m-2',                    &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1480,7 +1480,16 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'SPLAND',                    &
-    LONG_NAME          = 'rate_of_spurious_land_energy_source',&
+    LONG_NAME          = 'Spurious_sensible_heat_flux_land',&
+    UNITS              = 'W m-2',                     &
+    DIMS               = MAPL_DimsTileOnly,           &
+    VLOCATION          = MAPL_VLocationNone,          &
+                                           RC=STATUS  )
+  VERIFY_(STATUS)
+
+  call MAPL_AddExportSpec(GC,                    &
+    SHORT_NAME         = 'SPLH',                      &
+    LONG_NAME          = 'Spurious_latent_heat_flux_land',&
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1489,7 +1498,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'SPWATR',                    &
-    LONG_NAME          = 'rate_of_spurious_land_water_source',&
+    LONG_NAME          = 'Spurious_evapotranspiration_flux_land',&
     UNITS              = 'kg m-2 s-1',                &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1498,7 +1507,7 @@ contains
 
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'SPSNOW',                    &
-    LONG_NAME          = 'rate_of_spurious_snow_energy',&
+    LONG_NAME          = 'Spurious_snow_energy_flux_land',&
     UNITS              = 'W m-2',                     &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1838,7 +1847,7 @@ contains
     call MAPL_AddExportSpec(                                                    &
          gc,                                                                    &
          SHORT_NAME = "DRPAR",                                              &
-         LONG_NAME  = "surface_downwelling_par_beam_flux",                      &
+         LONG_NAME  = "surface_downwelling_PAR_beam_flux",                      &
          UNITS      = "W m-2",                                                  &
          DIMS       = MAPL_DimsTileOnly,                                        &
          VLOCATION  = MAPL_VlocationNone,                                       &
@@ -1849,7 +1858,7 @@ contains
     call MAPL_AddExportSpec(                                                    &
          gc,                                                                    &
          SHORT_NAME = "DFPAR",                                              &
-         LONG_NAME  = "surface_downwelling_par_diffuse_flux",                   &
+         LONG_NAME  = "surface_downwelling_PAR_diffuse_flux",                   &
          UNITS      = "W m-2",                                                  &
          DIMS       = MAPL_DimsTileOnly,                                        &
          VLOCATION  = MAPL_VlocationNone,                                       &
@@ -1904,7 +1913,7 @@ contains
     call MAPL_AddExportSpec(                                                    &
          gc,                                                                    &
          SHORT_NAME = "LWDNSRF",                                            &
-         LONG_NAME  = "perturbed_surface_downwelling_longwave_flux",            &
+         LONG_NAME  = "perturbed_surface_absorbed_longwave_flux",               &
          UNITS      = "W m-2",                                                  &
          DIMS       = MAPL_DimsTileOnly,                                        &
          VLOCATION  = MAPL_VlocationNone,                                       &
@@ -2419,6 +2428,7 @@ contains
     real, dimension(:),pointer :: DWLAND,DWLAND_enavg
     real, dimension(:),pointer :: DHLAND,DHLAND_enavg
     real, dimension(:),pointer :: SPLAND,SPLAND_enavg
+    real, dimension(:),pointer :: SPLH,  SPLH_enavg
     real, dimension(:),pointer :: SPWATR,SPWATR_enavg
     real, dimension(:),pointer :: SPSNOW,SPSNOW_enavg
     real, dimension(:),pointer :: PEATCLSM_WATERLEVEL,PEATCLSM_WATERLEVEL_enavg
@@ -2782,6 +2792,8 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(import, SPLAND,  'SPLAND' ,rc=status)
     VERIFY_(status)
+    call MAPL_GetPointer(import, SPLH,    'SPLH'   ,rc=status)
+    VERIFY_(status)
     call MAPL_GetPointer(import, SPWATR,  'SPWATR' ,rc=status)
     VERIFY_(status)
     call MAPL_GetPointer(import, SPSNOW,  'SPSNOW' ,rc=status)
@@ -3084,6 +3096,8 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(export, SPLAND_enavg,  'SPLAND' ,rc=status)
     VERIFY_(status)
+    call MAPL_GetPointer(export, SPLH_enavg,    'SPLH'   ,rc=status)
+    VERIFY_(status)
     call MAPL_GetPointer(export, SPWATR_enavg,  'SPWATR' ,rc=status)
     VERIFY_(status)
     call MAPL_GetPointer(export, SPSNOW_enavg,  'SPSNOW' ,rc=status)
@@ -3253,6 +3267,7 @@ contains
         if(associated(DWLAND_enavg)) DWLAND_enavg =  0.0
         if(associated(DHLAND_enavg)) DHLAND_enavg =  0.0
         if(associated(SPLAND_enavg)) SPLAND_enavg =  0.0
+        if(associated(SPLH_enavg))   SPLH_enavg   =  0.0
         if(associated(SPWATR_enavg)) SPWATR_enavg =  0.0
         if(associated(SPSNOW_enavg)) SPSNOW_enavg =  0.0
         if(associated(PEATCLSM_WATERLEVEL_enavg)) PEATCLSM_WATERLEVEL_enavg =  0.0
@@ -3546,6 +3561,8 @@ contains
         DHLAND_enavg = DHLAND_enavg + DHLAND
     if(associated(SPLAND_enavg) .and. associated(SPLAND))   & 
         SPLAND_enavg = SPLAND_enavg + SPLAND
+    if(associated(SPLH_enavg)   .and. associated(SPLH))     & 
+        SPLH_enavg   = SPLH_enavg   + SPLH
     if(associated(SPWATR_enavg) .and. associated(SPWATR))   & 
         SPWATR_enavg = SPWATR_enavg + SPWATR
     if(associated(SPSNOW_enavg) .and. associated(SPSNOW))   & 
@@ -3786,6 +3803,7 @@ contains
         if(associated(DWLAND_enavg)) DWLAND_enavg = DWLAND_enavg/NUM_ENSEMBLE
         if(associated(DHLAND_enavg)) DHLAND_enavg = DHLAND_enavg/NUM_ENSEMBLE
         if(associated(SPLAND_enavg)) SPLAND_enavg = SPLAND_enavg/NUM_ENSEMBLE
+        if(associated(SPLH_enavg))   SPLH_enavg   = SPLH_enavg  /NUM_ENSEMBLE
         if(associated(SPWATR_enavg)) SPWATR_enavg = SPWATR_enavg/NUM_ENSEMBLE
         if(associated(SPSNOW_enavg)) SPSNOW_enavg = SPSNOW_enavg/NUM_ENSEMBLE
         if(associated(PEATCLSM_WATERLEVEL_enavg)) PEATCLSM_WATERLEVEL_enavg = PEATCLSM_WATERLEVEL_enavg/NUM_ENSEMBLE

@@ -26,6 +26,7 @@ COLLECTIONS:
            ::
 
 #CUBE GRID_LABELS: PC720x361-DC
+#CUBE GRID_LABELS: PC1440x721-DC
 
 #CUBE      ::
 
@@ -35,6 +36,13 @@ COLLECTIONS:
 #CUBE PC720x361-DC.POLE: PC
 #CUBE PC720x361-DC.DATELINE: DC
 #CUBE PC720x361-DC.LM: 1
+
+#CUBE PC1440x721-DC.GRID_TYPE: LatLon
+#CUBE PC1440x721-DC.IM_WORLD: 1440
+#CUBE PC1440x721-DC.JM_WORLD: 721
+#CUBE PC1440x721-DC.POLE: PC
+#CUBE PC1440x721-DC.DATELINE: DC
+#CUBE PC1440x721-DC.LM: 1
 
 # Detailed definition of the collections listed above 
 #
@@ -107,46 +115,47 @@ COLLECTIONS:
           ::
 
   tavg24_1d_lnd_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
-  tavg24_1d_lnd_Nt.nbits:       12,
+#  tavg24_1d_lnd_Nt.nbits:       12,
   tavg24_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
   tavg24_1d_lnd_Nt.mode:        'time-averaged',
   tavg24_1d_lnd_Nt.frequency:   240000,
   tavg24_1d_lnd_Nt.ref_time:    000000,
-  tavg24_1d_lnd_Nt.fields:     'WET3'       , 'GridComp'  , 'GWETPROF'     ,
+  tavg24_1d_lnd_Nt.fields:     'GRN'        , 'VEGDYN'  ,
+                               'LAI'        , 'VEGDYN'  ,
+                               'WET3'       , 'GridComp'  , 'GWETPROF'     ,
                                'WET2'       , 'GridComp'  , 'GWETROOT'     ,
                                'WET1'       , 'GridComp'  , 'GWETTOP'      ,
                                'WCPR'       , 'GridComp'  , 'PRMC'         ,
                                'WCRZ'       , 'GridComp'  , 'RZMC'         ,
                                'WCSF'       , 'GridComp'  , 'SFMC'         ,
-                               'TPSNOW'     , 'GridComp'  ,
-                               'TPUNST'     , 'GridComp'  , 'TUNST'        ,
-                               'TPSAT'      , 'GridComp'  , 'TSAT'         ,
-                               'TPWLT'      , 'GridComp'  , 'TWLT'         ,
-                               'TPSURF'     , 'GridComp'  , 'TSURF'        ,
-                               'GRN'        , 'VEGDYN'  ,
-                               'LAI'        , 'VEGDYN'  ,
-                               'TP1'        , 'GridComp'  ,
-                               'TP2'        , 'GridComp'  ,
-                               'TP3'        , 'GridComp'  ,
-                               'TP4'        , 'GridComp'  ,
-                               'TP5'        , 'GridComp'  ,
-                               'TP6'        , 'GridComp'  ,
-                               'PRLAND'     , 'GridComp'  , 'PRECTOTLAND'  ,
-                               'SNOLAND'    , 'GridComp'  , 'PRECSNOLAND'  ,
-                               'TSLAND'     , 'GridComp'  , 'SNOMAS'       ,
-                               'SNOWDP'     , 'GridComp'  , 'SNODP'        ,
-                               'EVPSOI'     , 'GridComp'  , 'EVPSOIL'      ,
-                               'EVPVEG'     , 'GridComp'  , 'EVPTRNS'      ,
-                               'EVPINT'     , 'GridComp'  , 'EVPINTR'      ,
-                               'EVPICE'     , 'GridComp'  , 'EVPSBLN'      ,
-                               'RUNSURF'    , 'GridComp'  , 'RUNOFF'       ,
-                               'BASEFLOW'   , 'GridComp'  ,
+                               'CAPAC'      , 'GridComp'  , 'INTRWATR'     ,
+                               'TPSNOW'     , 'GridComp'  , 'TPSNOWLAND'   ,
+                               'TPUNST'     , 'GridComp'  , 'TUNSTLAND'    ,
+                               'TPSAT'      , 'GridComp'  , 'TSATLAND'     ,
+                               'TPWLT'      , 'GridComp'  , 'TWLTLAND'     ,
+                               'TPSURF'     , 'GridComp'  , 'TSURFLAND'    ,
+                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENS GC: TSOIL1TILE    
+                               'TP2'        , 'GridComp'  , 'TSOIL2'       ,         ! ...				     
+                               'TP3'        , 'GridComp'  , 'TSOIL3'       ,         ! ...				     
+                               'TP4'        , 'GridComp'  , 'TSOIL4'       ,         ! ...				     
+                               'TP5'        , 'GridComp'  , 'TSOIL5'       ,         ! ...				     
+                               'TP6'        , 'GridComp'  , 'TSOIL6'       ,         ! ...                                   
+                               'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     ! assume "corrected" precip
+                               'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     ! assume "corrected" precip
+                               'TSLAND'     , 'GridComp'  , 'SNOMASLAND'   ,
+                               'SNOWDP'     , 'GridComp'  , 'SNODPLAND'    ,
+                               'EVPSOI'     , 'GridComp'  , 'LHLANDSOIL'   ,
+                               'EVPVEG'     , 'GridComp'  , 'LHLANDTRNS'   ,
+                               'EVPINT'     , 'GridComp'  , 'LHLANDINTR'   ,
+                               'EVPICE'     , 'GridComp'  , 'LHLANDSBLN'   ,
+                               'RUNSURF'    , 'GridComp'  , 'RUNSURFLAND'  ,
+                               'BASEFLOW'   , 'GridComp'  , 'BASEFLOWLAND' , 
                                'SMLAND'     , 'GridComp'  ,
-                               'QINFIL'     , 'GridComp'  ,
-                               'FRUST'      , 'GridComp'  , 'FRUNST'       ,
-                               'FRSAT'      , 'GridComp'  ,
-                               'ASNOW'      , 'GridComp'  , 'FRSNO'        ,
-                               'FRWLT'      , 'GridComp'  ,
+                               'QINFIL'     , 'GridComp'  , 'QINFILLAND'   ,
+                               'FRUST'      , 'GridComp'  , 'FRLANDUNST'   ,
+                               'FRSAT'      , 'GridComp'  , 'FRLANDSAT'    ,
+                               'ASNOW'      , 'GridComp'  , 'FRLANDSNO'    ,
+                               'FRWLT'      , 'GridComp'  , 'FRLANDWLT'    ,
                                'DFPARLAND'  , 'GridComp'  , 'PARDFLAND'    ,
                                'DRPARLAND'  , 'GridComp'  , 'PARDRLAND'    ,
                                'SHLAND'     , 'GridComp'  ,
@@ -157,11 +166,12 @@ COLLECTIONS:
                                'GHLAND'     , 'GridComp'  ,
                                'TWLAND'     , 'GridComp'  ,
                                'TELAND'     , 'GridComp'  ,
-                               'DWLAND'     , 'GridComp'  , 'WCHANGE'      ,
-                               'DHLAND'     , 'GridComp'  , 'ECHANGE'      ,
-                               'SPLAND'     , 'GridComp'  ,
-                               'SPWATR'     , 'GridComp'  ,
-                               'SPSNOW'     , 'GridComp'  ,
+                               'DWLAND'     , 'GridComp'  , 'WCHANGELAND'  ,
+                               'DHLAND'     , 'GridComp'  , 'ECHANGELAND'  ,
+                               'SPLAND'     , 'GridComp'  , 'SPSHLAND'     ,
+                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,
+                               'SPWATR'     , 'GridComp'  , 'SPEVLAND'     ,
+                               'SPSNOW'     , 'GridComp'  , 'SPSNLAND'     ,
                                'PEATCLSM_WATERLEVEL', 'GridComp'  ,
                                'PEATCLSM_FSWCHANGE' , 'GridComp'  ,
 >>>HIST_AEROSOL<<<      'RMELTDU001'  , 'GridComp'  ,
@@ -203,52 +213,53 @@ COLLECTIONS:
 >>>HIST_IRRIG<<<        'IRRIGRATE'  , 'GridComp'  ,
                                ::
 
+  tavg24_2d_lnd_Nx.format:       'CFIO',
   tavg24_2d_lnd_Nx.descr:       '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
-  tavg24_2d_lnd_Nx.nbits:       12,
+#  tavg24_2d_lnd_Nx.nbits:       12,
   tavg24_2d_lnd_Nx.template:    '%y4%m2%d2_%h2%n2z.nc4',
   tavg24_2d_lnd_Nx.mode:        'time-averaged',
   tavg24_2d_lnd_Nx.frequency:    240000,
   tavg24_2d_lnd_Nx.ref_time:     000000,
-  tavg24_2d_lnd_Nx.format:       'CFIO',
   tavg24_2d_lnd_Nx.regrid_exch:  '../input/tile.data'
   tavg24_2d_lnd_Nx.regrid_name:  'GRIDNAME'
   tavg24_2d_lnd_Nx.grid_label:   PC720x361-DC
   tavg24_2d_lnd_Nx.deflate:      2,
-  tavg24_2d_lnd_Nx.fields:     'WET3'       , 'GridComp'  , 'GWETPROF'     ,
+  tavg24_2d_lnd_Nx.fields:     'GRN'        , 'VEGDYN'  ,
+                               'LAI'        , 'VEGDYN'  ,
+                               'WET3'       , 'GridComp'  , 'GWETPROF'     ,
                                'WET2'       , 'GridComp'  , 'GWETROOT'     ,
                                'WET1'       , 'GridComp'  , 'GWETTOP'      ,
                                'WCPR'       , 'GridComp'  , 'PRMC'         ,
                                'WCRZ'       , 'GridComp'  , 'RZMC'         ,
                                'WCSF'       , 'GridComp'  , 'SFMC'         ,
-                               'TPSNOW'     , 'GridComp'  ,
-                               'TPUNST'     , 'GridComp'  , 'TUNST'        ,
-                               'TPSAT'      , 'GridComp'  , 'TSAT'         ,
-                               'TPWLT'      , 'GridComp'  , 'TWLT'         ,
-                               'TPSURF'     , 'GridComp'  , 'TSURF'        ,
-                               'GRN'        , 'VEGDYN'  ,
-                               'LAI'        , 'VEGDYN'  ,
-                               'TP1'        , 'GridComp'  ,
-                               'TP2'        , 'GridComp'  ,
-                               'TP3'        , 'GridComp'  ,
-                               'TP4'        , 'GridComp'  ,
-                               'TP5'        , 'GridComp'  ,
-                               'TP6'        , 'GridComp'  ,
-                               'PRLAND'     , 'GridComp'  , 'PRECTOTLAND'  ,
-                               'SNOLAND'    , 'GridComp'  , 'PRECSNOLAND'  ,
-                               'TSLAND'     , 'GridComp'  , 'SNOMAS'       ,
-                               'SNOWDP'     , 'GridComp'  , 'SNODP'        ,
-                               'EVPSOI'     , 'GridComp'  , 'EVPSOIL'      ,
-                               'EVPVEG'     , 'GridComp'  , 'EVPTRNS'      ,
-                               'EVPINT'     , 'GridComp'  , 'EVPINTR'      ,
-                               'EVPICE'     , 'GridComp'  , 'EVPSBLN'      ,
-                               'RUNSURF'    , 'GridComp'  , 'RUNOFF'       ,
-                               'BASEFLOW'   , 'GridComp'  ,
+                               'CAPAC'      , 'GridComp'  , 'INTRWATR'     ,
+                               'TPSNOW'     , 'GridComp'  , 'TPSNOWLAND'   ,
+                               'TPUNST'     , 'GridComp'  , 'TUNSTLAND'    ,
+                               'TPSAT'      , 'GridComp'  , 'TSATLAND'     ,
+                               'TPWLT'      , 'GridComp'  , 'TWLTLAND'     ,
+                               'TPSURF'     , 'GridComp'  , 'TSURFLAND'    ,
+                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENS GC: TSOIL1TILE
+                               'TP2'        , 'GridComp'  , 'TSOIL2'       ,         ! ...
+                               'TP3'        , 'GridComp'  , 'TSOIL3'       ,         ! ...
+                               'TP4'        , 'GridComp'  , 'TSOIL4'       ,         ! ...
+                               'TP5'        , 'GridComp'  , 'TSOIL5'       ,         ! ...
+                               'TP6'        , 'GridComp'  , 'TSOIL6'       ,         ! ...                                   
+                               'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     ! assume "corrected" precip
+                               'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     ! assume "corrected" precip
+                               'TSLAND'     , 'GridComp'  , 'SNOMASLAND'   ,
+                               'SNOWDP'     , 'GridComp'  , 'SNODPLAND'    ,
+                               'EVPSOI'     , 'GridComp'  , 'LHLANDSOIL'   ,
+                               'EVPVEG'     , 'GridComp'  , 'LHLANDTRNS'   ,
+                               'EVPINT'     , 'GridComp'  , 'LHLANDINTR'   ,
+                               'EVPICE'     , 'GridComp'  , 'LHLANDSBLN'   ,
+                               'RUNSURF'    , 'GridComp'  , 'RUNSURFLAND'  ,
+                               'BASEFLOW'   , 'GridComp'  , 'BASEFLOWLAND' , 
                                'SMLAND'     , 'GridComp'  ,
-                               'QINFIL'     , 'GridComp'  ,
-                               'FRUST'      , 'GridComp'  , 'FRUNST'       ,
-                               'FRSAT'      , 'GridComp'  ,
-                               'ASNOW'      , 'GridComp'  , 'FRSNO'        ,
-                               'FRWLT'      , 'GridComp'  ,
+                               'QINFIL'     , 'GridComp'  , 'QINFILLAND'   ,
+                               'FRUST'      , 'GridComp'  , 'FRLANDUNST'   ,
+                               'FRSAT'      , 'GridComp'  , 'FRLANDSAT'    ,
+                               'ASNOW'      , 'GridComp'  , 'FRLANDSNO'    ,
+                               'FRWLT'      , 'GridComp'  , 'FRLANDWLT'    ,
                                'DFPARLAND'  , 'GridComp'  , 'PARDFLAND'    ,
                                'DRPARLAND'  , 'GridComp'  , 'PARDRLAND'    ,
                                'SHLAND'     , 'GridComp'  ,
@@ -259,11 +270,12 @@ COLLECTIONS:
                                'GHLAND'     , 'GridComp'  ,
                                'TWLAND'     , 'GridComp'  ,
                                'TELAND'     , 'GridComp'  ,
-                               'DWLAND'     , 'GridComp'  , 'WCHANGE'      ,
-                               'DHLAND'     , 'GridComp'  , 'ECHANGE'      ,
-                               'SPLAND'     , 'GridComp'  ,
-                               'SPWATR'     , 'GridComp'  ,
-                               'SPSNOW'     , 'GridComp'  ,
+                               'DWLAND'     , 'GridComp'  , 'WCHANGELAND'  ,
+                               'DHLAND'     , 'GridComp'  , 'ECHANGELAND'  ,
+                               'SPLAND'     , 'GridComp'  , 'SPSHLAND'     ,
+                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,
+                               'SPWATR'     , 'GridComp'  , 'SPEVLAND'     ,
+                               'SPSNOW'     , 'GridComp'  , 'SPSNLAND'     ,
                                'PEATCLSM_WATERLEVEL', 'GridComp'  ,
                                'PEATCLSM_FSWCHANGE' , 'GridComp'  ,
 >>>HIST_AEROSOL<<<     'RMELTDU001'  , 'GridComp'  ,
