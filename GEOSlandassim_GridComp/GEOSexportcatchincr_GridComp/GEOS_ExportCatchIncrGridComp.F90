@@ -88,7 +88,7 @@ contains
   ! Exports for Catchment prognostics increments
 
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_canopy_temperature_saturated_zone'         ,&
+       LONG_NAME          = 'increment_surface_temperature_saturated_zone'        ,&
        UNITS              = 'K'                                                   ,&
        SHORT_NAME         = 'TCFSAT_INCR'                                         ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
@@ -97,7 +97,7 @@ contains
   _VERIFY(STATUS)
   
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_canopy_temperature_transition_zone'        ,&
+       LONG_NAME          = 'increment_surface_temperature_of_unsaturated_zone'   ,&
        UNITS              = 'K'                                                   ,&
        SHORT_NAME         = 'TCFTRN_INCR'                                         ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
@@ -106,7 +106,7 @@ contains
   _VERIFY(STATUS)
   
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_canopy_temperature_wilting_zone'           ,&
+       LONG_NAME          = 'increment_surface_temperature_of_wilting_zone'       ,&
        UNITS              = 'K'                                                   ,&
        SHORT_NAME         = 'TCFWLT_INCR'                                         ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
@@ -115,7 +115,7 @@ contains
   _VERIFY(STATUS)
   
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_canopy_specific_humidity_saturated_zone'   ,&
+       LONG_NAME          = 'increment_surface_specific_humidity_of_saturated_zone'   ,&
        UNITS              = 'kg kg-1'                                             ,&
        SHORT_NAME         = 'QCFSAT_INCR'                                         ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
@@ -124,7 +124,7 @@ contains
   _VERIFY(STATUS)
   
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_canopy_specific_humidity_transition_zone'  ,&
+       LONG_NAME          = 'increment_surface_specific_humidity_of_unsaturated_zone' ,&
        UNITS              = 'kg kg-1'                                             ,&
        SHORT_NAME         = 'QCFTRN_INCR'                                         ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
@@ -133,7 +133,7 @@ contains
   _VERIFY(STATUS)
 
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_canopy_specific_humidity_wilting_zone'     ,&
+       LONG_NAME          = 'increment_surface_specific_humidity_of_wilting_zone'     ,&
        UNITS              = 'kg kg-1'                                             ,&
        SHORT_NAME         = 'QCFWLT_INCR'                                         ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
@@ -142,7 +142,7 @@ contains
   _VERIFY(STATUS)
   
   call MAPL_AddExportSpec(GC                                                      ,&
-       LONG_NAME          = 'increment_interception_reservoir_capac'              ,&
+       LONG_NAME          = 'increment_vegetation_interception_water_storage'     ,&
        UNITS              = 'kg m-2'                                              ,&
        SHORT_NAME         = 'CAPAC_INCR'                                          ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&

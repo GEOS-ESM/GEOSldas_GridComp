@@ -604,7 +604,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'rainwater_infiltration_flux',&
+    LONG_NAME          = 'soil_water_infiltration_rate',&
     UNITS              = 'kg m-2 s-1'                ,&
     SHORT_NAME         = 'QINFIL'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
