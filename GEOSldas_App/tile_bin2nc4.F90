@@ -393,6 +393,24 @@ contains
     case ('RMELTOC001');                       LONG_NAME = 'flushed_out_organic_carbon_mass_flux_from_the_bottom_layer_bin_1'; UNITS = 'kg m-2 s-1'
     case ('RMELTOC002');                       LONG_NAME = 'flushed_out_organic_carbon_mass_flux_from_the_bottom_layer_bin_2'; UNITS = 'kg m-2 s-1'
  
+    ! land constants
+
+    case ('CDCR2');                            LONG_NAME = 'maximum soil water content above wilting point';                   UNITS = 'kg m-2'
+    case ('DZGT1');                            LONG_NAME = 'thickness_of_soil_layer_associated_with_TSOIL1';                   UNITS = 'm'
+    case ('DZGT2');                            LONG_NAME = 'thickness_of_soil_layer_associated_with_TSOIL2';                   UNITS = 'm'
+    case ('DZGT3');                            LONG_NAME = 'thickness_of_soil_layer_associated_with_TSOIL3';                   UNITS = 'm'
+    case ('DZGT4');                            LONG_NAME = 'thickness_of_soil_layer_associated_with_TSOIL4';                   UNITS = 'm'
+    case ('DZGT5');                            LONG_NAME = 'thickness_of_soil_layer_associated_with_TSOIL5';                   UNITS = 'm'
+    case ('DZGT6');                            LONG_NAME = 'thickness_of_soil_layer_associated_with_TSOIL6';                   UNITS = 'm'
+    case ('DZPR');                             LONG_NAME = 'thickness_of_soil_layer_associated_with_PRMC_and_GWETPROF';        UNITS = 'm'
+    case ('DZRZ');                             LONG_NAME = 'thickness_of_soil_layer_associated_with_RZMC_and_GWETROOT';        UNITS = 'm'
+    case ('DZSF');                             LONG_NAME = 'thickness_of_soil_layer_associated_with_SFMC_and_GWETTOP';         UNITS = 'm'
+    case ('DZTS');                             LONG_NAME = 'thickness_of_soil_layer_associated_with_TSATLAND_TUNSTLAND_and_TWLTLAND';        UNITS = 'm'
+    case ('POROS');                            LONG_NAME = 'soil_porosity';                                                    UNITS = 'm3 m-3'
+    case ('WPEMW');                            LONG_NAME = 'soil_wilting_point_in_equivalent_mass_of_total_profile_water';     UNITS = 'kg m-2'
+    case ('WPMC');                             LONG_NAME = 'soil_wilting_point_in_volumetric_units';                           UNITS = 'm3 m-3'
+    case ('WPWET');                            LONG_NAME = 'soil_wilting_point_in_degree_of_saturation_units';                 UNITS = '1'
+
     ! land assimilation increments for Catchment prognostic variables in coupled land-atmosphere DAS (#sqz 2020-01)
 
     case ('TCFSAT_INCR');                      LONG_NAME = 'increment_surface_temperature_of_saturated_zone';                  UNITS = 'K' 
