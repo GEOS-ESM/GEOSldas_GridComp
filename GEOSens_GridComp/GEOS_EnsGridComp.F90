@@ -4,7 +4,8 @@
 module GEOS_EnsGridCompMod
 
   ! !USES
-  !! This grid comp behaves like a coupler. The set service, initialization are compliant with MAPL grid comp concept. 
+  !! This grid comp behaves like a coupler; SetServices() and Initialize() are compliant with MAPL's GridComp concept.
+ 
   use ESMF
   use MAPL_Mod
   use catch_constants, only: DZGT => CATCH_DZGT
@@ -31,22 +32,22 @@ module GEOS_EnsGridCompMod
   integer, parameter :: NUM_SUBTILES=4
   real               :: enavg_nodata_threshold
 
-  type(cat_progn_type),dimension(:,:), allocatable :: catch_progn
-  type(cat_param_type),dimension(:  ), allocatable :: catch_param
-
-
+  type(cat_progn_type), dimension(:,:), allocatable :: catch_progn
+  type(cat_param_type), dimension(:  ), allocatable :: catch_param  ! 1d only, assumes no parameter perturbations!
+  
+  
 contains
-
+  
   !BOP
-
-  ! !IROTUINE: SetServices -- Set ESMF services for this component
-
+  
+  ! !ROUTINE: SetServices -- Set ESMF services for this component
+  
   ! !INTERFACE:
-
+  
   subroutine SetServices(gc, rc)
-
+    
     ! !ARGUMENTS:
-
+    
     type(ESMF_GridComp), intent(inout) :: gc ! gridded component
     integer, optional                  :: rc ! return code
 
@@ -73,7 +74,7 @@ contains
          )
     VERIFY_(status)
 
-    ! phase one: collect forcing ensemble 
+    ! phase 1: collect forcing ensemble 
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
@@ -82,7 +83,7 @@ contains
          )
     VERIFY_(status)
  
-   ! phase two : collect ensemble out from land
+   ! phase 2: collect ensemble out from land
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
@@ -91,11 +92,11 @@ contains
          )
     VERIFY_(status)
 
-    !phase 3 : get cat_param
+    ! phase 3: get catch_param
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
-         GET_CATCH_PARAM ,                                                        &
+         GET_CATCH_PARAM ,                                                      &
          rc=status                                                              &
          )
     VERIFY_(status)
@@ -1224,21 +1225,19 @@ contains
     VLOCATION          = MAPL_VLocationNone,          &
                                            RC=STATUS  )
   VERIFY_(STATUS)
-
-
-     call MAPL_AddExportSpec(GC,                             &
-        SHORT_NAME         = 'ACCUM',                             &
-        LONG_NAME          = 'net_ice_accumulation_rate',         &
-        UNITS              = 'kg m-2 s-1',                        &
-        DIMS               = MAPL_DimsTileOnly,                   &
-        VLOCATION          = MAPL_VLocationNone,                  &
-                                                       RC=STATUS  )
-     VERIFY_(STATUS)
-
-
+  
+  call MAPL_AddExportSpec(GC,                    &
+    SHORT_NAME         = 'ACCUM',                     &
+    LONG_NAME          = 'net_ice_accumulation_rate', &
+    UNITS              = 'kg m-2 s-1',                &
+    DIMS               = MAPL_DimsTileOnly,           &
+    VLOCATION          = MAPL_VLocationNone,          &
+    RC=STATUS  )
+  VERIFY_(STATUS)
+  
   call MAPL_AddExportSpec(GC,                    &
     SHORT_NAME         = 'EVLAND',                    &
-    LONG_NAME          = 'total_evapotranspiration_land',          &
+    LONG_NAME          = 'total_evapotranspiration_land',     &
     UNITS              = 'kg m-2 s-1',                &
     DIMS               = MAPL_DimsTileOnly,           &
     VLOCATION          = MAPL_VLocationNone,          &
@@ -1950,10 +1949,11 @@ contains
 
   end subroutine SetServices
 
-
+  ! ------------------------------------------------------------------------------------------------------------
+  !
   !BOP
-
-  ! !IROTUINE: Initialize -- initialize method for LDAS GC
+  !
+  ! !ROUTINE: Initialize -- initialize method for LDAS Ens GC
 
   ! !INTERFACE:
 
@@ -2020,10 +2020,11 @@ contains
 
   end subroutine Initialize
 
-
+  ! ------------------------------------------------------------------------------------------------------------
+  !
   !BOP
-
-  ! !IROTUINE: collecting and averaging
+  !
+  ! !ROUTINE: collect and average surface met forcing ensemble
 
   subroutine Collect_force_ens(gc, import, export, clock, rc)
 
@@ -2096,7 +2097,6 @@ contains
     ! Turn timers on
     call MAPL_TimerOn(MAPL, "TOTAL")
     call MAPL_TimerOn(MAPL, "Collect_force")
-
 
     call MAPL_GetPointer(import, TApert, 'TApert', rc=status)
     VERIFY_(status)
@@ -2242,6 +2242,10 @@ contains
 
   end subroutine Collect_force_ens
 
+  ! ------------------------------------------------------------------------------------------------------------
+  !
+  ! !ROUTINE: collect and average land ensemble
+  
   subroutine Collect_land_ens(gc, import, export, clock, rc)
 
     ! !ARGUMENTS:
@@ -3868,7 +3872,10 @@ contains
     RETURN_(ESMF_SUCCESS)
 
   end subroutine Collect_land_ens
-
+  
+  ! ------------------------------------------------------------------------------------------------------------
+  !
+  ! !ROUTINE: collect Catchment model parameters
 
   subroutine GET_CATCH_PARAM( GC, IMPORT, EXPORT, CLOCK, RC )
 
@@ -3893,38 +3900,38 @@ contains
     logical :: firsttime = .true.
 
     real, pointer :: poros(:) =>null()
-    real, pointer :: cond(:) =>null()
-    real, pointer :: psis(:) =>null()
-    real, pointer :: bee(:) =>null()
+    real, pointer :: cond(:)  =>null()
+    real, pointer :: psis(:)  =>null()
+    real, pointer :: bee(:)   =>null()
     real, pointer :: wpwet(:) =>null()
-    real, pointer :: gnu(:) =>null()
-    real, pointer :: vgwmax(:) =>null()
-    real, pointer :: bf1(:) =>null()
-    real, pointer :: bf2(:) =>null()
-    real, pointer :: bf3(:) =>null()
+    real, pointer :: gnu(:)   =>null()
+    real, pointer :: vgwmax(:)=>null()
+    real, pointer :: bf1(:)   =>null()
+    real, pointer :: bf2(:)   =>null()
+    real, pointer :: bf3(:)   =>null()
     real, pointer :: cdcr1(:) =>null()
     real, pointer :: cdcr2(:) =>null()
-    real, pointer :: ars1(:) =>null()
-    real, pointer :: ars2(:) =>null()
-    real, pointer :: ars3(:) =>null()
-    real, pointer :: ara1(:) =>null()
-    real, pointer :: ara2(:) =>null()
-    real, pointer :: ara3(:) =>null()
-    real, pointer :: ara4(:) =>null()
-    real, pointer :: arw1(:) =>null()
-    real, pointer :: arw2(:) =>null()
-    real, pointer :: arw3(:) =>null()
-    real, pointer :: arw4(:) =>null()
-    real, pointer :: tsa1(:) =>null()
-    real, pointer :: tsa2(:) =>null()
-    real, pointer :: tsb1(:) =>null()
-    real, pointer :: tsb2(:) =>null()
-    real, pointer :: atau(:) =>null()
-    real, pointer :: btau(:) =>null()
-    real, pointer :: ity(:) =>null()
-    real, pointer :: z2ch(:) =>null()
+    real, pointer :: ars1(:)  =>null()
+    real, pointer :: ars2(:)  =>null()
+    real, pointer :: ars3(:)  =>null()
+    real, pointer :: ara1(:)  =>null()
+    real, pointer :: ara2(:)  =>null()
+    real, pointer :: ara3(:)  =>null()
+    real, pointer :: ara4(:)  =>null()
+    real, pointer :: arw1(:)  =>null()
+    real, pointer :: arw2(:)  =>null()
+    real, pointer :: arw3(:)  =>null()
+    real, pointer :: arw4(:)  =>null()
+    real, pointer :: tsa1(:)  =>null()
+    real, pointer :: tsa2(:)  =>null()
+    real, pointer :: tsb1(:)  =>null()
+    real, pointer :: tsb2(:)  =>null()
+    real, pointer :: atau(:)  =>null()
+    real, pointer :: btau(:)  =>null()
+    real, pointer :: ity(:)   =>null()
+    real, pointer :: z2ch(:)  =>null()
 
-    real :: SURFLAY, x
+    real    :: SURFLAY, x
     integer :: i
 
     if (firsttime) then
@@ -4001,46 +4008,48 @@ contains
        catch_param(:)%dzgt(4) = dzgt(4)
        catch_param(:)%dzgt(5) = dzgt(5)
        catch_param(:)%dzgt(6) = dzgt(6)
-       catch_param(:)%poros = poros
-       catch_param(:)%cond  = cond
-       catch_param(:)%psis  = psis
-       catch_param(:)%bee   = bee
-       catch_param(:)%wpwet = wpwet
-       catch_param(:)%gnu   = gnu
-       catch_param(:)%vgwmax= vgwmax
-       catch_param(:)%bf1   = bf1
-       catch_param(:)%bf2   = bf2
-       catch_param(:)%bf3   = bf3
-       catch_param(:)%cdcr1 = cdcr1
-       catch_param(:)%cdcr2 = cdcr2
-       catch_param(:)%ars1 = ars1
-       catch_param(:)%ars2 = ars2
-       catch_param(:)%ars3 = ars3
-       catch_param(:)%ara1 = ara1
-       catch_param(:)%ara2 = ara2
-       catch_param(:)%ara3 = ara3
-       catch_param(:)%ara4 = ara4
-       catch_param(:)%arw1 = arw1
-       catch_param(:)%arw2 = arw2
-       catch_param(:)%arw3 = arw3
-       catch_param(:)%arw4 = arw4
-       catch_param(:)%tsa1 = tsa1
-       catch_param(:)%tsa2 = tsa2
-       catch_param(:)%tsb1 = tsb1
-       catch_param(:)%tsb2 = tsb2
-       catch_param(:)%atau = atau
-       catch_param(:)%btau = btau
+       catch_param(:)%poros   = poros
+       catch_param(:)%cond    = cond
+       catch_param(:)%psis    = psis
+       catch_param(:)%bee     = bee
+       catch_param(:)%wpwet   = wpwet
+       catch_param(:)%gnu     = gnu
+       catch_param(:)%vgwmax  = vgwmax
+       catch_param(:)%bf1     = bf1
+       catch_param(:)%bf2     = bf2
+       catch_param(:)%bf3     = bf3
+       catch_param(:)%cdcr1   = cdcr1
+       catch_param(:)%cdcr2   = cdcr2
+       catch_param(:)%ars1    = ars1
+       catch_param(:)%ars2    = ars2
+       catch_param(:)%ars3    = ars3
+       catch_param(:)%ara1    = ara1
+       catch_param(:)%ara2    = ara2
+       catch_param(:)%ara3    = ara3
+       catch_param(:)%ara4    = ara4
+       catch_param(:)%arw1    = arw1
+       catch_param(:)%arw2    = arw2
+       catch_param(:)%arw3    = arw3
+       catch_param(:)%arw4    = arw4
+       catch_param(:)%tsa1    = tsa1
+       catch_param(:)%tsa2    = tsa2
+       catch_param(:)%tsb1    = tsb1
+       catch_param(:)%tsb2    = tsb2
+       catch_param(:)%atau    = atau
+       catch_param(:)%btau    = btau
        catch_param(:)%vegcls  = nint(ity)
        catch_param(:)%veghght = z2ch
 
        call MAPL_GetResource(MAPL, SURFLAY, Label="SURFLAY:", DEFAULT=50.0, rc=status)
 
-       catch_param(:)%dzsf = SURFLAY
-       catch_param(:)%dzpr = (cdcr2/(1.-wpwet)) / poros
-       catch_param(:)%dzrz = vgwmax/poros
+       catch_param(:)%dzsf    = SURFLAY
+       catch_param(:)%dzpr    = (cdcr2/(1.-wpwet)) / poros
+       catch_param(:)%dzrz    = vgwmax/poros
 
-       !assign NaN to other fields
+       ! assign NaN to other fields
+
        x = ieee_value(x,ieee_quiet_nan)
+
        catch_param(:)%soilcls30  = transfer(x,i)
        catch_param(:)%soilcls100 = transfer(x,i)
        catch_param(:)%gravel30   = x
@@ -4053,10 +4062,14 @@ contains
        catch_param(:)%wpwet30    = x
        catch_param(:)%poros30    = x
        catch_param(:)%dpth       = x
-    endif
-    RETURN_(ESMF_SUCCESS)
-end subroutine GET_CATCH_PARAM
 
+    endif
+
+    RETURN_(ESMF_SUCCESS)
+
+  end subroutine GET_CATCH_PARAM
+
+  ! ------------------------------------------------------------------------------------------------------------
 
   subroutine Finalize(gc, import, export, clock, rc)
 
@@ -4096,3 +4109,5 @@ end subroutine GET_CATCH_PARAM
   end subroutine Finalize
 
 end module GEOS_EnsGridCompMod
+
+! ============================= EOF ======================================================================
