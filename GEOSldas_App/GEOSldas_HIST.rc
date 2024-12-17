@@ -23,6 +23,8 @@ COLLECTIONS:
 #                'catch_progn_incr'
 #                'inst3_1d_lndfcstana_Nt'
 #                'inst3_2d_lndfcstana_Nx'
+#                'const_1d_lnd_Nt'
+#                'const_2d_lnd_Nx'
            ::
 
 #CUBE GRID_LABELS: PC720x361-DC
@@ -134,7 +136,7 @@ COLLECTIONS:
                                'TPSAT'      , 'GridComp'  , 'TSATLAND'     ,
                                'TPWLT'      , 'GridComp'  , 'TWLTLAND'     ,
                                'TPSURF'     , 'GridComp'  , 'TSURFLAND'    ,
-                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENS GC: TSOIL1TILE    
+                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE    
                                'TP2'        , 'GridComp'  , 'TSOIL2'       ,         ! ...				     
                                'TP3'        , 'GridComp'  , 'TSOIL3'       ,         ! ...				     
                                'TP4'        , 'GridComp'  , 'TSOIL4'       ,         ! ...				     
@@ -238,7 +240,7 @@ COLLECTIONS:
                                'TPSAT'      , 'GridComp'  , 'TSATLAND'     ,
                                'TPWLT'      , 'GridComp'  , 'TWLTLAND'     ,
                                'TPSURF'     , 'GridComp'  , 'TSURFLAND'    ,
-                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENS GC: TSOIL1TILE
+                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE
                                'TP2'        , 'GridComp'  , 'TSOIL2'       ,         ! ...
                                'TP3'        , 'GridComp'  , 'TSOIL3'       ,         ! ...
                                'TP4'        , 'GridComp'  , 'TSOIL4'       ,         ! ...
@@ -316,6 +318,57 @@ COLLECTIONS:
 >>>HIST_CATCHCN<<<        'ICESOI'   , 'GridComp'  ,
 >>>HIST_IRRIG<<<        'IRRIGRATE'  , 'GridComp'  ,
                                ::
+
+
+  const_1d_lnd_Nt.descr:       'Tile-space,Constant,Time-invariant,Single-Level,Assimilation,Land Surface Model Parameters',
+  const_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  const_1d_lnd_Nt.mode:        'instantaneous',
+  const_1d_lnd_Nt.frequency:   240000,
+  const_1d_lnd_Nt.ref_time:    240000,
+  const_1d_lnd_Nt.fields:      'DZGT1'      , 'GridComp'  ,
+                               'DZGT2'      , 'GridComp'  ,
+                               'DZGT3'      , 'GridComp'  ,
+                               'DZGT4'      , 'GridComp'  ,
+                               'DZGT5'      , 'GridComp'  ,
+                               'DZGT6'      , 'GridComp'  ,
+                               'DZPR'       , 'GridComp'  ,
+                               'DZRZ'       , 'GridComp'  ,
+                               'DZSF'       , 'GridComp'  ,
+                               'DZTS'       , 'GridComp'  ,
+                               'WPWET'      , 'GridComp'  ,
+                               'WPEMW'      , 'GridComp'  ,
+                               'WPMC'       , 'GridComp'  ,
+                               'CDCR2'      , 'GridComp'  ,
+                               'POROS'      , 'GridComp'  ,
+                                ::
+
+  const_2d_lnd_Nx.format:       'CFIO',
+  const_2d_lnd_Nx.descr:       '2d,Constant,Time-invariant,Single-Level,Assimilation,Land Surface Model Parameters',
+  const_2d_lnd_Nx.template:    '%y4%m2%d2_%h2%n2z.nc4',
+  const_2d_lnd_Nx.mode:        'instantaneous',
+  const_2d_lnd_Nx.frequency:    240000,
+  const_2d_lnd_Nx.ref_time:     240000,
+  const_2d_lnd_Nx.regrid_exch:  '../input/tile.data'
+  const_2d_lnd_Nx.regrid_name:  'GRIDNAME'
+  const_2d_lnd_Nx.grid_label:   PC720x361-DC
+  const_2d_lnd_Nx.deflate:      2,
+  const_2d_lnd_Nx.fields:      'DZGT1'      , 'GridComp'  ,
+                               'DZGT2'      , 'GridComp'  ,
+                               'DZGT3'      , 'GridComp'  ,
+                               'DZGT4'      , 'GridComp'  ,
+                               'DZGT5'      , 'GridComp'  ,
+                               'DZGT6'      , 'GridComp'  ,
+                               'DZPR'       , 'GridComp'  ,
+                               'DZRZ'       , 'GridComp'  ,
+                               'DZSF'       , 'GridComp'  ,
+                               'DZTS'       , 'GridComp'  ,
+                               'WPWET'      , 'GridComp'  ,
+                               'WPEMW'      , 'GridComp'  ,
+                               'WPMC'       , 'GridComp'  ,
+                               'CDCR2'      , 'GridComp'  ,
+                               'POROS'      , 'GridComp'  ,
+                                ::
+
 
   SMAP_L4_SM_gph.descr:         'Tile-space,3-Hourly,Time-Averaged,Single-Level,Assimilation,SMAP L4_SM Land Geophysical Diagnostics',
   SMAP_L4_SM_gph.nbits:         12,
