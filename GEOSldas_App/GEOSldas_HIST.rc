@@ -324,7 +324,7 @@ COLLECTIONS:
   const_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
   const_1d_lnd_Nt.mode:        'instantaneous',
   const_1d_lnd_Nt.frequency:   240000,
-  const_1d_lnd_Nt.ref_time:    240000,
+  const_1d_lnd_Nt.ref_time:    000000,
   const_1d_lnd_Nt.fields:      'DZGT1'      , 'GridComp'  ,
                                'DZGT2'      , 'GridComp'  ,
                                'DZGT3'      , 'GridComp'  ,
@@ -347,7 +347,7 @@ COLLECTIONS:
   const_2d_lnd_Nx.template:    '%y4%m2%d2_%h2%n2z.nc4',
   const_2d_lnd_Nx.mode:        'instantaneous',
   const_2d_lnd_Nx.frequency:    240000,
-  const_2d_lnd_Nx.ref_time:     240000,
+  const_2d_lnd_Nx.ref_time:     000000,
   const_2d_lnd_Nx.regrid_exch:  '../input/tile.data'
   const_2d_lnd_Nx.regrid_name:  'GRIDNAME'
   const_2d_lnd_Nx.grid_label:   PC720x361-DC
