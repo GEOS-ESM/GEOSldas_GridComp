@@ -1629,7 +1629,7 @@ contains
     type(date_time_type) :: date_time_tmp
     type(date_time_type) :: date_time_low, date_time_low_fname
     type(date_time_type) :: date_time_up
-    type(date_time_type) :: date_time_first_obs, date_time_last_obs
+    type(date_time_type) :: date_time_obs_beg, date_time_obs_end
     
     integer :: ii, ind, N_tmp, N_files, kk, N_obs, N_fnames, N_fnames_tmp, obs_dir_hier
     
@@ -1690,40 +1690,32 @@ contains
     
     ! ---------------
 
-    ! check if we are within time periods when observations are available for metop-a, metop-b, or metop-c
-
-    if (trim(this_obs_param%descr)     == 'ASCAT_META_SM') then
-       date_time_first_obs = date_time_type(2007, 6, 1, 1,31, 0, 0, 0)
-       date_time_last_obs  = date_time_type(2021,11,15, 9, 0, 0, 0, 0)
-    elseif (trim(this_obs_param%descr) == 'ASCAT_METB_SM') then
-       date_time_first_obs = date_time_type(2013, 4,24, 8, 0, 0, 0, 0)
-       date_time_last_obs  = date_time_type(2100, 1, 1, 0, 0, 0, 0, 0)
-    elseif (trim(this_obs_param%descr) == 'ASCAT_METC_SM') then
-       date_time_first_obs = date_time_type(2019,11,25,12, 0, 0, 0, 0)
-       date_time_last_obs  = date_time_type(2100, 1, 1, 0, 0, 0, 0, 0)
-    else
-       err_msg = 'Unknown observation time range for this ASCAT observation type'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
-
-    if (datetime_lt_refdatetime(date_time, date_time_first_obs) .or.                        &
-       datetime_lt_refdatetime(date_time_last_obs, date_time)) then
-       found_obs    = .false.
-       ASCAT_sm     = this_obs_param%nodata
-       ASCAT_lon    = this_obs_param%nodata
-       ASCAT_lat    = this_obs_param%nodata
-       ASCAT_time   = real(this_obs_param%nodata,kind(0.0D0))
-       ASCAT_sm_std = this_obs_param%nodata
-
-       err_msg = 'Looking for ' // trim(this_obs_param%descr) // ' observations before/after they are available'
-       call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
-
-       return
-    end if
-    
     ! initialize
     
     found_obs = .false.
+    
+    ! determine operating time range of sensor
+
+    if     (trim(this_obs_param%descr) == 'ASCAT_META_SM') then
+       date_time_obs_beg = date_time_type(2007, 6, 1, 1,31, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2021,11,15, 9, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_METB_SM') then
+       date_time_obs_beg = date_time_type(2013, 4,24, 8, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_METC_SM') then
+       date_time_obs_beg = date_time_type(2019,11,25,12, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    
+    ! return if date_time falls outside operating time range
+    
+    if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
+         datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
+    
+    ! ---------------
     
     ! find files that are within half-open interval 
     !   (date_time-dtstep_assim/2,date_time+dtstep_assim/2]
@@ -4497,7 +4489,7 @@ contains
     real                 :: tmpreal, Tb_std_max
     
     type(date_time_type) :: date_time_low, date_time_upp
-    type(date_time_type) :: date_time_first_obs
+    type(date_time_type) :: date_time_obs_beg
     
     character(  2)       :: MM, DD, HH, MI, orbit_tag
     character(  4)       :: YYYY
@@ -4526,26 +4518,20 @@ contains
 
     ! -------------------------------------------------------------------
     
-    ! check if we are in the time range of SMOS observations which start on 2010-05-24
-
-    date_time_first_obs = date_time_type(2010, 5,24, 0, 0, 0, 0, 0)
-
-    if (datetime_lt_refdatetime(date_time, date_time_first_obs)) then
-       found_obs     = .false.
-       SMOS_data     = this_obs_param%nodata
-       SMOS_lon      = this_obs_param%nodata
-       SMOS_lat      = this_obs_param%nodata
-       std_SMOS_data = this_obs_param%nodata
-
-       err_msg = 'Looking for SMOS observations before 2010-05-24'
-       call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
-
-       return
-    end if
-
     ! initialize
     
     found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    date_time_obs_beg = date_time_type(2010, 5,24, 0, 0, 0,-9999,-9999)
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+    
+    ! ------------------------------
+
 
     ! read soil moisture or brightness temperature files? 
 
@@ -5274,7 +5260,7 @@ contains
 
     type(date_time_type)  :: date_time_beg,       date_time_end
     type(date_time_type)  :: date_time_beg_MODIS, date_time_end_MODIS
-    type(date_time_type)  :: date_time_first_obs
+    type(date_time_type)  :: date_time_obs_beg
 
     real                  :: lon_beg,             lon_end
     real                  :: lon_beg_MODIS,       lon_end_MODIS
@@ -5297,29 +5283,26 @@ contains
     character(len=*),          parameter   :: Iam = 'read_obs_MODIS_SCF'
     character(len=400)                     :: err_msg
 
-    ! check if we are in the time range of MODIS observations which start on 2000-02-24 for Terra and 2002-07-04 for Aqua
+    ! ------------------------------------------------------------------------------------
+    !
+    ! initialize
+    
+    found_obs        = .false.
+    
+    ! determine operating time range of sensor
 
-    if (trim(this_obs_param%descr)    == 'MOD10C1') then
-       date_time_first_obs = date_time_type(2000, 2,24, 1,31, 0, 0, 0)
+    if     (trim(this_obs_param%descr) == 'MOD10C1') then
+       date_time_obs_beg = date_time_type(2000, 2,24, 1,31, 0,-9999,-9999)    ! Terra
     elseif (trim(this_obs_param%descr) == 'MYD10C1') then
-       date_time_first_obs = date_time_type(2002, 7, 4, 8, 0, 0, 0, 0)
+       date_time_obs_beg = date_time_type(2002, 7, 4, 8, 0, 0,-9999,-9999)    ! Aqua
     else
-       err_msg = 'Unknown observation time range for this MODIS SCF observation type'
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
-    if (datetime_lt_refdatetime(date_time, date_time_first_obs)) then
-       found_obs     = .false.
-       MODIS_obs     = this_obs_param%nodata
-       MODIS_lon     = this_obs_param%nodata
-       MODIS_lat     = this_obs_param%nodata
-       std_MODIS_obs = this_obs_param%nodata
+    ! return if date_time falls outside operating time range
 
-       err_msg = 'Looking for ' // trim(this_obs_param%descr) // ' SCF observations before they are avaiable'
-       call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
-
-       return
-    end if
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
 
     ! ----------------------------------------------------------------------------------
     !
@@ -5331,12 +5314,6 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        
     end if 
-
-    
-    ! initialize
-    
-    found_obs        = .false.
-    
 
     ! identify MODIS product and overpass hour
 
@@ -6924,7 +6901,7 @@ contains
 
     type(date_time_type) :: date_time_low,       date_time_upp
     type(date_time_type) :: date_time_low_fname, date_time_tmp
-    type(date_time_type) :: date_time_first_obs
+    type(date_time_type) :: date_time_obs_beg
 
     integer              :: ii, jj, kk, nn, mm
     integer              :: N_fnames, N_fnames_tmp, N_obs_tmp
@@ -6976,23 +6953,19 @@ contains
 
     ! -------------------------------------------------------------------
     
-    ! check if we are in the time range of SMAP observations which start on 2015-03-31
+    ! initialize
+    
+    found_obs = .false.
 
-    date_time_first_obs = date_time_type(2015, 3,31, 0, 0, 0, 0, 0)
+    ! determine operating time range of sensor
 
-    if (datetime_lt_refdatetime(date_time, date_time_first_obs)) then
-       found_obs     =      .false.
-       SMAP_data     =      this_obs_param%nodata
-       SMAP_lon      =      this_obs_param%nodata
-       SMAP_lat      =      this_obs_param%nodata
-       SMAP_time     = real(this_obs_param%nodata,kind(0.0D0))
-       std_SMAP_data =      this_obs_param%nodata
+    date_time_obs_beg = date_time_type(2015, 3,31, 0, 0, 0,-9999,-9999)
 
-       err_msg = 'Looking for SMAP observations before 2015-03-31'
-       call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
+    ! return if date_time falls outside operating time range
 
-       return
-    end if
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+
+    ! ----------------
 
     ! check inputs
     
@@ -7007,9 +6980,6 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
     
-    ! initialize
-    
-    found_obs = .false.
     
     ! read Tbs from L1C_TB, L1C_TB_E, or L2_SM_AP files? 
 
