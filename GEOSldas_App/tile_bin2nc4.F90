@@ -315,10 +315,8 @@ contains
     case ('TP4', 'TSOIL4');                    LONG_NAME = 'soil_temperature_layer_4';                                         UNITS = 'K'             ! units now K, rreichle & borescan, 6 Nov 2020
     case ('TP5', 'TSOIL5');                    LONG_NAME = 'soil_temperature_layer_5';                                         UNITS = 'K'             ! units now K, rreichle & borescan, 6 Nov 2020
     case ('TP6', 'TSOIL6');                    LONG_NAME = 'soil_temperature_layer_6';                                         UNITS = 'K'             ! units now K, rreichle & borescan, 6 Nov 2020
-    case ('PRECTOTLAND');                      LONG_NAME = 'Total_precipitation_land';                                         UNITS = 'kg m-2 s-1'
-    case ('PRECSNOLAND');                      LONG_NAME = 'snowfall_land';                                                    UNITS = 'kg m-2 s-1'
-    case ('PRECTOTCORRLAND');                  LONG_NAME = 'Total_precipitation_corrected_land';                               UNITS = 'kg m-2 s-1'
-    case ('PRECSNOCORRLAND');                  LONG_NAME = 'snowfall_corrected_land';                                          UNITS = 'kg m-2 s-1'
+    case ('PRECTOTLAND', 'PRECTOTCORRLAND');   LONG_NAME = 'Total_precipitation_land';                                         UNITS = 'kg m-2 s-1'
+    case ('PRECSNOLAND', 'PRECSNOCORRLAND');   LONG_NAME = 'snowfall_land';                                                    UNITS = 'kg m-2 s-1'
     case ('SNOWMASS', 'SNOMAS');               LONG_NAME = 'snow_mass';                                                        UNITS = 'kg m-2'
     case ('TSLAND', 'SNOMASLAND');             LONG_NAME = 'Total_snow_storage_land';                                          UNITS = 'kg m-2'
     case ('SNO');                              LONG_NAME = 'snowfall';                                                         UNITS = 'kg m-2 s-1'
