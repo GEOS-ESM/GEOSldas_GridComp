@@ -496,7 +496,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'snowpack_evaporation_latent_heat_flux',&
+    LONG_NAME          = 'snowpack_evaporation_latent_heat_flux_on_land',&
     UNITS              = 'W m-2'                     ,&
     SHORT_NAME         = 'EVPICE'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&
@@ -605,7 +605,7 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC,                    &
-    LONG_NAME          = 'soil_water_infiltration_rate',&
+    LONG_NAME          = 'Soil_water_infiltration_rate',&
     UNITS              = 'kg m-2 s-1'                ,&
     SHORT_NAME         = 'QINFIL'                    ,&
     DIMS               = MAPL_DimsTileOnly           ,&

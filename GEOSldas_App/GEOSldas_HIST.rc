@@ -215,17 +215,18 @@ COLLECTIONS:
 >>>HIST_IRRIG<<<        'IRRIGRATE'  , 'GridComp'  ,
                                ::
 
-  tavg24_2d_lnd_Nx.format:       'CFIO',
-  tavg24_2d_lnd_Nx.descr:       '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
-#  tavg24_2d_lnd_Nx.nbits:       12,
-  tavg24_2d_lnd_Nx.template:    '%y4%m2%d2_%h2%n2z.nc4',
-  tavg24_2d_lnd_Nx.mode:        'time-averaged',
-  tavg24_2d_lnd_Nx.frequency:    240000,
-  tavg24_2d_lnd_Nx.ref_time:     000000,
-  tavg24_2d_lnd_Nx.regrid_exch:  '../input/tile.data'
-  tavg24_2d_lnd_Nx.regrid_name:  'GRIDNAME'
-  tavg24_2d_lnd_Nx.grid_label:   PC720x361-DC
-  tavg24_2d_lnd_Nx.deflate:      2,
+  tavg24_2d_lnd_Nx.format:        'CFIO',
+  tavg24_2d_lnd_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
+#  tavg24_2d_lnd_Nx.nbits:        12,
+  tavg24_2d_lnd_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4',
+  tavg24_2d_lnd_Nx.mode:          'time-averaged',
+  tavg24_2d_lnd_Nx.frequency:     240000,
+  tavg24_2d_lnd_Nx.ref_time:      000000,
+  tavg24_2d_lnd_Nx.regrid_exch:   '../input/tile.data'
+  tavg24_2d_lnd_Nx.regrid_name:   'GRIDNAME'
+  tavg24_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,
+  tavg24_2d_lnd_Nx.grid_label:    PC720x361-DC
+  tavg24_2d_lnd_Nx.deflate:       2,
   tavg24_2d_lnd_Nx.fields:     'GRN'        , 'VEGDYN'  ,
                                'LAI'        , 'VEGDYN'  ,
                                'WET3'       , 'GridComp'  , 'GWETPROF'     ,
@@ -342,16 +343,17 @@ COLLECTIONS:
                                'POROS'      , 'GridComp'  ,
                                 ::
 
-  const_2d_lnd_Nx.format:       'CFIO',
-  const_2d_lnd_Nx.descr:       '2d,Constant,Time-invariant,Single-Level,Assimilation,Land Surface Model Parameters',
-  const_2d_lnd_Nx.template:    '%y4%m2%d2_%h2%n2z.nc4',
-  const_2d_lnd_Nx.mode:        'instantaneous',
-  const_2d_lnd_Nx.frequency:    240000,
-  const_2d_lnd_Nx.ref_time:     000000,
-  const_2d_lnd_Nx.regrid_exch:  '../input/tile.data'
-  const_2d_lnd_Nx.regrid_name:  'GRIDNAME'
-  const_2d_lnd_Nx.grid_label:   PC720x361-DC
-  const_2d_lnd_Nx.deflate:      2,
+  const_2d_lnd_Nx.format:        'CFIO',
+  const_2d_lnd_Nx.descr:         '2d,Constant,Time-invariant,Single-Level,Assimilation,Land Surface Model Parameters',
+  const_2d_lnd_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4',
+  const_2d_lnd_Nx.mode:          'instantaneous',
+  const_2d_lnd_Nx.frequency:     240000,
+  const_2d_lnd_Nx.ref_time:      000000,
+  const_2d_lnd_Nx.regrid_exch:   '../input/tile.data'
+  const_2d_lnd_Nx.regrid_name:   'GRIDNAME'
+  const_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,
+  const_2d_lnd_Nx.grid_label:    PC720x361-DC
+  const_2d_lnd_Nx.deflate:       2,
   const_2d_lnd_Nx.fields:      'DZGT1'      , 'GridComp'  ,
                                'DZGT2'      , 'GridComp'  ,
                                'DZGT3'      , 'GridComp'  ,
