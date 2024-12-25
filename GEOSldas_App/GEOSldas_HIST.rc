@@ -117,7 +117,7 @@ COLLECTIONS:
           ::
 
   tavg24_1d_lnd_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
-#  tavg24_1d_lnd_Nt.nbits:       12,
+  tavg24_1d_lnd_Nt.nbits:       12,
   tavg24_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
   tavg24_1d_lnd_Nt.mode:        'time-averaged',
   tavg24_1d_lnd_Nt.frequency:   240000,
@@ -217,14 +217,14 @@ COLLECTIONS:
 
   tavg24_2d_lnd_Nx.format:        'CFIO',
   tavg24_2d_lnd_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
-#  tavg24_2d_lnd_Nx.nbits:        12,
+  tavg24_2d_lnd_Nx.nbits:        12,
   tavg24_2d_lnd_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4',
   tavg24_2d_lnd_Nx.mode:          'time-averaged',
   tavg24_2d_lnd_Nx.frequency:     240000,
   tavg24_2d_lnd_Nx.ref_time:      000000,
   tavg24_2d_lnd_Nx.regrid_exch:   '../input/tile.data'
   tavg24_2d_lnd_Nx.regrid_name:   'GRIDNAME'
-  tavg24_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,
+#  tavg24_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,
   tavg24_2d_lnd_Nx.grid_label:    PC720x361-DC
   tavg24_2d_lnd_Nx.deflate:       2,
   tavg24_2d_lnd_Nx.fields:     'GRN'        , 'VEGDYN'  ,
