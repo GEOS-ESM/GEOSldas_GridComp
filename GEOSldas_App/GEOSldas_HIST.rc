@@ -171,7 +171,7 @@ COLLECTIONS:
                                'DWLAND'     , 'GridComp'  , 'WCHANGELAND'  ,
                                'DHLAND'     , 'GridComp'  , 'ECHANGELAND'  ,
                                'SPLAND'     , 'GridComp'  , 'SPSHLAND'     ,
-#                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN (comment out as needed)    
+#                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN
                                'SPWATR'     , 'GridComp'  , 'SPEVLAND'     ,
                                'SPSNOW'     , 'GridComp'  , 'SPSNLAND'     ,
                                'PEATCLSM_WATERLEVEL', 'GridComp'  ,
@@ -276,7 +276,7 @@ COLLECTIONS:
                                'DWLAND'     , 'GridComp'  , 'WCHANGELAND'  ,
                                'DHLAND'     , 'GridComp'  , 'ECHANGELAND'  ,
                                'SPLAND'     , 'GridComp'  , 'SPSHLAND'     ,
-#                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN (comment out as needed)    
+#                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN
                                'SPWATR'     , 'GridComp'  , 'SPEVLAND'     ,
                                'SPSNOW'     , 'GridComp'  , 'SPSNLAND'     ,
                                'PEATCLSM_WATERLEVEL', 'GridComp'  ,
