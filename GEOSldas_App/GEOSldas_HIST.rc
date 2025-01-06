@@ -136,14 +136,14 @@ COLLECTIONS:
                                'TPSAT'      , 'GridComp'  , 'TSATLAND'     ,
                                'TPWLT'      , 'GridComp'  , 'TWLTLAND'     ,
                                'TPSURF'     , 'GridComp'  , 'TSURFLAND'    ,
-                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE    
-                               'TP2'        , 'GridComp'  , 'TSOIL2'       ,         ! ...				     
-                               'TP3'        , 'GridComp'  , 'TSOIL3'       ,         ! ...				     
-                               'TP4'        , 'GridComp'  , 'TSOIL4'       ,         ! ...				     
-                               'TP5'        , 'GridComp'  , 'TSOIL5'       ,         ! ...				     
-                               'TP6'        , 'GridComp'  , 'TSOIL6'       ,         ! ...                                   
-                               'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     ! assume "corrected" precip
-                               'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     ! assume "corrected" precip
+                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         # CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE    
+                               'TP2'        , 'GridComp'  , 'TSOIL2'       ,         # ...				     
+                               'TP3'        , 'GridComp'  , 'TSOIL3'       ,         # ...				     
+                               'TP4'        , 'GridComp'  , 'TSOIL4'       ,         # ...				     
+                               'TP5'        , 'GridComp'  , 'TSOIL5'       ,         # ...				     
+                               'TP6'        , 'GridComp'  , 'TSOIL6'       ,         # ...                                   
+                               'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     # assume "corrected" precip
+                               'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     # assume "corrected" precip
                                'TSLAND'     , 'GridComp'  , 'SNOMASLAND'   ,
                                'SNOWDP'     , 'GridComp'  , 'SNODPLAND'    ,
                                'EVPSOI'     , 'GridComp'  , 'LHLANDSOIL'   ,
@@ -171,7 +171,7 @@ COLLECTIONS:
                                'DWLAND'     , 'GridComp'  , 'WCHANGELAND'  ,
                                'DHLAND'     , 'GridComp'  , 'ECHANGELAND'  ,
                                'SPLAND'     , 'GridComp'  , 'SPSHLAND'     ,
-                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,
+#                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN (comment out as needed)    
                                'SPWATR'     , 'GridComp'  , 'SPEVLAND'     ,
                                'SPSNOW'     , 'GridComp'  , 'SPSNLAND'     ,
                                'PEATCLSM_WATERLEVEL', 'GridComp'  ,
@@ -224,7 +224,7 @@ COLLECTIONS:
   tavg24_2d_lnd_Nx.ref_time:      000000,
   tavg24_2d_lnd_Nx.regrid_exch:   '../input/tile.data'
   tavg24_2d_lnd_Nx.regrid_name:   'GRIDNAME'
-#  tavg24_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,
+#  tavg24_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,                           
   tavg24_2d_lnd_Nx.grid_label:    PC720x361-DC
   tavg24_2d_lnd_Nx.deflate:       2,
   tavg24_2d_lnd_Nx.fields:     'GRN'        , 'VEGDYN'  ,
@@ -241,14 +241,14 @@ COLLECTIONS:
                                'TPSAT'      , 'GridComp'  , 'TSATLAND'     ,
                                'TPWLT'      , 'GridComp'  , 'TWLTLAND'     ,
                                'TPSURF'     , 'GridComp'  , 'TSURFLAND'    ,
-                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         ! CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE
-                               'TP2'        , 'GridComp'  , 'TSOIL2'       ,         ! ...
-                               'TP3'        , 'GridComp'  , 'TSOIL3'       ,         ! ...
-                               'TP4'        , 'GridComp'  , 'TSOIL4'       ,         ! ...
-                               'TP5'        , 'GridComp'  , 'TSOIL5'       ,         ! ...
-                               'TP6'        , 'GridComp'  , 'TSOIL6'       ,         ! ...                                   
-                               'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     ! assume "corrected" precip
-                               'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     ! assume "corrected" precip
+                               'TP1'        , 'GridComp'  , 'TSOIL1'       ,         # CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE
+                               'TP2'        , 'GridComp'  , 'TSOIL2'       ,         # ...
+                               'TP3'        , 'GridComp'  , 'TSOIL3'       ,         # ...
+                               'TP4'        , 'GridComp'  , 'TSOIL4'       ,         # ...
+                               'TP5'        , 'GridComp'  , 'TSOIL5'       ,         # ...
+                               'TP6'        , 'GridComp'  , 'TSOIL6'       ,         # ...                                   
+                               'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     # assume "corrected" precip
+                               'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     # assume "corrected" precip
                                'TSLAND'     , 'GridComp'  , 'SNOMASLAND'   ,
                                'SNOWDP'     , 'GridComp'  , 'SNODPLAND'    ,
                                'EVPSOI'     , 'GridComp'  , 'LHLANDSOIL'   ,
@@ -276,7 +276,7 @@ COLLECTIONS:
                                'DWLAND'     , 'GridComp'  , 'WCHANGELAND'  ,
                                'DHLAND'     , 'GridComp'  , 'ECHANGELAND'  ,
                                'SPLAND'     , 'GridComp'  , 'SPSHLAND'     ,
-                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,
+#                               'SPLH'       , 'GridComp'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN (comment out as needed)    
                                'SPWATR'     , 'GridComp'  , 'SPEVLAND'     ,
                                'SPSNOW'     , 'GridComp'  , 'SPSNLAND'     ,
                                'PEATCLSM_WATERLEVEL', 'GridComp'  ,
