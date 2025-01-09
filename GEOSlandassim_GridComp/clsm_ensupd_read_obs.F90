@@ -2186,12 +2186,48 @@ contains
 
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: CYGNSS_sm              ! sfds obs          [fraction]  (i.e., 0-1)
-    real,    intent(out), dimension(N_catd) :: CYGNSS_sm_std          ! sfds obs err std  [fraction]  (i.e., 0-1)
+    real,    intent(out), dimension(N_catd) :: CYGNSS_sm              ! sm obs          [cm3 cm-3]
+    real,    intent(out), dimension(N_catd) :: CYGNSS_sm_std          ! sm obs err std  [cm3 cm-3]
     real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
     real*8,  intent(out), dimension(N_catd) :: CYGNSS_time            ! J2000 seconds
 
     ! ---------------
+
+    character(4), parameter :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
+
+    type(date_time_type) :: date_time_obs_beg, date_time_obs_end
+    type(date_time_type) :: date_time_up, date_time_low
+
+    character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
+    character(len=400)           :: err_msg
+    
+    ! -------------------------------------------------------------------
+
+    ! initialize
+
+    found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM') then
+       date_time_obs_beg = date_time_type(2018, 8, 1, 0, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! return if date_time falls outside operating time range
+    
+    if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
+         datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
+
+    ! cygnss sm subdaily observations are for 4 timeslices per day - 00-06, 06-12, 12-18, 18-24 UTC
+    ! we will assimilate these at 03, 09, 15, 21 UTC
+         
+     write (logunit,*) 'This is where we will read CYGNSS obs at YY:', date_time%year, ' DD:', date_time%day, ' HH:', date_time%hour
+
+     return
 
   end subroutine read_obs_sm_CYGNSS
 
