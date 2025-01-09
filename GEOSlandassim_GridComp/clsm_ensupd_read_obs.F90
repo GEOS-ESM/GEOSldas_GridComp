@@ -1830,19 +1830,19 @@ contains
           
           ! open bufr file
           
-          call closbf(lnbufr)  ! if a file with unit number lnbufr is open in (or "linked" with) BUFR, close it
-          open(lnbufr, file=trim(fnames(kk)), action='read', form='unformatted')
-          call openbf(lnbufr, 'SEC3', lnbufr) 
-          call mtinfo( trim(this_obs_param%path) // '/BUFR_mastertable/', lnbufr+1, lnbufr+2)
-          call datelen(10)     ! select date/time format with 4-digit year (YYYYMMDDHH) 
+!          call closbf(lnbufr)  ! if a file with unit number lnbufr is open in (or "linked" with) BUFR, close it
+!          open(lnbufr, file=trim(fnames(kk)), action='read', form='unformatted')
+!          call openbf(lnbufr, 'SEC3', lnbufr) 
+!          call mtinfo( trim(this_obs_param%path) // '/BUFR_mastertable/', lnbufr+1, lnbufr+2)
+!          call datelen(10)     ! select date/time format with 4-digit year (YYYYMMDDHH) 
           
-          msg_report: do while( ireadmg(lnbufr,subset,idate) == 0 )
+!          msg_report: do while( ireadmg(lnbufr,subset,idate) == 0 )
              
-             loop_report: do while( ireadsb(lnbufr) == 0 )
+!             loop_report: do while( ireadsb(lnbufr) == 0 )
                 
                 ! columns of tmp_data:                  1    2    3    4    5    6    7    8    9    10   11   12   13    14
 
-                call ufbint(lnbufr,tmp_vdata,14,1,iret,'YEAR MNTH DAYS HOUR MINU SECO SSOM SMPF SMCF ALFR TPCX IWFR CLATH CLONH')
+!                call ufbint(lnbufr,tmp_vdata,14,1,iret,'YEAR MNTH DAYS HOUR MINU SECO SSOM SMPF SMCF ALFR TPCX IWFR CLATH CLONH')
 
                 N_obs = N_obs + 1
 
@@ -1853,11 +1853,11 @@ contains
 
                 tmp_data(N_obs,:) = tmp_vdata
                 
-             end do loop_report
-          end do msg_report
+!             end do loop_report
+!          end do msg_report
           
-          call closbf(lnbufr)
-          close(lnbufr)
+!          call closbf(lnbufr)
+!          close(lnbufr)
           
        end do ! end file loop
 
@@ -2121,7 +2121,72 @@ contains
     if (associated(tmp_jtime))    deallocate(tmp_jtime)
     
   end subroutine read_obs_sm_ASCAT_EUMET
-  
+
+  ! ****************************************************************************
+
+  subroutine read_obs_sm_CYGNSS(                                         &
+       date_time, dtstep_assim, N_catd, tile_coord,                           &
+       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
+       this_obs_param,                                                        &
+       found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
+
+!---------------------------------------------------------------------
+! 
+! Routine to read in ASCAT surface degree of saturation (sfds) obs from 
+!   BUFR files for both ascending and descending passes. 
+!
+! ASCAT_sm and ASCAT_sm_std outputs from this subroutine are in wetness fraction (i.e., 0-1) units!
+!
+! Read in EUMETSAT level 2 soil moisture product 25 km (SMO), PPF software version 5.0.
+!   Soil moisture derived from re-sampled (spatially averaged) backscatter (sigma0) values
+!   on a 25-km orbit swath grid.  Input data files are in BUFR file format.
+!
+! EUMETSAT BUFR files contain data for both ascending and descending half-orbits. 
+!   The BUFR field DOMO ("Direction of motion of moving observing platform") could be used to 
+!   separate Asc and Desc.  (The BUFR files do not contain any explicit orbit indicator variable.)
+!   According to Pamela Schoebel-Pattiselanno, EUMETSAT User Services Helpdesk:
+!   "When the value (of DOMO) is between 180 and 270 degrees, it is the descending part 
+!    of the orbit.  When it is between 270 and 360 degrees, it is the ascending part."
+!
+! Q. Liu,          Nov 2019 - based on read_obs_sm_ASCAT
+! A. Fox, reichle, Sep 2023 - updated
+! A. Fox, reichle, Feb 2024 - added ASCAT obs mask
+!
+! --------------------------------------------------------------------
+
+    use netcdf   
+    implicit none
+
+    ! inputs:
+
+    type(date_time_type), intent(in) :: date_time
+
+    integer, intent(in) :: dtstep_assim, N_catd
+
+    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+
+    type(grid_def_type), intent(in) :: tile_grid_d
+
+    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+       N_tile_in_cell_ij
+
+    integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
+
+    type(obs_param_type), intent(in) :: this_obs_param
+
+    ! outputs:
+
+    logical, intent(out)                    :: found_obs
+
+    real,    intent(out), dimension(N_catd) :: CYGNSS_sm              ! sfds obs          [fraction]  (i.e., 0-1)
+    real,    intent(out), dimension(N_catd) :: CYGNSS_sm_std          ! sfds obs err std  [fraction]  (i.e., 0-1)
+    real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
+    real*8,  intent(out), dimension(N_catd) :: CYGNSS_time            ! J2000 seconds
+
+    ! ---------------
+
+  end subroutine read_obs_sm_CYGNSS
+
   ! ***************************************************************************
 
   subroutine read_sm_ASCAT_bin( &
@@ -2306,7 +2371,6 @@ contains
     N_data = j
     
   end subroutine read_sm_ASCAT_bin
-
 
   ! *****************************************************************
   
@@ -8568,7 +8632,28 @@ contains
                 date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
                 tmp_obs, tmp_std_obs )
            
-        end if        
+        end if 
+        
+    case ('CYGNSS_SM','CYGNSS_SM_daily')
+
+        call read_obs_sm_CYGNSS(                                       &
+             date_time, dtstep_assim, N_catd, tile_coord,              &
+             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+             this_obs_param,                                           &
+             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+             tmp_time)
+  
+        ! scale observations to model climatology
+         
+        if (this_obs_param%scale .and. found_obs) then
+ 
+           scaled_obs = .true.
+ 
+           call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
+                tmp_obs, tmp_std_obs )
+            
+        end if         
 
     case ('isccp_tskin_gswp2_v1')
        
