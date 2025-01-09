@@ -2130,29 +2130,13 @@ contains
        this_obs_param,                                                        &
        found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
 
-!---------------------------------------------------------------------
-! 
-! Routine to read in ASCAT surface degree of saturation (sfds) obs from 
-!   BUFR files for both ascending and descending passes. 
-!
-! ASCAT_sm and ASCAT_sm_std outputs from this subroutine are in wetness fraction (i.e., 0-1) units!
-!
-! Read in EUMETSAT level 2 soil moisture product 25 km (SMO), PPF software version 5.0.
-!   Soil moisture derived from re-sampled (spatially averaged) backscatter (sigma0) values
-!   on a 25-km orbit swath grid.  Input data files are in BUFR file format.
-!
-! EUMETSAT BUFR files contain data for both ascending and descending half-orbits. 
-!   The BUFR field DOMO ("Direction of motion of moving observing platform") could be used to 
-!   separate Asc and Desc.  (The BUFR files do not contain any explicit orbit indicator variable.)
-!   According to Pamela Schoebel-Pattiselanno, EUMETSAT User Services Helpdesk:
-!   "When the value (of DOMO) is between 180 and 270 degrees, it is the descending part 
-!    of the orbit.  When it is between 270 and 360 degrees, it is the ascending part."
-!
-! Q. Liu,          Nov 2019 - based on read_obs_sm_ASCAT
-! A. Fox, reichle, Sep 2023 - updated
-! A. Fox, reichle, Feb 2024 - added ASCAT obs mask
-!
-! --------------------------------------------------------------------
+    !---------------------------------------------------------------------
+    ! 
+    ! Routine to read in CYGNSS soil moisture obs from netCDF files.
+    !
+    ! A. Fox, Jan 2025 
+    !
+    ! --------------------------------------------------------------------
 
     use netcdf   
     implicit none
