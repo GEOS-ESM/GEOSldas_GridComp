@@ -1629,6 +1629,7 @@ contains
     type(date_time_type) :: date_time_tmp
     type(date_time_type) :: date_time_low, date_time_low_fname
     type(date_time_type) :: date_time_up
+    type(date_time_type) :: date_time_obs_beg, date_time_obs_end
     
     integer :: ii, ind, N_tmp, N_files, kk, N_obs, N_fnames, N_fnames_tmp, obs_dir_hier
     
@@ -1688,10 +1689,33 @@ contains
     nullify( tmp_obs, tmp_lat, tmp_lon, tmp_tile_num, tmp_jtime )    
     
     ! ---------------
-    
+
     ! initialize
     
     found_obs = .false.
+    
+    ! determine operating time range of sensor
+
+    if     (trim(this_obs_param%descr) == 'ASCAT_META_SM') then
+       date_time_obs_beg = date_time_type(2007, 6, 1, 1,31, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2021,11,15, 9, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_METB_SM') then
+       date_time_obs_beg = date_time_type(2013, 4,24, 8, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_METC_SM') then
+       date_time_obs_beg = date_time_type(2019,11,25,12, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    
+    ! return if date_time falls outside operating time range
+    
+    if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
+         datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
+    
+    ! ---------------
     
     ! find files that are within half-open interval 
     !   (date_time-dtstep_assim/2,date_time+dtstep_assim/2]
@@ -4513,6 +4537,7 @@ contains
     real                 :: tmpreal, Tb_std_max
     
     type(date_time_type) :: date_time_low, date_time_upp
+    type(date_time_type) :: date_time_obs_beg
     
     character(  2)       :: MM, DD, HH, MI, orbit_tag
     character(  4)       :: YYYY
@@ -4544,6 +4569,17 @@ contains
     ! initialize
     
     found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    date_time_obs_beg = date_time_type(2010, 5,24, 0, 0, 0,-9999,-9999)
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+    
+    ! ------------------------------
+
 
     ! read soil moisture or brightness temperature files? 
 
@@ -5272,6 +5308,7 @@ contains
 
     type(date_time_type)  :: date_time_beg,       date_time_end
     type(date_time_type)  :: date_time_beg_MODIS, date_time_end_MODIS
+    type(date_time_type)  :: date_time_obs_beg
 
     real                  :: lon_beg,             lon_end
     real                  :: lon_beg_MODIS,       lon_end_MODIS
@@ -5293,7 +5330,28 @@ contains
 
     character(len=*),          parameter   :: Iam = 'read_obs_MODIS_SCF'
     character(len=400)                     :: err_msg
-   
+
+    ! ------------------------------------------------------------------------------------
+    !
+    ! initialize
+    
+    found_obs        = .false.
+    
+    ! determine operating time range of sensor
+
+    if     (trim(this_obs_param%descr) == 'MOD10C1') then
+       date_time_obs_beg = date_time_type(2000, 2,24, 1,31, 0,-9999,-9999)    ! Terra
+    elseif (trim(this_obs_param%descr) == 'MYD10C1') then
+       date_time_obs_beg = date_time_type(2002, 7, 4, 8, 0, 0,-9999,-9999)    ! Aqua
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+
     ! ----------------------------------------------------------------------------------
     !
     ! restrict assimilation time step to max allowed 
@@ -5304,12 +5362,6 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        
     end if 
-
-    
-    ! initialize
-    
-    found_obs        = .false.
-    
 
     ! identify MODIS product and overpass hour
 
@@ -6897,6 +6949,7 @@ contains
 
     type(date_time_type) :: date_time_low,       date_time_upp
     type(date_time_type) :: date_time_low_fname, date_time_tmp
+    type(date_time_type) :: date_time_obs_beg
 
     integer              :: ii, jj, kk, nn, mm
     integer              :: N_fnames, N_fnames_tmp, N_obs_tmp
@@ -6948,6 +7001,20 @@ contains
 
     ! -------------------------------------------------------------------
     
+    ! initialize
+    
+    found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    date_time_obs_beg = date_time_type(2015, 3,31, 0, 0, 0,-9999,-9999)
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+
+    ! ----------------
+
     ! check inputs
     
     ! the subroutine makes sense only if dtstep_assim <= 3 hours
@@ -6961,9 +7028,6 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
     
-    ! initialize
-    
-    found_obs = .false.
     
     ! read Tbs from L1C_TB, L1C_TB_E, or L2_SM_AP files? 
 
