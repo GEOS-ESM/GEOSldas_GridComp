@@ -2190,26 +2190,53 @@ contains
     real,    intent(out), dimension(N_catd) :: CYGNSS_sm_std          ! sm obs err std  [cm3 cm-3]
     real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
     real*8,  intent(out), dimension(N_catd) :: CYGNSS_time            ! J2000 seconds
+    
+    ! -------------------------------------------------------------------
+    ! local variables:
 
-    ! ---------------
-
-    character(4), parameter :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
+    integer, parameter           :: max_obs = 100000       ! max number of obs read by subroutine (expecting < 6 hr assim window)
+    character(4), parameter      :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
+    character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
 
     type(date_time_type) :: date_time_obs_beg, date_time_obs_end
     type(date_time_type) :: date_time_up, date_time_low
 
-    character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
-    character(len=400)           :: err_msg
-    
+    character(400)       :: err_msg    
+    character(300)       :: tmpfname, tmpname
+    character(  2)       :: MM, DD, HH, MI
+    character(  4)       :: YYYY
+
+    integer              :: pos, i, idx, N_obs, j, HHcnt
+    integer              :: ierr, ncid
+    integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid
+    integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
+    integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop
+
+    logical              :: file_exists
+    logical              :: HH03, HH09, HH12, HH15, HH21
+
+    real, dimension(:), pointer     :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_time(:)
+        
+    real, allocatable    :: sm_d(:,:,:), sm_subd(:,:,:), sigma_d(:,:,:), sigma_subd(:,:,:)
+    real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:)
+    real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_time(max_obs)
+
     ! -------------------------------------------------------------------
 
     ! initialize
 
+    nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_time )
+
     found_obs = .false.
+    HH03 = .false.
+    HH09 = .false.
+    HH12 = .false.
+    HH15 = .false.
+    HH21 = .false.
 
     ! determine operating time range of sensor
 
-    if (trim(this_obs_param%descr) == 'CYGNSS_SM') then
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM' .or. trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
        date_time_obs_beg = date_time_type(2018, 8, 1, 0, 0, 0,-9999,-9999)
        date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
     else
@@ -2222,12 +2249,167 @@ contains
     if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
          datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
 
+    ! find the time bounds of the assimilation window 
+    !   (date_time-dtstep_assim/2,date_time+dtstep_assim/2]
+
+         date_time_low = date_time    
+         call augment_date_time( -(dtstep_assim/2), date_time_low)
+         date_time_up = date_time    
+         call augment_date_time(  (dtstep_assim/2), date_time_up)
+    
+    ! establish if assimilation window encompasses 12:00 UTC (daily CYGNSS obs time)
+
+    if (date_time_low%hour < 12 .and. date_time_up%hour >= 12) then
+       HH12 = .true.
+    end if
+    
+    ! return if assimilating daily obs and HH12 is false
+    
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM_daily' .and. .not. HH12) return
+
     ! cygnss sm subdaily observations are for 4 timeslices per day - 00-06, 06-12, 12-18, 18-24 UTC
     ! we will assimilate these at 03, 09, 15, 21 UTC
-         
-     write (logunit,*) 'This is where we will read CYGNSS obs at YY:', date_time%year, ' DD:', date_time%day, ' HH:', date_time%hour
 
-     return
+    HHcnt = 0
+
+    if (date_time_low%hour < 3 .and. date_time_up%hour >= 3) then
+       HH03 = .true.
+       HHcnt = HHcnt + 1
+    end if
+    if (date_time_low%hour > 21 .and. date_time_up%hour >= 3) then  ! wrap-around from previous day
+       HH03 = .true.
+       HHcnt = HHcnt + 1
+    end if
+    if (date_time_low%hour < 9 .and. date_time_up%hour >= 9) then
+       HH09 = .true.
+       HHcnt = HHcnt + 1
+    end if
+    if (date_time_low%hour < 15 .and. date_time_up%hour >= 15) then
+       HH15 = .true.
+       HHcnt = HHcnt + 1
+    end if
+    if (date_time_low%hour < 21 .and. date_time_up%hour >= 21) then
+       HH21 = .true.
+       HHcnt = HHcnt + 1
+    end if
+
+    ! return if assimilating subdaily obs and no HH is true
+
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM' .and. .not. (HH03 .or. HH09 .or. HH15 .or. HH21)) return
+
+    ! if assimilation window encompasses more than one time sllice, abort
+
+    if (HHcnt > 1) then
+       err_msg = 'Can not assimilate subdaily CYGNSS obs from more than one time slice'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! determine filename for CYGNSS obs file
+
+    write (YYYY,'(i4.4)') date_time%year
+    write (MM,  '(i2.2)') date_time%month
+    write (DD,  '(i2.2)') date_time%day 
+    write (HH,  '(i2.2)') date_time%hour 
+    write (MI,  '(i2.2)') date_time%min
+
+    tmpname = trim(this_obs_param%name)
+
+    ! Replace s20180801 with sYYYYMMDD
+    pos = index(tmpname, "s20180801")
+    if (pos > 0) then
+       tmpname = tmpname(1:pos-1) // "s" // YYYY // MM // DD // tmpname(pos+9:)
+    endif
+
+    ! Replace e20180801 with eYYYYMMDD
+    pos = index(tmpname, "e20180801")
+    if (pos > 0) then
+       tmpname = tmpname(1:pos-1) // "e" // YYYY // MM // DD // tmpname(pos+9:)
+    endif
+        
+    tmpfname = trim(this_obs_param%path) // '/Y' // YYYY // '/M' // MM // '/' // trim(tmpname) // '.nc'
+
+    if (logit) write (logunit, '(400A)') 'Reading CYGNSS soil moisture data from file: ', trim(tmpfname)
+
+    ! Check if file exists
+
+    inquire(file=tmpfname, exist=file_exists)
+
+    if (.not. file_exists) then
+       err_msg = 'CYGNSS SM obs file not found!'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! Open the NetCDF observation file
+    ierr = nf90_open(trim(tmpfname), nf90_nowrite, ncid)
+
+    ! get variable dimension IDs
+    ierr = nf90_inq_dimid(ncid, 'lon',        lon_dimid)
+    ierr = nf90_inq_dimid(ncid, 'lat',        lat_dimid)
+    ierr = nf90_inq_dimid(ncid, 'time',       time_dimid)    
+    ierr = nf90_inq_dimid(ncid, 'timeslices', timeslices_dimid)
+    ierr = nf90_inq_dimid(ncid, 'startstop',  startstop_dimid)
+
+    ! dimensions sizes
+    ierr = nf90_inquire_dimension(ncid, lon_dimid,        len=N_lon)
+    ierr = nf90_inquire_dimension(ncid, lat_dimid,        len=N_lat)
+    ierr = nf90_inquire_dimension(ncid, time_dimid,       len=N_time)
+    ierr = nf90_inquire_dimension(ncid, timeslices_dimid, len=N_timeslices)
+    ierr = nf90_inquire_dimension(ncid, startstop_dimid,  len=N_startstop)
+
+    ! get variable IDs
+    ierr = nf90_inq_varid(ncid, 'SM_daily',       sm_d_varid)
+    ierr = nf90_inq_varid(ncid, 'SM_subdaily',    sm_subd_varid)
+    ierr = nf90_inq_varid(ncid, 'SIGMA_daily',    sigma_d_varid)
+    ierr = nf90_inq_varid(ncid, 'SIGMA_subdaily', sigma_subd_varid)
+    ierr = nf90_inq_varid(ncid, 'timeintervals',  timeintervals_varid)
+    ierr = nf90_inq_varid(ncid, 'latitude',       lat_varid)
+    ierr = nf90_inq_varid(ncid, 'longitude',      lon_varid)
+
+    ! allocate memory for the variables
+    allocate(sm_d(N_lon, N_lat, N_time))
+    allocate(sm_subd(N_lon, N_lat, N_timeslices))
+    allocate(sigma_d(N_lon, N_lat, N_time))
+    allocate(sigma_subd(N_lon, N_lat, N_timeslices))
+    allocate(timeintervals(N_startstop, N_timeslices))
+    allocate(latitudes(N_lon, N_lat))
+    allocate(longitudes(N_lon, N_lat))
+
+    ! read the variables
+    ierr = nf90_get_var(ncid, sm_d_varid,       sm_d)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading sm_d:', ierr
+    end if
+    ierr = nf90_get_var(ncid, sm_subd_varid,    sm_subd)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading sm_subd:', ierr
+    end if
+    ierr = nf90_get_var(ncid, sigma_d_varid,    sigma_d)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading sigma_d:', ierr
+    end if
+    ierr = nf90_get_var(ncid, sigma_subd_varid, sigma_subd)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading sigma_subd:', ierr
+    end if
+    ierr = nf90_get_var(ncid, timeintervals_varid, timeintervals)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading timeintervals:', ierr
+    end if
+    ierr = nf90_get_var(ncid, lat_varid, latitudes)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading latitudes:', ierr
+    end if
+    ierr = nf90_get_var(ncid, lon_varid, longitudes)
+    if (ierr /= nf90_noerr) then
+        write(*,*) 'Error reading longitudes:', ierr
+    end if
+
+    ! close the file
+    ierr = nf90_close(ncid)
+         
+    write (logunit,*) 'This is where we will read CYGNSS obs at YY:', date_time%year, ' DD:', date_time%day, ' HH:', date_time%hour
+
+    return
 
   end subroutine read_obs_sm_CYGNSS
 
