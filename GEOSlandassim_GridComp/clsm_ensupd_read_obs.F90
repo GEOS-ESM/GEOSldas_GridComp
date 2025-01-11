@@ -2194,31 +2194,36 @@ contains
     ! -------------------------------------------------------------------
     ! local variables:
 
-    integer, parameter           :: max_obs = 100000       ! max number of obs read by subroutine (expecting < 6 hr assim window)
-    character(4), parameter      :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
+    integer,           parameter :: max_obs = 50000              ! max number of obs read by subroutine (expecting < 6 hr assim window)
+    character(4),      parameter :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
     character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
 
     type(date_time_type) :: date_time_obs_beg, date_time_obs_end
     type(date_time_type) :: date_time_up, date_time_low
 
     character(400)       :: err_msg    
-    character(300)       :: tmpfname, tmpname
+    character(300)       :: tmpfname, tmpname, tmpmaskname
     character(  2)       :: MM, DD, HH, MI
     character(  4)       :: YYYY
 
     integer              :: pos, i, idx, N_obs, j, HHcnt
     integer              :: ierr, ncid
-    integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid
+    integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid, lon_dimid_m, lat_dimid_m
     integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
-    integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop
+    integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop, N_lon_m, N_lat_m
+    integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid, few_obs_varid, low_signal_varid    
+    integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)
 
     logical              :: file_exists
     logical              :: HH03, HH09, HH12, HH15, HH21
 
-    real, dimension(:), pointer     :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_time(:)
+    real, dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_time(:)
         
     real, allocatable    :: sm_d(:,:,:), sm_subd(:,:,:), sigma_d(:,:,:), sigma_subd(:,:,:)
-    real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:)
+    real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
+    real, allocatable    :: time(:), timeslices(:,:)
+    real, allocatable    :: latitudes_m(:,:), longitudes_m(:,:)
+
     real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_time(max_obs)
 
     ! -------------------------------------------------------------------
@@ -2373,39 +2378,152 @@ contains
     allocate(timeintervals(N_startstop, N_timeslices))
     allocate(latitudes(N_lon, N_lat))
     allocate(longitudes(N_lon, N_lat))
+    allocate(tmp_sm(N_lon, N_lat))
+    allocate(tmp_sigma(N_lon, N_lat))
 
     ! read the variables
-    ierr = nf90_get_var(ncid, sm_d_varid,       sm_d)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading sm_d:', ierr
-    end if
-    ierr = nf90_get_var(ncid, sm_subd_varid,    sm_subd)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading sm_subd:', ierr
-    end if
-    ierr = nf90_get_var(ncid, sigma_d_varid,    sigma_d)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading sigma_d:', ierr
-    end if
-    ierr = nf90_get_var(ncid, sigma_subd_varid, sigma_subd)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading sigma_subd:', ierr
-    end if
     ierr = nf90_get_var(ncid, timeintervals_varid, timeintervals)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading timeintervals:', ierr
-    end if
     ierr = nf90_get_var(ncid, lat_varid, latitudes)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading latitudes:', ierr
-    end if
     ierr = nf90_get_var(ncid, lon_varid, longitudes)
-    if (ierr /= nf90_noerr) then
-        write(*,*) 'Error reading longitudes:', ierr
+
+    ! read either subdaily or daily soil moisture and sigma variables
+    if (this_obs_param%descr == 'CYGNSS_SM' ) then
+
+       ! subdaily observations required
+       ierr = nf90_get_var(ncid, sm_subd_varid, sm_subd)
+       ierr = nf90_get_var(ncid, sigma_subd_varid, sigma_subd)
+
+       ! find the time slice that corresponds to the assimilation window
+       idx = -1
+       do i = 1, N_timeslices
+           if ((date_time%hour == 3  .and. timeintervals(1,i) == 0.0)  .or. &
+               (date_time%hour == 9  .and. timeintervals(1,i) == 0.25) .or. &
+               (date_time%hour == 15 .and. timeintervals(1,i) == 0.5)  .or. &
+               (date_time%hour == 21 .and. timeintervals(1,i) == 0.75)) then
+               idx = i
+               exit
+           end if
+       end do
+       if (idx == -1) then
+           err_msg = 'Error: No matching time interval found for HH = ' // HH
+           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       else
+           write(*,*) 'Index of matching time interval: ', idx
+       end if
+       tmp_sm = sm_subd(:,:,idx)
+       tmp_sigma = sigma_subd(:,:,idx)
+    else
+
+       ! daily observations required
+       ierr = nf90_get_var(ncid, sm_d_varid, sm_d)
+       ierr = nf90_get_var(ncid, sigma_d_varid, sigma_d)
+       tmp_sm = sm_d(:,:,1)
+       tmp_sigma = sigma_d(:,:,1)
     end if
 
-    ! close the file
+    ! close the obs file
     ierr = nf90_close(ncid)
+
+   ! get name for CYGNSS mask file
+
+    tmpmaskname = trim(this_obs_param%maskpath) // '/' // trim(this_obs_param%maskname) // '.nc'
+
+    inquire(file=tmpfname, exist=file_exists)
+
+    if (.not. file_exists) then
+       err_msg = 'CYGNSS mask file not found!'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! open the CYGNSS mask file
+
+    ierr = nf90_open(trim(tmpmaskname), nf90_nowrite, ncid)
+
+    ! get variable dimension IDs
+    ierr = nf90_inq_dimid(ncid, 'lon', lon_dimid)
+    ierr = nf90_inq_dimid(ncid, 'lat', lat_dimid)
+
+    ! dimensions sizes
+    ierr = nf90_inquire_dimension(ncid, lon_dimid, len=N_lon_m)
+    ierr = nf90_inquire_dimension(ncid, lat_dimid, len=N_lat_m)
+
+    ! get variable IDs
+    ierr = nf90_inq_varid(ncid, 'longitude',           longitudes_m_varid)
+    ierr = nf90_inq_varid(ncid, 'latitude',            latitudes_m_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_small_SM_range', small_SM_range_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_poor_SMAP',      poor_SMAP_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_high_ubrmsd',    high_ubrmsd_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_few_obs',        few_obs_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_low_signal',     low_signal_varid)
+
+
+    ! allocate memory for the variables
+    allocate(latitudes_m(N_lon_m, N_lat_m))
+    allocate(longitudes_m(N_lon_m, N_lat_m))
+    allocate(small_SM_range_flag(N_lon_m, N_lat_m))
+    allocate(poor_SMAP_flag(N_lon_m, N_lat_m))
+    allocate(high_ubrmsd_flag(N_lon_m, N_lat_m))
+    allocate(few_obs_flag(N_lon_m, N_lat_m))
+    allocate(low_signal_flag(N_lon_m, N_lat_m))
+
+    ! read the variables
+    ierr = nf90_get_var(ncid, latitudes_m_varid,    latitudes_m)
+    ierr = nf90_get_var(ncid, longitudes_m_varid,   longitudes_m)
+    ierr = nf90_get_var(ncid, small_SM_range_varid, small_SM_range_flag)
+    ierr = nf90_get_var(ncid, poor_SMAP_varid,      poor_SMAP_flag)
+    ierr = nf90_get_var(ncid, high_ubrmsd_varid,    high_ubrmsd_flag)
+    ierr = nf90_get_var(ncid, few_obs_varid,        few_obs_flag)
+    ierr = nf90_get_var(ncid, low_signal_varid,     low_signal_flag)
+
+    ! close the mask file
+    ierr = nf90_close(ncid)  
+
+    ! check the obs data and mask data are the same resolution
+    if (N_lon /= N_lon_m .or. N_lat /= N_lat_m) then
+       err_msg = 'The mask file ' // trim(this_obs_param%maskname) // ' does not match the obs resolution'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! fill tmp arrays
+    N_obs = 0
+
+    do i = 1, N_lon
+        do j = 1, N_lat
+            if (tmp_sm(i,j) .ne. this_obs_param%nodata .and.         &
+                small_SM_range_flag(i,j) .ne. 1        .and.         &
+                poor_SMAP_flag(i,j)      .ne. 1        .and.         &
+                high_ubrmsd_flag(i,j)    .ne. 1        .and.         &
+                few_obs_flag(i,j)        .ne. 1        .and.         &
+                low_signal_flag(i,j)     .ne. 1 ) then
+                
+                ! valid observation
+                N_obs = N_obs + 1
+                if (N_obs > max_obs) then
+                    err_msg = 'Attempting to read too many obs - how long is your assimilation window?'
+                    call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+                end if
+                tmp1_lon(N_obs) = longitudes(i,j)
+                tmp1_lat(N_obs) = latitudes(i,j)
+                tmp1_obs(N_obs) = tmp_sm(i,j)
+                tmp1_err(N_obs) = tmp_sigma(i,j)
+                tmp1_time(N_obs) = date_time%year
+            end if
+        end do
+    end do
+
+    write(*,*) 'Number of observations: ', N_obs
+
+    allocate(tmp_lon(N_obs))
+    allocate(tmp_lat(N_obs))
+    allocate(tmp_obs(N_obs))
+    allocate(tmp_err(N_obs))
+    allocate(tmp_time(N_obs))
+
+    tmp_lon = tmp1_lon(1:N_obs)
+    tmp_lat = tmp1_lat(1:N_obs)
+    tmp_obs = tmp1_obs(1:N_obs)
+    tmp_err = tmp1_err(1:N_obs)
+    tmp_time = tmp1_time(1:N_obs)    
          
     write (logunit,*) 'This is where we will read CYGNSS obs at YY:', date_time%year, ' DD:', date_time%day, ' HH:', date_time%hour
 
