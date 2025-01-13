@@ -2206,31 +2206,33 @@ contains
     character(  2)       :: MM, DD, HH, MI
     character(  4)       :: YYYY
 
-    integer              :: pos, i, idx, N_obs, j, HHcnt
+    integer              :: pos, i, idx, N_obs, j, HHcnt, ind, ii
     integer              :: ierr, ncid
     integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid, lon_dimid_m, lat_dimid_m
     integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
     integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop, N_lon_m, N_lat_m
     integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid, few_obs_varid, low_signal_varid    
-    integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)
+    integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)  
 
     logical              :: file_exists
     logical              :: HH03, HH09, HH12, HH15, HH21
 
-    real, dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_time(:)
-        
+    real,    dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_jtime(:)
+    integer, dimension(:), pointer :: tmp_tile_num
+    integer,   dimension(N_catd)   :: N_obs_in_tile          
+
     real, allocatable    :: sm_d(:,:,:), sm_subd(:,:,:), sigma_d(:,:,:), sigma_subd(:,:,:)
     real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
     real, allocatable    :: time(:), timeslices(:,:)
     real, allocatable    :: latitudes_m(:,:), longitudes_m(:,:)
 
-    real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_time(max_obs)
+    real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_jtime(max_obs)
 
     ! -------------------------------------------------------------------
 
     ! initialize
 
-    nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_time )
+    nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_jtime )
 
     found_obs = .false.
     HH03 = .false.
@@ -2502,32 +2504,136 @@ contains
                     err_msg = 'Attempting to read too many obs - how long is your assimilation window?'
                     call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
                 end if
-                tmp1_lon(N_obs) = longitudes(i,j)
-                tmp1_lat(N_obs) = latitudes(i,j)
-                tmp1_obs(N_obs) = tmp_sm(i,j)
-                tmp1_err(N_obs) = tmp_sigma(i,j)
-                tmp1_time(N_obs) = date_time%year
+                tmp1_lon( N_obs)  = longitudes(i,j)
+                tmp1_lat( N_obs)  = latitudes(i,j)
+                tmp1_obs( N_obs)  = tmp_sm(i,j)
+                tmp1_err( N_obs)  = tmp_sigma(i,j)
+                tmp1_jtime(N_obs) = datetime_to_J2000seconds( date_time, J2000_epoch_id )
             end if
         end do
     end do
 
-    write(*,*) 'Number of observations: ', N_obs
+    if (logit) then
+          
+      write (logunit,*) 'read_obs_sm_CYGNSS: read ', N_obs, ' at date_time = ', date_time, ' from: ', tmpfname
+      write (logunit,*) '----------'
+      write (logunit,*) 'max(obs)=',maxval(tmp1_obs(1:N_obs)), ',  min(obs)=',minval(tmp1_obs(1:N_obs)), &
+           ',  avg(obs)=',sum(tmp1_obs(1:N_obs))/N_obs
+      
+    end if    
 
     allocate(tmp_lon(N_obs))
     allocate(tmp_lat(N_obs))
     allocate(tmp_obs(N_obs))
     allocate(tmp_err(N_obs))
-    allocate(tmp_time(N_obs))
+    allocate(tmp_jtime(N_obs))
 
-    tmp_lon = tmp1_lon(1:N_obs)
-    tmp_lat = tmp1_lat(1:N_obs)
-    tmp_obs = tmp1_obs(1:N_obs)
-    tmp_err = tmp1_err(1:N_obs)
-    tmp_time = tmp1_time(1:N_obs)    
+    tmp_lon   = tmp1_lon(1:N_obs)
+    tmp_lat   = tmp1_lat(1:N_obs)
+    tmp_obs   = tmp1_obs(1:N_obs)
+    tmp_err   = tmp1_err(1:N_obs)
+    tmp_jtime = tmp1_jtime(1:N_obs)
+  
+    ! ----------------------------------------------------------------
+    !
+    ! 2.) for each observation
+    !     a) determine grid cell that contains lat/lon
+    !     b) determine tile within grid cell that contains lat/lon
+
+    if (N_obs>0) then
+       
+      allocate(tmp_tile_num(N_obs))
+      
+      call get_tile_num_for_obs(N_catd, tile_coord,                 &
+           tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+           N_obs, tmp_lat, tmp_lon,                                 &
+           this_obs_param,                                          &
+           tmp_tile_num )
+      
+      ! ----------------------------------------------------------------
+      !
+      ! 3.) compute super-obs for each tile from all obs w/in that tile
+      !     (also eliminate observations that are not in domain)
+      
+      CYGNSS_sm   = 0.
+      CYGNSS_lon  = 0.
+      CYGNSS_lat  = 0.
+      CYGNSS_time = 0.0D0
+      
+      N_obs_in_tile = 0
+      
+      do ii=1,N_obs
          
-    write (logunit,*) 'This is where we will read CYGNSS obs at YY:', date_time%year, ' DD:', date_time%day, ' HH:', date_time%hour
+         ind = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+         
+         if (ind>0) then         ! this step eliminates obs outside domain
+            
+            CYGNSS_sm(  ind) = CYGNSS_sm(  ind) + tmp_obs(  ii)
+            CYGNSS_lon( ind) = CYGNSS_lon( ind) + tmp_lon(  ii)
+            CYGNSS_lat( ind) = CYGNSS_lat( ind) + tmp_lat(  ii)
+            CYGNSS_time(ind) = CYGNSS_time(ind) + tmp_jtime(ii)
+            
+            N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
+            
+         end if
+         
+      end do
 
-    return
+      ! normalize and set obs error std-dev
+
+      do ii=1,N_catd
+         
+         ! set observation error standard deviation 
+        
+         CYGNSS_sm_std(ii) = this_obs_param%errstd/100.    ! change units from percent (0-100) to fraction (0-1)
+
+         ! normalize
+
+         if (N_obs_in_tile(ii)>1) then
+            
+            CYGNSS_sm(    ii) = CYGNSS_sm(  ii)/real(N_obs_in_tile(ii))
+            CYGNSS_lon(   ii) = CYGNSS_lon( ii)/real(N_obs_in_tile(ii))
+            CYGNSS_lat(   ii) = CYGNSS_lat( ii)/real(N_obs_in_tile(ii))
+            CYGNSS_time(  ii) = CYGNSS_time(ii)/real(N_obs_in_tile(ii),kind(0.0D0))
+            
+         elseif (N_obs_in_tile(ii)==0) then
+            
+            CYGNSS_sm(    ii) = this_obs_param%nodata
+            CYGNSS_lon(   ii) = this_obs_param%nodata
+            CYGNSS_lat(   ii) = this_obs_param%nodata
+            CYGNSS_time(  ii) = real(this_obs_param%nodata,kind(0.0D0))
+            CYGNSS_sm_std(ii) = this_obs_param%nodata
+            
+         else
+            
+            ! nothing to do if N_obs_in_tile(ii)==1 (and assuming N_obs_in_tile is never negative)
+            
+         end if
+         
+      end do
+      
+      ! clean up
+      
+      if (associated(tmp_tile_num)) deallocate(tmp_tile_num)
+      
+      if (any(N_obs_in_tile>0)) then
+       
+         found_obs = .true.
+         
+      else 
+         
+         found_obs = .false.
+         
+      end if
+      
+   end if
+   
+   ! clean up
+   
+   if (associated(tmp_obs))      deallocate(tmp_obs)
+   if (associated(tmp_lon))      deallocate(tmp_lon)
+   if (associated(tmp_lat))      deallocate(tmp_lat)
+   if (associated(tmp_jtime))    deallocate(tmp_jtime)
 
   end subroutine read_obs_sm_CYGNSS
 
