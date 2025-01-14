@@ -860,7 +860,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_1'  ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL1TILE'                ,&
+    SHORT_NAME         = 'TP1'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -869,7 +869,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_1_ensstd' ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL1TILE_ENSSTD'         ,&
+    SHORT_NAME         = 'TP1_ENSSTD'         ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -878,7 +878,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_2'  ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL2TILE'                ,&
+    SHORT_NAME         = 'TP2'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -887,7 +887,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_3'  ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL3TILE'                ,&
+    SHORT_NAME         = 'TP3'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -896,7 +896,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_4'  ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL4TILE'                ,&
+    SHORT_NAME         = 'TP4'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -905,7 +905,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_5'  ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL5TILE'                ,&
+    SHORT_NAME         = 'TP5'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -914,7 +914,7 @@ contains
   call MAPL_AddExportSpec(GC,                    &
     LONG_NAME          = 'soil_temperature_layer_6'  ,&
     UNITS              = 'K'                         ,&
-    SHORT_NAME         = 'TSOIL6TILE'                ,&
+    SHORT_NAME         = 'TP6'                ,&
     DIMS               = MAPL_DimsTileOnly           ,&
     VLOCATION          = MAPL_VLocationNone          ,&
                                            RC=STATUS  )
@@ -2966,19 +2966,19 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(export, WCPR_enstd,  'WCPR_ENSSTD' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP1_enavg,  'TSOIL1TILE' ,rc=status)
+    call MAPL_GetPointer(export, TP1_enavg,  'TP1' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP1_enstd,  'TSOIL1TILE_ENSSTD' ,rc=status)
+    call MAPL_GetPointer(export, TP1_enstd,  'TP1_ENSSTD' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP2_enavg,  'TSOIL2TILE' ,rc=status)
+    call MAPL_GetPointer(export, TP2_enavg,  'TP2' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP3_enavg,  'TSOIL3TILE' ,rc=status)
+    call MAPL_GetPointer(export, TP3_enavg,  'TP3' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP4_enavg,  'TSOIL4TILE' ,rc=status)
+    call MAPL_GetPointer(export, TP4_enavg,  'TP4' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP5_enavg,  'TSOIL5TILE' ,rc=status)
+    call MAPL_GetPointer(export, TP5_enavg,  'TP5' ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TP6_enavg,  'TSOIL6TILE' ,rc=status)
+    call MAPL_GetPointer(export, TP6_enavg,  'TP6' ,rc=status)
     VERIFY_(status)
     call MAPL_GetPointer(export, EMIS_enavg,  'EMIS' ,rc=status)
     VERIFY_(status)

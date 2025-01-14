@@ -849,7 +849,7 @@ contains
   call MAPL_AddExportSpec(GC                                                      ,&
        LONG_NAME          = 'soil_temperature_layer_1_analysis'                   ,&
        UNITS              = 'K'                                                   ,&
-       SHORT_NAME         = 'TSOIL1_ANA'                                          ,&
+       SHORT_NAME         = 'TP1_ANA'                                             ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
        VLOCATION          = MAPL_VLocationNone                                    ,&
        RC=STATUS  ) 
@@ -858,7 +858,7 @@ contains
   call MAPL_AddExportSpec(GC                                                      ,&
        LONG_NAME          = 'soil_temperature_layer_1_analysis_ensstd'            ,&
        UNITS              = 'K'                                                   ,&
-       SHORT_NAME         = 'TSOIL1_ANA_ENSSTD'                                   ,&
+       SHORT_NAME         = 'TP1_ANA_ENSSTD'                                      ,&
        DIMS               = MAPL_DimsTileOnly                                     ,&
        VLOCATION          = MAPL_VLocationNone                                    ,&
        RC=STATUS  )
@@ -1531,13 +1531,13 @@ contains
     real, dimension(:),pointer :: RZMC_ana=>null()           ! rootzone soil moisture
     real, dimension(:),pointer :: PRMC_ana=>null()           ! profile soil moisture
     real, dimension(:),pointer :: TPSURF_ana=>null()         ! tpsurf
-    real, dimension(:),pointer :: TSOIL1_ana=>null()         ! tsoil1
+    real, dimension(:),pointer :: TP1_ana=>null()            ! tsoil1
 
     real, dimension(:),pointer :: SFMC_ana_ensstd=>null()    ! surface soil moisture
     real, dimension(:),pointer :: RZMC_ana_ensstd=>null()    ! rootzone soil moisture
     real, dimension(:),pointer :: PRMC_ana_ensstd=>null()    ! profile soil moisture
     real, dimension(:),pointer :: TPSURF_ana_ensstd=>null()  ! tpsurf
-    real, dimension(:),pointer :: TSOIL1_ana_ensstd=>null()  ! tsoil1
+    real, dimension(:),pointer :: TP1_ana_ensstd=>null()     ! tsoil1
 
     !! export for microwave radiative transfer model (mwRTM)
 
@@ -1699,7 +1699,7 @@ contains
     
     call MAPL_GetPointer(export, TPSURF_ana,         'TPSURF_ANA'        ,rc=status)
     VERIFY_(status)
-    call MAPL_GetPointer(export, TSOIL1_ana,         'TSOIL1_ANA'        ,rc=status)
+    call MAPL_GetPointer(export, TP1_ana,            'TP1_ANA'           ,rc=status)
     VERIFY_(status)
     call MAPL_GetPointer(export, SFMC_ana,           'WCSF_ANA'          ,rc=status)
     VERIFY_(status)
@@ -1709,7 +1709,7 @@ contains
     VERIFY_(status)
     call MAPL_GetPointer(export, TPSURF_ana_ensstd,  'TPSURF_ANA_ENSSTD' ,rc=status)    
     VERIFY_(status)       
-    call MAPL_GetPointer(export, TSOIL1_ana_ensstd,  'TSOIL1_ANA_ENSSTD' ,rc=status)    
+    call MAPL_GetPointer(export, TP1_ana_ensstd,     'TP1_ANA_ENSSTD'    ,rc=status)    
     VERIFY_(status)       
     call MAPL_GetPointer(export, SFMC_ana_ensstd,    'WCSF_ANA_ENSSTD'   ,rc=status)
     VERIFY_(status)
@@ -2046,13 +2046,13 @@ contains
        if(associated(RZMC_ana))           RZMC_ana(:)          = cat_diagS_ensavg(:)%rzmc 
        if(associated(PRMC_ana))           PRMC_ana(:)          = cat_diagS_ensavg(:)%prmc 
        if(associated(TPSURF_ana))         TPSURF_ana(:)        = cat_diagS_ensavg(:)%tsurf
-       if(associated(TSOIL1_ana))         TSOIL1_ana(:)        = cat_diagS_ensavg(:)%tp(1) + MAPL_TICE   ! convert to K
+       if(associated(TP1_ana))            TP1_ana(:)           = cat_diagS_ensavg(:)%tp(1) + MAPL_TICE   ! convert to K
 
        if(associated(SFMC_ana_ensstd))    SFMC_ana_ensstd(:)   = max( cat_diagS_ensstd(:)%sfmc  , 0. )
        if(associated(RZMC_ana_ensstd))    RZMC_ana_ensstd(:)   = max( cat_diagS_ensstd(:)%rzmc  , 0. )
        if(associated(PRMC_ana_ensstd))    PRMC_ana_ensstd(:)   = max( cat_diagS_ensstd(:)%prmc  , 0. )
        if(associated(TPSURF_ana_ensstd))  TPSURF_ana_ensstd(:) = max( cat_diagS_ensstd(:)%tsurf , 0. )
-       if(associated(TSOIL1_ana_ensstd))  TSOIL1_ana_ensstd(:) = max( cat_diagS_ensstd(:)%tp(1) , 0. ) 
+       if(associated(TP1_ana_ensstd))     TP1_ana_ensstd(:)    = max( cat_diagS_ensstd(:)%tp(1) , 0. ) 
 
        if(associated(MWRTM_VEGOPACITY))   MWRTM_VEGOPACITY(:)  = mwRTM_param(:)%VEGOPACITY
        
