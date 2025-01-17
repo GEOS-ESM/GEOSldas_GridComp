@@ -1854,19 +1854,19 @@ contains
           
           ! open bufr file
           
-!          call closbf(lnbufr)  ! if a file with unit number lnbufr is open in (or "linked" with) BUFR, close it
-!          open(lnbufr, file=trim(fnames(kk)), action='read', form='unformatted')
-!          call openbf(lnbufr, 'SEC3', lnbufr) 
-!          call mtinfo( trim(this_obs_param%path) // '/BUFR_mastertable/', lnbufr+1, lnbufr+2)
-!          call datelen(10)     ! select date/time format with 4-digit year (YYYYMMDDHH) 
+          call closbf(lnbufr)  ! if a file with unit number lnbufr is open in (or "linked" with) BUFR, close it
+          open(lnbufr, file=trim(fnames(kk)), action='read', form='unformatted')
+          call openbf(lnbufr, 'SEC3', lnbufr) 
+          call mtinfo( trim(this_obs_param%path) // '/BUFR_mastertable/', lnbufr+1, lnbufr+2)
+          call datelen(10)     ! select date/time format with 4-digit year (YYYYMMDDHH) 
           
-!          msg_report: do while( ireadmg(lnbufr,subset,idate) == 0 )
+          msg_report: do while( ireadmg(lnbufr,subset,idate) == 0 )
              
-!             loop_report: do while( ireadsb(lnbufr) == 0 )
+             loop_report: do while( ireadsb(lnbufr) == 0 )
                 
                 ! columns of tmp_data:                  1    2    3    4    5    6    7    8    9    10   11   12   13    14
 
-!                call ufbint(lnbufr,tmp_vdata,14,1,iret,'YEAR MNTH DAYS HOUR MINU SECO SSOM SMPF SMCF ALFR TPCX IWFR CLATH CLONH')
+                call ufbint(lnbufr,tmp_vdata,14,1,iret,'YEAR MNTH DAYS HOUR MINU SECO SSOM SMPF SMCF ALFR TPCX IWFR CLATH CLONH')
 
                 N_obs = N_obs + 1
 
@@ -1877,11 +1877,11 @@ contains
 
                 tmp_data(N_obs,:) = tmp_vdata
                 
-!             end do loop_report
-!          end do msg_report
+             end do loop_report
+          end do msg_report
           
-!          call closbf(lnbufr)
-!          close(lnbufr)
+          call closbf(lnbufr)
+          close(lnbufr)
           
        end do ! end file loop
 
@@ -2148,7 +2148,7 @@ contains
 
   ! ****************************************************************************
 
-  subroutine read_obs_sm_CYGNSS(                                         &
+  subroutine read_obs_sm_CYGNSS(                                              &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                                        &
@@ -2156,7 +2156,17 @@ contains
 
     !---------------------------------------------------------------------
     ! 
-    ! Routine to read in CYGNSS soil moisture obs from netCDF files.
+    ! Routine to read in CYGNSS soil moisture obs from netCDF files and apply mask.
+    ! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2   
+    ! CYGNSS soil moisture obs are in volumetric units (cm3 cm-3) with a spatial 
+    ! resolution of 0.3 Decimal Degrees x 0.37 Decimal Degrees.
+    ! They are daily files countaining daily (obs_param_nml(54)%descr = CYGNSS_SM_daily) 
+    ! and subdaily SM estimates (obs_param_nml(53)%descr = CYGNSS_SM). The 
+    ! subdaily values are for 6 hr time intervals, 0-6hr, 6-12hr, 12-18hr, 18-24hr.
+    ! The subdaily values are assimilated at 3z, 9z, 15z, 21z. If the assimilation 
+    ! window is more than 6 hr the code will error out. The daily values are assimilated
+    ! at 12z. The assumption is that either the daily or subdaily values are assimilated,
+    ! but the code will assimilate both if in the nml.   
     !
     ! A. Fox, Jan 2025 
     !
@@ -2536,7 +2546,7 @@ contains
   
     ! ----------------------------------------------------------------
     !
-    ! 2.) for each observation
+    !    for each observation
     !     a) determine grid cell that contains lat/lon
     !     b) determine tile within grid cell that contains lat/lon
 
@@ -2552,7 +2562,7 @@ contains
       
       ! ----------------------------------------------------------------
       !
-      ! 3.) compute super-obs for each tile from all obs w/in that tile
+      !     compute super-obs for each tile from all obs w/in that tile
       !     (also eliminate observations that are not in domain)
       
       CYGNSS_sm   = 0.
@@ -2585,7 +2595,7 @@ contains
          
          ! set observation error standard deviation 
         
-         CYGNSS_sm_std(ii) = this_obs_param%errstd/100.    ! change units from percent (0-100) to fraction (0-1)
+         CYGNSS_sm_std(ii) = this_obs_param%errstd          ! fraction units (cm3 cm-3)
 
          ! normalize
 
