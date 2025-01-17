@@ -9149,9 +9149,7 @@ contains
  
            scaled_obs = .true.
  
-           call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
-                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
-                tmp_obs, tmp_std_obs )
+           ! TODO: implement scaling for CYGNSS obs
             
         end if         
 
