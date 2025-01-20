@@ -2158,10 +2158,10 @@ contains
     ! 
     ! Routine to read in CYGNSS soil moisture obs from netCDF files and apply mask.
     ! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2   
-    ! CYGNSS soil moisture obs are in volumetric units (cm3 cm-3) with a spatial 
+    ! CYGNSS soil moisture obs are in volumetric units (m3 m-3) with a spatial 
     ! resolution of 0.3 Decimal Degrees x 0.37 Decimal Degrees.
-    ! They are daily files countaining daily (obs_param_nml(54)%descr = CYGNSS_SM_daily) 
-    ! and subdaily SM estimates (obs_param_nml(53)%descr = CYGNSS_SM). The 
+    ! They are daily files containing daily (obs_param_nml(.)%descr = CYGNSS_SM_daily) 
+    ! and subdaily SM estimates (obs_param_nml(.)%descr = CYGNSS_SM). The 
     ! subdaily values are for 6 hr time intervals, 0-6hr, 6-12hr, 12-18hr, 18-24hr.
     ! The subdaily values are assimilated at 3z, 9z, 15z, 21z. If the assimilation 
     ! window is more than 6 hr the code will error out. The daily values are assimilated
@@ -2245,6 +2245,7 @@ contains
     nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_jtime )
 
     found_obs = .false.
+
     HH03 = .false.
     HH09 = .false.
     HH12 = .false.
@@ -2314,7 +2315,7 @@ contains
 
     if (trim(this_obs_param%descr) == 'CYGNSS_SM' .and. .not. (HH03 .or. HH09 .or. HH15 .or. HH21)) return
 
-    ! if assimilation window encompasses more than one time sllice, abort
+    ! if assimilation window encompasses more than one time slice, abort
 
     if (HHcnt > 1) then
        err_msg = 'Can not assimilate subdaily CYGNSS obs from more than one time slice'
@@ -2383,15 +2384,15 @@ contains
     ierr = nf90_inq_varid(ncid, 'longitude',      lon_varid)
 
     ! allocate memory for the variables
-    allocate(sm_d(N_lon, N_lat, N_time))
-    allocate(sm_subd(N_lon, N_lat, N_timeslices))
-    allocate(sigma_d(N_lon, N_lat, N_time))
-    allocate(sigma_subd(N_lon, N_lat, N_timeslices))
-    allocate(timeintervals(N_startstop, N_timeslices))
-    allocate(latitudes(N_lon, N_lat))
-    allocate(longitudes(N_lon, N_lat))
-    allocate(tmp_sm(N_lon, N_lat))
-    allocate(tmp_sigma(N_lon, N_lat))
+    allocate(sm_d(         N_lon, N_lat, N_time       ))
+    allocate(sm_subd(      N_lon, N_lat, N_timeslices ))
+    allocate(sigma_d(      N_lon, N_lat, N_time       ))
+    allocate(sigma_subd(   N_lon, N_lat, N_timeslices ))
+    allocate(timeintervals(N_startstop,  N_timeslices ))
+    allocate(latitudes(    N_lon, N_lat               ))
+    allocate(longitudes(   N_lon, N_lat               ))
+    allocate(tmp_sm(       N_lon, N_lat               ))
+    allocate(tmp_sigma(    N_lon, N_lat               ))
 
     ! read the variables
     ierr = nf90_get_var(ncid, timeintervals_varid, timeintervals)
@@ -2399,19 +2400,19 @@ contains
     ierr = nf90_get_var(ncid, lon_varid, longitudes)
 
     ! read either subdaily or daily soil moisture and sigma variables
-    if (this_obs_param%descr == 'CYGNSS_SM' ) then
+    if ( trim(this_obs_param%descr) == 'CYGNSS_SM' ) then
 
        ! subdaily observations required
-       ierr = nf90_get_var(ncid, sm_subd_varid, sm_subd)
+       ierr = nf90_get_var(ncid, sm_subd_varid,    sm_subd)
        ierr = nf90_get_var(ncid, sigma_subd_varid, sigma_subd)
 
        ! find the time slice that corresponds to the assimilation window
        idx = -1
        do i = 1, N_timeslices
-           if ((date_time%hour == 3  .and. timeintervals(1,i) == 0.0)  .or. &
-               (date_time%hour == 9  .and. timeintervals(1,i) == 0.25) .or. &
-               (date_time%hour == 15 .and. timeintervals(1,i) == 0.5)  .or. &
-               (date_time%hour == 21 .and. timeintervals(1,i) == 0.75)) then
+           if ((date_time%hour ==  3 .and. timeintervals(1,i) == 0.0 ) .or.            &
+               (date_time%hour ==  9 .and. timeintervals(1,i) == 0.25) .or.            &
+               (date_time%hour == 15 .and. timeintervals(1,i) == 0.5 ) .or.            &
+               (date_time%hour == 21 .and. timeintervals(1,i) == 0.75)         ) then
                idx = i
                exit
            end if
@@ -2422,15 +2423,17 @@ contains
        else
            write(*,*) 'Index of matching time interval: ', idx
        end if
-       tmp_sm = sm_subd(:,:,idx)
+       tmp_sm    = sm_subd(   :,:,idx)
        tmp_sigma = sigma_subd(:,:,idx)
+
     else
 
        ! daily observations required
-       ierr = nf90_get_var(ncid, sm_d_varid, sm_d)
+       ierr = nf90_get_var(ncid, sm_d_varid,    sm_d)
        ierr = nf90_get_var(ncid, sigma_d_varid, sigma_d)
-       tmp_sm = sm_d(:,:,1)
+       tmp_sm    = sm_d(   :,:,1)
        tmp_sigma = sigma_d(:,:,1)
+
     end if
 
     ! close the obs file
@@ -2470,13 +2473,13 @@ contains
 
 
     ! allocate memory for the variables
-    allocate(latitudes_m(N_lon_m, N_lat_m))
-    allocate(longitudes_m(N_lon_m, N_lat_m))
+    allocate(latitudes_m(        N_lon_m, N_lat_m))
+    allocate(longitudes_m(       N_lon_m, N_lat_m))
     allocate(small_SM_range_flag(N_lon_m, N_lat_m))
-    allocate(poor_SMAP_flag(N_lon_m, N_lat_m))
-    allocate(high_ubrmsd_flag(N_lon_m, N_lat_m))
-    allocate(few_obs_flag(N_lon_m, N_lat_m))
-    allocate(low_signal_flag(N_lon_m, N_lat_m))
+    allocate(poor_SMAP_flag(     N_lon_m, N_lat_m))
+    allocate(high_ubrmsd_flag(   N_lon_m, N_lat_m))
+    allocate(few_obs_flag(       N_lon_m, N_lat_m))
+    allocate(low_signal_flag(    N_lon_m, N_lat_m))
 
     ! read the variables
     ierr = nf90_get_var(ncid, latitudes_m_varid,    latitudes_m)
@@ -2514,10 +2517,10 @@ contains
                     err_msg = 'Attempting to read too many obs - how long is your assimilation window?'
                     call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
                 end if
-                tmp1_lon( N_obs)  = longitudes(i,j)
-                tmp1_lat( N_obs)  = latitudes(i,j)
-                tmp1_obs( N_obs)  = tmp_sm(i,j)
-                tmp1_err( N_obs)  = tmp_sigma(i,j)
+                tmp1_lon(  N_obs) = longitudes(i,j)
+                tmp1_lat(  N_obs) = latitudes( i,j)
+                tmp1_obs(  N_obs) = tmp_sm(    i,j)
+                tmp1_err(  N_obs) = tmp_sigma( i,j)
                 tmp1_jtime(N_obs) = datetime_to_J2000seconds( date_time, J2000_epoch_id )
             end if
         end do
@@ -2532,16 +2535,16 @@ contains
       
     end if    
 
-    allocate(tmp_lon(N_obs))
-    allocate(tmp_lat(N_obs))
-    allocate(tmp_obs(N_obs))
-    allocate(tmp_err(N_obs))
+    allocate(tmp_lon(  N_obs))
+    allocate(tmp_lat(  N_obs))
+    allocate(tmp_obs(  N_obs))
+    allocate(tmp_err(  N_obs))
     allocate(tmp_jtime(N_obs))
 
-    tmp_lon   = tmp1_lon(1:N_obs)
-    tmp_lat   = tmp1_lat(1:N_obs)
-    tmp_obs   = tmp1_obs(1:N_obs)
-    tmp_err   = tmp1_err(1:N_obs)
+    tmp_lon   = tmp1_lon(  1:N_obs)
+    tmp_lat   = tmp1_lat(  1:N_obs)
+    tmp_obs   = tmp1_obs(  1:N_obs)
+    tmp_err   = tmp1_err(  1:N_obs)
     tmp_jtime = tmp1_jtime(1:N_obs)
   
     ! ----------------------------------------------------------------
@@ -2595,7 +2598,7 @@ contains
          
          ! set observation error standard deviation 
         
-         CYGNSS_sm_std(ii) = this_obs_param%errstd          ! fraction units (cm3 cm-3)
+         CYGNSS_sm_std(ii) = this_obs_param%errstd          ! volumetric units (m3 m-3)
 
          ! normalize
 
