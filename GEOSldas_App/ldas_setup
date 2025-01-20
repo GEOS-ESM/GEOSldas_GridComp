@@ -749,7 +749,6 @@ class LDASsetup:
         if 'WEMIN_OUT' in self.rqdExeInp :
            wemin_out = self.rqdExeInp['WEMIN_OUT']
 
-
         tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False) 
         cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name + ' ' + '_'.join(self.tile_types) 
 
@@ -912,7 +911,7 @@ class LDASsetup:
              config['input']['shared']['agrid']      = 'C180'
              config['input']['shared']['ogrid']      = '1440x720'
              config['input']['shared']['omodel']     = 'data'
-           
+
            catch_obj = catchANDcn(config_obj = config)
            catch_obj.remap()
 
@@ -1417,6 +1416,8 @@ class LDASsetup:
         if self.GEOS_SITE == 'NAS':
           SBATCHQSUB = 'qsub'
 
+        DETECTED_MPI_STACK = "@MPI_STACK@"
+
         job_head = job_directive[self.GEOS_SITE]
         lenkf_str= (job_head+job_body).format(
                   SBATCHQSUB         = SBATCHQSUB,
@@ -1439,7 +1440,9 @@ class LDASsetup:
                   MY_LADAS_COUPLING  = str(self.ladas_coupling),
                   MY_ENSEMBLE_FORCING= self.rqdExeInp.get('ENSEMBLE_FORCING', 'NO').upper(),
                   MY_ADAS_EXPDIR     = self.adas_expdir,
-                  MY_EXPDIR          = self.expdir
+                  MY_EXPDIR          = self.expdir,
+                  DETECTED_MPI_STACK = DETECTED_MPI_STACK,
+                  BUILT_ON_SLES15    = str(self.BUILT_ON_SLES15).upper()
                   )
 
         with open('lenkf.j','wt') as fout :

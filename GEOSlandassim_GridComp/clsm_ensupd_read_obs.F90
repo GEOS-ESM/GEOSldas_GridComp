@@ -1629,6 +1629,7 @@ contains
     type(date_time_type) :: date_time_tmp
     type(date_time_type) :: date_time_low, date_time_low_fname
     type(date_time_type) :: date_time_up
+    type(date_time_type) :: date_time_obs_beg, date_time_obs_end
     
     integer :: ii, ind, N_tmp, N_files, kk, N_obs, N_fnames, N_fnames_tmp, obs_dir_hier
     
@@ -1667,7 +1668,7 @@ contains
 
     ! --------------------
 
-    character(100), dimension(2*N_fnames_max)   :: fname_list  ! max 2 days of files
+    character(200), dimension(2*N_fnames_max)   :: fname_list  ! max 2 days of files
 
     real,      dimension(:),     allocatable    :: tmp1_obs, tmp1_lat, tmp1_lon
     real*8,    dimension(:),     allocatable    :: tmp1_jtime
@@ -1688,10 +1689,33 @@ contains
     nullify( tmp_obs, tmp_lat, tmp_lon, tmp_tile_num, tmp_jtime )    
     
     ! ---------------
-    
+
     ! initialize
     
     found_obs = .false.
+    
+    ! determine operating time range of sensor
+
+    if     (trim(this_obs_param%descr) == 'ASCAT_META_SM') then
+       date_time_obs_beg = date_time_type(2007, 6, 1, 1,31, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2021,11,15, 9, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_METB_SM') then
+       date_time_obs_beg = date_time_type(2013, 4,24, 8, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_METC_SM') then
+       date_time_obs_beg = date_time_type(2019,11,25,12, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    
+    ! return if date_time falls outside operating time range
+    
+    if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
+         datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
+    
+    ! ---------------
     
     ! find files that are within half-open interval 
     !   (date_time-dtstep_assim/2,date_time+dtstep_assim/2]
@@ -1741,24 +1765,59 @@ contains
     N_tmp = 0   
     
     do kk = 1,N_fnames
-
+       
        tmpfname = fname_list(kk)
-
+       
        ! Are we in the required assimilation window?
        !
-       ! e.g. Y2019/M07/M01-ASCA-ASCSMO02-NA-5.0-20190702075700.000000000Z-20190702084627-1350204.bfr
+       ! NOTE: EUMETSAT changed the file name template sometime in 2023 or 2024.  
+       !       There was no change to the file contents.
+       !       Files from the original download (through data day ~1 Jun 2023) have 
+       !       the original file name template ("M0[X]-ASCA..."), more recently downloaded 
+       !       files have the revised template ("W_XX-EUMETSAT...").  
+       !       This reader accommodates both templates:
        !
-       !      12345678901234567890123456789012345678901234567890123456789012345678901234567890 
-       !               1         2         3         4         5         6         7
-
-       str_date_time = tmpfname(36:49)
-      
+       ! e.g. Y2019/M07/M01-ASCA-ASCSMO02-NA-5.0-20190702075700.000000000Z-20190702084627-1350204.bfr
+       !      Y2024/M02/W_XX-EUMETSAT-Darmstadt,SOUNDING+SATELLITE,METOPC+ASCAT_C_EUMR_20240229095700_27567_eps_o_250_ssm_l2.bin
+       !
+       !      123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890 
+       !               1         2         3         4         5         6         7         8         9         10        11        12
+       
+       ! check if tmpfname contains "ASCA-ASCSMO02" or "W_XX-EUMETSAT", error if neither
+       
+       if (index(tmpfname, "ASCA-ASCSMO02") /= 0) then
+          str_date_time = tmpfname(36:49)
+       else if (index(tmpfname, "W_XX-EUMETSAT") /= 0) then
+          str_date_time = tmpfname(74:87)
+       else
+          err_msg = 'Unknown ASCAT observation file name format'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+       
+       ! check if str_date_time only contains numeric characters
+       
+       do ii = 1, len(trim(str_date_time))
+          if (ichar(str_date_time(ii:ii)) < ichar('0') .or. ichar(str_date_time(ii:ii)) > ichar('9')) then
+             err_msg = 'Date-time string parsed from ASCAT sm obs file name contains non-numeric characters'
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          end if
+       end do
+   
        read(str_date_time( 1: 4), *) date_time_tmp%year
        read(str_date_time( 5: 6), *) date_time_tmp%month
        read(str_date_time( 7: 8), *) date_time_tmp%day
        read(str_date_time( 9:10), *) date_time_tmp%hour
        read(str_date_time(11:12), *) date_time_tmp%min
        read(str_date_time(13:14), *) date_time_tmp%sec
+
+       ! check if year, month, and day are valid
+       
+       if ( date_time_tmp%year  < 2007 .or. date_time_tmp%year  > 2100 .or.                     &
+            date_time_tmp%month <    1 .or. date_time_tmp%month >   12 .or.                     &
+            date_time_tmp%day   <    1 .or. date_time_tmp%day   >   31                ) then
+          err_msg = 'Could not parse valid date-time string from ASCAT obs file name'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
        
        if ( datetime_lt_refdatetime( date_time_low_fname, date_time_tmp ) .and.          &
             datetime_le_refdatetime( date_time_tmp,       date_time_up  )       ) then 
@@ -4430,6 +4489,7 @@ contains
     real                 :: tmpreal, Tb_std_max
     
     type(date_time_type) :: date_time_low, date_time_upp
+    type(date_time_type) :: date_time_obs_beg
     
     character(  2)       :: MM, DD, HH, MI, orbit_tag
     character(  4)       :: YYYY
@@ -4461,6 +4521,17 @@ contains
     ! initialize
     
     found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    date_time_obs_beg = date_time_type(2010, 5,24, 0, 0, 0,-9999,-9999)
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+    
+    ! ------------------------------
+
 
     ! read soil moisture or brightness temperature files? 
 
@@ -5189,6 +5260,7 @@ contains
 
     type(date_time_type)  :: date_time_beg,       date_time_end
     type(date_time_type)  :: date_time_beg_MODIS, date_time_end_MODIS
+    type(date_time_type)  :: date_time_obs_beg
 
     real                  :: lon_beg,             lon_end
     real                  :: lon_beg_MODIS,       lon_end_MODIS
@@ -5210,7 +5282,28 @@ contains
 
     character(len=*),          parameter   :: Iam = 'read_obs_MODIS_SCF'
     character(len=400)                     :: err_msg
-   
+
+    ! ------------------------------------------------------------------------------------
+    !
+    ! initialize
+    
+    found_obs        = .false.
+    
+    ! determine operating time range of sensor
+
+    if     (trim(this_obs_param%descr) == 'MOD10C1') then
+       date_time_obs_beg = date_time_type(2000, 2,24, 1,31, 0,-9999,-9999)    ! Terra
+    elseif (trim(this_obs_param%descr) == 'MYD10C1') then
+       date_time_obs_beg = date_time_type(2002, 7, 4, 8, 0, 0,-9999,-9999)    ! Aqua
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+
     ! ----------------------------------------------------------------------------------
     !
     ! restrict assimilation time step to max allowed 
@@ -5221,12 +5314,6 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        
     end if 
-
-    
-    ! initialize
-    
-    found_obs        = .false.
-    
 
     ! identify MODIS product and overpass hour
 
@@ -6132,7 +6219,7 @@ contains
     character(100)       :: dset_name_lon,  dset_name_lat
     character(100)       :: dset_name_time, dset_name_ft, dset_name_ft_qual_flag
 
-    character(100), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
+    character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
     integer,        dimension(7)                   :: dset_size
     integer,        dimension(N_fnames_max)        :: N_obs_kept
@@ -6814,6 +6901,7 @@ contains
 
     type(date_time_type) :: date_time_low,       date_time_upp
     type(date_time_type) :: date_time_low_fname, date_time_tmp
+    type(date_time_type) :: date_time_obs_beg
 
     integer              :: ii, jj, kk, nn, mm
     integer              :: N_fnames, N_fnames_tmp, N_obs_tmp
@@ -6839,7 +6927,7 @@ contains
     character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1
     character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2
 
-    character(100), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
+    character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
     integer,        dimension(7)                   :: dset_size
     integer,        dimension(N_fnames_max)        :: N_obs_kept
@@ -6865,6 +6953,20 @@ contains
 
     ! -------------------------------------------------------------------
     
+    ! initialize
+    
+    found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    date_time_obs_beg = date_time_type(2015, 3,31, 0, 0, 0,-9999,-9999)
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+
+    ! ----------------
+
     ! check inputs
     
     ! the subroutine makes sense only if dtstep_assim <= 3 hours
@@ -6878,9 +6980,6 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
     
-    ! initialize
-    
-    found_obs = .false.
     
     ! read Tbs from L1C_TB, L1C_TB_E, or L2_SM_AP files? 
 
@@ -8167,7 +8266,7 @@ contains
 
     integer,                          intent(out) :: N_fnames
 
-    character(100), dimension(N_max), intent(out) :: fname_list
+    character(200), dimension(N_max), intent(out) :: fname_list
     
     integer, optional,                intent(in)  :: obs_dir_hier
     
@@ -8176,7 +8275,7 @@ contains
     character(300)       :: fname
     character(200)       :: fpath_tmp
     character( 80)       :: fname_tmp
-    character( 80)       :: tmpstr80
+    character(200)       :: tmpstr200
 
     character( 14)       :: YYYYMMDDdir
     character( 10)       :: YYYYMMdir
@@ -8225,7 +8324,7 @@ contains
     
     do while (istat==0)
        
-       read(10,*,iostat=istat) tmpstr80
+       read(10, '(A)',iostat=istat) tmpstr200
        
        if (istat==0) then
           
@@ -8238,7 +8337,7 @@ contains
 
           ! preface file names with "Yyyyy/Mmm/Ddd" (default)
           
-          fname_list(ii) = YYYYMMDDdir // trim(tmpstr80)
+          fname_list(ii) = YYYYMMDDdir // trim(tmpstr200)
           
           if (present(obs_dir_hier)) then
              
@@ -8246,7 +8345,7 @@ contains
                 
                 ! preface file names with "Yyyyy/Mmm"
                 
-                fname_list(ii) = YYYYMMdir // trim(tmpstr80)
+                fname_list(ii) = YYYYMMdir // trim(tmpstr200)
                 
              else
                 
