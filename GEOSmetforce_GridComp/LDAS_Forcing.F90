@@ -3260,8 +3260,7 @@ contains
     
     GEOSIT_defs = G5DAS_defs
 
-    ! GEOSIT character(40):
-    !
+    ! character(40):
     !                             1         2         3         4
     !                    1234567890123456789012345678901234567890     
 
@@ -3305,18 +3304,22 @@ contains
 
     M21CCSINT_defs = M21CINT_defs
 
-    M21CCSINT_defs( 1,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]  
-    M21CCSINT_defs( 2,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]
-    M21CCSINT_defs( 3,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]
-    M21CCSINT_defs( 4,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]
-    M21CCSINT_defs( 5,3)=[character(len=40)::                         'int_tavg_1hr_glo_C360x360x6_slv'           ]  ! uncorrected
-    M21CCSINT_defs( 6,3)=[character(len=40)::                         'int_tavg_1hr_glo_C360x360x6_slv'           ]  ! uncorrected
-    M21CCSINT_defs( 7,3)=[character(len=40)::                         'int_tavg_1hr_glo_C360x360x6_slv'           ]  ! uncorrected
-    M21CCSINT_defs( 8,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]  
-    M21CCSINT_defs( 9,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]
-    M21CCSINT_defs(10,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]    
-    M21CCSINT_defs(11,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]    
-    M21CCSINT_defs(12,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]    
+    ! character(40):
+    !                                                                           1         2         3         4
+    !                                                                  1234567890123456789012345678901234567890     
+
+    M21CCSINT_defs( 1,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '             
+    M21CCSINT_defs( 2,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs( 3,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs( 4,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs( 5,3) =                                            'int_tavg_1hr_glo_C360x360x6_slv         '     ! uncorrected
+    M21CCSINT_defs( 6,3) =                                            'int_tavg_1hr_glo_C360x360x6_slv         '     ! uncorrected
+    M21CCSINT_defs( 7,3) =                                            'int_tavg_1hr_glo_C360x360x6_slv         '     ! uncorrected
+    M21CCSINT_defs( 8,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '             
+    M21CCSINT_defs( 9,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs(10,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '               
+    M21CCSINT_defs(11,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '               
+    M21CCSINT_defs(12,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '               
 
     ! M21C file specs with corrected precip, which could be either
     !  - native (ie, the precip seen by the land surface in the M21C system), or
@@ -3338,18 +3341,22 @@ contains
 
     M21CCSCOR_defs = M21CCOR_defs
 
-    M21CCSCOR_defs( 1,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]  
-    M21CCSCOR_defs( 2,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]
-    M21CCSCOR_defs( 3,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]
-    M21CCSCOR_defs( 4,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]
-    M21CCSCOR_defs( 5,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]  ! M21C built-in corrections
-    M21CCSCOR_defs( 6,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]  ! M21C built-in corrections
-    M21CCSCOR_defs( 7,3)=[character(len=40)::                         'lfo_tavg_1hr_glo_C360x360x6_slv'           ]  ! M21C built-in corrections
-    M21CCSCOR_defs( 8,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]  
-    M21CCSCOR_defs( 9,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]
-    M21CCSCOR_defs(10,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]    
-    M21CCSCOR_defs(11,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]    
-    M21CCSCOR_defs(12,3)=[character(len=40)::                         'lfo_inst_1hr_glo_C360x360x6_slv'           ]    
+    ! character(40):
+    !                                                                           1         2         3         4
+    !                                                                  1234567890123456789012345678901234567890     
+
+    M21CCSCOR_defs( 1,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '    
+    M21CCSCOR_defs( 2,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs( 3,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs( 4,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs( 5,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '     ! M21C built-in corrections
+    M21CCSCOR_defs( 6,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '     ! M21C built-in corrections
+    M21CCSCOR_defs( 7,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '     ! M21C built-in corrections
+    M21CCSCOR_defs( 8,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '    
+    M21CCSCOR_defs( 9,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs(10,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '      
+    M21CCSCOR_defs(11,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '      
+    M21CCSCOR_defs(12,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '      
 
 
     ! -----------------------------------------------------------------------
@@ -4841,7 +4848,7 @@ contains
     
     tmpind = 9
 
-    if (met_tag_in(5:6) = 'CS') tmpind = tmpind + 2
+    if (met_tag_in(5:6) == 'CS') tmpind = tmpind + 2
 
     tmpstream = met_tag_in(tmpind:tmpind+4)
 
