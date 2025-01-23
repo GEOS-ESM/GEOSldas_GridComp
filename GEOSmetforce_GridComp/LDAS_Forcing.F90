@@ -5504,9 +5504,9 @@ contains
        
        time_stamp(1:8)  = YYYY // MM // DD
        
-    elseif (                                                             & 
-         index(met_tag,'GEOSIT') > 0 .or. index(met_tag,'geosit') > 0    &
-         index(met_tag,'M21C'  ) > 0 .or. index(met_tag,'m21c'  ) > 0    &
+    elseif (                                                                    & 
+         index(met_tag,'GEOSIT') > 0  .or.  index(met_tag,'geosit') > 0  .or.   &
+         index(met_tag,'M21C'  ) > 0  .or.  index(met_tag,'m21c'  ) > 0         &
          )  then
        
        ! newer time stamp format (GEOS-IT, M21C, ...)
