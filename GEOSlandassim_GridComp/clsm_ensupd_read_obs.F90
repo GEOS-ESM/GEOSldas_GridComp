@@ -2161,7 +2161,7 @@ contains
     ! CYGNSS soil moisture obs are in volumetric units (m3 m-3) with a spatial 
     ! resolution of 0.3 Decimal Degrees x 0.37 Decimal Degrees.
     ! They are daily files containing daily (obs_param_nml(.)%descr = CYGNSS_SM_daily) 
-    ! and subdaily SM estimates (obs_param_nml(.)%descr = CYGNSS_SM). The 
+    ! and subdaily SM estimates (obs_param_nml(.)%descr = CYGNSS_SM_6hr). The 
     ! subdaily values are for 6 hr time intervals, 0-6hr, 6-12hr, 12-18hr, 18-24hr.
     ! The subdaily values are assimilated at 3z, 9z, 15z, 21z. If the assimilation 
     ! window is more than 6 hr the code will error out. The daily values are assimilated
@@ -2204,8 +2204,9 @@ contains
     ! -------------------------------------------------------------------
     ! local variables:
 
-    integer,           parameter :: max_obs = 50000              ! max number of obs read by subroutine (expecting < 6 hr assim window)
-    character(4),      parameter :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
+  
+    integer,           parameter :: max_obs        = 50000            ! max number of daily obs read by subroutine (expecting > 6 hr assim window)
+    character(4),      parameter :: J2000_epoch_id = 'TT12'           ! see date_time_util.F90
     character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
 
     type(date_time_type) :: date_time_obs_beg, date_time_obs_end
@@ -2254,7 +2255,7 @@ contains
 
     ! determine operating time range of sensor
 
-    if (trim(this_obs_param%descr) == 'CYGNSS_SM' .or. trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM_6hr' .or. trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
        date_time_obs_beg = date_time_type(2018, 8, 1, 0, 0, 0,-9999,-9999)
        date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
     else
@@ -2294,7 +2295,7 @@ contains
        HH03 = .true.
        HHcnt = HHcnt + 1
     end if
-    if (date_time_low%hour > 21 .and. date_time_up%hour >= 3) then  ! wrap-around from previous day
+    if (date_time_low%hour > 21 .and. date_time_up%hour >= 3) then  ! wrap-around from previous day for 3 hr < assim window <= 6 hr
        HH03 = .true.
        HHcnt = HHcnt + 1
     end if
@@ -2310,10 +2311,14 @@ contains
        HH21 = .true.
        HHcnt = HHcnt + 1
     end if
+    if (date_time_low%hour < 21 .and. date_time_up%hour < 3) then  ! wrap-around into next day for 3 hr < assim window <= 6 hr 
+       HH21 = .true.
+       HHcnt = HHcnt + 1
+    end if
 
     ! return if assimilating subdaily obs and no HH is true
 
-    if (trim(this_obs_param%descr) == 'CYGNSS_SM' .and. .not. (HH03 .or. HH09 .or. HH15 .or. HH21)) return
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM_6hr' .and. .not. (HH03 .or. HH09 .or. HH15 .or. HH21)) return
 
     ! if assimilation window encompasses more than one time slice, abort
 
@@ -2330,25 +2335,15 @@ contains
     write (HH,  '(i2.2)') date_time%hour 
     write (MI,  '(i2.2)') date_time%min
 
-    tmpname = trim(this_obs_param%name)
+    ! construct the file name using hardwired name and date_time
 
-    ! Replace s20180801 with sYYYYMMDD
-    pos = index(tmpname, "s20180801")
-    if (pos > 0) then
-       tmpname = tmpname(1:pos-1) // "s" // YYYY // MM // DD // tmpname(pos+9:)
-    endif
-
-    ! Replace e20180801 with eYYYYMMDD
-    pos = index(tmpname, "e20180801")
-    if (pos > 0) then
-       tmpname = tmpname(1:pos-1) // "e" // YYYY // MM // DD // tmpname(pos+9:)
-    endif
+    tmpname = 'cyg.ddmi.s'// YYYY // MM // DD //'-030000-e'// YYYY // MM // DD //'-210000.l3.grid-soil-moisture-36km.a32.d33.nc'
         
     tmpfname = trim(this_obs_param%path) // '/Y' // YYYY // '/M' // MM // '/' // trim(tmpname) // '.nc'
 
     if (logit) write (logunit, '(400A)') 'Reading CYGNSS soil moisture data from file: ', trim(tmpfname)
 
-    ! Check if file exists
+    ! check if file exists
 
     inquire(file=tmpfname, exist=file_exists)
 
@@ -2357,7 +2352,7 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
-    ! Open the NetCDF observation file
+    ! open the NetCDF observation file
     ierr = nf90_open(trim(tmpfname), nf90_nowrite, ncid)
 
     ! get variable dimension IDs
@@ -2383,11 +2378,7 @@ contains
     ierr = nf90_inq_varid(ncid, 'latitude',       lat_varid)
     ierr = nf90_inq_varid(ncid, 'longitude',      lon_varid)
 
-    ! allocate memory for the variables
-    allocate(sm_d(         N_lon, N_lat, N_time       ))
-    allocate(sm_subd(      N_lon, N_lat, N_timeslices ))
-    allocate(sigma_d(      N_lon, N_lat, N_time       ))
-    allocate(sigma_subd(   N_lon, N_lat, N_timeslices ))
+    ! allocate memory for universal variables
     allocate(timeintervals(N_startstop,  N_timeslices ))
     allocate(latitudes(    N_lon, N_lat               ))
     allocate(longitudes(   N_lon, N_lat               ))
@@ -2400,7 +2391,11 @@ contains
     ierr = nf90_get_var(ncid, lon_varid, longitudes)
 
     ! read either subdaily or daily soil moisture and sigma variables
-    if ( trim(this_obs_param%descr) == 'CYGNSS_SM' ) then
+    if ( trim(this_obs_param%descr) == 'CYGNSS_SM_6hr' ) then
+
+       ! allocate memory for subdaily variables
+       allocate(sm_subd(   N_lon, N_lat, N_timeslices ))
+       allocate(sigma_subd(N_lon, N_lat, N_timeslices ))
 
        ! subdaily observations required
        ierr = nf90_get_var(ncid, sm_subd_varid,    sm_subd)
@@ -2409,10 +2404,10 @@ contains
        ! find the time slice that corresponds to the assimilation window
        idx = -1
        do i = 1, N_timeslices
-           if ((date_time%hour ==  3 .and. timeintervals(1,i) == 0.0 ) .or.            &
-               (date_time%hour ==  9 .and. timeintervals(1,i) == 0.25) .or.            &
-               (date_time%hour == 15 .and. timeintervals(1,i) == 0.5 ) .or.            &
-               (date_time%hour == 21 .and. timeintervals(1,i) == 0.75)         ) then
+           if ((HH03 .and. timeintervals(1,i) == 0.0 ) .or.            &
+               (HH09 .and. timeintervals(1,i) == 0.25) .or.            &
+               (HH15 .and. timeintervals(1,i) == 0.5 ) .or.            &
+               (HH21 .and. timeintervals(1,i) == 0.75)         ) then
                idx = i
                exit
            end if
@@ -2427,6 +2422,10 @@ contains
        tmp_sigma = sigma_subd(:,:,idx)
 
     else
+
+       ! allocate memory for daily variables
+       allocate(sm_d(   N_lon, N_lat, N_time ))
+       allocate(sigma_d(N_lon, N_lat, N_time ))
 
        ! daily observations required
        ierr = nf90_get_var(ncid, sm_d_varid,    sm_d)
@@ -2584,7 +2583,7 @@ contains
             CYGNSS_sm(  ind) = CYGNSS_sm(  ind) + tmp_obs(  ii)
             CYGNSS_lon( ind) = CYGNSS_lon( ind) + tmp_lon(  ii)
             CYGNSS_lat( ind) = CYGNSS_lat( ind) + tmp_lat(  ii)
-            CYGNSS_time(ind) = CYGNSS_time(ind) + tmp_jtime(ii)
+            CYGNSS_time(ind) = tmp_jtime(ii)                      ! time is the same for all observations
             
             N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
             
@@ -2607,7 +2606,6 @@ contains
             CYGNSS_sm(    ii) = CYGNSS_sm(  ii)/real(N_obs_in_tile(ii))
             CYGNSS_lon(   ii) = CYGNSS_lon( ii)/real(N_obs_in_tile(ii))
             CYGNSS_lat(   ii) = CYGNSS_lat( ii)/real(N_obs_in_tile(ii))
-            CYGNSS_time(  ii) = CYGNSS_time(ii)/real(N_obs_in_tile(ii),kind(0.0D0))
             
          elseif (N_obs_in_tile(ii)==0) then
             
@@ -2642,6 +2640,24 @@ contains
    end if
    
    ! clean up
+
+   deallocate(timeintervals)
+   deallocate(latitudes)
+   deallocate(longitudes)
+   deallocate(tmp_sm)
+   deallocate(tmp_sigma)
+   deallocate(latitudes_m)
+   deallocate(longitudes_m)
+   deallocate(small_SM_range_flag)
+   deallocate(poor_SMAP_flag)
+   deallocate(high_ubrmsd_flag)
+   deallocate(few_obs_flag)
+   deallocate(low_signal_flag)
+
+   if (allocated(sm_d))          deallocate(sm_d)
+   if (allocated(sm_subd))       deallocate(sm_subd)
+   if (allocated(sigma_d))       deallocate(sigma_d)
+   if (allocated(sigma_subd))    deallocate(sigma_subd)
    
    if (associated(tmp_obs))      deallocate(tmp_obs)
    if (associated(tmp_lon))      deallocate(tmp_lon)
@@ -9137,7 +9153,7 @@ contains
            
         end if 
         
-    case ('CYGNSS_SM','CYGNSS_SM_daily')
+    case ('CYGNSS_SM_6hr','CYGNSS_SM_daily')
 
         call read_obs_sm_CYGNSS(                                       &
              date_time, dtstep_assim, N_catd, tile_coord,              &
