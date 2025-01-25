@@ -2339,7 +2339,7 @@ contains
 
     tmpname = 'cyg.ddmi.s'// YYYY // MM // DD //'-030000-e'// YYYY // MM // DD //'-210000.l3.grid-soil-moisture-36km.a32.d33.nc'
         
-    tmpfname = trim(this_obs_param%path) // '/Y' // YYYY // '/M' // MM // '/' // trim(tmpname) // '.nc'
+    tmpfname = trim(this_obs_param%path) // '/Y' // YYYY // '/M' // MM // '/' // trim(tmpname)
 
     if (logit) write (logunit, '(400A)') 'Reading CYGNSS soil moisture data from file: ', trim(tmpfname)
 
