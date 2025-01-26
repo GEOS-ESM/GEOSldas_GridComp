@@ -25,7 +25,7 @@ function [ tile_coord ] = read_til_file_ASCII( fname_til, fname_catchmentdef )
 
 % determine fname_catchmentdef
 
-%%%if ~exist( fname_catchmentdef )
+if ~exist('fname_catchmentdef','var')
 
   ind=strfind(fname_til,'/');
 
@@ -41,7 +41,7 @@ function [ tile_coord ] = read_til_file_ASCII( fname_til, fname_catchmentdef )
   
   fname_catchmentdef = [ fname_til(1:ind(end-2)), 'land/', resolution, '/clsm/catchment.def' ]; 
 
-%%%end
+end
 
 % -------------------------------------------------------------
 %
