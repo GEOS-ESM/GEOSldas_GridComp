@@ -10,9 +10,39 @@ disp(['reading from ', fname])
 
 s = ncinfo( fname );
 
+% dimensions
+
 tile_coord.N_tile = s.Dimensions.Length;
 
-varnames = {s.Variables.Name}
+% ---------------------------------
+
+% read tile space attributes
+
+attnames = {s.Attributes.Name};
+
+for kk=1:length(attnames)
+
+  this_attname = attnames{kk};
+  
+  % skip select attributes
+
+  if strcmp(this_attname,'NCO'    ), continue, end
+  if strcmp(this_attname,'history'), continue, end
+
+  tmpdata = ncreadatt( fname, '/', this_attname );
+
+  cmd = ['tile_coord.', this_attname, ' = tmpdata;'];
+
+  %disp(cmd)
+  eval(cmd)
+
+end
+
+% ---------------------------------
+
+% read tile variables
+
+varnames = {s.Variables.Name};
 
 for kk=1:length(varnames)
 
@@ -34,9 +64,5 @@ for kk=1:length(varnames)
   eval(cmd)
 
 end
-
-
-
-
 
 % ========== EOF ===================================================
