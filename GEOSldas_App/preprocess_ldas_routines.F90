@@ -409,7 +409,7 @@ contains
 
       ! locals 
       
-      integer :: n, this_tileid, this_catpfaf, N_exclude, N_include, indomain, rc
+      integer :: n, this_tileid, N_exclude, N_include, indomain, rc
       
       integer, dimension(N_cat_global) :: ExcludeList, IncludeList, tmp_d2g
       
@@ -2964,7 +2964,7 @@ end block
              
              read (tmpline,*)                     &
                   tile_coord(i)%typ,              &   !  1
-                  tile_coord(i)%pfaf,             &   !  2
+                  tile_coord(i)%pfaf_index,       &   !  2
                   tile_coord(i)%com_lon,          &   !  3
                   tile_coord(i)%com_lat,          &   !  4
                   tile_coord(i)%i_indg,           &   !  5
@@ -2985,7 +2985,7 @@ end block
 
                 read (tmpline,*)                  &
                      tile_coord(i)%typ,           &   !  1  
-                     tile_coord(i)%pfaf,          &   !  2  *
+                     tile_coord(i)%pfaf_index,    &   !  2  *
                      tile_coord(i)%com_lon,       &   !  3
                      tile_coord(i)%com_lat,       &   !  4
                      tile_coord(i)%i_indg,        &   !  5
@@ -3009,7 +3009,7 @@ end block
                      tile_coord(i)%j_indg,        &   !  6
                      tile_coord(i)%frac_cell,     &   !  7
                      tmpint1,                     &   !  8
-                     tile_coord(i)%pfaf,          &   !  9  *
+                     tile_coord(i)%pfaf_index,    &   !  9  *
                      tmpint2,                     &   ! 10
                      tile_coord(i)%frac_pfaf,     &   ! 11
                      tmpint3                          ! 12  * (previously "tile_id")
@@ -3250,7 +3250,7 @@ end block
       !
       ! Header line: N_tile
       !
-      ! Columns: tile_id, Pfaf, min_lon, max_lon, min_lat, max_lat, [elev]
+      ! Columns: tile_id, pfaf_index, min_lon, max_lon, min_lat, max_lat, [elev]
       !
       ! Elevation [m] is ONLY available for EASE grid tile definitions
       
@@ -3266,7 +3266,7 @@ end block
       
       integer :: i, istat, tmpint1, sweep
       
-      integer, dimension(N_tile)  :: tmp_tileid, tmp_pfaf
+      integer, dimension(N_tile)  :: tmp_tileid, tmp_pfafindex
       
       character(len=*), parameter :: Iam = 'read_catchment_def'
       character(len=400)          :: err_msg
@@ -3305,7 +3305,7 @@ end block
                
                ! read 7 columns, avoid using exact format specification
                
-               read (10,*, iostat=istat) tmp_tileid(i), tmp_pfaf(i), &
+               read (10,*, iostat=istat) tmp_tileid(i), tmp_pfafindex(i), &
                     tile_coord(i)%min_lon,    &
                     tile_coord(i)%max_lon,    &
                     tile_coord(i)%min_lat,    &
@@ -3316,7 +3316,7 @@ end block
                
                ! read 6 columns, avoid using exact format specification
                
-               read (10,*, iostat=istat) tmp_tileid(i), tmp_pfaf(i), &
+               read (10,*, iostat=istat) tmp_tileid(i), tmp_pfafindex(i), &
                     tile_coord(i)%min_lon,    &
                     tile_coord(i)%max_lon,    &
                     tile_coord(i)%min_lat,    &
@@ -3358,8 +3358,8 @@ end block
          
       end do      ! loop through sweeps
       
-      if ( any(tile_coord(1:N_tile)%tile_id/=tmp_tileid) .or.          &
-           any(tile_coord(1:N_tile)%pfaf   /=tmp_pfaf)         ) then
+      if ( any(tile_coord(1:N_tile)%tile_id   /=tmp_tileid)      .or.          &
+           any(tile_coord(1:N_tile)%pfaf_index/=tmp_pfafindex)         ) then
          
          err_msg = 'tile_coord_file and catchment_def_file mismatch. (2)'
          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
