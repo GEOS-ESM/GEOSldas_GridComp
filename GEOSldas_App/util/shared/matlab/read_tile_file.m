@@ -81,7 +81,6 @@ if is_nc4
     
     % rename some fields 
     
-    if strcmp(this_varname,'pfaf_index'  ), this_varname = 'pfaf';        end
     if strcmp(this_varname,'i_indg1'     ), this_varname = 'i_indg';      end
     if strcmp(this_varname,'j_indg1'     ), this_varname = 'j_indg';      end
     if strcmp(this_varname,'frac_cell1'  ), this_varname = 'frac_cell';   end
@@ -346,7 +345,7 @@ else
   tile_coord.elev          = tmpNaN;                 % elevation of tile
                                                      
   tile_coord.area          = tmpNaN;                 % area of "atm" grid cell 
-  tile_coord.pfaf          = tmpNaN;                 % index of (hydrological) Pfafstetter catchment
+  tile_coord.pfaf_index    = tmpNaN;                 % index of (hydrological) Pfafstetter catchment
   tile_coord.frac_pfaf     = tmpNaN;                 % area fraction of Pfafstetter catchment
                      
   if ~isEASE
@@ -372,14 +371,14 @@ else
   if isEASE
   
     col_area      = NaN;
-    col_pfaf      = 2;      % land tiles only
-    col_frac_pfaf = NaN;    % land tiles only 
+    col_pfafindex = 2;      % land tiles only
+    col_fracpfaf  = NaN;    % land tiles only 
   
   else
   
     col_area      = 2;
-    col_pfaf      = 9;      % land tiles only
-    col_frac_pfaf = 11; 
+    col_pfafindex = 9;      % land tiles only
+    col_fracpfaf  = 11; 
     
   end 
   
@@ -390,7 +389,7 @@ else
     
   end
   
-  tile_coord.pfaf(       ind_NOTocean) = tmpdata(ind_NOTocean, col_pfaf);   
+  tile_coord.pfaf_index( ind_NOTocean) = tmpdata(ind_NOTocean, col_pfafindex);   
   
   % -------------------------------------------------
   %
@@ -401,14 +400,14 @@ else
   %
   % non-EASE grid tile file:
   %
-  %   column  9: i_indg2    [for ocean tiles] *OR* pfaf      [for non-ocean tiles]
+  %   column  9: i_indg2    [for ocean tiles] *OR* pfaf_index [for non-ocean tiles]
   %   column 10: j_indg2
-  %   column 11: frac_cell2 [for ocean tiles] *OR* frac_pfaf [for non-ocean tiles]
+  %   column 11: frac_cell2 [for ocean tiles] *OR* frac_pfaf  [for non-ocean tiles]
   %   column 12: dummy_index2
   
   if ~isEASE
   
-    tile_coord.frac_pfaf( ind_NOTocean) = tmpdata(ind_NOTocean, col_frac_pfaf);
+    tile_coord.frac_pfaf( ind_NOTocean) = tmpdata(ind_NOTocean, col_fracpfaf);
   
     tile_coord.i_indg2(   ind_ocean)    = tmpdata(ind_ocean,     9);
     tile_coord.j_indg2(   ind_ocean)    = tmpdata(ind_ocean,    10);
@@ -430,11 +429,11 @@ else
   
   end
   
-  if ( any(tile_coord.tile_id(ind_land) - tctmp.tile_id) | ...
-       any(tile_coord.pfaf(   ind_land) - tctmp.pfaf   )   ...
+  if ( any(tile_coord.tile_id(   ind_land) - tctmp.tile_id   )  |   ...
+       any(tile_coord.pfaf_index(ind_land) - tctmp.pfaf_index)      ...
        )
   
-    error('mismatch between tile file and catchment.def file: tile_id or pfaf')
+    error('mismatch between tile file and catchment.def file: tile_id or pfaf_index')
   
   end
   
