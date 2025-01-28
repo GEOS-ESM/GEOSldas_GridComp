@@ -1358,10 +1358,9 @@ class LDASsetup:
         constraint='cas'
         if self.GEOS_SITE == "NAS":
           constraint = 'cas_ait'
-        elif self.BUILT_ON_SLES15:
+        elif (int(self.rqdRmInp['ntasks-per-node']) > 46):
           constraint = 'mil'
-        else:
-           assert int(self.rqdRmInp['ntasks-per-node']) <= 46, 'ntasks-per-node should be <=46 for cas'
+          assert self.BUILT_ON_SLES15, 'Program should be built on SLES15'
 
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
