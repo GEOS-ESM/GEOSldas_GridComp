@@ -2365,11 +2365,11 @@ obs_param_nml(53)%adapt          = 0
 
 ! --------------------------------------------------------------------------------------------------------------
 !
-!  54 = CYGNSS_SM (CYGNSS Level 3 soil moisture version 3.2)
+!  54 = CYGNSS_SM_6hr (CYGNSS Level 3 soil moisture version 3.2)
 !
 ! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2
 
-obs_param_nml(54)%descr          = 'CYGNSS_SM'
+obs_param_nml(54)%descr          = 'CYGNSS_SM_6hr'
 obs_param_nml(54)%orbit          = 3
 obs_param_nml(54)%pol            = 0
 obs_param_nml(54)%N_ang          = 0
@@ -2394,10 +2394,10 @@ obs_param_nml(54)%scalepath      = ''
 obs_param_nml(54)%scalename      = ''
 obs_param_nml(54)%flistpath      = ''
 obs_param_nml(54)%flistname      = ''
-obs_param_nml(54)%errstd         = 0.1
+obs_param_nml(54)%errstd         = 0.04
 obs_param_nml(54)%std_normal_max = 2.5
 obs_param_nml(54)%zeromean       = .true.
-obs_param_nml(54)%coarsen_pert   = .false.
+obs_param_nml(54)%coarsen_pert   = .true.
 obs_param_nml(54)%xcorr          = 0.25
 obs_param_nml(54)%ycorr          = 0.25
 obs_param_nml(54)%adapt          = 0
@@ -2433,10 +2433,10 @@ obs_param_nml(55)%scalepath      = ''
 obs_param_nml(55)%scalename      = ''
 obs_param_nml(55)%flistpath      = ''
 obs_param_nml(55)%flistname      = ''
-obs_param_nml(55)%errstd         = 0.1
+obs_param_nml(55)%errstd         = 0.04
 obs_param_nml(55)%std_normal_max = 2.5
 obs_param_nml(55)%zeromean       = .true.
-obs_param_nml(55)%coarsen_pert   = .false.
+obs_param_nml(55)%coarsen_pert   = .true.
 obs_param_nml(55)%xcorr          = 0.25
 obs_param_nml(55)%ycorr          = 0.25
 obs_param_nml(55)%adapt          = 0

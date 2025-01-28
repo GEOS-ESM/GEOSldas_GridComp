@@ -2205,7 +2205,7 @@ contains
     ! local variables:
 
   
-    integer,           parameter :: max_obs        = 50000            ! max number of daily obs read by subroutine (expecting > 6 hr assim window)
+    integer,           parameter :: max_obs        = 50000            ! max number of daily obs read by subroutine (assim window <= 24 hr)
     character(4),      parameter :: J2000_epoch_id = 'TT12'           ! see date_time_util.F90
     character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
 
@@ -2217,26 +2217,26 @@ contains
     character(  2)       :: MM, DD, HH, MI
     character(  4)       :: YYYY
 
-    integer              :: pos, i, idx, N_obs, j, HHcnt, ind, ii
+    integer              :: i, idx, N_obs, j, ind, ii, dt_obs, obs_hour
     integer              :: ierr, ncid
     integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid, lon_dimid_m, lat_dimid_m
     integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
     integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop, N_lon_m, N_lat_m
     integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid, few_obs_varid, low_signal_varid    
+    integer              :: start(3), count(3)
     integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)  
 
     logical              :: file_exists
-    logical              :: HH03, HH09, HH12, HH15, HH21
 
     real,    dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_jtime(:)
     integer, dimension(:), pointer :: tmp_tile_num
     integer,   dimension(N_catd)   :: N_obs_in_tile          
 
-    real, allocatable    :: sm_d(:,:,:), sm_subd(:,:,:), sigma_d(:,:,:), sigma_subd(:,:,:)
     real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
     real, allocatable    :: time(:), timeslices(:,:)
     real, allocatable    :: latitudes_m(:,:), longitudes_m(:,:)
 
+    real                 :: date_time_low_hour, date_time_up_hour
     real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_jtime(max_obs)
 
     ! -------------------------------------------------------------------
@@ -2246,12 +2246,6 @@ contains
     nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_jtime )
 
     found_obs = .false.
-
-    HH03 = .false.
-    HH09 = .false.
-    HH12 = .false.
-    HH15 = .false.
-    HH21 = .false.
 
     ! determine operating time range of sensor
 
@@ -2268,64 +2262,57 @@ contains
     if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
          datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
 
+    ! determine if reading daily or subdaily obs
+
+    if     (trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
+       dt_obs = 24        ! obs frequency in hours   
+    elseif (trim(this_obs_param%descr) == 'CYGNSS_SM_6hr') then
+       dt_obs = 6
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
     ! find the time bounds of the assimilation window 
     !   (date_time-dtstep_assim/2,date_time+dtstep_assim/2]
 
-         date_time_low = date_time    
-         call augment_date_time( -(dtstep_assim/2), date_time_low)
-         date_time_up = date_time    
-         call augment_date_time(  (dtstep_assim/2), date_time_up)
-    
-    ! establish if assimilation window encompasses 12:00 UTC (daily CYGNSS obs time)
+    date_time_low = date_time    
+    call augment_date_time( -(dtstep_assim/2), date_time_low)
+    date_time_up = date_time    
+    call augment_date_time(  (dtstep_assim/2), date_time_up)
 
-    if (date_time_low%hour < 12 .and. date_time_up%hour >= 12) then
-       HH12 = .true.
-    end if
-    
-    ! return if assimilating daily obs and HH12 is false
-    
-    if (trim(this_obs_param%descr) == 'CYGNSS_SM_daily' .and. .not. HH12) return
+    ! account for minutes and seconds in date_time_low and date_time_up
 
-    ! cygnss sm subdaily observations are for 4 timeslices per day - 00-06, 06-12, 12-18, 18-24 UTC
-    ! we will assimilate these at 03, 09, 15, 21 UTC
+    date_time_low_hour = date_time_low%hour + date_time_low%min/60.0 + date_time_low%sec/3600.0
+    date_time_up_hour  = date_time_up%hour  + date_time_up%min/60.0  + date_time_up%sec/3600.0
 
-    HHcnt = 0
+    ! deal with assimilation window that spans 0z
 
-    if (date_time_low%hour < 3 .and. date_time_up%hour >= 3) then
-       HH03 = .true.
-       HHcnt = HHcnt + 1
-    end if
-    if (date_time_low%hour > 21 .and. date_time_up%hour >= 3) then  ! wrap-around from previous day for 3 hr < assim window <= 6 hr
-       HH03 = .true.
-       HHcnt = HHcnt + 1
-    end if
-    if (date_time_low%hour < 9 .and. date_time_up%hour >= 9) then
-       HH09 = .true.
-       HHcnt = HHcnt + 1
-    end if
-    if (date_time_low%hour < 15 .and. date_time_up%hour >= 15) then
-       HH15 = .true.
-       HHcnt = HHcnt + 1
-    end if
-    if (date_time_low%hour < 21 .and. date_time_up%hour >= 21) then
-       HH21 = .true.
-       HHcnt = HHcnt + 1
-    end if
-    if (date_time_low%hour < 21 .and. date_time_up%hour < 3) then  ! wrap-around into next day for 3 hr < assim window <= 6 hr 
-       HH21 = .true.
-       HHcnt = HHcnt + 1
+    if (date_time_low_hour > date_time_up_hour) then
+       date_time_low_hour = date_time_low_hour - 24.0
     end if
 
-    ! return if assimilating subdaily obs and no HH is true
+    obs_hour = -9999
 
-    if (trim(this_obs_param%descr) == 'CYGNSS_SM_6hr' .and. .not. (HH03 .or. HH09 .or. HH15 .or. HH21)) return
-
-    ! if assimilation window encompasses more than one time slice, abort
-
-    if (HHcnt > 1) then
-       err_msg = 'Can not assimilate subdaily CYGNSS obs from more than one time slice'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    if (dt_obs == 6) then          ! subdaily obs
+       if (date_time_low_hour < 3.0 .and. date_time_up_hour >= 3.0) then
+          obs_hour = 3
+       elseif (date_time_low_hour < 9.0 .and. date_time_up_hour >= 9.0) then
+          obs_hour = 9
+       elseif (date_time_low_hour < 15.0 .and. date_time_up_hour >= 15.0) then
+          obs_hour = 15
+       elseif (date_time_low_hour < 21.0 .and. date_time_up_hour >= 21.0) then
+          obs_hour = 21
+       end if
+    else                           ! daily obs
+       if (date_time_low_hour < 12.0 .and. date_time_up_hour >= 12.0) then
+          obs_hour = 12
+       end if
     end if
+
+    ! return if assimilation window does not encompass any obs
+
+    if (obs_hour < 0) return
 
     ! determine filename for CYGNSS obs file
 
@@ -2385,55 +2372,46 @@ contains
     allocate(tmp_sm(       N_lon, N_lat               ))
     allocate(tmp_sigma(    N_lon, N_lat               ))
 
+    ! define the count array for the NetCDF read operations
+    count = (/ N_lon, N_lat, 1 /)
+    
     ! read the variables
     ierr = nf90_get_var(ncid, timeintervals_varid, timeintervals)
     ierr = nf90_get_var(ncid, lat_varid, latitudes)
     ierr = nf90_get_var(ncid, lon_varid, longitudes)
 
+    idx = -1
+
     ! read either subdaily or daily soil moisture and sigma variables
-    if ( trim(this_obs_param%descr) == 'CYGNSS_SM_6hr' ) then
-
-       ! allocate memory for subdaily variables
-       allocate(sm_subd(   N_lon, N_lat, N_timeslices ))
-       allocate(sigma_subd(N_lon, N_lat, N_timeslices ))
-
-       ! subdaily observations required
-       ierr = nf90_get_var(ncid, sm_subd_varid,    sm_subd)
-       ierr = nf90_get_var(ncid, sigma_subd_varid, sigma_subd)
-
-       ! find the time slice that corresponds to the assimilation window
-       idx = -1
+    
+    if (dt_obs == 6) then
        do i = 1, N_timeslices
-           if ((HH03 .and. timeintervals(1,i) == 0.0 ) .or.            &
-               (HH09 .and. timeintervals(1,i) == 0.25) .or.            &
-               (HH15 .and. timeintervals(1,i) == 0.5 ) .or.            &
-               (HH21 .and. timeintervals(1,i) == 0.75)         ) then
-               idx = i
-               exit
-           end if
+          if ((obs_hour ==  3 .and. timeintervals(1,i) == 0.0 ) .or.            &
+              (obs_hour ==  9 .and. timeintervals(1,i) == 0.25) .or.            &
+              (obs_hour == 15 .and. timeintervals(1,i) == 0.5 ) .or.            &
+              (obs_hour == 21 .and. timeintervals(1,i) == 0.75)         ) then
+              idx = i
+              exit
+          end if
        end do
+
        if (idx == -1) then
-           err_msg = 'Error: No matching time interval found for HH = ' // HH
-           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       else
-           write(*,*) 'Index of matching time interval: ', idx
-       end if
-       tmp_sm    = sm_subd(   :,:,idx)
-       tmp_sigma = sigma_subd(:,:,idx)
+          write(err_msg, '(A,I2)') 'Error: No matching time interval found for obs_hour = ', obs_hour
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       endif
 
-    else
+       start = (/ 1, 1, idx /)
+       ierr = nf90_get_var(ncid, sm_subd_varid,    tmp_sm,    start=start, count=count)
+       ierr = nf90_get_var(ncid, sigma_subd_varid, tmp_sigma, start=start, count=count)
+    
+    else                       ! daily obs
+       idx = 1
 
-       ! allocate memory for daily variables
-       allocate(sm_d(   N_lon, N_lat, N_time ))
-       allocate(sigma_d(N_lon, N_lat, N_time ))
+       start = (/ 1, 1, idx /)
+       ierr = nf90_get_var(ncid, sm_d_varid,    tmp_sm,    start=start, count=count)
+       ierr = nf90_get_var(ncid, sigma_d_varid, tmp_sigma, start=start, count=count)
 
-       ! daily observations required
-       ierr = nf90_get_var(ncid, sm_d_varid,    sm_d)
-       ierr = nf90_get_var(ncid, sigma_d_varid, sigma_d)
-       tmp_sm    = sm_d(   :,:,1)
-       tmp_sigma = sigma_d(:,:,1)
-
-    end if
+    endif
 
     ! close the obs file
     ierr = nf90_close(ncid)
@@ -2653,11 +2631,6 @@ contains
    deallocate(high_ubrmsd_flag)
    deallocate(few_obs_flag)
    deallocate(low_signal_flag)
-
-   if (allocated(sm_d))          deallocate(sm_d)
-   if (allocated(sm_subd))       deallocate(sm_subd)
-   if (allocated(sigma_d))       deallocate(sigma_d)
-   if (allocated(sigma_subd))    deallocate(sigma_subd)
    
    if (associated(tmp_obs))      deallocate(tmp_obs)
    if (associated(tmp_lon))      deallocate(tmp_lon)
