@@ -11,12 +11,14 @@
 #
 ##############################################################################
 
+EXP_DOMAIN:    CF0[ADAS_CENTRAL_GRID e.g. 360]x6C_GLOBAL 
+
 LADAS_COUPLING:    1
 
 ADAS_EXPDIR:       [full_path]/[ADAS_EXPDIR]
 
 MET_TAG:           [ADAS_EXPID]__Nx+- 
-MET_PATH:          ../../scratch  
+MET_PATH:          ../../../../recycle/holdpredout 
 # option to use perturbed forcing created from central simulation and atm ensemble
 # MET_PATH:          [ADAS_EXPDIR]/atmens/rgdlfo
 

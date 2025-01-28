@@ -11,7 +11,9 @@
 #
 ##############################################################################
 
-NUM_LDAS_ENSEMBLE: [NUM_ATM_ENSEMBLE]
+EXP_DOMAIN:        CF00[ADAS_ATMENS_GRID e.g. 90]x6C_GLOBAL
+
+NUM_LDAS_ENSEMBLE: [NUM_ATMENS_ENSEMBLE]
 
 LADAS_COUPLING:    2
 
@@ -33,5 +35,7 @@ ENSEMBLE_FORCING:  YES
 
 JOB_SGMT:          00000000 060000 
 NUM_SGMT:          1
+
+HISTRC_FILE:      [path of GEOSldas_GridComp/GEOSldas_App/sample_config_files/LADAS]/GEOSldas_HIST.rc.atmens 
 
 ################################# EOF ########################################
