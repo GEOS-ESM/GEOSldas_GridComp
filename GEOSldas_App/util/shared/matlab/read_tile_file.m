@@ -79,13 +79,6 @@ if is_nc4
   
     tmpdata = ncread( fname_til, this_varname );
     
-    % rename some fields 
-    
-    if strcmp(this_varname,'i_indg1'     ), this_varname = 'i_indg';      end
-    if strcmp(this_varname,'j_indg1'     ), this_varname = 'j_indg';      end
-    if strcmp(this_varname,'frac_cell1'  ), this_varname = 'frac_cell';   end
-    if strcmp(this_varname,'dummy_index1'), this_varname = 'dummy_index'; end
-    
     cmd = ['tile_coord.', this_varname, ' = tmpdata;'];
 
     %disp(cmd)
@@ -232,16 +225,16 @@ else
   %
   % header line 2: 
   
-  tile_coord.N_grids = fscanf( ifp, '%f', 1 );     
+  tile_coord.N_Grids = fscanf( ifp, '%f', 1 );     
   
-  % verify N_grids (should be 1 for EASE and 2 for non-EASE)
+  % verify N_Grids (should be 1 for EASE and 2 for non-EASE)
   
-  if  isEASE & tile_coord.N_grids~=1, error(['unexpected N_grids for EASE tile space: ',     num2str(tile_coord.N_grids)]), end 
+  if  isEASE & tile_coord.N_Grids~=1, error(['unexpected N_Grids for EASE tile space: ',     num2str(tile_coord.N_Grids)]), end 
   
-  if ~isEASE & tile_coord.N_grids~=2, error(['unexpected N_grids for non-EASE tile space: ', num2str(tile_coord.N_grids)]), end 
+  if ~isEASE & tile_coord.N_Grids~=2, error(['unexpected N_Grids for non-EASE tile space: ', num2str(tile_coord.N_Grids)]), end 
   
   % Deal with older EASE bcs versions having (useless) header lines for grid 2, 
-  %   despite having the correct value of N_grids=1 in header line 2.
+  %   despite having the correct value of N_Grids=1 in header line 2.
   
   if isEASE & ( ~isempty(findstr('NL3',fname_til)) | ~isempty(findstr('NL4',fname_til)) )
   
@@ -249,7 +242,7 @@ else
   
   else 
   
-    tmp_n_grids = tile_coord.N_grids; 
+    tmp_n_grids = tile_coord.N_Grids; 
   
   end
   
@@ -267,11 +260,12 @@ else
   
   if tmp_n_grids==2
   
-    % NOTE: EASE NL3 and NL4 contain additional header lines for second grid, despite (correct) N_grids=1
+    % NOTE: EASE NL3 and NL4 contain additional header lines for second grid, despite (correct) N_Grids=1
+    %       For these old versions, read (and then ignore) additional header lines.
   
-    tile_coord.Grid2_Name = fscanf( ifp, '%s', 1 );
-    tile_coord.IM2        = fscanf( ifp, '%f', 1 );
-  tile_coord.JM2        = fscanf( ifp, '%f', 1 );
+    tile_coord.Grid_ocn_Name = fscanf( ifp, '%s', 1 );
+    tile_coord.IM_ocn        = fscanf( ifp, '%f', 1 );
+    tile_coord.JM_ocn        = fscanf( ifp, '%f', 1 );
 
   end
   
@@ -318,41 +312,41 @@ else
   %
   % copy data into tile_coord structure 
   
-  tile_coord.N_tile        = size(tmpdata,1);        % number of tiles (assign here in case of subsetting above)
+  tile_coord.N_tile          = size(tmpdata,1);        % number of tiles (assign here in case of subsetting above)
   
   % the following are universal (for EASE and non-EASE, all tile types)
   
-  tile_coord.tile_id       = tmp_tileid;             % tile ID
+  tile_coord.tile_id         = tmp_tileid;             % tile ID
   
-  tile_coord.typ           = tmpdata(:, 1);          % tile type
+  tile_coord.typ             = tmpdata(:, 1);          % tile type
   
-  tile_coord.com_lon       = tmpdata(:, 3);          % center-of-mass longitude of tile
-  tile_coord.com_lat       = tmpdata(:, 4);          % center-of-mass latitude  of tile
+  tile_coord.com_lon         = tmpdata(:, 3);          % center-of-mass longitude of tile
+  tile_coord.com_lat         = tmpdata(:, 4);          % center-of-mass latitude  of tile
   
-  tile_coord.i_indg        = tmpdata(:, 5);          % i index of tile on global "atm" (or EASE) grid 
-  tile_coord.j_indg        = tmpdata(:, 6);          % j index of tile on global "atm" (or EASE) grid 
-  tile_coord.frac_cell     = tmpdata(:, 7);          % area fraction of "atm" (or EASE) grid cell 
+  tile_coord.i_indg          = tmpdata(:, 5);          % i index of tile on global "atm" (or EASE) grid 
+  tile_coord.j_indg          = tmpdata(:, 6);          % j index of tile on global "atm" (or EASE) grid 
+  tile_coord.frac_cell       = tmpdata(:, 7);          % area fraction of "atm" (or EASE) grid cell 
   
   % initialize remaining fields (to be filled below)
   
   tmpNaN = NaN*ones(tile_coord.N_tile,1);
   
-  tile_coord.min_lon       = tmpNaN;                 % min longitude of tile
-  tile_coord.max_lon       = tmpNaN;                 % max longitude of tile
-  tile_coord.min_lat       = tmpNaN;                 % min latitude  of tile
-  tile_coord.max_lat       = tmpNaN;                 % max latitude  of tile
+  tile_coord.min_lon         = tmpNaN;                 % min longitude of tile
+  tile_coord.max_lon         = tmpNaN;                 % max longitude of tile
+  tile_coord.min_lat         = tmpNaN;                 % min latitude  of tile
+  tile_coord.max_lat         = tmpNaN;                 % max latitude  of tile
                                                      
-  tile_coord.elev          = tmpNaN;                 % elevation of tile
+  tile_coord.elev            = tmpNaN;                 % elevation of tile
                                                      
-  tile_coord.area          = tmpNaN;                 % area of "atm" grid cell 
-  tile_coord.pfaf_index    = tmpNaN;                 % index of (hydrological) Pfafstetter catchment
-  tile_coord.frac_pfaf     = tmpNaN;                 % area fraction of Pfafstetter catchment
+  tile_coord.area            = tmpNaN;                 % area of "atm" grid cell 
+  tile_coord.pfaf_index      = tmpNaN;                 % index of (hydrological) Pfafstetter catchment
+  tile_coord.frac_pfaf       = tmpNaN;                 % area fraction of Pfafstetter catchment
                      
   if ~isEASE
                                  
-    tile_coord.i_indg2     = tmpNaN;                 % i index of tile on global "ocean" grid (grid 2)
-    tile_coord.j_indg2     = tmpNaN;                 % j index of tile on global "ocean" grid (grid 2)
-    tile_coord.frac_cell2  = tmpNaN;                 % area fraction of "ocean" grid cell (grid 2)
+    tile_coord.i_indg_ocn    = tmpNaN;                 % i index of tile on global "ocean" grid (grid 2)
+    tile_coord.j_indg_ocn    = tmpNaN;                 % j index of tile on global "ocean" grid (grid 2)
+    tile_coord.frac_cell_ocn = tmpNaN;                 % area fraction of "ocean" grid cell (grid 2)
   
   end
   
@@ -409,9 +403,9 @@ else
   
     tile_coord.frac_pfaf( ind_NOTocean) = tmpdata(ind_NOTocean, col_fracpfaf);
   
-    tile_coord.i_indg2(   ind_ocean)    = tmpdata(ind_ocean,     9);
-    tile_coord.j_indg2(   ind_ocean)    = tmpdata(ind_ocean,    10);
-    tile_coord.frac_cell2(ind_ocean)    = tmpdata(ind_ocean,    11);
+    tile_coord.i_indg_ocn(   ind_ocean)    = tmpdata(ind_ocean,     9);
+    tile_coord.j_indg_ocn(   ind_ocean)    = tmpdata(ind_ocean,    10);
+    tile_coord.frac_cell_ocn(ind_ocean)    = tmpdata(ind_ocean,    11);
   
   end
   
