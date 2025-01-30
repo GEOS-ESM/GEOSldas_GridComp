@@ -2209,6 +2209,7 @@ contains
     integer,           parameter :: max_obs        = 50000            ! max number of daily obs read by subroutine (assim window <= 24 hr)
     character(4),      parameter :: J2000_epoch_id = 'TT12'           ! see date_time_util.F90
     character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
+    real,              parameter :: tolerance = 1.0e-6                ! tolerance for floating point comparisons
 
     type(date_time_type) :: date_time_obs_beg, date_time_obs_end
     type(date_time_type) :: date_time_up, date_time_low
@@ -2224,7 +2225,7 @@ contains
     integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
     integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop, N_lon_m, N_lat_m
     integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid
-    integer              :: few_obs_varid, low_signal_varid    
+    integer              :: few_obs_varid, low_signal_varid, good_flag_value    
 
     integer              :: start(3), count(3)
     integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)  
@@ -2397,10 +2398,10 @@ contains
     
     if (dt_obs == 6) then
        do i = 1, N_timeslices
-          if ((obs_hour ==  3 .and. timeintervals(1,i) == 0.0 ) .or.            &
-              (obs_hour ==  9 .and. timeintervals(1,i) == 0.25) .or.            &
-              (obs_hour == 15 .and. timeintervals(1,i) == 0.5 ) .or.            &
-              (obs_hour == 21 .and. timeintervals(1,i) == 0.75)         ) then
+          if ((obs_hour ==  3 .and. (abs(timeintervals(1,i) - 0.0 ) < tolerance)) .or.            &
+              (obs_hour ==  9 .and. (abs(timeintervals(1,i) - 0.25) < tolerance)) .or.            &
+              (obs_hour == 15 .and. (abs(timeintervals(1,i) - 0.5 ) < tolerance)) .or.            &
+              (obs_hour == 21 .and. (abs(timeintervals(1,i) - 0.75) < tolerance))        ) then
               idx = i
               exit
           end if
@@ -2485,17 +2486,19 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
+    good_flag_value = 255  ! should really be 0 but is 255 because of unsigned v. signed byte issues
+
     ! fill tmp arrays
     N_obs = 0
 
     do i = 1, N_lon
         do j = 1, N_lat
-            if (tmp_sm(i,j) .ne. this_obs_param%nodata .and.         &
-                small_SM_range_flag(i,j) .ne. 1        .and.         &
-                poor_SMAP_flag(i,j)      .ne. 1        .and.         &
-                high_ubrmsd_flag(i,j)    .ne. 1        .and.         &
-                few_obs_flag(i,j)        .ne. 1        .and.         &
-                low_signal_flag(i,j)     .ne. 1 ) then
+            if (tmp_sm(i,j) .ne. this_obs_param%nodata      .and.         &
+                small_SM_range_flag(i,j) == good_flag_value .and.         &
+                poor_SMAP_flag(i,j)      == good_flag_value .and.         &
+                high_ubrmsd_flag(i,j)    == good_flag_value .and.         &
+                few_obs_flag(i,j)        == good_flag_value .and.         &
+                low_signal_flag(i,j)     == good_flag_value ) then
                 
                 ! valid observation
                 N_obs = N_obs + 1
