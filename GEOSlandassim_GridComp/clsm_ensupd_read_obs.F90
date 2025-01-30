@@ -2156,19 +2156,20 @@ contains
 
     !---------------------------------------------------------------------
     ! 
-    ! Routine to read in CYGNSS soil moisture obs from netCDF files and apply mask.
+    ! Routine to read CYGNSS soil moisture obs from netCDF file and apply mask.
     ! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2   
-    ! CYGNSS soil moisture obs are in volumetric units (m3 m-3) with a spatial 
-    ! resolution of 0.3 Decimal Degrees x 0.37 Decimal Degrees.
-    ! They are daily files containing daily (obs_param_nml(.)%descr = CYGNSS_SM_daily) 
-    ! and subdaily SM estimates (obs_param_nml(.)%descr = CYGNSS_SM_6hr). The 
-    ! subdaily values are for 6 hr time intervals, 0-6hr, 6-12hr, 12-18hr, 18-24hr.
-    ! The subdaily values are assimilated at 3z, 9z, 15z, 21z. If the assimilation 
-    ! window is more than 6 hr the code will error out. The daily values are assimilated
-    ! at 12z. The assumption is that either the daily or subdaily values are assimilated,
-    ! but the code will assimilate both if in the nml.   
+    ! CYGNSS soil moisture obs are in volumetric units (m3 m-3) on the 
+    ! 36-km EASEv2 global cylindrical grid.
+    ! Obs are in files containing daily (obs_param_nml(.)%descr = CYGNSS_SM_daily) 
+    ! and subdaily SM estimates (obs_param_nml(.)%descr = CYGNSS_SM_6hr). 
+    ! Daily values are for 0-24z and assimilated at 12z.
+    ! Subdaily values are for 6 hr time intervals, 0-6z, 6-12z, 12-18z, and 18-24z
+    ! and assimilated at 3z, 9z, 15z, 21z. 
+    ! Assimilation window must not be longer than 6 hours.
+    ! Subroutine read_ens_upd_inputs() ensures that only daily *or* subdaily
+    ! obs are assimilated.
     !
-    ! A. Fox, Jan 2025 
+    ! A. Fox, reichle, Jan 2025 
     !
     ! --------------------------------------------------------------------
 
@@ -2265,6 +2266,13 @@ contains
     if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
          datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
 
+    ! make sure assimilation window is no longer than 6 hours
+
+    if (dtstep_assim>6*60*60) then
+       err_msg = 'dtstep_assim too long for CYGNSS soil moisture obs'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    
     ! determine if reading daily or subdaily obs
 
     if     (trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
