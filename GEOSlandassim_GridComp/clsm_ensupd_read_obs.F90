@@ -2222,7 +2222,9 @@ contains
     integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid, lon_dimid_m, lat_dimid_m
     integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
     integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop, N_lon_m, N_lat_m
-    integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid, few_obs_varid, low_signal_varid    
+    integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid
+    integer              :: few_obs_varid, low_signal_varid    
+
     integer              :: start(3), count(3)
     integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)  
 
@@ -2230,7 +2232,8 @@ contains
 
     real,    dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_jtime(:)
     integer, dimension(:), pointer :: tmp_tile_num
-    integer,   dimension(N_catd)   :: N_obs_in_tile          
+
+    integer, dimension(N_catd)     :: N_obs_in_tile          
 
     real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
     real, allocatable    :: time(:), timeslices(:,:)
@@ -2243,7 +2246,7 @@ contains
 
     ! initialize
 
-    nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_jtime )
+    nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_jtime, tmp_tile_num )
 
     found_obs = .false.
 
@@ -2281,7 +2284,7 @@ contains
     date_time_up = date_time    
     call augment_date_time(  (dtstep_assim/2), date_time_up)
 
-    ! account for minutes and seconds in date_time_low and date_time_up
+    ! get fractional time-of-day (hours) 
 
     date_time_low_hour = date_time_low%hour + date_time_low%min/60.0 + date_time_low%sec/3600.0
     date_time_up_hour  = date_time_up%hour  + date_time_up%min/60.0  + date_time_up%sec/3600.0
@@ -2295,17 +2298,17 @@ contains
     obs_hour = -9999
 
     if (dt_obs == 6) then          ! subdaily obs
-       if (date_time_low_hour < 3.0 .and. date_time_up_hour >= 3.0) then
-          obs_hour = 3
-       elseif (date_time_low_hour < 9.0 .and. date_time_up_hour >= 9.0) then
-          obs_hour = 9
+       if     (date_time_low_hour <  3.0 .and. date_time_up_hour >=  3.0) then
+          obs_hour =  3
+       elseif (date_time_low_hour <  9.0 .and. date_time_up_hour >=  9.0) then
+          obs_hour =  9
        elseif (date_time_low_hour < 15.0 .and. date_time_up_hour >= 15.0) then
           obs_hour = 15
        elseif (date_time_low_hour < 21.0 .and. date_time_up_hour >= 21.0) then
           obs_hour = 21
        end if
     else                           ! daily obs
-       if (date_time_low_hour < 12.0 .and. date_time_up_hour >= 12.0) then
+       if     (date_time_low_hour < 12.0 .and. date_time_up_hour >= 12.0) then
           obs_hour = 12
        end if
     end if
@@ -2405,11 +2408,10 @@ contains
        ierr = nf90_get_var(ncid, sigma_subd_varid, tmp_sigma, start=start, count=count)
     
     else                       ! daily obs
-       idx = 1
 
-       start = (/ 1, 1, idx /)
-       ierr = nf90_get_var(ncid, sm_d_varid,    tmp_sm,    start=start, count=count)
-       ierr = nf90_get_var(ncid, sigma_d_varid, tmp_sigma, start=start, count=count)
+       start = (/ 1, 1, 1 /)
+       ierr = nf90_get_var(ncid, sm_d_varid,       tmp_sm,    start=start, count=count)
+       ierr = nf90_get_var(ncid, sigma_d_varid,    tmp_sigma, start=start, count=count)
 
     endif
 
@@ -2447,7 +2449,6 @@ contains
     ierr = nf90_inq_varid(ncid, 'flag_high_ubrmsd',    high_ubrmsd_varid)
     ierr = nf90_inq_varid(ncid, 'flag_few_obs',        few_obs_varid)
     ierr = nf90_inq_varid(ncid, 'flag_low_signal',     low_signal_varid)
-
 
     ! allocate memory for the variables
     allocate(latitudes_m(        N_lon_m, N_lat_m))
