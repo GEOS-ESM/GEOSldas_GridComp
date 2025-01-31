@@ -2363,8 +2363,86 @@ obs_param_nml(53)%xcorr          = 0.
 obs_param_nml(53)%ycorr          = 0.
 obs_param_nml(53)%adapt          = 0
 
+! --------------------------------------------------------------------------------------------------------------
+!
+!  54 = CYGNSS_SM_6hr (CYGNSS Level 3 soil moisture version 3.2)
+!
+! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2
+
+obs_param_nml(54)%descr          = 'CYGNSS_SM_6hr'
+obs_param_nml(54)%orbit          = 3
+obs_param_nml(54)%pol            = 0
+obs_param_nml(54)%N_ang          = 0
+obs_param_nml(54)%freq           = 0
+obs_param_nml(54)%FOV            = 20.
+obs_param_nml(54)%FOV_units      = 'km'
+obs_param_nml(54)%assim          = .false.
+obs_param_nml(54)%scale          = .false.
+obs_param_nml(54)%getinnov       = .false.
+obs_param_nml(54)%RTM_ID         = 0
+obs_param_nml(54)%bias_Npar      = 0
+obs_param_nml(54)%bias_trel      = 864000
+obs_param_nml(54)%bias_tcut      = 432000
+obs_param_nml(54)%nodata         = -9999.
+obs_param_nml(54)%varname        = 'sfmc'
+obs_param_nml(54)%units          = 'm3 m-3'
+obs_param_nml(54)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/CYGNSS/'
+obs_param_nml(54)%name           = ''
+obs_param_nml(54)%maskpath       = ''
+obs_param_nml(54)%maskname       = ''
+obs_param_nml(54)%scalepath      = ''
+obs_param_nml(54)%scalename      = ''
+obs_param_nml(54)%flistpath      = ''
+obs_param_nml(54)%flistname      = ''
+obs_param_nml(54)%errstd         = 0.04
+obs_param_nml(54)%std_normal_max = 2.5
+obs_param_nml(54)%zeromean       = .true.
+obs_param_nml(54)%coarsen_pert   = .true.
+obs_param_nml(54)%xcorr          = 0.25
+obs_param_nml(54)%ycorr          = 0.25
+obs_param_nml(54)%adapt          = 0
+
+! --------------------------------------------------------------------------------------------------------------
+!
+!  55 = CYGNSS_SM_daily (CYGNSS Level 3 soil moisture version 3.2)
+!
+! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2
+
+obs_param_nml(55)%descr          = 'CYGNSS_SM_daily'
+obs_param_nml(55)%orbit          = 3
+obs_param_nml(55)%pol            = 0
+obs_param_nml(55)%N_ang          = 0
+obs_param_nml(55)%freq           = 0
+obs_param_nml(55)%FOV            = 20.
+obs_param_nml(55)%FOV_units      = 'km'
+obs_param_nml(55)%assim          = .false.
+obs_param_nml(55)%scale          = .false.
+obs_param_nml(55)%getinnov       = .false.
+obs_param_nml(55)%RTM_ID         = 0
+obs_param_nml(55)%bias_Npar      = 0
+obs_param_nml(55)%bias_trel      = 864000
+obs_param_nml(55)%bias_tcut      = 432000
+obs_param_nml(55)%nodata         = -9999.
+obs_param_nml(55)%varname        = 'sfmc'
+obs_param_nml(55)%units          = 'm3 m-3'
+obs_param_nml(55)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/CYGNSS/'
+obs_param_nml(55)%name           = ''
+obs_param_nml(55)%maskpath       = ''
+obs_param_nml(55)%maskname       = ''
+obs_param_nml(55)%scalepath      = ''
+obs_param_nml(55)%scalename      = ''
+obs_param_nml(55)%flistpath      = ''
+obs_param_nml(55)%flistname      = ''
+obs_param_nml(55)%errstd         = 0.04
+obs_param_nml(55)%std_normal_max = 2.5
+obs_param_nml(55)%zeromean       = .true.
+obs_param_nml(55)%coarsen_pert   = .true.
+obs_param_nml(55)%xcorr          = 0.25
+obs_param_nml(55)%ycorr          = 0.25
+obs_param_nml(55)%adapt          = 0
 
 ! --------------------------------------------------------------------
+
 
 /
 
