@@ -9098,65 +9098,67 @@ contains
 
        
     case ('ASCAT_SM_A', 'ASCAT_SM_D' )
-      
-        call read_obs_sm_ASCAT(                                        &
-             work_path, exp_id,                                        &
-             date_time, dtstep_assim, N_catd, tile_coord,              &
-             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-             this_obs_param,                                           &
-             found_obs, tmp_obs, tmp_std_obs )
-        
-        ! scale observations to model climatology
-        
-        if (this_obs_param%scale .and. found_obs) then
-
-           scaled_obs = .true.
-
-           call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
-                tmp_obs, tmp_std_obs )
-           
-        end if
-        
+       
+       call read_obs_sm_ASCAT(                                        &
+            work_path, exp_id,                                        &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs )
+       
+       ! scale observations to model climatology
+       
+       if (this_obs_param%scale .and. found_obs) then
+          
+          scaled_obs = .true.
+          
+          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+               tmp_obs, tmp_std_obs )
+          
+       end if
+       
     case ('ASCAT_META_SM','ASCAT_METB_SM','ASCAT_METC_SM' )
-
-        call read_obs_sm_ASCAT_EUMET(                                  &
-             date_time, dtstep_assim, N_catd, tile_coord,              &
-             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-             this_obs_param,                                           &
-             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-             tmp_time)
- 
-        ! scale observations to model climatology
-        
-        if (this_obs_param%scale .and. found_obs) then
-
-           scaled_obs = .true.
-
-           call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
-                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
-                tmp_obs, tmp_std_obs )
-           
-        end if 
-        
+       
+       call read_obs_sm_ASCAT_EUMET(                                  &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
+       
+       ! scale observations to model climatology
+       
+       if (this_obs_param%scale .and. found_obs) then
+          
+          scaled_obs = .true.
+          
+          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+               date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
+               tmp_obs, tmp_std_obs )
+          
+       end if
+       
     case ('CYGNSS_SM_6hr','CYGNSS_SM_daily')
-
-        call read_obs_sm_CYGNSS(                                       &
-             date_time, dtstep_assim, N_catd, tile_coord,              &
-             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-             this_obs_param,                                           &
-             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-             tmp_time)
-  
-        ! scale observations to model climatology
-         
-        if (this_obs_param%scale .and. found_obs) then
- 
-           scaled_obs = .true.
- 
-           ! TODO: implement scaling for CYGNSS obs
-            
-        end if         
-
+       
+       call read_obs_sm_CYGNSS(                                       &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
+       
+       ! scale observations to model climatology
+       
+       if (this_obs_param%scale .and. found_obs) then
+          
+          scaled_obs = .true.
+          
+          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+               date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
+               tmp_obs, tmp_std_obs )
+          
+       end if
+       
     case ('isccp_tskin_gswp2_v1')
        
        call read_obs_isccp_tskin_gswp2_v1(                            &
