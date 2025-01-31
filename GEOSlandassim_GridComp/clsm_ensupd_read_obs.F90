@@ -2145,7 +2145,512 @@ contains
     if (associated(tmp_jtime))    deallocate(tmp_jtime)
     
   end subroutine read_obs_sm_ASCAT_EUMET
+
+  ! ****************************************************************************
+
+  subroutine read_obs_sm_CYGNSS(                                              &
+       date_time, dtstep_assim, N_catd, tile_coord,                           &
+       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
+       this_obs_param,                                                        &
+       found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
+
+    !---------------------------------------------------------------------
+    ! 
+    ! Routine to read CYGNSS soil moisture obs from netCDF file and apply mask.
+    ! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2   
+    ! CYGNSS soil moisture obs are in volumetric units (m3 m-3) on the 
+    ! 36-km EASEv2 global cylindrical grid.
+    ! Obs are in files containing daily (obs_param_nml(.)%descr = CYGNSS_SM_daily) 
+    ! and subdaily SM estimates (obs_param_nml(.)%descr = CYGNSS_SM_6hr). 
+    ! Daily values are for 0-24z and assimilated at 12z.
+    ! Subdaily values are for 6 hr time intervals, 0-6z, 6-12z, 12-18z, and 18-24z
+    ! and assimilated at 3z, 9z, 15z, 21z. 
+    ! Assimilation window must not be longer than 6 hours.
+    ! Subroutine read_ens_upd_inputs() ensures that only daily *or* subdaily
+    ! obs are assimilated.
+    !
+    ! A. Fox, reichle, Jan 2025 
+    !
+    ! --------------------------------------------------------------------
+
+    use netcdf   
+    implicit none
+
+    ! inputs:
+
+    type(date_time_type), intent(in) :: date_time
+
+    integer, intent(in) :: dtstep_assim, N_catd
+
+    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+
+    type(grid_def_type), intent(in) :: tile_grid_d
+
+    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+       N_tile_in_cell_ij
+
+    integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
+
+    type(obs_param_type), intent(in) :: this_obs_param
+
+    ! outputs:
+
+    logical, intent(out)                    :: found_obs
+
+    real,    intent(out), dimension(N_catd) :: CYGNSS_sm              ! sm obs          [cm3 cm-3]
+    real,    intent(out), dimension(N_catd) :: CYGNSS_sm_std          ! sm obs err std  [cm3 cm-3]
+    real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
+    real*8,  intent(out), dimension(N_catd) :: CYGNSS_time            ! J2000 seconds
+    
+    ! -------------------------------------------------------------------
+    ! local variables:
+
   
+    integer,           parameter :: max_obs        = 50000            ! max number of daily obs read by subroutine (assim window <= 24 hr)
+    character(4),      parameter :: J2000_epoch_id = 'TT12'           ! see date_time_util.F90
+    character(len=*),  parameter :: Iam = 'read_obs_sm_CYGNSS'
+    real,              parameter :: tolerance = 1.0e-6                ! tolerance for floating point comparisons
+
+    type(date_time_type) :: date_time_obs_beg, date_time_obs_end
+    type(date_time_type) :: date_time_up, date_time_low
+
+    character(400)       :: err_msg    
+    character(300)       :: tmpfname, tmpname, tmpmaskname
+    character(  2)       :: MM, DD, HH, MI
+    character(  4)       :: YYYY
+
+    integer              :: i, idx, N_obs, j, ind, ii, dt_obs, obs_hour
+    integer              :: ierr, ncid
+    integer              :: lon_dimid, lat_dimid, time_dimid, timeslices_dimid, startstop_dimid, lon_dimid_m, lat_dimid_m
+    integer              :: sm_d_varid, sm_subd_varid, sigma_d_varid, sigma_subd_varid, timeintervals_varid, lat_varid, lon_varid
+    integer              :: N_lon, N_lat, N_time, N_timeslices, N_startstop, N_lon_m, N_lat_m
+    integer              :: longitudes_m_varid, latitudes_m_varid, small_SM_range_varid, poor_SMAP_varid, high_ubrmsd_varid
+    integer              :: few_obs_varid, low_signal_varid, good_flag_value    
+
+    integer              :: start(3), count(3)
+    integer, allocatable :: small_SM_range_flag(:,:), poor_SMAP_flag(:,:), high_ubrmsd_flag(:,:), few_obs_flag(:,:), low_signal_flag(:,:)  
+
+    logical              :: file_exists
+
+    real,    dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_jtime(:)
+    integer, dimension(:), pointer :: tmp_tile_num
+
+    integer, dimension(N_catd)     :: N_obs_in_tile          
+
+    real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
+    real, allocatable    :: time(:), timeslices(:,:)
+    real, allocatable    :: latitudes_m(:,:), longitudes_m(:,:)
+
+    real                 :: date_time_low_hour, date_time_up_hour
+    real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_jtime(max_obs)
+
+    ! -------------------------------------------------------------------
+
+    ! initialize
+
+    nullify( tmp_lon, tmp_lat, tmp_obs, tmp_err, tmp_jtime, tmp_tile_num )
+
+    found_obs = .false.
+
+    ! determine operating time range of sensor
+
+    if (trim(this_obs_param%descr) == 'CYGNSS_SM_6hr' .or. trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
+       date_time_obs_beg = date_time_type(2018, 8, 1, 0, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! return if date_time falls outside operating time range
+    
+    if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.                &
+         datetime_lt_refdatetime(date_time_obs_end, date_time)              )  return
+
+    ! make sure assimilation window is no longer than 6 hours
+
+    if (dtstep_assim>6*60*60) then
+       err_msg = 'dtstep_assim too long for CYGNSS soil moisture obs'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    
+    ! determine if reading daily or subdaily obs
+
+    if     (trim(this_obs_param%descr) == 'CYGNSS_SM_daily') then
+       dt_obs = 24        ! obs frequency in hours   
+    elseif (trim(this_obs_param%descr) == 'CYGNSS_SM_6hr') then
+       dt_obs = 6
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! find the time bounds of the assimilation window 
+    !   (date_time-dtstep_assim/2,date_time+dtstep_assim/2]
+
+    date_time_low = date_time    
+    call augment_date_time( -(dtstep_assim/2), date_time_low)
+    date_time_up = date_time    
+    call augment_date_time(  (dtstep_assim/2), date_time_up)
+
+    ! get fractional time-of-day (hours) 
+
+    date_time_low_hour = date_time_low%hour + date_time_low%min/60.0 + date_time_low%sec/3600.0
+    date_time_up_hour  = date_time_up%hour  + date_time_up%min/60.0  + date_time_up%sec/3600.0
+
+    ! deal with assimilation window that spans 0z
+
+    if (date_time_low_hour > date_time_up_hour) then
+       date_time_low_hour = date_time_low_hour - 24.0
+    end if
+
+    obs_hour = -9999
+
+    if (dt_obs == 6) then          ! subdaily obs
+       if     (date_time_low_hour <  3.0 .and. date_time_up_hour >=  3.0) then
+          obs_hour =  3
+       elseif (date_time_low_hour <  9.0 .and. date_time_up_hour >=  9.0) then
+          obs_hour =  9
+       elseif (date_time_low_hour < 15.0 .and. date_time_up_hour >= 15.0) then
+          obs_hour = 15
+       elseif (date_time_low_hour < 21.0 .and. date_time_up_hour >= 21.0) then
+          obs_hour = 21
+       end if
+    else                           ! daily obs
+       if     (date_time_low_hour < 12.0 .and. date_time_up_hour >= 12.0) then
+          obs_hour = 12
+       end if
+    end if
+
+    ! return if assimilation window does not encompass any obs
+
+    if (obs_hour < 0) return
+
+    ! determine filename for CYGNSS obs file
+
+    write (YYYY,'(i4.4)') date_time%year
+    write (MM,  '(i2.2)') date_time%month
+    write (DD,  '(i2.2)') date_time%day 
+    write (HH,  '(i2.2)') date_time%hour 
+    write (MI,  '(i2.2)') date_time%min
+
+    ! construct the file name using hardwired name and date_time
+
+    tmpname = 'cyg.ddmi.s'// YYYY // MM // DD //'-030000-e'// YYYY // MM // DD //'-210000.l3.grid-soil-moisture-36km.a32.d33.nc'
+        
+    tmpfname = trim(this_obs_param%path) // '/Y' // YYYY // '/M' // MM // '/' // trim(tmpname)
+
+    if (logit) write (logunit, '(400A)') 'Reading CYGNSS soil moisture data from file: ', trim(tmpfname)
+
+    ! check if file exists
+
+    inquire(file=tmpfname, exist=file_exists)
+
+    if (.not. file_exists) then
+       err_msg = 'CYGNSS SM obs file not found!'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! open the NetCDF observation file
+    ierr = nf90_open(trim(tmpfname), nf90_nowrite, ncid)
+
+    ! get variable dimension IDs
+    ierr = nf90_inq_dimid(ncid, 'lon',        lon_dimid)
+    ierr = nf90_inq_dimid(ncid, 'lat',        lat_dimid)
+    ierr = nf90_inq_dimid(ncid, 'time',       time_dimid)    
+    ierr = nf90_inq_dimid(ncid, 'timeslices', timeslices_dimid)
+    ierr = nf90_inq_dimid(ncid, 'startstop',  startstop_dimid)
+
+    ! dimensions sizes
+    ierr = nf90_inquire_dimension(ncid, lon_dimid,        len=N_lon)
+    ierr = nf90_inquire_dimension(ncid, lat_dimid,        len=N_lat)
+    ierr = nf90_inquire_dimension(ncid, time_dimid,       len=N_time)
+    ierr = nf90_inquire_dimension(ncid, timeslices_dimid, len=N_timeslices)
+    ierr = nf90_inquire_dimension(ncid, startstop_dimid,  len=N_startstop)
+
+    ! get variable IDs
+    ierr = nf90_inq_varid(ncid, 'SM_daily',       sm_d_varid)
+    ierr = nf90_inq_varid(ncid, 'SM_subdaily',    sm_subd_varid)
+    ierr = nf90_inq_varid(ncid, 'SIGMA_daily',    sigma_d_varid)
+    ierr = nf90_inq_varid(ncid, 'SIGMA_subdaily', sigma_subd_varid)
+    ierr = nf90_inq_varid(ncid, 'timeintervals',  timeintervals_varid)
+    ierr = nf90_inq_varid(ncid, 'latitude',       lat_varid)
+    ierr = nf90_inq_varid(ncid, 'longitude',      lon_varid)
+
+    ! allocate memory for universal variables
+    allocate(timeintervals(N_startstop,  N_timeslices ))
+    allocate(latitudes(    N_lon, N_lat               ))
+    allocate(longitudes(   N_lon, N_lat               ))
+    allocate(tmp_sm(       N_lon, N_lat               ))
+    allocate(tmp_sigma(    N_lon, N_lat               ))
+
+    ! define the count array for the NetCDF read operations
+    count = (/ N_lon, N_lat, 1 /)
+    
+    ! read the variables
+    ierr = nf90_get_var(ncid, timeintervals_varid, timeintervals)
+    ierr = nf90_get_var(ncid, lat_varid, latitudes)
+    ierr = nf90_get_var(ncid, lon_varid, longitudes)
+
+    idx = -1
+
+    ! read either subdaily or daily soil moisture and sigma variables
+    
+    if (dt_obs == 6) then
+       do i = 1, N_timeslices
+          if ((obs_hour ==  3 .and. (abs(timeintervals(1,i) - 0.0 ) < tolerance)) .or.            &
+              (obs_hour ==  9 .and. (abs(timeintervals(1,i) - 0.25) < tolerance)) .or.            &
+              (obs_hour == 15 .and. (abs(timeintervals(1,i) - 0.5 ) < tolerance)) .or.            &
+              (obs_hour == 21 .and. (abs(timeintervals(1,i) - 0.75) < tolerance))        ) then
+              idx = i
+              exit
+          end if
+       end do
+
+       if (idx == -1) then
+          write(err_msg, '(A,I2)') 'Error: No matching time interval found for obs_hour = ', obs_hour
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       endif
+
+       start = (/ 1, 1, idx /)
+       ierr = nf90_get_var(ncid, sm_subd_varid,    tmp_sm,    start=start, count=count)
+       ierr = nf90_get_var(ncid, sigma_subd_varid, tmp_sigma, start=start, count=count)
+    
+    else                       ! daily obs
+
+       start = (/ 1, 1, 1 /)
+       ierr = nf90_get_var(ncid, sm_d_varid,       tmp_sm,    start=start, count=count)
+       ierr = nf90_get_var(ncid, sigma_d_varid,    tmp_sigma, start=start, count=count)
+
+    endif
+
+    ! close the obs file
+    ierr = nf90_close(ncid)
+
+   ! get name for CYGNSS mask file
+
+    tmpmaskname = trim(this_obs_param%maskpath) // '/' // trim(this_obs_param%maskname) // '.nc'
+
+    inquire(file=tmpfname, exist=file_exists)
+
+    if (.not. file_exists) then
+       err_msg = 'CYGNSS mask file not found!'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! open the CYGNSS mask file
+
+    ierr = nf90_open(trim(tmpmaskname), nf90_nowrite, ncid)
+
+    ! get variable dimension IDs
+    ierr = nf90_inq_dimid(ncid, 'lon', lon_dimid)
+    ierr = nf90_inq_dimid(ncid, 'lat', lat_dimid)
+
+    ! dimensions sizes
+    ierr = nf90_inquire_dimension(ncid, lon_dimid, len=N_lon_m)
+    ierr = nf90_inquire_dimension(ncid, lat_dimid, len=N_lat_m)
+
+    ! get variable IDs
+    ierr = nf90_inq_varid(ncid, 'longitude',           longitudes_m_varid)
+    ierr = nf90_inq_varid(ncid, 'latitude',            latitudes_m_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_small_SM_range', small_SM_range_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_poor_SMAP',      poor_SMAP_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_high_ubrmsd',    high_ubrmsd_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_few_obs',        few_obs_varid)
+    ierr = nf90_inq_varid(ncid, 'flag_low_signal',     low_signal_varid)
+
+    ! allocate memory for the variables
+    allocate(latitudes_m(        N_lon_m, N_lat_m))
+    allocate(longitudes_m(       N_lon_m, N_lat_m))
+    allocate(small_SM_range_flag(N_lon_m, N_lat_m))
+    allocate(poor_SMAP_flag(     N_lon_m, N_lat_m))
+    allocate(high_ubrmsd_flag(   N_lon_m, N_lat_m))
+    allocate(few_obs_flag(       N_lon_m, N_lat_m))
+    allocate(low_signal_flag(    N_lon_m, N_lat_m))
+
+    ! read the variables
+    ierr = nf90_get_var(ncid, latitudes_m_varid,    latitudes_m)
+    ierr = nf90_get_var(ncid, longitudes_m_varid,   longitudes_m)
+    ierr = nf90_get_var(ncid, small_SM_range_varid, small_SM_range_flag)
+    ierr = nf90_get_var(ncid, poor_SMAP_varid,      poor_SMAP_flag)
+    ierr = nf90_get_var(ncid, high_ubrmsd_varid,    high_ubrmsd_flag)
+    ierr = nf90_get_var(ncid, few_obs_varid,        few_obs_flag)
+    ierr = nf90_get_var(ncid, low_signal_varid,     low_signal_flag)
+
+    ! close the mask file
+    ierr = nf90_close(ncid)  
+
+    ! check the obs data and mask data are the same resolution
+    if (N_lon /= N_lon_m .or. N_lat /= N_lat_m) then
+       err_msg = 'The mask file ' // trim(this_obs_param%maskname) // ' does not match the obs resolution'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    good_flag_value = 255  ! should really be 0 but is 255 because of unsigned v. signed byte issues
+
+    ! fill tmp arrays
+    N_obs = 0
+
+    do i = 1, N_lon
+        do j = 1, N_lat
+            if (tmp_sm(i,j) .ne. this_obs_param%nodata      .and.         &
+                small_SM_range_flag(i,j) == good_flag_value .and.         &
+                poor_SMAP_flag(i,j)      == good_flag_value .and.         &
+                high_ubrmsd_flag(i,j)    == good_flag_value .and.         &
+                few_obs_flag(i,j)        == good_flag_value .and.         &
+                low_signal_flag(i,j)     == good_flag_value ) then
+                
+                ! valid observation
+                N_obs = N_obs + 1
+                if (N_obs > max_obs) then
+                    err_msg = 'Attempting to read too many obs - how long is your assimilation window?'
+                    call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+                end if
+                tmp1_lon(  N_obs) = longitudes(i,j)
+                tmp1_lat(  N_obs) = latitudes( i,j)
+                tmp1_obs(  N_obs) = tmp_sm(    i,j)
+                tmp1_err(  N_obs) = tmp_sigma( i,j)
+                tmp1_jtime(N_obs) = datetime_to_J2000seconds( date_time, J2000_epoch_id )
+            end if
+        end do
+    end do
+
+    if (logit) then
+          
+      write (logunit,*) 'read_obs_sm_CYGNSS: read ', N_obs, ' at date_time = ', date_time, ' from: ', tmpfname
+      write (logunit,*) '----------'
+      write (logunit,*) 'max(obs)=',maxval(tmp1_obs(1:N_obs)), ',  min(obs)=',minval(tmp1_obs(1:N_obs)), &
+           ',  avg(obs)=',sum(tmp1_obs(1:N_obs))/N_obs
+      
+    end if    
+
+    allocate(tmp_lon(  N_obs))
+    allocate(tmp_lat(  N_obs))
+    allocate(tmp_obs(  N_obs))
+    allocate(tmp_err(  N_obs))
+    allocate(tmp_jtime(N_obs))
+
+    tmp_lon   = tmp1_lon(  1:N_obs)
+    tmp_lat   = tmp1_lat(  1:N_obs)
+    tmp_obs   = tmp1_obs(  1:N_obs)
+    tmp_err   = tmp1_err(  1:N_obs)
+    tmp_jtime = tmp1_jtime(1:N_obs)
+  
+    ! ----------------------------------------------------------------
+    !
+    !    for each observation
+    !     a) determine grid cell that contains lat/lon
+    !     b) determine tile within grid cell that contains lat/lon
+
+    if (N_obs>0) then
+       
+      allocate(tmp_tile_num(N_obs))
+      
+      call get_tile_num_for_obs(N_catd, tile_coord,                 &
+           tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+           N_obs, tmp_lat, tmp_lon,                                 &
+           this_obs_param,                                          &
+           tmp_tile_num )
+      
+      ! ----------------------------------------------------------------
+      !
+      !     compute super-obs for each tile from all obs w/in that tile
+      !     (also eliminate observations that are not in domain)
+      
+      CYGNSS_sm   = 0.
+      CYGNSS_lon  = 0.
+      CYGNSS_lat  = 0.
+      CYGNSS_time = 0.0D0
+      
+      N_obs_in_tile = 0
+      
+      do ii=1,N_obs
+         
+         ind = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+         
+         if (ind>0) then         ! this step eliminates obs outside domain
+            
+            CYGNSS_sm(  ind) = CYGNSS_sm(  ind) + tmp_obs(  ii)
+            CYGNSS_lon( ind) = CYGNSS_lon( ind) + tmp_lon(  ii)
+            CYGNSS_lat( ind) = CYGNSS_lat( ind) + tmp_lat(  ii)
+            CYGNSS_time(ind) = tmp_jtime(ii)                      ! time is the same for all observations
+            
+            N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
+            
+         end if
+         
+      end do
+
+      ! normalize and set obs error std-dev
+
+      do ii=1,N_catd
+         
+         ! set observation error standard deviation 
+        
+         CYGNSS_sm_std(ii) = this_obs_param%errstd          ! volumetric units (m3 m-3)
+
+         ! normalize
+
+         if (N_obs_in_tile(ii)>1) then
+            
+            CYGNSS_sm(    ii) = CYGNSS_sm(  ii)/real(N_obs_in_tile(ii))
+            CYGNSS_lon(   ii) = CYGNSS_lon( ii)/real(N_obs_in_tile(ii))
+            CYGNSS_lat(   ii) = CYGNSS_lat( ii)/real(N_obs_in_tile(ii))
+            
+         elseif (N_obs_in_tile(ii)==0) then
+            
+            CYGNSS_sm(    ii) = this_obs_param%nodata
+            CYGNSS_lon(   ii) = this_obs_param%nodata
+            CYGNSS_lat(   ii) = this_obs_param%nodata
+            CYGNSS_time(  ii) = real(this_obs_param%nodata,kind(0.0D0))
+            CYGNSS_sm_std(ii) = this_obs_param%nodata
+            
+         else
+            
+            ! nothing to do if N_obs_in_tile(ii)==1 (and assuming N_obs_in_tile is never negative)
+            
+         end if
+         
+      end do
+      
+      ! clean up
+      
+      if (associated(tmp_tile_num)) deallocate(tmp_tile_num)
+      
+      if (any(N_obs_in_tile>0)) then
+       
+         found_obs = .true.
+         
+      else 
+         
+         found_obs = .false.
+         
+      end if
+      
+   end if
+   
+   ! clean up
+
+   deallocate(timeintervals)
+   deallocate(latitudes)
+   deallocate(longitudes)
+   deallocate(tmp_sm)
+   deallocate(tmp_sigma)
+   deallocate(latitudes_m)
+   deallocate(longitudes_m)
+   deallocate(small_SM_range_flag)
+   deallocate(poor_SMAP_flag)
+   deallocate(high_ubrmsd_flag)
+   deallocate(few_obs_flag)
+   deallocate(low_signal_flag)
+   
+   if (associated(tmp_obs))      deallocate(tmp_obs)
+   if (associated(tmp_lon))      deallocate(tmp_lon)
+   if (associated(tmp_lat))      deallocate(tmp_lat)
+   if (associated(tmp_jtime))    deallocate(tmp_jtime)
+
+  end subroutine read_obs_sm_CYGNSS
+
   ! ***************************************************************************
 
   subroutine read_sm_ASCAT_bin( &
@@ -2330,7 +2835,6 @@ contains
     N_data = j
     
   end subroutine read_sm_ASCAT_bin
-
 
   ! *****************************************************************
   
@@ -8594,46 +9098,67 @@ contains
 
        
     case ('ASCAT_SM_A', 'ASCAT_SM_D' )
-      
-        call read_obs_sm_ASCAT(                                        &
-             work_path, exp_id,                                        &
-             date_time, dtstep_assim, N_catd, tile_coord,              &
-             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-             this_obs_param,                                           &
-             found_obs, tmp_obs, tmp_std_obs )
-        
-        ! scale observations to model climatology
-        
-        if (this_obs_param%scale .and. found_obs) then
-
-           scaled_obs = .true.
-
-           call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
-                tmp_obs, tmp_std_obs )
-           
-        end if
-        
+       
+       call read_obs_sm_ASCAT(                                        &
+            work_path, exp_id,                                        &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs )
+       
+       ! scale observations to model climatology
+       
+       if (this_obs_param%scale .and. found_obs) then
+          
+          scaled_obs = .true.
+          
+          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+               tmp_obs, tmp_std_obs )
+          
+       end if
+       
     case ('ASCAT_META_SM','ASCAT_METB_SM','ASCAT_METC_SM' )
-
-        call read_obs_sm_ASCAT_EUMET(                                  &
-             date_time, dtstep_assim, N_catd, tile_coord,              &
-             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-             this_obs_param,                                           &
-             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-             tmp_time)
- 
-        ! scale observations to model climatology
-        
-        if (this_obs_param%scale .and. found_obs) then
-
-           scaled_obs = .true.
-
-           call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
-                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
-                tmp_obs, tmp_std_obs )
-           
-        end if        
-
+       
+       call read_obs_sm_ASCAT_EUMET(                                  &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
+       
+       ! scale observations to model climatology
+       
+       if (this_obs_param%scale .and. found_obs) then
+          
+          scaled_obs = .true.
+          
+          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+               date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
+               tmp_obs, tmp_std_obs )
+          
+       end if
+       
+    case ('CYGNSS_SM_6hr','CYGNSS_SM_daily')
+       
+       call read_obs_sm_CYGNSS(                                       &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
+       
+       ! scale observations to model climatology
+       
+       if (this_obs_param%scale .and. found_obs) then
+          
+          scaled_obs = .true.
+          
+          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+               date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
+               tmp_obs, tmp_std_obs )
+          
+       end if
+       
     case ('isccp_tskin_gswp2_v1')
        
        call read_obs_isccp_tskin_gswp2_v1(                            &
