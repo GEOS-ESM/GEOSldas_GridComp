@@ -617,7 +617,30 @@ contains
        
     end if
     
+    ! make sure only sub-daily or daily CYGNSS sm obs are assimilated
 
+    k=0
+    
+    do i=1,N_obs_param
+       
+       if (obs_param(i)%assim) then
+          
+          select case (trim(obs_param(i)%descr))
+             
+          case('CYGNSS_SM_daily','CYGNSS_SM_6hr'); k=k+1  
+             
+          end select
+          
+       end if
+       
+    end do
+    
+    if (k>1) then
+
+       err_msg = 'cannot assimilate CYGNSS_SM_daily *and* CYGNSS_SM_6hr'  
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       
+    end if
     
     ! -------------------------------------------------------------
     !
