@@ -173,7 +173,7 @@ class LDASsetup:
         self.adas_expdir =''
         if self.ladas_coupling > 0:
            self.adas_expdir = os.path.dirname(self.exphome)
-           self.rqdExeInp['ADAS_EXPDIR'] = self.adas_expdir
+           self.rqdExeInp[ 'ADAS_EXPDIR'] = self.adas_expdir
            self.adas_expid = os.path.basename(self.adas_expdir)
            self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__Nx+-'
            if self.ladas_coupling == 1:
@@ -1576,11 +1576,9 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#  (3) MET_TAG  must be set to [ADAS_EXPID]__Nx+-          #')
     print ('#      MET_PATH must be set as follows for                 #')
     print ('#        LADAS_COUPLING = 1:                               #')
-    print ('#          ../../../../recycle/holdpredout                 #')
+    print ('#          ../../../../recycle/holdpredout/                #')
     print ('#        LADAS_COUPLING = 2:                               #')
     print ('#          [ADAS_EXPDIR]/atmens/ensdiag/mem                #')
-    print ('#      After ldas exp setup, verify the following link:    #')
-    print ('#        ../input/met_forcing/* -> [MET_PATH]           #')
     print ('#                                                          #')
     print ('#  (4) BCS_PATH must be consistent with that of            #')
     print ('#        [ADAS_EXPDIR][/run/lnbcs                          #')

@@ -11,7 +11,8 @@
 #
 ##############################################################################
 
-EXP_DOMAIN:        CF00[ADAS_ATMENS_GRID e.g. 90]x6C_GLOBAL
+# e.g., ATMENS_AGCM_GRID = CF0090x6C
+EXP_DOMAIN:        [ATMENS_AGCM_GRID]_GLOBAL
 
 NUM_LDAS_ENSEMBLE: [NUM_ATMENS_ENSEMBLE]
 
