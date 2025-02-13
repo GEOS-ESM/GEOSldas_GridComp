@@ -94,7 +94,9 @@ class LDASsetup:
         exphome_ = cmdLineArgs['exphome'].rstrip('/')
         assert os.path.isdir(exphome_) # exphome should exist
         self.exphome = os.path.abspath(exphome_)
-        self.nymdb = cmdLineArgs[ 'nymdb' ]
+        self.nymdb = cmdLineArgs['nymdb']
+        self.nhmsb = cmdLineArgs['nhmsb']
+        self.lfotag = cmdLineArgs['lfotag']
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -154,9 +156,11 @@ class LDASsetup:
 
         for key in rqdExeInpKeys :
             assert key in self.rqdExeInp,' "%s" is required in the input file %s' % (key,self.exeinpfile)
-        if cmdLineArgs['nymdb' ] != 'None' :
-            self.date  = f"{self.nymdb} 210000"
+        if cmdLineArgs['nymdb'] != 'None' and cmdLineArgs['nhmsb'] != 'None' :
+            self.date  = f"{self.nymdb} {self.nhmsb}"
             self.rqdExeInp[ 'BEG_DATE' ] = self.date
+        if cmdLineArgs['lfotag' ] != 'None' :
+            self.lfotag = f"{self.lfotag}"
 
         # print rqd exe inputs
         if self.verbose:
@@ -171,16 +175,20 @@ class LDASsetup:
         _mydir = None
         self.ladas_coupling = int(self.rqdExeInp.get('LADAS_COUPLING',0))
         self.adas_expdir =''
-        if self.ladas_coupling > 0:
+        if self.ladas_coupling > 0 :
            self.adas_expdir = os.path.dirname(self.exphome)
            self.rqdExeInp[ 'ADAS_EXPDIR'] = self.adas_expdir
            self.adas_expid = os.path.basename(self.adas_expdir)
            self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__Nx+-'
-           if self.ladas_coupling == 1:
+           if self.lfotag == 'bkg' :
+                 self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__bkg'
+           if self.ladas_coupling == 1 :
                  self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS'
-           if self.ladas_coupling == 2:
+           if self.ladas_coupling == 2 :
                  self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS4ens'
                  self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/ensdiag/mem'
+                 if self.lfotag == 'bkg' :
+                       self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/mem'   
 
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
@@ -1730,7 +1738,17 @@ def parseCmdLine():
         )
     p_setup.add_argument(
         '--nymdb',
-        help='replace BEG_DATE in expinp file ',
+        help='replaces BEG_DATE date in exeinp file ',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--nhmsb',
+        help='replaces BEG_DATE time in exeinp file ',
+        type=str, default='None'
+        ) 
+    p_setup.add_argument(
+        '--lfotag',
+        help='use adas bkg lfo forcing ',
         type=str, default='None'
         )
     p_setup.add_argument(

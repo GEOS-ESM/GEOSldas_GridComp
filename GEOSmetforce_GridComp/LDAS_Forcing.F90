@@ -3093,7 +3093,6 @@ contains
     ! qliu+reichle,      5 Dec 2023 - added GEOS-IT 
     ! 
     ! rreichle,         18 Dec 2024 - added M21C
-    !
     ! -----------------------------------
     !
     ! Read surface met forcing from MERRA, MERRA-2 or GEOS-5 DAS (i.e., FP) based on parsing of "met_tag".
@@ -3173,7 +3172,8 @@ contains
 
     real,    parameter :: nodata_GEOSgcm = 1.e15   
     
-    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: G5DAS_defs
+    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: G5DAS_defs 
+    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: G5LADAS_defs
     character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: GEOSIT_defs
     character(40), dimension(N_MERRA_vars,              N_defs_cols) :: MERRA_defs
     character(40), dimension(N_MERRA2plusAerosol_vars,  N_defs_cols) :: M2INT_defs
@@ -3212,7 +3212,7 @@ contains
     
     integer :: j, k, GEOSgcm_var, fid, km, lm, nvars, ngatts, rc, YYYYMMDD, HHMMSS
 
-    logical :: minimize_shift, use_prec_corr, use_Predictor, tmp_init
+    logical :: minimize_shift, use_prec_corr, use_Predictor, use_bkg,tmp_init
 
     logical :: daily_met_files, daily_precipcorr_files
     
@@ -3251,6 +3251,46 @@ contains
     G5DAS_defs(10,:)=[character(len=40):: 'TLML    ','inst','inst1_2d_lfo_Nx','diag','S']    
     G5DAS_defs(11,:)=[character(len=40):: 'QLML    ','inst','inst1_2d_lfo_Nx','diag','S']    
     G5DAS_defs(12,:)=[character(len=40):: 'SPEEDLML','inst','inst1_2d_lfo_Nx','diag','S']    
+
+
+    ! -----------------------------------------------------------------------
+    !
+    ! define LADAS file specs 
+    !
+    ! same as G5DAS except for file tag (column 3)
+
+    G5LADAS_defs = G5DAS_defs
+
+    ! character(40):
+    !                             1         2         3         4
+    !                    1234567890123456789012345678901234567890     
+
+    G5LADAS_defs( 1,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 2,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 3,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 4,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 5,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 6,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 7,3) = 'bkg.tavg1_2d_lfo                        '
+    G5LADAS_defs( 8,3) = 'bkg.inst1_2d_lfo                        '
+    G5LADAS_defs( 9,3) = 'bkg.inst1_2d_lfo                        '
+    G5LADAS_defs(10,3) = 'bkg.inst1_2d_lfo                        '
+    G5LADAS_defs(11,3) = 'bkg.inst1_2d_lfo                        '
+    G5LADAS_defs(12,3) = 'bkg.inst1_2d_lfo                        '
+  
+    G5LADAS_defs( 1,4) = 'rs                                      '
+    G5LADAS_defs( 2,4) = 'rs                                      '
+    G5LADAS_defs( 3,4) = 'rs                                      '
+    G5LADAS_defs( 4,4) = 'rs                                      '
+    G5LADAS_defs( 5,4) = 'rs                                      '
+    G5LADAS_defs( 6,4) = 'rs                                      '
+    G5LADAS_defs( 7,4) = 'rs                                      '
+    G5LADAS_defs( 8,4) = 'rs                                      '
+    G5LADAS_defs( 9,4) = 'rs                                      '
+    G5LADAS_defs(10,4) = 'rs                                      '
+    G5LADAS_defs(11,4) = 'rs                                      '
+    G5LADAS_defs(12,4) = 'rs                                      '
+
 
     ! -----------------------------------------------------------------------
     !
@@ -3739,6 +3779,7 @@ contains
        
        allocate(GEOSgcm_defs(N_GEOSgcm_vars,N_defs_cols))
 
+
        if ( (index(met_tag, 'GEOSIT') > 0) .or. (index(met_tag, 'geosit') > 0) ) then
           GEOSgcm_defs(1:N_G5DAS_vars,:) = GEOSIT_defs
        else
@@ -3747,15 +3788,15 @@ contains
 
        call parse_G5DAS_met_tag( met_path, met_tag, date_time_inst,          &
             met_path_inst, prec_path_inst, met_tag_inst, use_prec_corr,      &
-            use_Predictor )
+            use_Predictor, use_bkg )
 
        call parse_G5DAS_met_tag( met_path, met_tag, date_time_fwd,           &
             met_path_fwd,  prec_path_fwd,  met_tag_fwd,  use_prec_corr,      &
-            use_Predictor )
+            use_Predictor, use_bkg )
 
        call parse_G5DAS_met_tag( met_path, met_tag, date_time_bkwd,          &
             met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr,      &
-            use_Predictor )
+            use_Predictor, use_bkg )
               
        if (use_Predictor) then
           
@@ -3768,6 +3809,17 @@ contains
           end do
           
        end if
+
+      if (use_bkg) then
+
+         do j=1,N_GEOSgcm_vars
+
+             GEOSgcm_defs(j,3) = G5LADAS_defs(j,3) 
+             GEOSgcm_defs(j,4) = G5LADAS_defs(j,4)
+
+         end do
+
+      end if
        
     end if
     
@@ -4918,7 +4970,7 @@ contains
   
   subroutine parse_G5DAS_met_tag( met_path_in, met_tag_in, date_time, &
        met_path_default, met_path_prec, met_tag_out, use_prec_corr,   &
-       use_Predictor )
+       use_Predictor, use_bkg )
     
     ! parse G5DAS "met_tag"
     !
@@ -4949,7 +5001,7 @@ contains
     ! reichle, 17 Jan 2020: added FP transition from f522 to f525
     ! reichle,  3 Apr 2020: added FP transition from f525 to f525_p5
     ! qliu+reichle,  5 Dec 2023: added GEOS-IT
-    !    
+    ! sqz              Jan 2025: added G5DAS bkg 
     ! ---------------------------------------------------------------------------    
 
     implicit none
@@ -4964,6 +5016,7 @@ contains
     
     logical,              intent(out) :: use_prec_corr
     logical,              intent(out) :: use_Predictor
+    logical,              intent(out) :: use_bkg
 
     ! local variables
 
@@ -5219,6 +5272,8 @@ contains
 
     use_Predictor = .false.
 
+    use_bkg       = .false.
+
     ! -----------------------------------------------------
     !
     ! identify "GCM" tag and whether to use precip corrections and/or
@@ -5405,8 +5460,11 @@ contains
           
           use_Predictor = .true.
 
-       else
-          
+       elseif (tmp_tag(ii)(1:3)=='bkg') then
+
+          use_bkg = .true. 
+
+       else   
           err_msg = 'invalid met_tag_in, unknown optional tag segment'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
 
@@ -5584,7 +5642,6 @@ contains
     if (file_exists) return                            ! done
       
     fname_full_tmp2 = trim(fname_full)                 ! remember for error log below
-
 
     ! last try: for GEOS FP with generic file names, try product counter '.V02.' in year/month/day dir
  
@@ -6634,6 +6691,7 @@ program ut_parse_G5DAS_met_tag
   
   logical        :: use_prec_corr
   logical        :: use_Predictor
+  logical        :: use_bkg
   
 
   ! other
@@ -6646,6 +6704,7 @@ program ut_parse_G5DAS_met_tag
   met_tag_in_vec = (/                              &
        'gcmexpname' ,                          &
        'gcmexpname__Nx+-' ,                    &
+       'gcmexpname__bkg' ,                     &
        'gcmexpname__precCORRPREC',             &
        'gcmexpname__precCORRPREC__Nx+-' ,            &
        'gcmexpname__Nx+-__precCORRPREC' ,            &
@@ -6668,6 +6727,7 @@ program ut_parse_G5DAS_met_tag
      write (*,*) 'met_tag_out      = ', trim(met_tag_out)         
      write (*,*) 'use_prec_corr    = ', use_prec_corr       
      write (*,*) 'use_Predictor    = ', use_Predictor
+     write (*,*) 'use_bkg          = ', use_bkg 
      
   end do
   
