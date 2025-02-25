@@ -1092,7 +1092,7 @@ class LDASsetup:
 
         # DEFAULT rc files
         default_rc = glob.glob(etcdir+'/GEOSldas_*.rc')
-        assert len(default_rc)==4
+        assert len(default_rc)==6
         print (default_rc)
         for rcfile in default_rc:
             shortfile=rcfile.rsplit('GEOSldas_',1)[1]
@@ -1131,8 +1131,6 @@ class LDASsetup:
                 tmprcfile=self.rundir+'/HISTORY.rc'
                 histrc_file=rcfile
                 shutil.copy2(rcfile, tmprcfile)
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
                 for line in fileinput.input(tmprcfile,inplace=True):
                     print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
             if shortfile =='HISTens.rc' and self.ladas_coupling == 2 :
