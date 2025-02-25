@@ -96,7 +96,6 @@ class LDASsetup:
         self.exphome = os.path.abspath(exphome_)
         self.nymdb = cmdLineArgs['nymdb']
         self.nhmsb = cmdLineArgs['nhmsb']
-        self.lfotag = cmdLineArgs['lfotag']
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -159,8 +158,6 @@ class LDASsetup:
         if cmdLineArgs['nymdb'] != 'None' and cmdLineArgs['nhmsb'] != 'None' :
             self.date  = f"{self.nymdb} {self.nhmsb}"
             self.rqdExeInp[ 'BEG_DATE' ] = self.date
-        if cmdLineArgs['lfotag' ] != 'None' :
-            self.lfotag = f"{self.lfotag}"
 
         # print rqd exe inputs
         if self.verbose:
@@ -179,16 +176,12 @@ class LDASsetup:
            self.adas_expdir = os.path.dirname(self.exphome)
            self.rqdExeInp[ 'ADAS_EXPDIR'] = self.adas_expdir
            self.adas_expid = os.path.basename(self.adas_expdir)
-           self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__Nx+-'
-           if self.lfotag == 'bkg' :
-                 self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__bkg'
+           self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__bkg'
            if self.ladas_coupling == 1 :
                  self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS'
            if self.ladas_coupling == 2 :
                  self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS4ens'
-                 self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/ensdiag/mem'
-                 if self.lfotag == 'bkg' :
-                       self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/mem'   
+                 self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/mem'
 
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
@@ -1132,13 +1125,22 @@ class LDASsetup:
                     sp.call(shlex.split(cmd))
                 for line in fileinput.input(tmprcfile,inplace=True):
                     print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
-                if (self.ladas_coupling == 1) :
-                    for line in fileinput.input(tmprcfile,inplace=True):
-                        print (line.rstrip().replace("#                'catch_progn_incr'","   'catch_progn_incr'"))
-                    for line in fileinput.input(tmprcfile,inplace=True):
-                        print (line.rstrip().replace('catch_progn_incr.ref_time:    000000,','catch_progn_incr.ref_time:    013000,'))
-                    for line in fileinput.input(tmprcfile,inplace=True):
-                        print (line.rstrip().replace("'SMAP_L4_SM_gph'","# 'SMAP_L4_SM_gph'"))
+
+            # take  HISTdet or HISTens if ladas 
+            if shortfile =='HISTdet.rc' and self.ladas_coupling == 1 :
+                tmprcfile=self.rundir+'/HISTORY.rc'
+                histrc_file=rcfile
+                shutil.copy2(rcfile, tmprcfile)
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
+            if shortfile =='HISTens.rc' and self.ladas_coupling == 2 :
+                tmprcfile=self.rundir+'/HISTORY.rc'
+                histrc_file=rcfile
+                shutil.copy2(rcfile, tmprcfile)
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
 
             # just copy an empty ExtData.rc
             if shortfile=='ExtData.rc' :
@@ -1581,12 +1583,12 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#                                                          #')
     print ('#  (2) EXP_DOMAIN must be global CS grid as in ADAS exp    #')
     print ('#                                                          #')
-    print ('#  (3) MET_TAG  must be set to [ADAS_EXPID]__Nx+-          #')
+    print ('#  (3) MET_TAG  must be set to [ADAS_EXPID]__bkg           #')
     print ('#      MET_PATH must be set as follows for                 #')
     print ('#        LADAS_COUPLING = 1:                               #')
     print ('#          ../../../../recycle/holdpredout/                #')
     print ('#        LADAS_COUPLING = 2:                               #')
-    print ('#          [ADAS_EXPDIR]/atmens/ensdiag/mem                #')
+    print ('#          [ADAS_EXPDIR]/atmens/mem                        #')
     print ('#                                                          #')
     print ('#  (4) BCS_PATH must be consistent with that of            #')
     print ('#        [ADAS_EXPDIR][/run/lnbcs                          #')
@@ -1746,11 +1748,6 @@ def parseCmdLine():
         help='replaces BEG_DATE time in exeinp file ',
         type=str, default='None'
         ) 
-    p_setup.add_argument(
-        '--lfotag',
-        help='use adas bkg lfo forcing ',
-        type=str, default='None'
-        )
     p_setup.add_argument(
         '--runmodel',
         help='Obsolete.',
