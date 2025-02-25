@@ -20,8 +20,8 @@ LADAS_COUPLING:    2
 
 ADAS_EXPDIR:       [full_path]/[ADAS_EXPDIR]
 
-MET_TAG:           [ADAS_EXPID]__Nx+- 
-MET_PATH:          [ADAS_EXPDIR]/atmens/ensdiag/mem
+MET_TAG:           [ADAS_EXPID]__bkg 
+MET_PATH:          [ADAS_EXPDIR]/atmens/mem
 
 MET_HINTERP:       0
 
@@ -36,7 +36,5 @@ ENSEMBLE_FORCING:  YES
 
 JOB_SGMT:          00000000 060000 
 NUM_SGMT:          1
-
-HISTRC_FILE:      [path of GEOSldas_GridComp/GEOSldas_App/sample_config_files/LADAS]/GEOSldas_HIST.rc.atmens 
 
 ################################# EOF ########################################
