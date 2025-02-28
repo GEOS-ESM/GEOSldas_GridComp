@@ -87,12 +87,8 @@ if ( ${{MPI_STACK}} == "openmpi" ) then
 
 else if ( ${{MPI_STACK}} == "intelmpi" ) then
 
-    setenv BUILT_ON_SLES15 {BUILT_ON_SLES15}
-
-    if ( ${{BUILT_ON_SLES15}} == TRUE ) then
-        setenv I_MPI_FABRICS shm:ofi
-        setenv I_MPI_OFI_PROVIDER psm3
-    endif # BUILT_ON_SLES15
+    setenv I_MPI_FABRICS shm:ofi
+    setenv I_MPI_OFI_PROVIDER psm3
 
 endif # MPI_STACK
 
