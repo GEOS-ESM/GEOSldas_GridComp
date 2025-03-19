@@ -470,10 +470,10 @@ contains
     ! land ice fields 
 
     case ('EMIS');                             LONG_NAME = 'surface_emissivity';                                               UNITS = '1'
-   ! case ('ALBVR');                            LONG_NAME = 'surface_reflectivity_for_visible_beam';                            UNITS = '1'
-   ! case ('ALBVF');                            LONG_NAME = 'surface_reflectivity_for_visible_diffuse';                         UNITS = '1'
-   ! case ('ALBNR');                            LONG_NAME = 'surface_reflectivity_for_near_infrared_beam';                      UNITS = '1'
-   ! case ('ALBNF');                            LONG_NAME = 'surface_reflectivity_for_near_infrared_direct';                    UNITS = '1'
+    case ('ALBVR_GL');                            LONG_NAME = 'surface_reflectivity_for_visible_beam';                            UNITS = '1'
+    case ('ALBVF_GL');                            LONG_NAME = 'surface_reflectivity_for_visible_diffuse';                         UNITS = '1'
+    case ('ALBNR_GL');                            LONG_NAME = 'surface_reflectivity_for_near_infrared_beam';                      UNITS = '1'
+    case ('ALBNF_GL');                            LONG_NAME = 'surface_reflectivity_for_near_infrared_direct';                    UNITS = '1'
     case ('TST');                              LONG_NAME = 'surface_temperature';                                              UNITS = 'K'
     case ('QST');                              LONG_NAME = 'surface_specific_humidity';                                        UNITS = 'kg kg-1'
     case ('TH');                               LONG_NAME = 'turbulence_surface_skin_temperature';                              UNITS = 'K'
@@ -516,7 +516,7 @@ contains
     case ('MELTWTR');                          LONG_NAME = 'melt_water_production';                                           UNITS = 'kg m-2 s-1'
     case ('MELTWTRCONT');                      LONG_NAME = 'snowpack_meltwater_content';                                      UNITS = 'kg m-2'
     case ('LWC');                              LONG_NAME = 'liquid_water_content_in_top_snow_layer';                          UNITS = '1'
-    !case ('RUNOFF');                           LONG_NAME = 'runoff_total_flux';                                               UNITS = 'kg m-2 s-1'
+    case ('RUNOFF_GL');                           LONG_NAME = 'runoff_total_flux';                                               UNITS = 'kg m-2 s-1'
     case ('GUST');                             LONG_NAME = 'gustiness';                                                       UNITS = 'm s-1'
     case ('VENT');                             LONG_NAME = 'surface_ventilation_velocity';                                    UNITS = 'm s-1'
     case ('Z0');                               LONG_NAME = 'surface_roughness';                                               UNITS = 'm'
@@ -533,13 +533,13 @@ contains
     case ('MOV50M');                           LONG_NAME = 'merodopma;_50m_wind_from_MO_sfc';                                 UNITS = 'm s-1'
     case ('EVAPOUT');                          LONG_NAME = 'evaporation';                                                     UNITS = 'kg m-2 s-1'
     case ('SHOUT');                            LONG_NAME = 'upward_sensible_heat_flux';                                       UNITS = 'W m-2'
-    !case ('HLWUP');                            LONG_NAME = 'surface_emitted_longwave_flux';                                   UNITS = 'W m-2'
+    case ('HLWUP_GL');                            LONG_NAME = 'surface_emitted_longwave_flux';                                   UNITS = 'W m-2'
     case ('LWNDSRF');                          LONG_NAME = 'surface_net_downward_longwave_flux';                              UNITS = 'W m-2'
     case ('SWNDSRF');                          LONG_NAME = 'surface_net_downward_shortwave_flux';                             UNITS = 'W m-2'
     case ('HLATN');                            LONG_NAME = 'total_latent_energy_flux';                                        UNITS = 'W m-2'
     case ('DNICFLX');                          LONG_NAME = 'downward_heat_flux_in_ice';                                       UNITS = 'W m-2'
     case ('GHSNOW');                           LONG_NAME = 'ground_heating_snow';                                             UNITS = 'W m-2'
-    !case ('GHTSKIN');                          LONG_NAME = 'glacier_ice_heating_flux';                                        UNITS = 'W m-2'
+    case ('GHTSKIN_GL');                          LONG_NAME = 'glacier_ice_heating_flux';                                        UNITS = 'W m-2'
 
 ! default LONG_NAME and UNITS for nc4 files created by tile_bin2nc4.F90 (used for any SHORT_NAME not listed above):
 
