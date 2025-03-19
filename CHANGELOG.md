@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- NCCS has retired SLES12, so the conditions on SLES12 and SLES15 are removed
 - Updated subroutine read_obs_sm_ASCAT_EUMET() to work with both original and revised file name templates. 
 - Updated subroutines read_obs_sm_ASCAT_EUMET(), read_obs_SMAP_halforbit_Tb(), read_obs_SMOS() and read_obs_MODIS_SCF() with hardcoded time ranges for when observations are available and should be read.
 - Revised variable names (SHORT_NAME) and descriptions (LONG_NAME) to match M21C file specs.
@@ -26,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Removed
+
+- Removed support for SLES12 operating system at NCCS.
 
 ### Deprecated
 
