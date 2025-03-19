@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed support for SLES12 operating system at NCCS.
+
 ### Deprecated
 
 -----------------------------
