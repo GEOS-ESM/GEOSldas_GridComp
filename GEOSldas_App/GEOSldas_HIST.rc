@@ -25,6 +25,7 @@ COLLECTIONS:
 #                'inst3_2d_lndfcstana_Nx'
 #                'const_1d_lnd_Nt'
 #                'const_2d_lnd_Nx'
+#                'tavg24_1d_glc_Nx'
            ::
 
 #CUBE GRID_LABELS: PC720x361-DC
@@ -543,5 +544,47 @@ COLLECTIONS:
                                      'TPSURF_ANA_ENSSTD' , 'LANDASSIM' , 'TSURF_ANA_ENSSTD'    ,
                                      'TP1_ANA_ENSSTD'    , 'LANDASSIM' , 'TSOIL1_ANA_ENSSTD' 
                         ::
+  
+  tavg24_1d_glc_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Land Ice Diagnostics',
+  tavg24_1d_glc_Nx.nbits:         12,
+  tavg24_1d_glc_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
+  tavg24_1d_glc_Nx.mode:          'time-averaged' ,
+  tavg24_1d_glc_Nx.frequency:      240000 ,
+  tavg24_1d_glc_Nx.ref_time:       000000 ,
+  tavg24_1d_glc_Nx.format:        'CFIO' ,
+  tavg24_1d_glc_Nx.regrid_exch:   '../input/tile.data' ,
+  tavg24_1d_glc_Nx.regrid_name:   'PE180x1080-CF' ,
+  tavg24_1d_glc_Nx.grid_label:     PC720x361-DC ,
+  tavg24_1d_glc_Nx.deflate:        1,
+  tavg24_1d_glc_Nx.fields:      'ACCUM'       , 'LANDICE' ,
+                                'ALBVR'       , 'LANDICE' ,
+                                'ALBVF'       , 'LANDICE' ,
+                                'ALBNR'       , 'LANDICE' ,
+                                'ALBNF'       , 'LANDICE' ,
+                                'ASNOW_GL'    , 'LANDICE' ,
+                                'DELTS'       , 'LANDICE' ,
+                                'DNICFLX'     , 'LANDICE' ,
+                                'EVAPOUT'     , 'LANDICE' ,
+                                'QH'          , 'LANDICE' ,
+                                'GHTSKIN'     , 'LANDICE' ,
+                                'HLATN'       , 'LANDICE' ,
+                                'IMELT'       , 'LANDICE' ,
+                                'LWNDSRF'     , 'LANDICE' ,
+                                'MELTWTR'     , 'LANDICE' ,
+                                'MELTWTRCONT' , 'LANDICE' ,
+                                'RUNOFF'      , 'LANDICE' ,
+                                'SHOUT'       , 'LANDICE' ,
+                                'SMELT'       , 'LANDICE' ,
+                                'SNICEALB'    , 'LANDICE' ,
+                                'SNOMAS_GL'   , 'LANDICE' ,
+                                'SNOWALB'     , 'LANDICE' ,
+                                'SNOWDP_GL'   , 'LANDICE' ,
+                                'SWNDSRF'     , 'LANDICE' ,
+                                'TST'         , 'LANDICE' ,
+                                'WESNBOT'     , 'LANDICE' ,
+                                'WESNEXT'     , 'LANDICE' ,
+                                'WESNPERC'    , 'LANDICE' ,
+                                'WESNPREC'    , 'LANDICE' ,
+                                 ::
 
 # ========================== EOF ==============================================================

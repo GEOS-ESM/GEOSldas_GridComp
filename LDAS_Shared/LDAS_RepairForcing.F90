@@ -57,7 +57,7 @@ contains
 
     ! min/max values for allowable range of forcing fields
 
-    real, parameter :: min_Tair           =    190. ! [K]
+    real, parameter :: min_Tair           =    180. ! [K]
     real, parameter :: max_Tair           =    340. ! [K]
 
     real, parameter :: max_PSurf          = 115000. ! [Pa]
@@ -235,7 +235,7 @@ contains
           ! NOTE: "warn" is turned on when repair_forcing is called first
           !        time after the forcing has been read from files
 
-          if ((warn) .and. (met_force(i)%Tair < 190.)) then
+          if ((warn) .and. (met_force(i)%Tair < min_Tair)) then
 
              write (tmpstr13a,'(e13.5)') met_force(i)%Tair    ! convert real to string
 
