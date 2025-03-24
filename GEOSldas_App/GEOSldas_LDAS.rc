@@ -36,6 +36,12 @@ CATCHMENT_SPINUP: 0
 #
 LSM_CHOICE: 1
 
+# ---- Choice of tile types for the model
+#  There should not have space between types
+#  LAND,LANDICE
+#
+TILE_TYPES: LAND
+
 
 # ---- Domain definition
 #
