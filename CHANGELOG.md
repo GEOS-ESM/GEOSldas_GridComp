@@ -12,10 +12,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added landice grid comp
+- New update_type for joint 3d soil moisture and 1d snow analysis (Tb+sfmc+sfds+SCF obs)
+
+### Changed
+
+- Updated subroutine read_obs_sm_ASCAT_EUMET() to work with both original and revised file name templates. 
+- Updated subroutines read_obs_sm_ASCAT_EUMET(), read_obs_SMAP_halforbit_Tb(), read_obs_SMOS() and read_obs_MODIS_SCF() with hardcoded time ranges for when observations are available and should be read.
+- Revised variable names (SHORT_NAME) and descriptions (LONG_NAME) to match M21C file specs.
+
+### Fixed
+
+### Removed
+
+### Deprecated
+
+-----------------------------
+
+## [v1.1.0] - 2024-11-05
+
+- 0-diff vs. v1.0.2 except for data assimilation in cube-sphere tile space ([PR #41](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/41)).
 
 ### Changed
 
 - More optimal distribution of tiles on processors for cubed-sphere tile space.
+- Updates to scripting to allow for Intel MPI.
 
 ### Fixed
 
@@ -27,8 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Remove restart options F and G.
-
-### Deprecated
 
 -----------------------------
 
@@ -45,9 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Moved external `GEOSgcm_GridComp` repository to under `GEOSldas/src/Components` for
   consistency with directory structure of GEOSgcm and GEOSadas  ([PR #27](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/27), [PR #30](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/30)).
-- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)). 
+- Changed lenkf.j.template to python string ([PR #16](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/16)).
 
-  
+
 -----------------------------
 
 ## [v1.0.1] - 2024-04-10
