@@ -9,12 +9,12 @@
 ##################################################################################
 
 VERSION: 1
-EXPID:   hybd_ladas_LDAS 
+EXPID:   GEOSldas_expid 
 
 COLLECTIONS:
                 'catch_progn_incr'
                 'tavg3_1d_lnd_Nt'
-               # 'inst3_2d_lndfcstana_Nx'
+                'inst3_2d_lndfcstana_Nx'
            ::
 
 GRID_LABELS: PC720x361-DC
@@ -138,7 +138,7 @@ catch_progn_incr.fields:     'TCFSAT_INCR'    , 'LANDASSIM'      ,
   inst3_2d_lndfcstana_Nx.ref_time:    013000,
   inst3_2d_lndfcstana_Nx.format:      'CFIO',
   inst3_2d_lndfcstana_Nx.regrid_exch: '../input/tile.data',
-  inst3_2d_lndfcstana_Nx.regrid_name: 'PE360x2160-CF',
+  inst3_2d_lndfcstana_Nx.regrid_name: 'GRIDNAME',
   inst3_2d_lndfcstana_Nx.grid_label:  PC720x361-DC,
   inst3_2d_lndfcstana_Nx.deflate:     2,        
   inst3_2d_lndfcstana_Nx.fields:     'WCSF'              , 'ENSAVG'    , 'SFMC_FCST'           ,
