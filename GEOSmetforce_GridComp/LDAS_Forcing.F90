@@ -3782,7 +3782,9 @@ contains
 
        if ( (index(met_tag, 'GEOSIT') > 0) .or. (index(met_tag, 'geosit') > 0) ) then
           GEOSgcm_defs(1:N_G5DAS_vars,:) = GEOSIT_defs
-       else
+       else if (index(met_tag, 'bkg') > 0) then
+          GEOSgcm_defs(1:N_G5DAS_vars,:) = G5LADAS_defs
+       else 
           GEOSgcm_defs(1:N_G5DAS_vars,:) = G5DAS_defs
        end if
 
