@@ -7,8 +7,16 @@
 # (1) Create exeinp template using:
 #         ldas_setup sample --exeinp > MY_exeinp.txt
 #
-# (2) Use the resource parameter settings below when editing MY_exeinp.txt
+# (2) Use the resource parameter settings below when editing MY_exeinp.txt 
 #
+# (3) The following resource parameters are provided via fvsetup,
+#     which supersede the default in MY_exeinp.txt
+#      ADAS_EXPDIR
+#      ADAS_EXPID
+#      EXP_ID
+#      MET_TAG       
+#      BEG_DATE 
+#      GID 
 ##############################################################################
 
 # e.g., CENTRAL_AGCM_GRID = CF0360x6C
@@ -16,7 +24,7 @@ EXP_DOMAIN:        [CENTRAL_AGCM_GRID]_GLOBAL
 
 LADAS_COUPLING:    1
 
-ADAS_EXPDIR:       [full_path]/[ADAS_EXPDIR]
+ADAS_EXPDIR:       [full_path]/[ADAS_EXPID]
 
 MET_TAG:           [ADAS_EXPID]__bkg 
 MET_PATH:          ../../../../recycle/holdpredout 

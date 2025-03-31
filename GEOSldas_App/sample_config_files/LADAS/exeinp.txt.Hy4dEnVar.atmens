@@ -9,6 +9,14 @@
 #
 # (2) Use the resource parameter settings below when editing MY_exeinp.txt
 #
+# (3) The following resource parameters are provided via fvsetup, 
+#     which supersede the default in MY_exeinp.txt:  
+#     ADAS_EXPDIR 
+#     ADAS_EXPID 
+#     EXP_ID
+#     MET_TAG
+#     BEG_DATE
+#     GID 
 ##############################################################################
 
 # e.g., ATMENS_AGCM_GRID = CF0090x6C
@@ -18,7 +26,7 @@ NUM_LDAS_ENSEMBLE: [NUM_ATMENS_ENSEMBLE]
 
 LADAS_COUPLING:    2
 
-ADAS_EXPDIR:       [full_path]/[ADAS_EXPDIR]
+ADAS_EXPDIR:       [full_path]/[ADAS_EXPID]
 
 MET_TAG:           [ADAS_EXPID]__bkg 
 MET_PATH:          [ADAS_EXPDIR]/atmens/mem
