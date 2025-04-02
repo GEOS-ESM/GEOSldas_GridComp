@@ -14,13 +14,13 @@ def write_sums_nc4(file_path, N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa
     data = nc.createVariable('N_data', 'i4', ('tile','species', ), zlib=True, complevel=4)
     data[:,:] = N_data
 
-    data = nc.createVariable('obsxfcst_sum', 'i4', ('tile','species', ), zlib=True, complevel=4)
+    data = nc.createVariable('obsxfcst_sum', 'f4', ('tile','species', ), zlib=True, complevel=4)
     data[:,:] = oxf_sum 
 
-    data = nc.createVariable('obsxana_sum', 'i4', ('tile','species', ), zlib=True, complevel=4)
+    data = nc.createVariable('obsxana_sum', 'f4', ('tile','species', ), zlib=True, complevel=4)
     data[:,:] = oxa_sum 
 
-    data = nc.createVariable('fcstxana_sum', 'i4', ('tile','species', ), zlib=True, complevel=4)
+    data = nc.createVariable('fcstxana_sum', 'f4', ('tile','species', ), zlib=True, complevel=4)
     data[:,:] = fxa_sum 
 
     for key, value in data_sum.items():
