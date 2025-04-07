@@ -42,6 +42,11 @@ LSM_CHOICE: 1
 #
 TILE_TYPES: LAND
 
+# ---- Choice of tile file types
+# There are three choices : txt, nc4 or default
+# If it is default, the type would be detected, or searched txt first
+# 
+TILE_FILE_TYPE: default 
 
 # ---- Domain definition
 #
