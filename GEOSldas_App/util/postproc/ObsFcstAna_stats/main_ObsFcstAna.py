@@ -42,7 +42,7 @@ from helper.read_GEOSldas import read_tilecoord, read_obs_param
 from helper.util import make_folder, array2grid
 from helper.plot import plotMap
 from easev2 import easev2_ind2latlon
-from helper.compute_monthly_stats import compute_monthly_stats
+from compute_monthly_stats import compute_monthly_stats
 from helper.write_nc4 import write_sums_nc4
 
 import warnings; warnings.filterwarnings("ignore")
