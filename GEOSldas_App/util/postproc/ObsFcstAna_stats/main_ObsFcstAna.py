@@ -35,11 +35,13 @@ from dateutil.relativedelta import relativedelta
 from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
+import sys
+sys.path.append('../../shared/python/')
 
 from helper.read_GEOSldas import read_tilecoord, read_obs_param
 from helper.util import make_folder, array2grid
 from helper.plot import plotMap
-from helper.smapeasev2 import smapeasev2_ind2latlon
+from easev2 import easev2_ind2latlon
 from helper.compute_monthly_stats import compute_monthly_stats
 from helper.write_nc4 import write_sums_nc4
 
@@ -47,8 +49,8 @@ import warnings; warnings.filterwarnings("ignore")
 import sys 
 import io
 
-sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
-sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
+#sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
+#sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
 
 expdir = '/gpfsm/dnb05/projects/p51/SMAP_Nature/'
 expid = 'SPL4SM_Vv8010'
@@ -237,7 +239,7 @@ for i in np.arange(2):
             else:
                 grid_data = np.nanmean(reshaped,axis=(1, 3))
                 
-            lat_M36, lon_M36 = smapeasev2_ind2latlon(np.arange(406), np.arange(964),'M36')
+            lat_M36, lon_M36 = easev2_ind2latlon(np.arange(406), np.arange(964),'M36')
             lon_2d,lat_2d = np.meshgrid(lon_M36,lat_M36)
         else:
             grid_data, uy,ux = array2grid(tile_data, lat = tc['com_lat'], lon = tc['com_lon'])
