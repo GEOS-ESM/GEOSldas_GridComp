@@ -29,7 +29,7 @@ def compute_monthly_stats(expdir,expid,domain,this_month,tc,obs_param,var_list):
     date_time = start_time
     while date_time < end_time:
 
-        fname =  fname = expdir+expid+'/output/'+domain+'/ana/ens_avg/Y'+ \
+        fname = expdir+expid+'/output/'+domain+'/ana/ens_avg/Y'+ \
                           date_time.strftime('%Y') + '/M' + \
                           date_time.strftime('%m') + '/'  + \
                           expid+'.ens_avg.ldas_ObsFcstAna.' + \
@@ -37,7 +37,7 @@ def compute_monthly_stats(expdir,expid,domain,this_month,tc,obs_param,var_list):
 
         OFA = read_ObsFcstAna(fname)
 
-        if len(OFA['obs_tilenum'] > 0):
+        if len(OFA['obs_tilenum']) > 0:
             # Initialize full size variable to keep values
             data_tile={}
             for var in var_list:
