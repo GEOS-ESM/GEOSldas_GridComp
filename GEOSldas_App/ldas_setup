@@ -51,12 +51,6 @@ class LDASsetup:
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
             'ADAS_EXPDIR', 'BCS_RESOLUTION' ]
 
-        # if built on sles15, BUILT_ON_SLES15 is "TRUE", else empty ""
-        BUILT_ON_SLES15 = "@BUILT_ON_SLES15@"
-        if BUILT_ON_SLES15 == "TRUE":
-          self.BUILT_ON_SLES15 = True
-        else:
-          self.BUILT_ON_SLES15 = False
 
         self.GEOS_SITE       = "@GEOS_SITE@"
 
@@ -718,10 +712,7 @@ class LDASsetup:
         print ('\nCorrect the tile file if it is an old EASE tile format... \n')
         EASEtile=self.bcsdir+'/MAPL_'+short_tile
         cmd = self.bindir + '/preprocess_ldas.x correctease  '+ tile + ' '+ EASEtile
-        if self.BUILT_ON_SLES15 :
-          print ("Executables were built on SLES15 and must be run on SLES15:   " + cmd)
-        else:
-          print ("cmd:   " + cmd)
+        print ("cmd:   " + cmd)
 
         sp.call(shlex.split(cmd))
 
@@ -1388,10 +1379,8 @@ class LDASsetup:
         constraint='cas'
         if self.GEOS_SITE == "NAS":
           constraint = 'cas_ait'
-        elif self.BUILT_ON_SLES15:
-          constraint = 'mil'
-        else:
-           assert int(self.rqdRmInp['ntasks-per-node']) <= 46, 'ntasks-per-node should be <=46 for cas'
+        elif self.GEOS_SITE == "NCCS":
+          constraint = '"[mil|cas]"'
 
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
@@ -1423,7 +1412,6 @@ class LDASsetup:
                   MY_ADAS_EXPDIR     = self.adas_expdir,
                   MY_EXPDIR          = self.expdir,
                   DETECTED_MPI_STACK = DETECTED_MPI_STACK,
-                  BUILT_ON_SLES15    = str(self.BUILT_ON_SLES15).upper()
                   )
 
         with open('lenkf.j','wt') as fout :
