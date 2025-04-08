@@ -14,6 +14,7 @@ def crd2grid(y, x):
     indY = ny - 1 - indY
     return (uy, ux, indY, indX)
 
+# convert data from an array format to a grid format based on lat/lon coordinates
 def array2grid(data, *, lat, lon):
     (uy, ux, indY, indX) = crd2grid(lat, lon)
     ny = len(uy)

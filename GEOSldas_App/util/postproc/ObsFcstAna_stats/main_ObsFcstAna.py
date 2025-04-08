@@ -38,12 +38,12 @@ from mpl_toolkits.basemap import Basemap
 import sys
 sys.path.append('../../shared/python/')
 
-from helper.read_GEOSldas import read_tilecoord, read_obs_param
-from helper.util import make_folder, array2grid
-from helper.plot import plotMap
+from read_GEOSldas import read_tilecoord, read_obs_param
+from util import make_folder, array2grid
+from plot import plotMap
 from easev2 import easev2_ind2latlon
 from compute_monthly_stats import compute_monthly_stats
-from helper.write_nc4 import write_sums_nc4
+from helper.write_sum_nc4 import write_sums_nc4
 
 import warnings; warnings.filterwarnings("ignore")
 import sys 

@@ -1,7 +1,10 @@
 import numpy as np
+import sys
+sys.path.append('../../shared/python/')
+
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from helper.read_GEOSldas import read_ObsFcstAna, read_tilecoord, read_obs_param
+from read_GEOSldas import read_ObsFcstAna, read_tilecoord, read_obs_param
 
 def compute_monthly_stats(expdir,expid,domain,this_month,tc,obs_param,var_list):
 
