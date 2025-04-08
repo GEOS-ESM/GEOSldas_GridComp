@@ -1905,13 +1905,19 @@ contains
     implicit none
     character(*),intent(in) :: orig_ease
     character(*),intent(in) :: new_ease
-    logical :: file_exist,is_oldEASE
-    integer :: i, N_tile, N_grid
+    logical :: file_exist,is_oldEASE, isNC4
+    integer :: i, N_tile, N_grid, file_type, status
     character(len=256) :: tmpline
     
     inquire(file=trim(orig_ease),exist=file_exist)
     if( .not. file_exist) stop (" no ease_tile_file")
-    
+    call MAPL_NCIOGetFileType(orig_ease, file_type, rc=status)
+    isNC4   = (file_type == MAPL_FILETYPE_NC4)
+
+    if (isNC4) then
+       print*, "isNC4 tile file, no need to be corrected"
+       return
+    endif 
     open(55,file=trim(orig_ease),action='read')
     read(55,*) N_tile
     read(55,*) N_grid
