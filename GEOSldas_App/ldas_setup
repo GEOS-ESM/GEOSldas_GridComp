@@ -13,6 +13,7 @@ import resource
 import subprocess as sp
 import shlex
 import tempfile
+import netCDF4
 from dateutil import rrule
 from datetime import datetime
 from datetime import timedelta
@@ -301,7 +302,7 @@ class LDASsetup:
         self.rqdExeInp['LNFM_FILE'] = ''
         tile_file_type = self.rqdExeInp.get('TILE_FILE_TYPE', 'default')
         if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
-           text_tile = glob.glob(self.bcs_geom + '*.til')
+           txt_tile = glob.glob(self.bcs_geom + '*.til')
            nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
            if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
            if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
@@ -347,7 +348,7 @@ class LDASsetup:
 
                 if os.path.isfile(ldas_domain):
                     _numd = int(linecache.getline(ldas_domain, 1).strip())
-                    text_tile = glob.glob(self.bcs_geom + '*.til')
+                    txt_tile = glob.glob(self.bcs_geom + '*.til')
                     nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
                     if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
                     if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
