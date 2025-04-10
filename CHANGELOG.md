@@ -14,10 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New update_type for joint 3d soil moisture and 1d snow analysis (Tb+sfmc+sfds+SCF obs).
 - Added CYGNSS soil moisture reader.
 - Added M21C surface met forcing.
+- Add Github Actions workflow for testing and building GEOSldas_GridComp.
 
 ### Changed
 
-- Updated subroutine read_obs_sm_ASCAT_EUMET() to work with both original and revised file name templates. 
+- Updated subroutine read_obs_sm_ASCAT_EUMET() to work with both original and revised file name templates.
 - Updated subroutines read_obs_sm_ASCAT_EUMET(), read_obs_SMAP_halforbit_Tb(), read_obs_SMOS() and read_obs_MODIS_SCF() with hardcoded time ranges for when observations are available and should be read.
 - Revised variable names (SHORT_NAME) and descriptions (LONG_NAME) to match M21C file specs.
 - Renamed tilecoord%pfaf to %pfaf_index; added matlab tile file reader.
