@@ -1132,6 +1132,8 @@ class LDASsetup:
                 shutil.copy2(rcfile, tmprcfile)
                 for line in fileinput.input(tmprcfile,inplace=True):
                     print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GRIDNAME',self.rqdExeInp['GRIDNAME']))
 
             # just copy an empty ExtData.rc
             if shortfile=='ExtData.rc' :
