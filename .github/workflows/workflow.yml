@@ -78,7 +78,7 @@ jobs:
     if: "!contains(github.event.pull_request.labels.*.name, '0 diff trivial')"
     runs-on: ubuntu-24.04
     container:
-      image: gmao/ubuntu24-geos-env:v7.32.0-openmpi_5.0.5-gcc_14.2.0
+      image: gmao/ubuntu24-geos-env-mkl:v7.32.0-openmpi_5.0.5-gcc_14.2.0
 
     env:
       OMPI_ALLOW_RUN_AS_ROOT: 1
