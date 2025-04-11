@@ -416,7 +416,7 @@ contains
 
       ! locals 
       
-      integer :: n, this_tileid, this_catpfaf, N_exclude, N_include, indomain, rc, N_tile_r, N_tile_f
+      integer :: n, this_tileid, this_catpfaf, N_exclude, N_include, indomain, rc, n_tiles_r, n_tiles_f
       
       integer, dimension(:), allocatable :: ExcludeList, IncludeList
       
@@ -444,7 +444,7 @@ contains
       ! try reading *domain.txt, *tilecoord.txt, and *tilegrids.txt files 
       
       call io_domain_files( 'r', work_path, exp_id, &
-           N_tile_f, f2r, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
+           n_tiles_f, f2r, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
       
       if (rc==0) then        ! read was successful
          
@@ -485,12 +485,12 @@ contains
          
          indomain    = 0     ! initialize
 
-         N_tile_r = size(tile_coord_r)
-         allocate(tmp_f2r(N_tile_r))
-         do n=1,N_tile_r
+         n_tiles_r = size(tile_coord_r)
+         allocate(tmp_f2r(n_tiles_r))
+         do n=1,n_tiles_r
             
             this_tileid  = tile_coord_r(n)%tile_id
-            
+
             if( .not. c3_grid .and. tile_coord_r(n)%typ == MAPL_LAND) then
                this_minlon  = tile_coord_r(n)%min_lon
                this_minlat  = tile_coord_r(n)%min_lat
@@ -523,14 +523,14 @@ contains
             
          end do
          
-         N_tile_f    = indomain
+         n_tiles_f    = indomain
          
-         if (N_tile_f .eq. 0) then
+         if (n_tiles_f .eq. 0) then
             err_msg = 'No catchments found in domain'
             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
          else
             if (logit) then
-               write (logunit,*) 'Number of tiles in domain = ', N_tile_f 
+               write (logunit,*) 'Number of tiles in domain = ', n_tiles_f 
                write (logunit,*)
             end if
          end if
@@ -539,17 +539,17 @@ contains
          !
          ! assemble d2g, tile_coord, tile_grid_d
          
-         allocate(f2r(       N_tile_f))
-         allocate(tile_coord_f(N_tile_f))
+         allocate(f2r(       n_tiles_f))
+         allocate(tile_coord_f(n_tiles_f))
          
-         f2r(1:N_tile_f) = tmp_f2r(1:N_tile_f)
+         f2r(1:n_tiles_f) = tmp_f2r(1:n_tiles_f)
          tile_coord_f    = tile_coord_r(f2r)
          
          ! finalize extent of actual domain:
          !  determine smallest subgrid of tile_grid_d that contains all
          !  catchments/tiles in domain
          
-         tile_grid_f = get_minExtent_grid( N_tile_f, tile_coord_f%i_indg, tile_coord_f%j_indg, &
+         tile_grid_f = get_minExtent_grid( n_tiles_f, tile_coord_f%i_indg, tile_coord_f%j_indg, &
               tile_coord_f%min_lon, tile_coord_f%min_lat, tile_coord_f%max_lon, tile_coord_f%max_lat,  &
               tile_grid_g) 
          
@@ -558,7 +558,7 @@ contains
          tmp_grid_def = tile_grid_g  ! cannot use intent(in) tile_grid_g w/ io_domain_files
          
          call io_domain_files( 'w', work_path, exp_id, &
-              N_tile_f, f2r, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
+              n_tiles_f, f2r, tile_coord_f, tmp_grid_def, tile_grid_f, rc )
          
       end if   ! domain/tilecoord/tilegrids files exist
       
@@ -974,7 +974,7 @@ contains
       
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
-      
+
       do k=1,N_catf
          
          ! this check works only for "SiB2_V2" and newer versions
@@ -1554,13 +1554,13 @@ contains
     
     integer, dimension(:),allocatable :: f2g, f2r,r2g, tile_types, N_tiles_r, N_tiles_f
 
-    integer :: n,stat, ty, N_types, nx, ny, file_type, status, n_grids, N_PfafCat
+    integer :: n,stat, ty, N_types, nx, ny, file_type, status, N_PfafCat
 
-    integer :: N_tile, N_grid, g_id, f_id
-    integer, allocatable :: IM(:), JM(:)
+    integer :: n_tiles, N_grids, g_id, f_id
+    integer :: IM(2), JM(2)
     integer, allocatable :: iTable(:,:)
     real(KIND=REAL64), allocatable :: rTable(:,:)
-    character(len=128), allocatable :: Gnames(:)
+    character(len=128) :: Gnames(2)
     character(len=4) :: typ_str, typ_str_exclude
     character(len=*), parameter :: Iam = 'createZoominTilefile'
     
@@ -1583,11 +1583,9 @@ contains
 
     if (isNC4) then
 
-      call MAPL_ReadTilingNC4(orig_tile, n_grids = n_grids)
-      allocate(Gnames(n_grids), IM(n_grids), JM(n_grids))
-      call MAPL_ReadTilingNC4(orig_tile, GridName=GNames, im=im, jm=jm, nx=nx, ny=ny,&
+      call MAPL_ReadTilingNC4(orig_tile, GridName=GNames, im=im, jm=jm, nx=nx, ny=ny, n_grids = n_grids, n_tiles=n_tiles, &
                                iTable=iTable, rTable=rTable, N_PfafCat=N_PfafCat, rc=status)
-      do n = 1, n_tile
+      do n = 1, n_tiles
         if (any(tile_types == iTable(n,0))) then
            if (f2g(f_id) /= n) then
               iTable(n,0) = iTable(n,0) + MAPL_ExcludeFromDomain
@@ -1598,26 +1596,27 @@ contains
         endif
       enddo
 
-      call MAPL_WriteTilingNc4(new_tile, gNames, im, jm, nx, ny, iTable, rTable, N_PfafCat=N_PfafCat, rc=status)
+      call MAPL_WriteTilingNc4(new_tile, gNames(1:n_grids), im(1:n_grids), jm(1:N_grids), &
+                               nx, ny, iTable, rTable, N_PfafCat=N_PfafCat, rc=status)
 
     else
        open(40,file=trim(orig_tile),action="read")
        open(50,file=trim(new_tile),action="write")
        
        ! copy the header back into the output tile file
-       ! (also corrects bug in EASE *.til files that have "N_grid=1" in line 2 but
+       ! (also corrects bug in EASE *.til files that have "n_grids=1" in line 2 but
        !  still contain three additional lines for second grid definition)
        do n=1,5
           read(40,'(A)') line
           if(n==1) then
-             read(line,*) N_tile
+             read(line,*) n_tiles
           endif
           if(n==2) then
-             read(line,*) N_grid
+             read(line,*) n_grids
           endif
           write(50,'(A)') trim(line)
        enddo
-       if (N_grid==2) then
+       if (n_grids==2) then
           do n=1,3
              read(40,'(A)') line
              write(50,'(A)') trim(line)
@@ -1893,7 +1892,7 @@ contains
     
     ! This subroutine corrects for a bug that is present in some EASE *.til files
     ! through at least Icarus-NLv4.
-    ! Affected files state "N_grid=1" in line 2 of the header, but the header still includes
+    ! Affected files state "n_grids=1" in line 2 of the header, but the header still includes
     ! three additional lines for a second grid, which throws off the canonical *.til reader
     ! (subroutine LDAS_read_til_file()).
     !
@@ -1906,7 +1905,7 @@ contains
     character(*),intent(in) :: orig_ease
     character(*),intent(in) :: new_ease
     logical :: file_exist,is_oldEASE, isNC4
-    integer :: i, N_tile, N_grid, file_type, status
+    integer :: i, n_tiles, n_grids, file_type, status
     character(len=256) :: tmpline
     
     inquire(file=trim(orig_ease),exist=file_exist)
@@ -1919,8 +1918,8 @@ contains
        return
     endif 
     open(55,file=trim(orig_ease),action='read')
-    read(55,*) N_tile
-    read(55,*) N_grid
+    read(55,*) n_tiles
+    read(55,*) n_grids
     read(55,*)
     read(55,*)
     read(55,*)
@@ -1928,7 +1927,7 @@ contains
     close(55)
     
     is_oldEASE= .false.
-    if(N_grid==1 .and. index(tmpline,'OCEAN')/=0) is_oldEASE=.true.
+    if(n_grids==1 .and. index(tmpline,'OCEAN')/=0) is_oldEASE=.true.
     
     if( is_oldEASE) then
        open(55,file=trim(orig_ease),action='read')
@@ -1940,7 +1939,7 @@ contains
        read(55,*)
        read(55,*)
        read(55,*)
-       do i=1,N_tile
+       do i=1,n_tiles
           read(55,'(A)')tmpline
           write(56,'(A)')trim(tmpline)
        enddo
@@ -1986,24 +1985,24 @@ contains
     integer, optional, intent(in) :: types(:)    
     ! local variables
     integer :: N_proc
-    integer :: N_tile,N_lon,N_lat,N_grid
+    integer :: n_tiles,N_lon,N_lat,n_grids
     integer,allocatable :: tilePosition(:)
-    integer,allocatable :: IMS(:),JMS(:)
+    integer,allocatable :: IMS(:),JMS(:), typs(:), II(:), JJ(:)
     integer,allocatable :: local_tile(:)
     integer :: total_tile
     integer :: n,typ,tmpint
     real ::  tmpreal
     integer :: avg_tile,n0,local
-    integer :: i,s,e,j,k,n1,n2, s1, s2
+    integer :: i,s,e,j,k,n1,n2, s1, s2, IM(2), JM(2)
     logical :: file_exist
     character(len=256):: tmpLine
-    character(len=128):: gridname
+    character(len=128):: gridname, gNames(2)
     real :: rate,rates(60),maxf(60)
-    integer :: IMGLOB, JMGLOB
+    integer :: IMGLOB, JMGLOB, file_type, status
     integer :: face(6),face_land(6)
-    logical :: forward
+    logical :: forward, isNC4
     character(len=:), allocatable :: IMS_file, JMS_File
-    integer, allocatable :: tile_types(:)    
+    integer, allocatable :: tile_types(:), iTable(:,:)   
     character(len=*), parameter :: Iam = 'optimize_latlon'
     character(len=400)          :: err_msg
 
@@ -2023,14 +2022,28 @@ contains
        err_msg = 'tile file does not exist: ' //trim(fname_tilefile)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
     end if
+
+    call MAPL_NCIOGetFileType(trim(fname_tilefile), file_type, rc=status)
+    isNC4   = (file_type == MAPL_FILETYPE_NC4)
     
-    open (10, file=trim(fname_tilefile), form='formatted', action='read')
-    read (10,*) N_tile
-    read (10,*) N_grid         ! some number (?)
-    read (10,*) gridname       ! some string describing tile definition grid (?)
-    read (10,*) N_lon
-    read (10,*) n_lat
-    
+    if (isNC4) then
+       call MAPL_ReadTilingNC4(trim(fname_tilefile), GridName=GNames, im=im, jm=jm, n_Grids=n_grids, n_tiles=n_tiles, &
+                               iTable=iTable, rc=status)
+       gridname = GNames(1)
+       n_lon    = IM(1)
+       n_lat    = JM(1)
+ 
+    else    
+       open (10, file=trim(fname_tilefile), form='formatted', action='read')
+       read (10,*) n_tiles
+       read (10,*) n_grids         ! some number (?)
+       read (10,*) gridname       ! some string describing tile definition grid (?)
+       read (10,*) N_lon
+       read (10,*) n_lat
+    endif
+
+    allocate(typs(n_tiles), II(n_tiles), JJ(n_tiles))
+
     if (index(gridname,"CF") /=0) then    ! cube-sphere tile space
        
        IMGLOB = N_lon                     ! e.g.,  180 for c180
@@ -2043,48 +2056,41 @@ contains
        allocate(tilePosition(JMGLOB))
        tilePosition = 0
        total_tile   = 0
-       
-       if(N_grid==2) then
-          read (10,*)          ! some string describing ocean grid                   (?)
-          read (10,*)          ! # ocean grid cells in longitude direction (N_i_ocn) (?)
-          read (10,*)
-       endif
-       
-       do n = 1,N_tile
-          read (10,*)  &
-               typ,           &   !  1
+
+
+       if (.not. isNC4) then
+          if(n_grids==2) then
+             read (10,*)          ! some string describing ocean grid                   (?)
+             read (10,*)          ! # ocean grid cells in longitude direction (N_i_ocn) (?)
+             read (10,*)
+          endif
+          do n = 1, n_tiles
+            read (10,*)  &
+               typs(n),           &   !  1
                tmpreal,       &   !  2  *
                tmpreal,       &   !  3
                tmpreal,       &   !  4
-               i ,            &   !  5
-               j                  !  6
-          !tmpreal,       &   !  7
-          !tmpint,        &   !  8
-          !tmpreal,       &   !  9  *
-          !tmpint,        &   ! 10
-          !tmpreal,       &   ! 11
-          !tmpint             ! 12  * (previously "tile_id")
+               ii(n) ,        &   !  5
+               jj(n)            !  5
+          enddo
+          close(10)
+       else
+          typs  = iTable(:,0)
+          II    = iTable(:,2) 
+          JJ    = iTable(:,3) 
+       endif
+
+       do n = 1,n_tiles
+          typ = typs(n)
+          i   = II(n)
+          j   = jj(n)
 
           if(any (tile_types == typ)) then
              total_tile=total_tile+1
              tilePosition(j) = tilePosition(j)+1
           endif
           
-          ! assume all land tiles are at the beginning
-          ! UNSAFE ASSUMPTION! - reichle, 2 Aug 2020
-          if (all (tile_types == MAPL_LAND)) then
-            if (typ/=MAPL_Land .and. typ/=MAPL_Land + MAPL_ExcludeFromDomain) then   ! exit if not land
-               if (logit) then
-                  write (logunit,*) 'WARNING: Encountered first non-land tile in *.til file.'
-                  write (logunit,*) '         Stop reading *.til file under the assumption that'
-                  write (logunit,*) '           land tiles are first in *.til file.'
-                  write (logunit,*) '         This is NOT a safe assumption beyond Icarus-NLv[x] tile spaces!!'
-               end if
-               exit ! assuming land comes first in the til file
-            end if
-          endif
        enddo
-       close(10)
        
        if(mod(N_proc,6) /=0) then
           print*,"WARNING: ntasks should be adjusted to multiple of 6 for cubed-sphere grid :",N_proc
@@ -2230,7 +2236,7 @@ contains
        
        ! NOTE:
        !  There is a bug in at least some EASE *.til files through at least Icarus-NLv4.
-       !  Affected files state "N_grid=1" in line 2 of the header, but the header still includes
+       !  Affected files state "n_grids=1" in line 2 of the header, but the header still includes
        !  three additional lines for a second grid.
        !
        !  The "else" block below corrects for this bug.
@@ -2240,20 +2246,42 @@ contains
        !  ldas_setup.
        !
        ! -reichle, 2 Aug 2020
-       
-       if(N_grid==2) then
-          read (10,*)          ! some string describing ocean grid                   (?)
-          read (10,*)          ! # ocean grid cells in longitude direction (N_i_ocn) (?)
-          read (10,*)   
-          read(10,'(A)') tmpLine
+      
+       if (isNC4) then 
+
+          typs  = iTable(:,0)
+          II    = iTable(:,2) 
+          JJ    = iTable(:,3) 
        else
-          read(10,'(A)') tmpLine
-          if (index(tmpLine,"OCEAN") /=0) then
+          if(n_grids==2) then
              read (10,*)          ! some string describing ocean grid                   (?)
              read (10,*)          ! # ocean grid cells in longitude direction (N_i_ocn) (?)
              read (10,*)   
              read(10,'(A)') tmpLine
+          else
+             read(10,'(A)') tmpLine
+             if (index(tmpLine,"OCEAN") /=0) then
+                read (10,*)          ! some string describing ocean grid                   (?)
+                read (10,*)          ! # ocean grid cells in longitude direction (N_i_ocn) (?)
+                read (10,*)   
+                read(10,'(A)') tmpLine
+             endif
           endif
+          read (tmpLine,*)    &
+            typs(1),          &   !  1
+            tmpreal,       &   !  2  *
+            tmpreal,       &   !  3
+            tmpreal,       &   !  4
+            ii(1)
+          do n=2, n_tiles
+            read (10,*)       &
+               typs(n),       &   !  1
+               tmpreal,       &   !  2  *
+               tmpreal,       &   !  3
+               tmpreal,       &   !  4
+               ii(n)              !  5
+           enddo
+           close(10)
        endif
        
        if (index(gridname,'EASE') /=0) then
@@ -2270,53 +2298,17 @@ contains
        
        ! 1) read through tile file, put the land tile into the N_lon of bucket
        
-       read (tmpLine,*)    &
-            typ,           &   !  1
-            tmpreal,       &   !  2  *
-            tmpreal,       &   !  3
-            tmpreal,       &   !  4
-            i                  !  5
-       if (any(tile_types == typ)) then
-          total_tile=total_tile+1
-          tilePosition(i) = tilePosition(i)+1
-       endif
-       
-       do n = 2,N_tile
-          read (10,*)         &
-               typ,           &   !  1
-               tmpreal,       &   !  2  *
-               tmpreal,       &   !  3
-               tmpreal,       &   !  4
-               i                  !  5
-          !tmpint,        &   !  6
-          !tmpreal,       &   !  7
-          !tmpint,        &   !  8
-          !tmpreal,       &   !  9  *
-          !tmpint,        &   ! 10
-          !tmpreal,       &   ! 11
-          !tmpint             ! 12  * (previously "tile_id")
+       do n = 1,n_tiles
+          typ = typs(n)
+          i   = II(n)
+
           if (any(tile_types == typ)) then
              total_tile=total_tile+1
              tilePosition(i) = tilePosition(i)+1
           endif
           
-          ! assume all land tiles are at the beginning
-          ! UNSAFE ASSUMPTION! - reichle, 2 Aug 2020
-          
-          if (all (tile_types == MAPL_LAND)) then
-            if (typ/=MAPL_Land .and. typ/=MAPL_Land + MAPL_ExcludeFromDomain ) then   ! exit if not land
-               if (logit) then
-                  write (logunit,*) 'WARNING: Encountered first non-land tile in *.til file.'
-                  write (logunit,*) '         Stop reading *.til file under the assumption that'
-                  write (logunit,*) '           land tiles are first in *.til file.'
-                  write (logunit,*) '         This is NOT a safe assumption beyond Icarus-NLv[x] tile spaces!!'
-               end if
-               exit ! assuming land comes first in the til file
-            endif
-          endif
        enddo
        
-       close(10)
        
        if(sum(tilePosition) /= total_tile) print*, "wrong counting of land"
        
@@ -2787,7 +2779,7 @@ end block
     ! subroutine to match order of tiles in *.til file
     ! - reichle, 22 Aug 2013
     !
-    ! improved documentation of bug in some EASE *.til files (header says N_grid=1 but has two grid defs)
+    ! improved documentation of bug in some EASE *.til files (header says n_grids=1 but has two grid defs)
     ! and minor clean-up
     ! - reichle,  2 Aug 2020
     !
@@ -2808,9 +2800,9 @@ end block
     integer,               dimension(:), allocatable :: r2g_tmp  ! out
 
     real    :: ease_cell_area
-    integer :: i, N_tile, N_grid,tmpint1, tmpint2, tmpint3, tmpint4
+    integer :: i, n_tiles, n_grids,tmpint1, tmpint2, tmpint3, tmpint4
     integer :: i_indg_offset, j_indg_offset, col_order
-    integer :: N_tile_land, n_lon, n_lat
+    integer :: n_tiles_land, n_lon, n_lat
     logical :: ease_grid, isNC4
     integer :: typ, k, file_type, status
     integer, dimension(:), allocatable :: tile_types
@@ -2819,8 +2811,8 @@ end block
     character(128) :: gridname
     character(512) :: fname
 
-    character(128), allocatable :: GNames(:)
-    integer, allocatable :: IM(:), JM(:)
+    character(128) :: GNames(2)
+    integer        :: IM(2), JM(2)
     integer, allocatable :: iTable(:,:)
     real(KIND=REAL64), allocatable :: rTable(:,:)
 
@@ -2848,19 +2840,16 @@ end block
     isNC4   = (file_type == MAPL_FILETYPE_NC4)
 
     if (isNC4) then
-       call MAPL_ReadTilingNC4(tile_file, n_Grids=n_Grid, rc=status)
 
-       allocate(GNames(n_grid), IM(n_grid), JM(n_grid))
-
-       call MAPL_ReadTilingNC4(tile_file, GridName=GNames, im=im, jm=jm, n_Grids=n_Grid, n_tiles=n_tile, &
-                               iTable=iTable, rTable=rTable, N_PfafCat=N_catg, rc=status)
+       call MAPL_ReadTilingNC4(tile_file, GridName=GNames, im=im, jm=jm, n_Grids=n_grids, n_tiles=n_tiles, &
+                               iTable=iTable, rTable=rTable, rc=status)
        gridname = GNames(1)
        n_lon    = IM(1)
        n_lat    = JM(1)
 
        i =0
-       allocate(r2g_tmp(N_tile))
-       do k = 1, n_tile
+       allocate(r2g_tmp(n_tiles))
+       do k = 1, n_tiles
          if (any(tile_types == iTable(k,0))) then
            i = i +1
            r2g_tmp(i) = k
@@ -2868,32 +2857,30 @@ end block
        enddo
        allocate(r2g, source = r2g_tmp(1:i))
        allocate(tile_coord_r(i))
-
-
+       deallocate(r2g_tmp)
     else
     
        open (10, file=trim(tile_file), form='formatted', action='read')
     
-       read (10,*) N_tile      ! number of all tiles in *.til file, incl non-land types
-       read (10,*) N_grid          
+       read (10,*) n_tiles      ! number of all tiles in *.til file, incl non-land types
+       read (10,*) n_grids          
        read (10,*) gridname        
        read (10,*) n_lon
        read (10,*) n_lat
 
        ! NOTE:
        !  There is a bug in at least some EASE *.til files through at least Icarus-NLv4.
-       !  Affected files state "N_grid=1" in line 2 of the header, but the header still includes
+       !  Affected files state "n_grids=1" in line 2 of the header, but the header still includes
        !  three additional lines for a second grid.
        !  LDAS pre-processing corrects for this bug through subroutine correctEase() in
        !  preprocess_LDAS.F90, which creates a second, corrected version of the *.til file during
        !  ldas_setup.  Here, this corrected *.til file is read!
        
-       if(N_grid==2) then
+       if(n_grids==2) then
           read (10,*)          ! some string describing ocean grid                   (?)
           read (10,*)          ! # ocean grid cells in longitude direction (N_i_ocn) (?)
           read (10,*)          ! # ocean grid cells in latitude direction (N_j_ocn)  (?)
        endif
-
        
     endif
 
@@ -2905,6 +2892,7 @@ end block
     
 
     if (isNC4 ) then
+       N_catg  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + MAPL_ExcludeFromDomain))
        tile_coord_r(:)%typ     = iTable(r2g, 0)
        tile_coord_r(:)%i_indg  = iTable(r2g, 2) 
        tile_coord_r(:)%j_indg  = iTable(r2g, 3)
@@ -2912,11 +2900,8 @@ end block
        tile_coord_r(:)%i_indg  =  tile_coord_r(:)%i_indg + i_indg_offset
        tile_coord_r(:)%j_indg  =  tile_coord_r(:)%j_indg + j_indg_offset 
 
-       if (N_grid == 1) then 
-         tile_coord_r(:)%pfaf    = iTable(r2g, 4) 
-       else
-         tile_coord_r(:)%pfaf    = iTable(r2g, 6) 
-       endif
+       tile_coord_r(:)%tile_id   = r2g
+       tile_coord_r(:)%pfaf      = iTable(r2g, 4) 
        tile_coord_r(:)%com_lon   = rTable(r2g, 1)
        tile_coord_r(:)%com_lat   = rTable(r2g, 2)
        tile_coord_r(:)%area      = rTable(r2g, 3)
@@ -2931,15 +2916,15 @@ end block
        tile_coord_r%pert_i_indg  = nint(nodata_generic)
        tile_coord_r%pert_j_indg  = nint(nodata_generic)
     else
-       allocate(tile_coord(N_tile))
-       allocate(r2g_tmp(N_tile))
+       allocate(tile_coord(n_tiles))
+       allocate(r2g_tmp(n_tiles))
        
        i   = 0
        
        ! WJ notes: i and k are the same---global ids
        !           fid --- num in simulation domain
        N_catg = 0 
-       do k=1,N_tile
+       do k=1,n_tiles
           
           read(10,'(A)')  tmpline 
           read(tmpline,*) typ
@@ -2955,11 +2940,11 @@ end block
              tile_coord(i)%tile_id = k
              r2g_tmp(i) = k
                 
-             ! Not sure ".or. N_grid==1" will always work in the following conditional.
-             ! Some Tripolar grid *.til files may have N_grid=1.
+             ! Not sure ".or. n_grids==1" will always work in the following conditional.
+             ! Some Tripolar grid *.til files may have n_grids=1.
              ! - reichle, 2 Aug 2020
              
-             if (ease_grid .or. N_grid==1) then  
+             if (ease_grid .or. n_grids==1) then  
                 
                 ! EASE grid til file has fewer columns 
                 ! (excludes "tile_id", "frac_pfaf", and "area")
@@ -3049,9 +3034,9 @@ end block
    
        close(10)
        ! i here is the number of restart nmuber including types in 'types')
-       N_tile = i
-       allocate(r2g, source= r2g_tmp(1:n_tile))
-       allocate(tile_coord_r, source = tile_coord(1:N_tile))
+       n_tiles = i
+       allocate(r2g, source= r2g_tmp(1:n_tiles))
+       allocate(tile_coord_r, source = tile_coord(1:n_tiles))
        deallocate(tile_coord) 
        deallocate(r2g_tmp)
        ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing
@@ -3075,7 +3060,7 @@ end block
           fname= ''
           read(10,'(A)') fname
           close(10)
-          call read_grid_elev( trim(fname), tile_grid_g, N_tile, tile_coord_r )
+          call read_grid_elev( trim(fname), tile_grid_g, n_tiles, tile_coord_r )
    
        end if
        
@@ -3090,13 +3075,13 @@ end block
     ! fix dateline bug that existed up to and including MERRA version of
     !  *.til and catchment.def files
     
-    call fix_dateline_bug_in_tilecoord( N_tile, tile_grid_g, tile_coord_r ) 
+    call fix_dateline_bug_in_tilecoord( n_tiles, tile_grid_g, tile_coord_r ) 
 
   contains
     
     ! *************************************************************************************
     
-    subroutine read_grid_elev( fname, tile_grid, N_tile, tile_coord )
+    subroutine read_grid_elev( fname, tile_grid, n_tiles, tile_coord )
       
       ! read gridded elevation file (for GEOS-5 discretizations; NOT available
       ! for EASE grids, where elevation information is in catchment.def file)
@@ -3108,7 +3093,7 @@ end block
       character(*),        intent(in) :: fname
       
       type(grid_def_type), intent(in) :: tile_grid
-      integer,             intent(in) :: N_tile
+      integer,             intent(in) :: n_tiles
       type(tile_coord_type), dimension(:), pointer :: tile_coord ! inout
       
       ! local variables
@@ -3150,7 +3135,7 @@ end block
       
       ! map elevation to tiles
       
-      do i=1,N_tile
+      do i=1,n_tiles
          
          tile_coord(i)%elev = grid_elev( tile_coord(i)%i_indg, tile_coord(i)%j_indg )
          
@@ -3159,7 +3144,7 @@ end block
     end subroutine read_grid_elev
     
     ! *******************************************************************
-    subroutine fix_dateline_bug_in_tilecoord( N_tile, tile_grid, tile_coord )
+    subroutine fix_dateline_bug_in_tilecoord( n_tiles, tile_grid, tile_coord )
       
       ! bug in com_lon and minlon/maxlon for tiles straddling the dateline
       ! existed through (and including) MERRA tag
@@ -3170,7 +3155,7 @@ end block
       
       implicit none
      
-      integer,             intent(in) :: N_tile
+      integer,             intent(in) :: n_tiles
  
       type(grid_def_type), intent(in) :: tile_grid
       
@@ -3191,7 +3176,7 @@ end block
       if ( (tile_grid%ll_lon<-180.) .and.  &
            (.not. (tile_grid%ll_lon-nodata_generic)<nodata_tol_generic) ) then
          
-         do k=1,N_tile
+         do k=1,n_tiles
             
             ! min/max longitude of tile definition grid cell
             
@@ -3241,7 +3226,7 @@ end block
       
       ! format of catchment.def file
       !
-      ! Header line: N_tile
+      ! Header line: n_tiles
       !
       ! Columns: tile_id, Pfaf, min_lon, max_lon, min_lat, max_lat, [elev]
       !

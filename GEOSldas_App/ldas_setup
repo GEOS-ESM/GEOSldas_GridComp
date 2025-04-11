@@ -50,7 +50,7 @@ class LDASsetup:
             'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
-            'ADAS_EXPDIR', 'BCS_RESOLUTION' ]
+            'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_TYPE' ]
 
         # if built on sles15, BUILT_ON_SLES15 is "TRUE", else empty ""
         BUILT_ON_SLES15 = "@BUILT_ON_SLES15@"
@@ -366,10 +366,14 @@ class LDASsetup:
 
         if 'GRIDNAME' not in self.rqdExeInp :
             tmptile = os.path.realpath(self.rqdExeInp['TILING_FILE'])
-            if os.path.splitext(tmptile)[1] == '.til':
+            extension = os.path.splitext(tmptile)[1]
+            if extension == '.domain':
+              extension = os.path.splitext(tmptile)[0]
+               
+            if extension == '.til':
                self.rqdExeInp['GRIDNAME']  = linecache.getline(tmptile, 3).strip()
             else:
-               nc_tile = netCDF4.Dataset(tmptile,'r')
+               nc_file = netCDF4.Dataset(tmptile,'r')
                self.rqdExeInp['GRIDNAME'] = nc_file.getncattr('Grid_Name')
                
         if 'LSM_CHOICE' not in self.rqdExeInp:
