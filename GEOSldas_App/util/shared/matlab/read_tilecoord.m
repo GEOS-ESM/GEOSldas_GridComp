@@ -76,71 +76,71 @@ if is_binary
 
   ifp = fopen( fname, 'r', machfmt);
 
-  fortran_tag          = fread( ifp,  1, int_precision );
-  tile_coord.N_tile    = fread( ifp,  1, int_precision );
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
+  tile_coord.N_tile       = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
 
   Nt = tile_coord.N_tile;
   
-  fortran_tag          = fread( ifp,  1, int_precision );
-  tile_coord.tile_id   = fread( ifp, Nt, int_precision );
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
+  tile_coord.tile_id      = fread( ifp, Nt, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.typ       = fread( ifp, Nt, int_precision );
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.typ          = fread( ifp, Nt, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.pfaf      = fread( ifp, Nt, int_precision );      
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.pfaf_index   = fread( ifp, Nt, int_precision );      
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.com_lon   = fread( ifp, Nt, float_precision );   
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.com_lon      = fread( ifp, Nt, float_precision );   
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.com_lat   = fread( ifp, Nt, float_precision );   
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.com_lat      = fread( ifp, Nt, float_precision );   
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.min_lon   = fread( ifp, Nt, float_precision );   
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.min_lon      = fread( ifp, Nt, float_precision );   
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.max_lon   = fread( ifp, Nt, float_precision );   
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.max_lon      = fread( ifp, Nt, float_precision );   
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.min_lat   = fread( ifp, Nt, float_precision );    
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.min_lat      = fread( ifp, Nt, float_precision );    
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.max_lat   = fread( ifp, Nt, float_precision );   
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.max_lat      = fread( ifp, Nt, float_precision );   
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.i_indg    = fread( ifp, Nt, int_precision );     
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.i_indg       = fread( ifp, Nt, int_precision );     
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.j_indg    = fread( ifp, Nt, int_precision );     
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.j_indg       = fread( ifp, Nt, int_precision );     
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.frac_cell = fread( ifp, Nt, float_precision );  
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.frac_cell    = fread( ifp, Nt, float_precision );  
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.frac_pfaf = fread( ifp, Nt, float_precision ); 
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.frac_pfaf    = fread( ifp, Nt, float_precision ); 
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.area      = fread( ifp, Nt, float_precision );
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.area         = fread( ifp, Nt, float_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
   
-  fortran_tag          = fread( ifp,  1, int_precision );  
-  tile_coord.elev      = fread( ifp, Nt, float_precision );
-  fortran_tag          = fread( ifp,  1, int_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );  
+  tile_coord.elev         = fread( ifp, Nt, float_precision );
+  fortran_tag             = fread( ifp,  1, int_precision );
 
 
   % if requested, convert to ASCII (txt) file
@@ -166,7 +166,7 @@ if is_binary
 		    '%5i%5i%13.6f%13.6f%13.4f%13.4f\n'],    ... 
               [tile_coord.tile_id(ii),     ...
                tile_coord.typ(ii),         ...
-               tile_coord.pfaf(ii),        ...      
+               tile_coord.pfaf_index(ii),  ...      
                tile_coord.com_lon(ii),     ...   
                tile_coord.com_lat(ii),     ...   
                tile_coord.min_lon(ii),     ...   
@@ -208,7 +208,7 @@ else
 
   tile_coord.tile_id       = tmpdata(:, 1);
   tile_coord.typ           = tmpdata(:, 2);
-  tile_coord.pfaf          = tmpdata(:, 3);      
+  tile_coord.pfaf_index    = tmpdata(:, 3);      
   tile_coord.com_lon       = tmpdata(:, 4);   
   tile_coord.com_lat       = tmpdata(:, 5);   
   tile_coord.min_lon       = tmpdata(:, 6);   

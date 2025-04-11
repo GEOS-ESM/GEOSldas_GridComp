@@ -416,7 +416,7 @@ contains
 
       ! locals 
       
-      integer :: n, this_tileid, this_catpfaf, N_exclude, N_include, indomain, rc, n_tiles_r, n_tiles_f
+      integer :: n, this_tileid, N_exclude, N_include, indomain, rc, n_tiles_r, n_tiles_f
       
       integer, dimension(:), allocatable :: ExcludeList, IncludeList
       
@@ -2901,7 +2901,7 @@ end block
        tile_coord_r(:)%j_indg  =  tile_coord_r(:)%j_indg + j_indg_offset 
 
        tile_coord_r(:)%tile_id   = r2g
-       tile_coord_r(:)%pfaf      = iTable(r2g, 4) 
+       tile_coord_r(:)%pfaf_index= iTable(r2g, 4) 
        tile_coord_r(:)%com_lon   = rTable(r2g, 1)
        tile_coord_r(:)%com_lat   = rTable(r2g, 2)
        tile_coord_r(:)%area      = rTable(r2g, 3)
@@ -2951,7 +2951,7 @@ end block
                 
                 read (tmpline,*)                     &
                      tile_coord(i)%typ,              &   !  1
-                     tile_coord(i)%pfaf,             &   !  2
+                     tile_coord(i)%pfaf_index,       &   !  2
                      tile_coord(i)%com_lon,          &   !  3
                      tile_coord(i)%com_lat,          &   !  4
                      tile_coord(i)%i_indg,           &   !  5
@@ -2972,7 +2972,7 @@ end block
    
                    read (tmpline,*)                  &
                         tile_coord(i)%typ,           &   !  1  
-                        tile_coord(i)%pfaf,          &   !  2  *
+                        tile_coord(i)%pfaf_index,    &   !  2  *
                         tile_coord(i)%com_lon,       &   !  3
                         tile_coord(i)%com_lat,       &   !  4
                         tile_coord(i)%i_indg,        &   !  5
@@ -2996,7 +2996,7 @@ end block
                         tile_coord(i)%j_indg,        &   !  6
                         tile_coord(i)%frac_cell,     &   !  7
                         tmpint1,                     &   !  8
-                        tile_coord(i)%pfaf,          &   !  9  *
+                        tile_coord(i)%pfaf_index,    &   !  9  *
                         tmpint2,                     &   ! 10
                         tile_coord(i)%frac_pfaf,     &   ! 11
                         tmpint3                          ! 12  * (previously "tile_id")
@@ -3311,7 +3311,7 @@ end block
                tile_coord_r(k)%min_lat = min_lat
                tile_coord_r(k)%max_lat = max_lat
                tile_coord_r(k)%elev    = elev
-               if (tile_coord_r(k)%pfaf   /=tmp_pfaf) then
+               if (tile_coord_r(k)%pfaf_index   /=tmp_pfaf) then
                   err_msg = 'tile_coord_file and catchment_def_file mismatch. (2)'
                   call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
                endif
