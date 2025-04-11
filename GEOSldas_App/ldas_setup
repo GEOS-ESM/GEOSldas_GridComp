@@ -13,6 +13,7 @@ import resource
 import subprocess as sp
 import shlex
 import tempfile
+import netCDF4
 from dateutil import rrule
 from datetime import datetime
 from datetime import timedelta
@@ -49,7 +50,7 @@ class LDASsetup:
             'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
-            'ADAS_EXPDIR', 'BCS_RESOLUTION' ]
+            'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_TYPE' ]
 
         # if built on sles15, BUILT_ON_SLES15 is "TRUE", else empty ""
         BUILT_ON_SLES15 = "@BUILT_ON_SLES15@"
@@ -299,8 +300,14 @@ class LDASsetup:
         #                self.rqdExeInp['RST_FROM_GLOBAL'] = 0
 
         self.rqdExeInp['LNFM_FILE'] = ''
+        tile_file_type = self.rqdExeInp.get('TILE_FILE_TYPE', 'default')
         if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
-           self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
+           txt_tile = glob.glob(self.bcs_geom + '*.til')
+           nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
+           if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
+           if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
+           if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[0]
+
            self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
            self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
            tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
@@ -334,11 +341,19 @@ class LDASsetup:
                    in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
                    if len(in_tilefiles_) == 0 :
                       in_tilefiles_ = glob.glob(inpdir+'/*.til')
+                   if len(in_tilefiles_) == 0 :
+                      in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
+
                 self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
                 if os.path.isfile(ldas_domain):
                     _numd = int(linecache.getline(ldas_domain, 1).strip())
-                    self.rqdExeInp['TILING_FILE'] =glob.glob(self.bcs_geom + '*.til')[0]
+                    txt_tile = glob.glob(self.bcs_geom + '*.til')
+                    nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
+                    if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
+                    if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
+                    if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[0]
+
                     self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
                     self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
                     tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
@@ -350,9 +365,17 @@ class LDASsetup:
                     self.rqdExeInp['VISDF_FILE']= glob.glob(self.bcs_land + 'visdf_*.dat')[0]
 
         if 'GRIDNAME' not in self.rqdExeInp :
-            tmptile =self.rqdExeInp['TILING_FILE']
-            self.rqdExeInp['GRIDNAME']  = linecache.getline(tmptile, 3).strip()
-
+            tmptile = os.path.realpath(self.rqdExeInp['TILING_FILE'])
+            extension = os.path.splitext(tmptile)[1]
+            if extension == '.domain':
+              extension = os.path.splitext(tmptile)[0]
+               
+            if extension == '.til':
+               self.rqdExeInp['GRIDNAME']  = linecache.getline(tmptile, 3).strip()
+            else:
+               nc_file = netCDF4.Dataset(tmptile,'r')
+               self.rqdExeInp['GRIDNAME'] = nc_file.getncattr('Grid_Name')
+               
         if 'LSM_CHOICE' not in self.rqdExeInp:
             self.rqdExeInp['LSM_CHOICE'] = 1
 
@@ -833,11 +856,7 @@ class LDASsetup:
                   '/output/'+self.rqdExeInp['RESTART_DOMAIN']+'/rc_out/'
 
         # pass into remap_config_ldas
-        sponsorid = self.rqdRmInp['account']
         exp_id    = self.rqdExeInp['EXP_ID']
-        exp_dir   = self.exphome
-        out_bcdir     = self.rqdExeInp['BCS_PATH']
-        out_tilefile  = self.rqdExeInp['TILING_FILE']
         RESTART_str  = str(self.rqdExeInp['RESTART'])
         YYYYMMDD  = '%4d%02d%02d' % (_start.year, _start.month,_start.day)
         YYYYMMDDHH= '%4d%02d%02d%02d' % (_start.year, _start.month,_start.day, _start.hour)
