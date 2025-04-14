@@ -34,3 +34,16 @@ def write_sums_nc4(file_path, N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa
         data [:,:]= value
 
     nc.close()
+
+def write_stats_nc4(file_path, stats):
+
+    nc = Dataset(file_path,'w',formate='NETCDF4')
+    tile = nc.createDimension('tile', stats['N_data'].shape[0])
+    species = nc.createDimension('species', stats['N_data'].shape[1])
+
+    for key, value in stats.items():
+        data = nc.createVariable(key,'f4',('tile','species', ), \
+                                fill_value=-9999.0, zlib=True, complevel=4)
+        data[:,:] = value
+
+    nc.close()
