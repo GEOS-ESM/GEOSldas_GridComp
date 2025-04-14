@@ -3798,6 +3798,19 @@ contains
           GEOSgcm_defs(1:N_G5DAS_vars,:) = GEOSIT_defs
        else if ( use_bkg )                                                            then
           GEOSgcm_defs(1:N_G5DAS_vars,:) = G5BKG_defs
+          
+          ! +++++++++++++++++++++++++++++
+          ! for now, keep 'Nx+-' to ensure backward compatibility w/ regression tests; 'Nx+-' is obsolete otherwise
+          ! - reichle, 14 Apr 2025
+          if (index(met_tag, 'Nx+-') > 0) then   ! "met_tag" here is as specified in LDAS.rc, incl. optional tag segments
+             GEOSgcm_defs(1:N_G5DAS_vars,:) = G5DAS_defs             
+             ! append "+-" to GCM file tag (ie, replace "Nx" with "Nx+-")
+             do j=1,N_GEOSgcm_vars
+                GEOSgcm_defs(j,3) = trim(GEOSgcm_defs(j,3)) // '+-'
+             end do
+          end if
+          ! +++++++++++++++++++++++++++++          
+          
        else 
           GEOSgcm_defs(1:N_G5DAS_vars,:) = G5DAS_defs
        end if
@@ -5435,8 +5448,12 @@ contains
           
           prec_tag      = tmp_tag(ii)(5:len(tmp_tag(ii)))
 
-       elseif (tmp_tag(ii)(1:3)=='bkg') then
-
+       elseif ( (tmp_tag(ii)(1:3)=='bkg') .or. (tmp_tag(ii)(1:4)=='Nx+-') ) then
+          !                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          ! for now, keep 'Nx+-' to ensure backward compatibility w/ regression tests; 'Nx+-' is obsolete otherwise
+          ! - reichle, 14 Apr 2025
+          ! +++++++++++++++++++++++++++++
+          
           use_bkg = .true.
           
        else
@@ -5467,7 +5484,7 @@ contains
     ! Double-check if optional tag segments were somehow missed, e.g., 
     !  because they were accidentally appended with single underscores.
     ! Assumes that "prec" and "Nx+-" never appear in GEOS-5 product names.
-    ! Does NOT protect against spelling errors, e.g., "__perc" or "__Nx-+".
+    ! Does NOT protect against spelling errors, e.g., "__perc" or "__bgk" or "__Nx-+".
     ! - reichle, 24 Nov 2015
     
     if ((.not. use_prec_corr) .and. (index( met_tag_in, 'prec')>0)) then
@@ -5483,7 +5500,16 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        
     end if
-        
+
+    ! +++++++++++++++++++++++++++++
+    ! for now, keep 'Nx+-' to ensure backward compatibility w/ regression tests; 'Nx+-' is obsolete otherwise
+    ! - reichle, 14 Apr 2025
+    if ((.not. use_bkg) .and. (index( met_tag_in, 'Nx+-')>0)) then
+       err_msg = 'questionable met_tag_in: includes "Nx+-" but use_bkg=.false.'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    ! +++++++++++++++++++++++++++++
+    
   end subroutine parse_G5DAS_met_tag
   
   ! ****************************************************************
