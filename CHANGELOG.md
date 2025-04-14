@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated subroutines read_obs_sm_ASCAT_EUMET(), read_obs_SMAP_halforbit_Tb(), read_obs_SMOS() and read_obs_MODIS_SCF() with hardcoded time ranges for when observations are available and should be read.
 - Revised variable names (SHORT_NAME) and descriptions (LONG_NAME) to match M21C file specs.
 - Renamed tilecoord%pfaf to %pfaf_index; added matlab tile file reader.
+- Improved setup of coupled land/atm DAS (incl. changed nomenclature of met forcing files: "Nx+-" --> "bkg.lfo_*"). 
 
 ### Fixed
 
