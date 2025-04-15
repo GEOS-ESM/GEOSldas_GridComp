@@ -11,26 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New update_type for joint 3d soil moisture and 1d snow analysis (Tb+sfmc+sfds+SCF obs).
-- Added CYGNSS soil moisture reader.
-- Added M21C surface met forcing.
-- Add Github Actions workflow for testing and building GEOSldas_GridComp.
-
 ### Changed
-
-- Updated subroutine read_obs_sm_ASCAT_EUMET() to work with both original and revised file name templates.
-- Updated subroutines read_obs_sm_ASCAT_EUMET(), read_obs_SMAP_halforbit_Tb(), read_obs_SMOS() and read_obs_MODIS_SCF() with hardcoded time ranges for when observations are available and should be read.
-- Revised variable names (SHORT_NAME) and descriptions (LONG_NAME) to match M21C file specs.
-- Renamed tilecoord%pfaf to %pfaf_index; added matlab tile file reader.
-- Improved setup of coupled land/atm DAS (incl. changed nomenclature of met forcing files: "Nx+-" --> "bkg.lfo_*"). 
 
 ### Fixed
 
 ### Removed
 
-- Removed support for SLES12 operating system at NCCS.
-
 ### Deprecated
+
+-----------------------------
+
+## [v2.0.0] - 2025-04-15
+
+- 0-diff vs. v1.1.0.
+
+### Added
+
+- New update_type for joint 3d soil moisture and 1d snow analysis (Tb+sfmc+sfds+SCF obs) ([PR #68](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/68)).
+- Updated subroutine read_obs_sm_ASCAT_EUMET() to work with both original and revised file name templates ([PR #69](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/69)).
+- Added CYGNSS soil moisture reader ([PR #76](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/76)).
+- Added M21C surface met forcing ([PR #77](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/77)).
+- Added Github Actions workflow for testing and building GEOSldas_GridComp ([PR #86](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/86)).
+
+### Changed
+
+- Revised variable names (SHORT_NAME) and descriptions (LONG_NAME) to match M21C file specs ([PR #72](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/72)).
+- Updated subroutines read_obs_sm_ASCAT_EUMET(), read_obs_SMAP_halforbit_Tb(), read_obs_SMOS() and read_obs_MODIS_SCF() with hardcoded time ranges for when observations are available and should be read ([PR #73](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/73)).
+- Renamed tilecoord%pfaf to %pfaf_index; added matlab tile file reader ([PR #78](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/78)).
+- Improved setup of coupled land/atm DAS (incl. changed nomenclature of met forcing files: "Nx+-" --> "bkg.lfo_*") ([PR #81](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/81)).
+
+### Removed
+
+- Removed support for SLES12 operating system at NCCS ([PR #83](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/83)).
 
 -----------------------------
 
@@ -40,19 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- More optimal distribution of tiles on processors for cubed-sphere tile space.
-- Updates to scripting to allow for Intel MPI.
+- More optimal distribution of tiles on processors for cubed-sphere tile space ([PR #41](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/41)).
+- Updates to scripting to allow for Intel MPI ([PR #57](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/57)).
 
 ### Fixed
 
-- Do not increment CO2_YEAR when it is a no-data-value. For Catchment simulations, exclude CatchCN-specific resource variables from LDAS.rc.
-- Bug fix and improved efficiency in matlab script for generation of mwRTM_param.
-- Changed EXPDIR to absolute path for POSTPROC_HIST>0 option to work.
-- Support HISTORY output of ASNOW alone from ENSAVG Gridcomp.
+- Do not increment CO2_YEAR when it is a no-data-value; for Catchment simulations, exclude CatchCN-specific resource variables from LDAS.rc ([PR #51](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/51)).
+- Bug fix and improved efficiency in matlab script for generation of mwRTM_param ([PR #46](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/46)).
+- Changed EXPDIR to absolute path for POSTPROC_HIST>0 option to work ([PR #42](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/42)).
+- Support HISTORY output of ASNOW alone from ENSAVG Gridcomp  ([PR #49](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/49)).
 
 ### Removed
 
-- Remove restart options F and G.
+- Remove restart options F and G  ([PR #40](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/40)).
 
 -----------------------------
 
