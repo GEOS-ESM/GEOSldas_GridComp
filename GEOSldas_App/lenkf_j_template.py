@@ -87,12 +87,8 @@ if ( ${{MPI_STACK}} == "openmpi" ) then
 
 else if ( ${{MPI_STACK}} == "intelmpi" ) then
 
-    setenv BUILT_ON_SLES15 {BUILT_ON_SLES15}
-
-    if ( ${{BUILT_ON_SLES15}} == TRUE ) then
-        setenv I_MPI_FABRICS shm:ofi
-        setenv I_MPI_OFI_PROVIDER psm3
-    endif # BUILT_ON_SLES15
+    setenv I_MPI_FABRICS shm:ofi
+    setenv I_MPI_OFI_PROVIDER psm3
 
 endif # MPI_STACK
 
@@ -179,11 +175,6 @@ if ( $LADAS_COUPLING == 1 ) then
       setenv GRID $forcgrid
       $GEOSBIN/enpert_forc.csh
       cd $SCRDIR
-   else
-
-      # move central-simulation forcing held in met_forcing to scratch dir
-      echo "move lfo_Nx+- met forcing from $EXPDIR/input/met_forcing to $SCRDIR"
-      /bin/mv $EXPDIR/input/met_forcing/*lfo_Nx+-*nc4  $SCRDIR/.
 
    endif
 endif
