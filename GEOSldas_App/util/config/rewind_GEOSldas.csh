@@ -70,24 +70,24 @@ while ($inens <= $NENS)
 
     if     ($inens <   10) then
         set ENSDIR = `echo          ens000${inens}`
-        set catin  = `echo        catch000${inens}`
-        set pertin = `echo     landpert000${inens}`
-        set seedin = `echo obspertrseed000${inens}`
+        set catin  = `echo        catch_e000${inens}`
+        set pertin = `echo     landpert_e000${inens}`
+        set seedin = `echo obspertrseed_e000${inens}`
     else if($inens <  100) then
         set ENSDIR = `echo           ens00${inens}`
-        set catin  = `echo         catch00${inens}`
-        set pertin = `echo      landpert00${inens}`
-        set seedin = `echo  obspertrseed00${inens}`
+        set catin  = `echo         catch_e00${inens}`
+        set pertin = `echo      landpert_e00${inens}`
+        set seedin = `echo  obspertrseed_e00${inens}`
     else if($inens < 1000) then
         set ENSDIR = `echo            ens0${inens}`
-        set catin  = `echo          catch0${inens}`
-        set pertin = `echo       landpert0${inens}`
-        set seedin = `echo   obspertrseed0${inens}`
+        set catin  = `echo          catch_e0${inens}`
+        set pertin = `echo       landpert_e0${inens}`
+        set seedin = `echo   obspertrseed_e0${inens}`
     else
         set ENSDIR = `echo             ens${inens}`
-        set catin  = `echo           catch${inens}`
-        set pertin = `echo        landpert${inens}`
-        set seedin = `echo    obspertrseed${inens}`
+        set catin  = `echo           catch_e${inens}`
+        set pertin = `echo        landpert_e${inens}`
+        set seedin = `echo    obspertrseed_e${inens}`
     endif
 
     /bin/ln -s ${rsout}/${ENSDIR}/Y${yin}/M${min}/${expid}.catch_internal_rst.${date} ${catin}_internal_rst

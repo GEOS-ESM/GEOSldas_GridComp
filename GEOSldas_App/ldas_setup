@@ -89,6 +89,8 @@ class LDASsetup:
         exphome_ = cmdLineArgs['exphome'].rstrip('/')
         assert os.path.isdir(exphome_) # exphome should exist
         self.exphome = os.path.abspath(exphome_)
+        self.nymdb = cmdLineArgs['nymdb']
+        self.nhmsb = cmdLineArgs['nhmsb']
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -151,6 +153,9 @@ class LDASsetup:
 
         for key in rqdExeInpKeys :
             assert key in self.rqdExeInp,' "%s" is required in the input file %s' % (key,self.exeinpfile)
+        if cmdLineArgs['nymdb'] != 'None' and cmdLineArgs['nhmsb'] != 'None' :
+            self.date  = f"{self.nymdb} {self.nhmsb}"
+            self.rqdExeInp[ 'BEG_DATE' ] = self.date
 
         # print rqd exe inputs
         if self.verbose:
@@ -172,9 +177,17 @@ class LDASsetup:
         _mydir = None
         self.ladas_coupling = int(self.rqdExeInp.get('LADAS_COUPLING',0))
         self.adas_expdir =''
-        if self.ladas_coupling > 0:
-           assert 'ADAS_EXPDIR'  in self.rqdExeInp, " need ADAS_EXPDIR  in the input file %s" %(self.exeinpfile)
-           self.adas_expdir = self.rqdExeInp['ADAS_EXPDIR']
+        if self.ladas_coupling > 0 :
+           self.adas_expdir = os.path.dirname(self.exphome)
+           self.rqdExeInp[ 'ADAS_EXPDIR'] = self.adas_expdir
+           self.adas_expid = os.path.basename(self.adas_expdir)
+           self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__bkg'
+           if self.ladas_coupling == 1 :
+                 self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS'
+           if self.ladas_coupling == 2 :
+                 self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS4ens'
+                 self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/mem'
+
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
         if self.nens > 1:
@@ -1124,7 +1137,7 @@ class LDASsetup:
 
         # DEFAULT rc files
         default_rc = glob.glob(etcdir+'/GEOSldas_*.rc')
-        assert len(default_rc)==4
+        assert len(default_rc)==6
         print (default_rc)
         for rcfile in default_rc:
             shortfile=rcfile.rsplit('GEOSldas_',1)[1]
@@ -1157,6 +1170,25 @@ class LDASsetup:
                     sp.call(shlex.split(cmd))
                 for line in fileinput.input(tmprcfile,inplace=True):
                     print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
+
+            # take  HISTdet or HISTens if ladas 
+            if shortfile =='HISTdet.rc' and self.ladas_coupling == 1 :
+                tmprcfile=self.rundir+'/HISTORY.rc'
+                histrc_file=rcfile
+                shutil.copy2(rcfile, tmprcfile)
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GRIDNAME',self.rqdExeInp['GRIDNAME']))
+            if shortfile =='HISTens.rc' and self.ladas_coupling == 2 :
+                tmprcfile=self.rundir+'/HISTORY.rc'
+                histrc_file=rcfile
+                shutil.copy2(rcfile, tmprcfile)
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
+                for line in fileinput.input(tmprcfile,inplace=True):
+                    print (line.rstrip().replace('GRIDNAME',self.rqdExeInp['GRIDNAME']))
+
             # just copy an empty ExtData.rc
             if shortfile=='ExtData.rc' :
                 shutil.copy2(rcfile, self.rundir+'/'+shortfile)
@@ -1609,14 +1641,12 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#                                                          #')
     print ('#  (2) EXP_DOMAIN must be global CS grid as in ADAS exp    #')
     print ('#                                                          #')
-    print ('#  (3) MET_TAG  must be set to [ADAS_EXPID]__Nx+-          #')
+    print ('#  (3) MET_TAG  must be set to [ADAS_EXPID]__bkg           #')
     print ('#      MET_PATH must be set as follows for                 #')
     print ('#        LADAS_COUPLING = 1:                               #')
-    print ('#          [full_path]/[LDAS_EXPID]/scratch/               #')
+    print ('#          ../../../../recycle/holdpredout/                #')
     print ('#        LADAS_COUPLING = 2:                               #')
-    print ('#          [ADAS_EXPDIR]/atmens/ensdiag/forc               #')
-    print ('#      After ldas exp setup, verify the following link:    #')
-    print ('#        ../input/met_forcing/forc -> [MET_PATH]           #')
+    print ('#          [ADAS_EXPDIR]/atmens/mem                        #')
     print ('#                                                          #')
     print ('#  (4) BCS_PATH must be consistent with that of            #')
     print ('#        [ADAS_EXPDIR][/run/lnbcs                          #')
@@ -1766,6 +1796,16 @@ def parseCmdLine():
         help='replace computing/sponsor account in batinp file',
         type=str, default='None'
         )
+    p_setup.add_argument(
+        '--nymdb',
+        help='replaces BEG_DATE date in exeinp file ',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--nhmsb',
+        help='replaces BEG_DATE time in exeinp file ',
+        type=str, default='None'
+        ) 
     p_setup.add_argument(
         '--runmodel',
         help='Obsolete.',
