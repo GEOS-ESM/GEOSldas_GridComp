@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
 
 """
-This script provids a sample to computes and plots GEOSldas Data Assimilation (DA)
-diagnostics maps based on the ObsFcstAna output.
+Sample script for computing/plotting GEOSldas Data Assimilation (DA) Diagnostics
 
-User provides the experiment inforamtion and calls ObsFcstAna_prep to
-1. calculate and save the monthly sums of Obs/Fcst/Ana and sum of squared/products
-2. calculate mean/stdv of Obs/Fcst/Ana
+This script computes and plots DA diagnostic maps from ObsFcstAna output.
 
-Afterwards, user can compute the desired DA diagnostic statistics based on the priliminary
-results  and create plots. 
+Processing workflow:
+1. User provides experiment information and calls ObsFcstAna_prep to:
+   - Calculate/save monthly sums of Obs/Fcst/Ana and squared/products
+   - Calculate mean/stdv of Obs/Fcst/Ana
+2. User computes desired DA diagnostic statistics and creates plots
 
-To run this script on  Discover:
+Usage on Discover:
     $ module load python/GEOSpyD
     $ ./Main_example.py
-     or to run in the background,
+    
+    # Background execution:
     $ nohup ./Main_example.py > out.log &
-
-Requirements:
-    - Python 3.x
-    - Modules: numpy, matplotlib, netCDF4 (included in GEOSpyD)
 
 Author: Q. Liu
 Last Modified: Apr., 2025
@@ -43,66 +40,107 @@ from easev2 import easev2_ind2latlon
 
 from ObsFcstAna_prep import obsfcstana_prep
 
-# Uncomment if running in the background
+# Uncomment if to run the script in the background to see the standard output while running 
 # import io
 #sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
 #sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
 
-# -------------------------------- Information of experiment  -----------------------------------------
-#  Experiment dictionary, need "expdir", "expid", "domain", "tilecoord", "obsparam"
-Vv8010 = { 'expdir' : '/gpfsm/dnb05/projects/p51/SMAP_Nature/',
-                    'expid' : 'SPL4SM_Vv8010',
-                    'domain':  'SMAP_EASEv2_M09_GLOBAL'}
-
+# Define time range for processing
 start_time = datetime(2015,4,1)
-end_time = datetime(2021,4,1)
+end_time = datetime(2016,4,1)
 
- # Read tilecoord and obsparam for tile and obs species information
-expdir = Vv8010['expdir']
-expid = Vv8010['expid']
-domain = Vv8010['domain']
-ftc = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilecoord.bin'
-tc = read_tilecoord(ftc)
+# -------------------------------- Experiments Information -----------------------------------------
+# Supports single or multiple experiments;
+# multiple require identical tilecoords and numbe/order of observation species
+# if the default "species" number/order don't match, need to set the *optional*
+# "select_species" key to get a match, i.e. same species sequences
 
-fop = expdir+expid+'/output/'+domain+'/rc_out/Y2015/M04/'+expid+'.ldas_obsparam.20150401_0000z.txt'
-obsparam = read_obs_param(fop)
+exp_1 = { 'expdir' : '//gpfsm/dnb05/projects/p15/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
+                    'expid' : 'DAv8_SMOSSMAP',
+                    'exptag': 'DAMulti_SMAP', 
+                    'domain':  'SMAP_EASEv2_M36_GLOBAL',
+                    'species_list': [5,6,7,8] }
 
-Vv8010.update({'tilecoord':tc,'obsparam':obsparam})
+exp_2 = { 'expdir' : '//gpfsm/dnb05/projects/p15/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
+                    'expid' : 'DAv8_M36',
+                    'exptag': 'DASMAP_SMAP', 
+                    'domain':  'SMAP_EASEv2_M36_GLOBAL',
+                    'species_list': [1,2,3,4]  }
 
-# Base directory for storing monthly files
-# This can be the same as the experiment directory (expdir) or a different location
-out_path_mo = '/discover/nobackup/qliu/SMAP_diag/' +Vv8010['expid']+ \
-              '/output/'+Vv8010['domain']+'/ana/ens_avg/'
+# Uses forecasts/analyses from first experiment in list;
+# observations from experiment specified by 'obs_from' parameter
+exp_list = [exp_1, exp_2]
+obs_from = 1 # obs is from "exp_2"
+if obs_from >= len(exp_list):
+    raise ValueError('Invalid "obs_from" value')
+
+# Add tilecoord and obs_param information to each experiment
+for exp in exp_list:
+    expdir = exp['expdir']
+    expid = exp['expid']
+    domain = exp['domain']
+    fop = expdir+expid+'/output/'+domain+'/rc_out/Y2015/M04/'+expid+'.ldas_obsparam.20150401_0000z.txt'
+    obsparam = read_obs_param(fop)
+
+    # get the species list and default to list of all species if doesn't exist 
+    species_list = exp.get('species_list',[int(obsparam[i]['species']) for i in range(len(obsparam))])
+    
+    # reorder obsparam to match across experiments
+    obsparam_new = []
+    for i in range(len(obsparam)):
+        if int(obsparam[i]['species']) in species_list:
+               obsparam_new.append(obsparam[i])              
+    obsparam = obsparam_new
+    
+    ftc = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilecoord.bin'
+    tc = read_tilecoord(ftc)
+
+    exp.update({'tilecoord':tc,'obsparam':obsparam})
+
+# Top directory for monthly temporary data output;
+# can match experiment's ana/ or be located elsewhere
+out_path_mo = '/discover/nobackup/qliu/SMAP_diag/' +exp_list[0]['expid']+ \
+              '/output/'+exp_list[0]['domain']+'/ana/ens_avg/'
 
 # Output directory for final diagnostic files and plots
 out_path = '/discover/nobackup/qliu/SMAP_diag/'
 make_folder(out_path)
-stats_file  = out_path + 'tmp_stats_Vv8010_'+start_time.strftime('%Y%m%d')+'_'+ \
+
+if len(exp_list) >1 :
+    stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_obsfrom_'+ \
+                  exp_list[obs_from]['exptag']+'_'+start_time.strftime('%Y%m%d')+'_'+ \
+                  end_time.strftime('%Y%m%d')+'.nc4'
+else:
+    stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
               end_time.strftime('%Y%m%d')+'.nc4'
 
-#  --------- Preprocess into month data and compute basic statistics --------------------
+#  =========================================================================
+#  Prepocess raw ObsFcstAna output data into monthly sums for simpler and faster postprocessing;
+#  computes mean, vairance from monthly sums that can be used to compute DA diagnostics directly
+
 if not os.path.isfile(stats_file):
-    # Initialize
-    prep_v8 = obsfcstana_prep(Vv8010, start_time, end_time)
-    # Step 1: save monthly sums if files don't exist
-    prep_v8.save_monthly_sum(out_path_mo)
-    # Step 2: Compute basic statistics based on monthly sums, option to save stats in a nc4 file
-    stats = prep_v8.calculate_stats_fromsums(mo_path=out_path_mo, write_to_nc=True, filename=stats_file)
+    # Initialize the preprocess object
+    prep = obsfcstana_prep(exp_list, start_time, end_time,obs_from=obs_from)
+    # Step 1: Computer and save monthly sums 
+    prep.save_monthly_sum(out_path_mo)
+    # Step 2: Compute statistics from monthly sums, option to save result to file
+    stats = prep.calculate_stats_fromsums(mo_path=out_path_mo, write_to_nc=True, filename=stats_file)
 else:
-    # Read from previous saved stats file
     print('reading stats nc4 file '+stats_file)
     stats = {}
     with Dataset(stats_file,'r') as nc:
         for key, value in nc.variables.items():
             stats[key] = value[:].filled(np.nan)
+# 
+#  ==========================================================================
 
-#  -------------   Calculate user prefered statistical metrics and make plots ----------------
-# Define a minimum threshold for the temporal data points to ensure statistical reliability
-# of the computed metrics. 
+# Sample of final compuation of selected diagnostic metrics 
+ 
 Nmin = 20
 
 # Then computer metrics of O-F, O-A, etc. based on above computed
 N_data = stats['N_data']
+O_mean = stats['obs_mean']
 # mean(x-y) = E[x] - E[y]   
 OmF_mean = stats['obs_mean'] - stats['fcst_mean']
 OmA_mean = stats['obs_mean'] - stats['ana_mean']
@@ -137,6 +175,7 @@ OmA_stdv = np.nansum(OmA_stdv*N_data,axis=1)/np.nansum(N_data,axis=1)
 Nobs_data = np.nansum(N_data, axis=1)
 
 # Plotting
+expid = exp_list[0]['exptag']
 
 fig, axes = plt.subplots(2,2, figsize=(18,10))
 plt.rcParams.update({'font.size':14})
@@ -184,19 +223,31 @@ for i in np.arange(2):
             #   grid_data = np.nanmean(reshaped,axis=(1, 3))
 
             grid_data = grid_data_M09[1::4, 2::4]
-            
+
+            # NOT area weighted 
+            wmean = np.nanmean(grid_data)
+            wabsmean = np.nanmean(np.abs(grid_data))
+            if 'normalized' in title_txt:
+                wabsmean = np.nanmean(np.abs(grid_data-1.))
+                
             lat_M36, lon_M36 = easev2_ind2latlon(np.arange(406), np.arange(964),'M36')
             lon_2d,lat_2d = np.meshgrid(lon_M36,lat_M36)
         else:
             grid_data, uy,ux = array2grid(tile_data, lat = tc['com_lat'], lon = tc['com_lon'])
             lon_2d,lat_2d = np.meshgrid(ux, uy)
-            
+
+            # Aear weighted mean and mean(abs)
+            wmean = np.nansum(tile_data * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
+            wabsmean = np.nansum(np.abs(tile_data) * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
+            if 'normalized' in title_txt:
+                wabsmean = np.nansum(np.abs(tile_data-1.)*tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
+                
         if 'normalized' in title_txt:
-            title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (np.nanmean(grid_data), np.nanmean(np.abs(grid_data-1.)))+' '+units
+            title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (wmean, wabsmean)+' '+units
         elif 'mean' in title_txt:
-            title_txt = title_txt + '\n' + "avg=%.3f, avg(abs)=%.3f" % (np.nanmean(grid_data), np.nanmean(np.abs(grid_data)))+' '+units
+            title_txt = title_txt + '\n' + "avg=%.3f, avg(abs)=%.3f" % (wmean, wabsmean)+' '+units
         else:
-            title_txt = title_txt + '\n' + "avg=%.2f" % (np.nanmean(grid_data)) +' '+units                
+            title_txt = title_txt + '\n' + "avg=%.2f" % (wmean) +' '+units                
      
         if 'normalized' in title_txt:
             grid_data = np.log10(grid_data)
@@ -209,6 +260,6 @@ plt.tight_layout()
 # Save figure to file
 fig.savefig(out_path+'Map_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
                     end_time.strftime('%Y%m')+'.png')
-#plt.show()
+plt.show()
 plt.close(fig)
 

@@ -14,23 +14,26 @@ import warnings; warnings.filterwarnings("ignore")
 
 class obsfcstana_prep:
     
-    def __init__(self, experiment, start_time, end_time):
-        self.expdir = experiment['expdir']
-        self.expid = experiment['expid']
-        self.domain   = experiment['domain']
+    def __init__(self, exp_list, start_time, end_time, obs_from=0):
+        self.expdir_list = [item['expdir'] for item in exp_list]
+        self.expid_list = [item['expid'] for item in exp_list]
+        self.exptag_list = [item['exptag'] for item in exp_list]
+        self.domain   = exp_list[0]['domain']
         self.start_time = start_time 
         self.end_time = end_time 
         self.var_list = ['obs_obs', 'obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
-        self.tilecoord = experiment['tilecoord']
-        self.obsparam = experiment['obsparam']
+        self.tilecoord = exp_list[0]['tilecoord']
+        self.obsparam_list = [item['obsparam'] for item in exp_list]
+        self.obs_from = obs_from
 
     def save_monthly_sum(self, outpath='./'):
-        expdir  = self.expdir
-        expid = self.expid
+        expdir_list  = self.expdir_list
+        expid_list = self.expid_list
+        exptag_list = self.exptag_list
         domain = self.domain
         var_list = self.var_list
         tc = self.tilecoord
-        obs_param = self.obsparam
+        obsparam_list = self.obsparam_list
         start_time = self.start_time
         end_time = self.end_time
 
@@ -49,19 +52,26 @@ class obsfcstana_prep:
             mo_path = outpath + '/Y'+ current_month.strftime('%Y') + '/M' + current_month.strftime('%m') + '/'
             make_folder(mo_path)
             
+            outid =  '_'.join([item for item in exptag_list])
+
+            if self.obs_from  > 0:
+                outid = outid + '_Obs_from_' + exptag_list[self.obs_from]
+                
             if current_month == start_month and start_time.day > 1:
                 sdate = start_time
                 edate = current_month + relativedelta(months =1)
-                fout = mo_path + expid + '.ens_avg.ldas_ObsFcstAna.from_' + start_time.strftime('%Y%m%d') +'_stats.nc4'
+                fout = outid + '.ens_avg.ldas_ObsFcstAna.from_' + start_time.strftime('%Y%m%d') +'_stats.nc4'
             elif current_month.year == end_time.year and current_month.month == end_time.month:
                 sdate  = current_month
                 edate = end_time
-                fout = mo_path + expid+ '.ens_avg.ldas_ObsFcstAna.to_' + end_time.strftime('%Y%m%d') +'_stats.nc4'
+                fout = outid+ '.ens_avg.ldas_ObsFcstAna.to_' + end_time.strftime('%Y%m%d') +'_stats.nc4'
             else:
                 sdate = current_month
                 edate = current_month + relativedelta(months =1)
-                fout = mo_path + expid + '.ens_avg.ldas_ObsFcstAna.' + current_month.strftime('%Y%m') +'_stats.nc4'
+                fout = outid + '.ens_avg.ldas_ObsFcstAna.' + current_month.strftime('%Y%m') +'_stats.nc4'
 
+            fout = mo_path + fout
+            
             # allow stats based on partial month
             month_range = [sdate, edate]
             # skip if output file already exists
@@ -69,10 +79,10 @@ class obsfcstana_prep:
                 print('computing monthly sums ...')
                 # compute monthly sum
                 mN_data, mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum = \
-                        compute_monthly_stats(expdir,expid,domain,month_range,tc,obs_param,var_list)
+                        compute_monthly_stats(expdir_list,expid_list,domain,month_range,tc,obsparam_list,var_list,self.obs_from)
 
                 # save monthly sum in nc4 file
-                write_sums_nc4(fout, mN_data,mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum, obs_param)
+                write_sums_nc4(fout, mN_data,mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum, obsparam_list[0])
             else:
                 print('file exist, skip '+fout)
                 
@@ -82,14 +92,14 @@ class obsfcstana_prep:
         
         start_time = self.start_time
         end_time = self.end_time
-        expid = self.expid
+        exptag_list = self.exptag_list
         
         # Variable list for computing sum and sum of squared
         var_list = self.var_list 
 
         # Read tilecoord and obsparam for tile and obs species information
         n_tile = self.tilecoord['N_tile']
-        n_spec = len(self.obsparam)
+        n_spec = len(self.obsparam_list[0])
 
         # Initialize statistical metrics 
         data_sum = {}
@@ -117,20 +127,27 @@ class obsfcstana_prep:
         while current_month < end_month:
             
             fpath = mo_path + '/Y'+ current_month.strftime('%Y') + '/M' + current_month.strftime('%m') + '/'
-            
+
+            outid =  '_'.join([item for item in exptag_list])
+
+            if self.obs_from  > 0:
+                outid = outid + '_Obs_from_' + exptag_list[self.obs_from]
+                
             if current_month == start_month and start_time.day > 1:
                 sdate = start_time
                 edate = current_month + relativedelta(months =1)
-                fout = fpath + expid + '.ens_avg.ldas_ObsFcstAna.from_' + start_time.strftime('%Y%m%d') +'_stats.nc4'
+                fout = outid + '.ens_avg.ldas_ObsFcstAna.from_' + start_time.strftime('%Y%m%d') +'_stats.nc4'
             elif current_month.year == end_time.year and current_month.month == end_time.month:
                 sdate  = current_month
                 edate = end_time
-                fout = fpath + expid+ '.ens_avg.ldas_ObsFcstAna.to_' + end_time.strftime('%Y%m%d') +'_stats.nc4'
+                fout = outid+ '.ens_avg.ldas_ObsFcstAna.to_' + end_time.strftime('%Y%m%d') +'_stats.nc4'
             else:
                 sdate = current_month
                 edate = current_month + relativedelta(months =1)
-                fout = fpath + expid + '.ens_avg.ldas_ObsFcstAna.' + current_month.strftime('%Y%m') +'_stats.nc4'
-                
+                fout = outid + '.ens_avg.ldas_ObsFcstAna.' + current_month.strftime('%Y%m') +'_stats.nc4'
+
+            fout = fpath + fout
+                            
             # Read monthly data if file exists, otherwise compute monthly statistics first   
             if os.path.isfile(fout):
                 print('read sums from  monthly file: '+fout)

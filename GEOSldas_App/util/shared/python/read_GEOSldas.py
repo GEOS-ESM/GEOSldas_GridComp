@@ -36,9 +36,9 @@ def read_obs_param(fname):
             param['path'] = fid.readline().strip().strip('"')
             param['name'] = fid.readline().strip().strip('"')
 
-            if 'Vv80' in fname or 'OL80' in fname:
-                fid.readline()  # Skip two lines
-                fid.readline()
+            #if 'Vv80' in fname or 'OL80' in fname:
+            fid.readline()  # Skip two lines
+            fid.readline()
 
             param['scalepath'] = fid.readline().strip().strip('"')
             param['scalename'] = fid.readline().strip().strip('"')
