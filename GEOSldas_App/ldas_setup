@@ -882,7 +882,8 @@ class LDASsetup:
            config['input']['surface']['catch_tilefile']  = self.in_tilefile
            config['input']['shared']['expid']            = self.rqdExeInp['RESTART_ID']
            config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-           config['input']['shared']['rst_dir']          = os.path.dirname(self.in_rstfile)+'/'
+           if RESTART_str == '2' :
+             config['input']['shared']['rst_dir']        = os.path.dirname(self.in_rstfile)+'/'
            config['input']['surface']['wemin']           = wemin_in
            config['input']['surface']['catch_model']     = self.catch
 
@@ -921,6 +922,8 @@ class LDASsetup:
              config['input']['shared']['agrid']      = 'C180'
              config['input']['shared']['ogrid']      = '1440x720'
              config['input']['shared']['omodel']     = 'data'
+             config['input']['shared']['MERRA-2']    = True
+             config['input']['surface']['catch_tilefile'] = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles/GM4/geometry/CF0180x6C_DE1440xPE0720/CF0180x6C_DE1440xPE0720-Pfafstetter.til'
 
            catch_obj = catchANDcn(config_obj = config)
            catch_obj.remap()
