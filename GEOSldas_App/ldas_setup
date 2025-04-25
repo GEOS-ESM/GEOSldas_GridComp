@@ -40,8 +40,7 @@ class LDASsetup:
             'BEG_DATE', 'END_DATE','RESTART_PATH',
             'RESTART_DOMAIN','RESTART_ID','MET_TAG','MET_PATH','FORCE_DTSTEP','BCS_PATH', 'BCS_RESOLUTION']
         rqdExeInpKeys_rst = ['EXP_ID', 'EXP_DOMAIN', 'NUM_LDAS_ENSEMBLE',
-            'BEG_DATE', 'END_DATE','MET_TAG','MET_PATH','FORCE_DTSTEP','BCS_PATH', 'BCS_RESOLUTION']
-
+            'BEG_DATE', 'END_DATE','MET_TAG','MET_PATH','FORCE_DTSTEP','BCS_PATH', 'BCS_RESOLUTION'] 
         # These keywords are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
@@ -90,6 +89,9 @@ class LDASsetup:
         self.exphome = os.path.abspath(exphome_)
         self.nymdb = cmdLineArgs['nymdb']
         self.nhmsb = cmdLineArgs['nhmsb']
+        self.adomain = cmdLineArgs['adomain']
+        self.acoup  = cmdLineArgs['acoup']
+        self.ldasrs  = cmdLineArgs['ldasrs']
         self.verbose = cmdLineArgs['verbose']
         self.runmodel = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -152,6 +154,20 @@ class LDASsetup:
         if cmdLineArgs['nymdb'] != 'None' and cmdLineArgs['nhmsb'] != 'None' :
             self.date  = f"{self.nymdb} {self.nhmsb}"
             self.rqdExeInp[ 'BEG_DATE' ] = self.date
+        if cmdLineArgs['acoup'] != 'None' :
+            self.lacase = self.acoup
+            self.rqdExeInp['LADAS_COUPLING'] = self.lacase 
+        if cmdLineArgs['adomain'] != 'None' : 
+            res_string = self.adomain 
+            if len(res_string) == 4 : 
+               adres = res_string.replace("C", "0") 
+            if len(res_string) == 3 : 
+               adres = res_string.replace("C", "00")
+            self.adasdomain = adres 
+        if cmdLineArgs['ldasrs'] != 'None' :
+            ldasrshome_ = cmdLineArgs['ldasrs'].rstrip('/')
+            assert os.path.isdir(ldasrshome_) # ldas exp for rs  should exist
+            self.ldasrsdir = os.path.abspath(ldasrshome_)
 
         # print rqd exe inputs
         if self.verbose:
@@ -159,11 +175,14 @@ class LDASsetup:
             _printdict(self.rqdExeInp)
 
         # nens is an integer and =1 for model run
-        self.nens         =    int(self.rqdExeInp['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
+        self.nens = int(self.rqdExeInp['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
         assert self.nens>0, 'NUM_LDAS_ENSEMBLE [%d] <= 0' % self.nens
         _mydir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
         assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
         _mydir = None
+        self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
+
+        ###  in cases of ladas coupling
         self.ladas_coupling = int(self.rqdExeInp.get('LADAS_COUPLING',0))
         self.adas_expdir =''
         if self.ladas_coupling > 0 :
@@ -171,13 +190,41 @@ class LDASsetup:
            self.rqdExeInp[ 'ADAS_EXPDIR'] = self.adas_expdir
            self.adas_expid = os.path.basename(self.adas_expdir)
            self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__bkg'
+           # couple with adas det
            if self.ladas_coupling == 1 :
                  self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS'
+                 self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/recycle/holdpredout'
+                 self.rqdExeInp[ 'ENSEMBLE_FORCING' ] = 'NO'
+                 self.nens = 24
+           # couple with adas ens 
            if self.ladas_coupling == 2 :
                  self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS4ens'
                  self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/mem'
-
-        self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
+                 self.rqdExeInp[ 'ENSEMBLE_FORCING' ] = 'YES' 
+                 self.nens = 32
+           self.rqdExeInp['NUM_LDAS_ENSEMBLE'] = self.nens
+           self.first_ens_id  = 1
+           self.rqdExeInp['FIRST_ENS_ID'] = self.first_ens_id 
+           self.rqdExeInp['EXP_DOMAIN'] = 'CF'+ self.adasdomain +'x6C_GLOBAL'
+           self.rqdExeInp['BCS_RESOLUTION'] = 'CF'+ self.adasdomain +'x6C_CF'+self.adasdomain +'x6C'
+           self.rqdExeInp['RESTART_DOMAIN'] = 'CF'+ self.adasdomain +'x6C_GLOBAL' 
+           self.rsdir = os.path.dirname(self.ldasrsdir)
+           self.rqdExeInp[ 'RESTART_PATH' ] = self.rsdir 
+           self.rqdExeInp[ 'RESTART_ID'   ] = os.path.basename(self.ldasrsdir)
+           # the following are not in default rqdExeInp list 
+           self.met_hinterp = int(self.rqdExeInp.get('MET_HINTERP',0))
+           self.rqdExeInp['MET_HINTERP'] = 0
+           self.landassim_dt = str(self.rqdExeInp.get('LANDASSIM_DT', "10800"))
+           self.rqdExeInp['LANDASSIM_DT'] = "10800"
+           self.landassim_t0 = str(self.rqdExeInp.get('LANDASSIM_T0', "013000"))
+           self.rqdExeInp['LANDASSIM_T0'] = "013000"
+           jobsgmtdef = "00000000 060000"
+           self.jobsgmt  = str(self.rqdExeInp.get('JOB_SGMT', jobsgmtdef ))
+           self.rqdExeInp['JOB_SGMT'] = jobsgmtdef
+           self.num_sgmt  = int(self.rqdExeInp.get('NUM_SGMT', 1))
+           self.rqdExeInp['NUM_SGMT'] = 1
+        ### 
+         
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
         if self.nens > 1:
            self.perturb = 1
@@ -234,12 +281,6 @@ class LDASsetup:
 
         if 'NUM_SGMT' not in self.rqdExeInp:
            self.rqdExeInp['NUM_SGMT'] = 1
-        # hard set NUM_SGMT and NUM_SGMT
-        if (self.ladas_coupling > 0) :
-           if int(self.rqdExeInp['NUM_SGMT']) != 1 :
-              sys.exit("'NUM_SGMT' should be set to 1 with LADAS_COUPLING")
-           if self.rqdExeInp['JOB_SGMT'] != "00000000 060000" :
-              sys.exit("'JOB_SGMT' should be set to  00000000 060000 with LADAS_COUPLING")
 
         _years  = int(self.rqdExeInp['JOB_SGMT'][0:4])
         _months = int(self.rqdExeInp['JOB_SGMT'][4:6])
@@ -1061,6 +1102,9 @@ class LDASsetup:
         special_nml=[]
         if 'NML_INPUT_PATH' in self.rqdExeInp :
             special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/LDASsa_SPECIAL_inputs_*.nml')
+            if self.ladas_coupling > 0: 
+               special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/'+ self.rqdExeInp['EXP_DOMAIN'] + '/LDASsa_SPECIAL_inputs_*.nml') 
+  
         for nmlfile in special_nml:
             shortfile=nmlfile.split('/')[-1]
             shutil.copy2(nmlfile, self.rundir+'/'+shortfile)
@@ -1738,6 +1782,22 @@ def parseCmdLine():
         help='replaces BEG_DATE time in exeinp file ',
         type=str, default='None'
         ) 
+    p_setup.add_argument(
+        '--acoup',
+        help='coupling with adas_det (1) or adas_ens (2)',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--adomain',
+        help='adas exp domain for coupling ldas EXP_DOMAIN',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--ldasrs',
+        help='ldas restart exp path/expid',
+        type=str, default='None'
+        )
+
     p_setup.add_argument(
         '--runmodel',
         help='Obsolete.',
