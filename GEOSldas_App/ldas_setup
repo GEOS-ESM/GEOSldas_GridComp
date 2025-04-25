@@ -21,6 +21,7 @@ from collections import OrderedDict
 from dateutil.relativedelta import relativedelta
 from remap_utils import *
 from remap_catchANDcn  import *
+from remap_lake_landice_saltwater import *
 from lenkf_j_template import *
 """
 This script is intended to be run from any installed directory with GEOSldas.x and ldas_setup
@@ -895,8 +896,7 @@ class LDASsetup:
            config['input']['surface']['catch_tilefile']  = self.in_tilefile
            config['input']['shared']['expid']            = self.rqdExeInp['RESTART_ID']
            config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-           if RESTART_str == '2' :
-             config['input']['shared']['rst_dir']        = os.path.dirname(self.in_rstfile)+'/'
+           config['input']['shared']['rst_dir']          = os.path.dirname(self.in_rstfile)+'/'
            config['input']['surface']['wemin']           = wemin_in
            config['input']['surface']['catch_model']     = self.catch
 
@@ -940,6 +940,11 @@ class LDASsetup:
 
            catch_obj = catchANDcn(config_obj = config)
            catch_obj.remap()
+           if (self.with_landice):
+             config['output']['surface']['remap_water'] = True
+             config['input']['surface']['zoom'] = '2'
+             landice_obj = lake_landice_saltwater(config_obj = config)
+             landice_obj.remap()
 
         #for ens in self.ensdirs :
         catchRstFile0  = ''
@@ -1009,8 +1014,16 @@ class LDASsetup:
             else :
                 vegdynRstFile = vegdynRstFile0
 
-            landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-            if os.path.isfile(landiceRstFile) and self.with_landice :
+            landiceRstFile = ''
+            if self.with_landice :
+               if self.rqdExeInp['RESTART'].isdigit():
+                  if int(self.rqdExeInp['RESTART']) == 0 or int(self.rqdExeInp['RESTART']) == 2 :
+                     print(" landice type does not support REATART=0 or 2 option. please use M option(MERRA-2)")
+                  landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
+               else:
+                  landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+
+            if os.path.isfile(landiceRstFile) :
                landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
                if self.isZoomIn :
                   print ("Creating coom in landice restart file... \n")
