@@ -268,6 +268,16 @@ class LDASsetup:
         self.bcs_land   = self.rqdExeInp['BCS_PATH']+ '/land/' + self.rqdExeInp['BCS_RESOLUTION']+'/'
         self.bcs_geom   = self.rqdExeInp['BCS_PATH']+ '/geometry/' + self.rqdExeInp['BCS_RESOLUTION']+'/'
         self.bcs_landshared = self.rqdExeInp['BCS_PATH']+ '/land/shared/'
+        if ('SG001' in self.rqdExeInp['BCS_RESOLUTION']):
+           self.rqdExeInp['GEOSldas.STRETCH_FACTOR]') = 2.5
+           self.rqdExeInp['GEOSldas.TARGET_LON']      = -98.35
+           self.rqdExeInp['GEOSldas.TARGET_LAT']      = 39.5
+
+        if ('SG002' in self.rqdExeInp['BCS_RESOLUTION']):
+           self.rqdExeInp['GEOSldas.STRETCH_FACTOR]') = 3.0
+           self.rqdExeInp['GEOSldas.TARGET_LON']      = -98.35
+           self.rqdExeInp['GEOSldas.TARGET_LAT']      = 39.5
+   
 
         if self.rqdExeInp['MET_PATH'][-1] != '/':
            self.rqdExeInp['MET_PATH'] = self.rqdExeInp['MET_PATH']+'/'
