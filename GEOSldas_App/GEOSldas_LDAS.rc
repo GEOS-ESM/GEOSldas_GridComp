@@ -44,7 +44,7 @@ TILE_TYPES: LAND
 
 # ---- Choice of tile file types
 # There are three choices : txt, nc4 and default
-# If it is default, the type would be detected (searched txt first)
+# If it is default, the type would be detected (searched nc4 first)
 # 
 TILE_FILE_TYPE: default 
 

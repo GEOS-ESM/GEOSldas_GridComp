@@ -314,7 +314,7 @@ class LDASsetup:
            nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
            if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
            if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
-           if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[0]
+           if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
            self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
            self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
@@ -360,7 +360,7 @@ class LDASsetup:
                     nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
                     if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
                     if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
-                    if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[0]
+                    if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
                     self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
                     self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
