@@ -3036,10 +3036,16 @@ end block
        end do
    
        close(10)
-       ! i here is the number of restart nmuber including types in 'types')
+       
+       ! i here is the number of tiles including all types specified in 'types'
+
        n_tiles = i
-       allocate(r2g, source= r2g_tmp(1:n_tiles))
+
+       ! allocate and fill output variables (r2g, tile_coord_r)
+
+       allocate(r2g,          source = r2g_tmp(   1:n_tiles))
        allocate(tile_coord_r, source = tile_coord(1:n_tiles))
+       
        deallocate(tile_coord) 
        deallocate(r2g_tmp)
        ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing
