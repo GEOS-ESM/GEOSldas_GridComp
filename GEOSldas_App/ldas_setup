@@ -51,7 +51,7 @@ class LDASsetup:
             'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
-            'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_TYPE' ]
+            'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_FORMAT' ]
 
 
         self.GEOS_SITE       = "@GEOS_SITE@"
@@ -308,13 +308,12 @@ class LDASsetup:
         #                self.rqdExeInp['RST_FROM_GLOBAL'] = 0
 
         self.rqdExeInp['LNFM_FILE'] = ''
-        tile_file_type = self.rqdExeInp.get('TILE_FILE_TYPE', 'default')
+        tile_file_format = self.rqdExeInp.get('TILE_FILE_FORMAT', 'DEFAULT')
         if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
            txt_tile = glob.glob(self.bcs_geom + '*.til')
-           nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
-           if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
-           if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
-           if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
+           nc4_tile = glob.glob(self.bcs_geom + '*.nc4')
+           if tile_file_format.upper() == 'TXT'     : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
+           if tile_file_format.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
            self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
            self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
@@ -358,9 +357,8 @@ class LDASsetup:
                     _numd = int(linecache.getline(ldas_domain, 1).strip())
                     txt_tile = glob.glob(self.bcs_geom + '*.til')
                     nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
-                    if tile_file_type.upper() == 'TXT' : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
-                    if tile_file_type.upper() == 'NC4' : self.rqdExeInp['TILING_FILE'] = nc4_tile[0]
-                    if tile_file_type.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
+                    if tile_file_format.upper() == 'TXT'     : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
+                    if tile_file_format.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
                     self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
                     self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]

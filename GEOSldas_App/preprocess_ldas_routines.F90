@@ -2753,9 +2753,9 @@ end block
 
   ! **************************************************************************************************
   
-  subroutine LDAS_read_til_file( tile_file, catch_file, tile_grid_g, tile_coord_r, r2g, N_catg, types )
+  subroutine LDAS_read_til_file( tile_file, catch_file, tile_grid_g, tile_coord_r, r2g, N_tiles_land_g, types )
     
-    ! read land tile information from *.til file
+    ! read tile information from *.til file
     !
     ! This subroutine:
     !  - is the GEOSldas version of the LDASsa subroutine read_til_file() and
@@ -2763,17 +2763,17 @@ end block
     !
     ! inputs:
     !  tile_file       : *.til tile definition file (full path + name)
-    !  catch_file      : catchment.def file         (full path + name) 
+    !  catch_file      : catchment.def file         (full path + name)
     !
     ! outputs:
     !  tile_grid_g     : parameters of tile definition grid
-    !  tile_coord_land : coordinates of tiles (see tile_coord_type),
+    !  tile_coord_r    : coordinates of tiles (see tile_coord_type),
     !                    implemented as pointer which is allocated in 
     !                    this subroutine
-    !                    NOTE: number of *land* tiles can be diagnosed with size(tile_coord)
+    !
     ! optional:
-    !    r2g           : the restart domain id to the global id
-    !    N_catg        : Number of land tiles
+    !  r2g             : the restart domain id to the global id
+    !  N_tiles_land_g  : Number of *land* tiles in global domain
 
     ! "tile_id" is no longer read from *.til file and is now set in this 
     ! subroutine to match order of tiles in *.til file
@@ -2783,6 +2783,9 @@ end block
     ! and minor clean-up
     ! - reichle,  2 Aug 2020
     !
+    ! modified to accommodate additional tile types (landice)
+    ! - wjiang, reichle, 30 Apr 2025
+    !
     ! -------------------------------------------------------------
 
     implicit none
@@ -2791,7 +2794,7 @@ end block
     character(*),                                          intent(in)   :: catch_file
     type(grid_def_type),                                   intent(inout):: tile_grid_g
     type(tile_coord_type), dimension(:),           pointer              :: tile_coord_r ! out
-    integer,  intent(out)                                               :: N_catg
+    integer,  intent(out)                                               :: N_tiles_land_g
     integer,               dimension(:),           pointer              :: r2g ! out
     integer,               dimension(:), optional                       :: types ! input
 
@@ -2802,7 +2805,7 @@ end block
     real    :: ease_cell_area
     integer :: i, n_tiles, n_grids,tmpint1, tmpint2, tmpint3, tmpint4
     integer :: i_indg_offset, j_indg_offset, col_order
-    integer :: n_tiles_land, n_lon, n_lat
+    integer :: n_lon, n_lat
     logical :: ease_grid, isNC4
     integer :: typ, k, file_type, status
     integer, dimension(:), allocatable :: tile_types
@@ -2826,7 +2829,7 @@ end block
     if (present(types)) then
        tile_types = types
     else
-       tile_types =[MAPL_LAND]
+       tile_types =[MAPL_LAND]    ! default is to include only land tiles
     endif
 
     ! read *.til file header 
@@ -2892,7 +2895,7 @@ end block
     
 
     if (isNC4 ) then
-       N_catg  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + MAPL_ExcludeFromDomain))
+       N_tiles_land_g  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + MAPL_ExcludeFromDomain))
        tile_coord_r(:)%typ     = iTable(r2g, 0)
        tile_coord_r(:)%i_indg  = iTable(r2g, 2) 
        tile_coord_r(:)%j_indg  = iTable(r2g, 3)
@@ -2912,7 +2915,7 @@ end block
        tile_coord_r(:)%max_lat   = rTable(r2g, 9)
        tile_coord_r(:)%elev      = rTable(r2g, 10)
 
-       tile_coord_r%frac_pfaf    = nodata_generic
+       tile_coord_r%frac_pfaf    =      nodata_generic
        tile_coord_r%pert_i_indg  = nint(nodata_generic)
        tile_coord_r%pert_j_indg  = nint(nodata_generic)
     else
@@ -2923,15 +2926,15 @@ end block
        
        ! WJ notes: i and k are the same---global ids
        !           fid --- num in simulation domain
-       N_catg = 0 
+       N_tiles_land_g = 0 
        do k=1,n_tiles
           
           read(10,'(A)')  tmpline 
           read(tmpline,*) typ
    
-          if (typ == MAPL_LAND .or. typ == MAPL_LAND + MAPL_ExcludeFromDomain) N_catg = N_catg + 1
+          if (typ == MAPL_LAND .or. typ == MAPL_LAND + MAPL_ExcludeFromDomain) N_tiles_land_g = N_tiles_land_g + 1
    
-          ! tile type "MAPL_Land_ExcludeFromDomain" identifies land tiles to exclude
+          ! tile type "MAPL_ExcludeFromDomain" identifies tiles to exclude
           !  when non-global domain is created
    
           if (any( tile_types == typ))  then  ! all needed tiles
@@ -3042,12 +3045,15 @@ end block
        ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing
        tile_coord_r%pert_i_indg = nint(nodata_generic)
        tile_coord_r%pert_j_indg = nint(nodata_generic)
-       tile_coord_r%elev        = nodata_generic
-       call read_catchment_def( catch_file, N_catg, tile_coord_r )
+       tile_coord_r%elev        =      nodata_generic
+       call read_catchment_def( catch_file, N_tiles_land_g, tile_coord_r )
        
        ! ----------------------------------------------------------------------
        !
        ! if elevation info is still needed, read *gridded* elevation data (check only first tile!)
+
+       ! at this stage, elev should still be needed only for very old bcs that were created before
+       ! elev was included in catchment.def (wjiang+reichle, 30 Apr 2025)
        
        ! gridded elevation file is NOT available for EASE grids, where elevation information
        !  is in catchment.def file
