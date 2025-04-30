@@ -3042,6 +3042,7 @@ end block
        ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing
        tile_coord_r%pert_i_indg = nint(nodata_generic)
        tile_coord_r%pert_j_indg = nint(nodata_generic)
+       tile_coord_r%elev        = nodata_generic
        call read_catchment_def( catch_file, N_catg, tile_coord_r )
        
        ! ----------------------------------------------------------------------
