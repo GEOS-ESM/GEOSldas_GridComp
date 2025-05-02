@@ -159,12 +159,7 @@ class LDASsetup:
             self.lacase = self.ladas_cpl
             self.rqdExeInp['LADAS_COUPLING'] = self.lacase 
         if cmdLineArgs['agcm_res'] != 'None' : 
-            res_string = self.agcm_res 
-            if len(res_string) == 4 : 
-               adres = res_string.replace("C", "0") 
-            if len(res_string) == 3 : 
-               adres = res_string.replace("C", "00")
-            self.adasdomain = adres 
+            self.adasdomain = self.agcm_res
         if cmdLineArgs['rstdir'] != 'None' :
             rstdir_ = cmdLineArgs['rstdir'].rstrip('/')      # remove trailing '/'
             assert os.path.isdir(rstdir_)                    # ldas exp for rs  should exist
