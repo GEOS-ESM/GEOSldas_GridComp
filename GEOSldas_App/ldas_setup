@@ -40,7 +40,8 @@ class LDASsetup:
             'BEG_DATE', 'END_DATE','RESTART_PATH',
             'RESTART_DOMAIN','RESTART_ID','MET_TAG','MET_PATH','FORCE_DTSTEP','BCS_PATH', 'BCS_RESOLUTION']
         rqdExeInpKeys_rst = ['EXP_ID', 'EXP_DOMAIN', 'NUM_LDAS_ENSEMBLE',
-            'BEG_DATE', 'END_DATE','MET_TAG','MET_PATH','FORCE_DTSTEP','BCS_PATH', 'BCS_RESOLUTION'] 
+            'BEG_DATE', 'END_DATE','MET_TAG','MET_PATH','FORCE_DTSTEP','BCS_PATH', 'BCS_RESOLUTION']
+
         # These keywords are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
@@ -69,62 +70,62 @@ class LDASsetup:
             # sample sub-command
             # by construction, we can have
             # either: {'exeinp': False, 'batinp': 'lasgh'}    <-- 'lasgh'???
-            # or:     {'exeinp': True, 'batinp': None}
+            # or:     {'exeinp': True,  'batinp': None   }
             if cmdLineArgs['exeinp']:
                 _printExeInputKeys(rqdExeInpKeys)
             elif cmdLineArgs['batinp'] :
                 _printRmInputKeys(rqdRmInpKeys, optSlurmInpKeys)
             else:
-                raise Exception('not recognized option')
+                raise Exception('unrecognized option')
             sys.exit(0)
 
         # ------
         # ./ldsetup.py setup ...
         # ------
         # Instance variables
-        self.exeinpfile = cmdLineArgs['exeinpfile']
-        self.batinpfile = cmdLineArgs['batinpfile']
-        exphome_ = cmdLineArgs['exphome'].rstrip('/')
-        assert os.path.isdir(exphome_) # exphome should exist
-        self.exphome = os.path.abspath(exphome_)
-        self.nymdb = cmdLineArgs['nymdb']
-        self.nhmsb = cmdLineArgs['nhmsb']
-        self.adomain = cmdLineArgs['adomain']
-        self.acoup  = cmdLineArgs['acoup']
-        self.ldasrs  = cmdLineArgs['ldasrs']
-        self.verbose = cmdLineArgs['verbose']
-        self.runmodel = cmdLineArgs['runmodel']
+        self.exeinpfile         = cmdLineArgs['exeinpfile']
+        self.batinpfile         = cmdLineArgs['batinpfile']
+        exphome_                = cmdLineArgs['exphome'].rstrip('/')
+        assert os.path.isdir(exphome_)                                   # exphome should exist
+        self.exphome            = os.path.abspath(exphome_)
+        self.nymdb              = cmdLineArgs['nymdb']
+        self.nhmsb              = cmdLineArgs['nhmsb']
+        self.agcm_res           = cmdLineArgs['agcm_res']
+        self.ladas_cpl          = cmdLineArgs['ladas_cpl']
+        self.rstdir             = cmdLineArgs['rstdir']
+        self.verbose            = cmdLineArgs['verbose']
+        self.runmodel           = cmdLineArgs['runmodel']
         if self.runmodel :
           print('\n The option "--runmodel" is out of date, not necessary anymore. \n')
-        self.daysperjob = cmdLineArgs['daysperjob']
-        self.monthsperjob = cmdLineArgs['monthsperjob']
-        self.rqdExeInp = OrderedDict()
-        self.rqdRmInp = OrderedDict()
-        self.optRmInp = OrderedDict()
-        self.rundir    = None
-        self.blddir   = None
-        self.blddirLn = None
-        self.outdir   = None
-        self.out_path   = None
-        self.inpdir   = None
-        self.exefyl = None
-        self.islocal = False
-        self.catch = ''
-        self.has_mwrtm = False
-        self.has_vegopacity = False
-        self.assim = False
+        self.daysperjob         = cmdLineArgs['daysperjob']
+        self.monthsperjob       = cmdLineArgs['monthsperjob']
+        self.rqdExeInp          = OrderedDict()
+        self.rqdRmInp           = OrderedDict()
+        self.optRmInp           = OrderedDict()
+        self.rundir             = None
+        self.blddir             = None
+        self.blddirLn           = None
+        self.outdir             = None
+        self.out_path           = None
+        self.inpdir             = None
+        self.exefyl             = None
+        self.islocal            = False
+        self.catch              = ''
+        self.has_mwrtm          = False
+        self.has_vegopacity     = False
+        self.assim              = False
         self.has_landassim_seed = False
-        self.has_geos_pert = False
-        self.nSegments = 1
-        self.perturb = 0
-        self.first_ens_id = 0
-        self.ladas_coupling = 0
-        self.in_rstfile = None
-        self.in_tilefile = 'None' # default string
-        self.ens_id_width = 6     # _eXXXX
-        self.bcs_land = ''
-        self.bcs_geom = ''
-        self.bcs_landshared = ''
+        self.has_geos_pert      = False
+        self.nSegments          = 1
+        self.perturb            = 0
+        self.first_ens_id       = 0
+        self.ladas_coupling     = 0
+        self.in_rstfile         = None
+        self.in_tilefile        = 'None'                 # default string
+        self.ens_id_width       = 6                      # _eXXXX
+        self.bcs_land           = ''
+        self.bcs_geom           = ''
+        self.bcs_landshared     = ''
 
         # ------
         # Read exe input file which is required to set up the dir
@@ -154,20 +155,20 @@ class LDASsetup:
         if cmdLineArgs['nymdb'] != 'None' and cmdLineArgs['nhmsb'] != 'None' :
             self.date  = f"{self.nymdb} {self.nhmsb}"
             self.rqdExeInp[ 'BEG_DATE' ] = self.date
-        if cmdLineArgs['acoup'] != 'None' :
-            self.lacase = self.acoup
+        if cmdLineArgs['ladas_cpl'] != 'None' :
+            self.lacase = self.ladas_cpl
             self.rqdExeInp['LADAS_COUPLING'] = self.lacase 
-        if cmdLineArgs['adomain'] != 'None' : 
-            res_string = self.adomain 
+        if cmdLineArgs['agcm_res'] != 'None' : 
+            res_string = self.agcm_res 
             if len(res_string) == 4 : 
                adres = res_string.replace("C", "0") 
             if len(res_string) == 3 : 
                adres = res_string.replace("C", "00")
             self.adasdomain = adres 
-        if cmdLineArgs['ldasrs'] != 'None' :
-            ldasrshome_ = cmdLineArgs['ldasrs'].rstrip('/')
-            assert os.path.isdir(ldasrshome_) # ldas exp for rs  should exist
-            self.ldasrsdir = os.path.abspath(ldasrshome_)
+        if cmdLineArgs['rstdir'] != 'None' :
+            rstdir_ = cmdLineArgs['rstdir'].rstrip('/')      # remove trailing '/'
+            assert os.path.isdir(rstdir_)                    # ldas exp for rs  should exist
+            self.rstdir = os.path.abspath(rstdir_)
 
         # print rqd exe inputs
         if self.verbose:
@@ -182,47 +183,49 @@ class LDASsetup:
         _mydir = None
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
 
-        ###  in cases of ladas coupling
-        self.ladas_coupling = int(self.rqdExeInp.get('LADAS_COUPLING',0))
-        self.adas_expdir =''
+        ### check if ldas is coupled to adas; if so, set input parameters accordingly
+        self.ladas_coupling                           = int(self.rqdExeInp.get('LADAS_COUPLING',0))
+        self.adas_expdir                              = ''
         if self.ladas_coupling > 0 :
-           self.adas_expdir = os.path.dirname(self.exphome)
-           self.rqdExeInp[ 'ADAS_EXPDIR'] = self.adas_expdir
-           self.adas_expid = os.path.basename(self.adas_expdir)
-           self.rqdExeInp[ 'MET_TAG' ] = self.adas_expid + '__bkg'
-           # couple with adas det
+           self.adas_expdir                           = os.path.dirname(self.exphome)
+           self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
+           self.adas_expid                            = os.path.basename(self.adas_expdir)
+           self.rqdExeInp['MET_TAG']                  = self.adas_expid + '__bkg'
            if self.ladas_coupling == 1 :
-                 self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS'
-                 self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/recycle/holdpredout'
-                 self.rqdExeInp[ 'ENSEMBLE_FORCING' ] = 'NO'
-                 self.nens = 24
-           # couple with adas ens 
-           if self.ladas_coupling == 2 :
-                 self.rqdExeInp[ 'EXP_ID' ] = self.adas_expid + '_LDAS4ens'
-                 self.rqdExeInp[ 'MET_PATH' ] = self.adas_expdir +'/atmens/mem'
-                 self.rqdExeInp[ 'ENSEMBLE_FORCING' ] = 'YES' 
-                 self.nens = 32
-           self.rqdExeInp['NUM_LDAS_ENSEMBLE'] = self.nens
-           self.first_ens_id  = 1
-           self.rqdExeInp['FIRST_ENS_ID'] = self.first_ens_id 
-           self.rqdExeInp['EXP_DOMAIN'] = 'CF'+ self.adasdomain +'x6C_GLOBAL'
-           self.rqdExeInp['BCS_RESOLUTION'] = 'CF'+ self.adasdomain +'x6C_CF'+self.adasdomain +'x6C'
-           self.rqdExeInp['RESTART_DOMAIN'] = 'CF'+ self.adasdomain +'x6C_GLOBAL' 
-           self.rsdir = os.path.dirname(self.ldasrsdir)
-           self.rqdExeInp[ 'RESTART_PATH' ] = self.rsdir 
-           self.rqdExeInp[ 'RESTART_ID'   ] = os.path.basename(self.ldasrsdir)
+               # ldas coupled with determistic component of adas
+               self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
+               self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
+               self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
+               self.nens = 24
+           elif self.ladas_coupling == 2 :
+               # ldas coupled with ensemble component of adas
+               self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
+               self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
+               self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
+               self.nens = 32
+           else :
+               exit("Error. Unknown value of ladas_coupling.\n")
+           self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
+           self.first_ens_id                          = 1
+           self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id 
+           self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.adasdomain +'x6C_GLOBAL'
+           self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.adasdomain +'x6C_CF'     + self.adasdomain +'x6C'
+           self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.adasdomain +'x6C_GLOBAL' 
+           self.rsdir                                 = os.path.dirname(self.rstdir)
+           self.rqdExeInp[ 'RESTART_PATH' ]           = self.rsdir 
+           self.rqdExeInp[ 'RESTART_ID'   ]           = os.path.basename(self.rstdir)
            # the following are not in default rqdExeInp list 
-           self.met_hinterp = int(self.rqdExeInp.get('MET_HINTERP',0))
-           self.rqdExeInp['MET_HINTERP'] = 0
-           self.landassim_dt = str(self.rqdExeInp.get('LANDASSIM_DT', "10800"))
-           self.rqdExeInp['LANDASSIM_DT'] = "10800"
-           self.landassim_t0 = str(self.rqdExeInp.get('LANDASSIM_T0', "013000"))
-           self.rqdExeInp['LANDASSIM_T0'] = "013000"
-           jobsgmtdef = "00000000 060000"
-           self.jobsgmt  = str(self.rqdExeInp.get('JOB_SGMT', jobsgmtdef ))
-           self.rqdExeInp['JOB_SGMT'] = jobsgmtdef
-           self.num_sgmt  = int(self.rqdExeInp.get('NUM_SGMT', 1))
-           self.rqdExeInp['NUM_SGMT'] = 1
+           self.met_hinterp                           = int(self.rqdExeInp.get('MET_HINTERP',0))
+           self.rqdExeInp['MET_HINTERP']              = 0
+           self.landassim_dt                          = str(self.rqdExeInp.get('LANDASSIM_DT', "10800"))
+           self.rqdExeInp['LANDASSIM_DT']             = "10800"
+           self.landassim_t0                          = str(self.rqdExeInp.get('LANDASSIM_T0', "013000"))
+           self.rqdExeInp['LANDASSIM_T0']             = "013000"
+           jobsgmtdef                                 = "00000000 060000"
+           self.jobsgmt                               = str(self.rqdExeInp.get('JOB_SGMT', jobsgmtdef ))
+           self.rqdExeInp['JOB_SGMT']                 = jobsgmtdef
+           self.num_sgmt                              = int(self.rqdExeInp.get('NUM_SGMT', 1))
+           self.rqdExeInp['NUM_SGMT']                 = 1
         ### 
          
         self.perturb = int(self.rqdExeInp.get('PERTURBATIONS',0))
@@ -712,7 +715,7 @@ class LDASsetup:
         status = True
         return status
 
-    # create link, BCs , restarts
+    # create links to BCs, restarts, met forcing, ...
     def createLnRstBc(self) :
         # link bld dir
         status = False
@@ -1604,12 +1607,13 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('# Coupling of LDAS to ADAS ("LADAS"):                      #')
     print ('#                                                          #')
     print ('#   0 -- LDAS not coupled with ADAS (default)              #')
-    print ('#   1 -- LDAS coupled with central member of ADAS          #')
+    print ('#   1 -- LDAS coupled with central (det) member of ADAS    #')
     print ('#   2 -- LDAS coupled with ens component of ADAS           #')
     print ('#                                                          #')
-    print ('#  Requirements for LADAS_COUPLING > 0:                    #')
+    print ('#  Requirements for LADAS_COUPLING > 0 are as follows,     #')
+    print ('#    with most requirements hardwired into ldas_setup:     #')
     print ('#                                                          #')
-    print ('#  (0) Specify ADAS_EXPDIR = [full_path]/[ADAS_EXPID]      #')
+    print ('#  (0) ADAS_EXPDIR = [full_path]/[ADAS_EXPID]              #')
     print ('#                                                          #')
     print ('#  (1) BEG_DATE must be consistent with first cycle date   #')
     print ('#        and time of ADAS experiment (time is typically    #')
@@ -1635,7 +1639,8 @@ def _printExeInputKeys(rqdExeInpKeys):
     print ('#  (7) HISTORY:                                            #')
     print ('#      - instantaneous "catch_progn_incr" must be in       #')
     print ('#          HISTORY collection                              #')
-    print ('#      - time step must match that of LDAS analysis        #')
+    print ('#      - time step must be consistent with that of         #')
+    print ('#          LDAS analysis                                   #')
     print ('#      - for LADAS_COUPLING=2, HISTORY must include        #')
     print ('#          "catch_progn_incr[ENS_INDEX]"                   #')
     print ('#                                                          #')
@@ -1741,7 +1746,7 @@ def parseCmdLine():
         )
     group.add_argument(
         '--batinp',
-        help='print sample input file for SLURM ',
+        help='print sample input file for the resource manager (SLURM)',
         action='store_true',
         )
     # subparser: setup command
@@ -1750,7 +1755,7 @@ def parseCmdLine():
         help='setup LDAS experiment',
         description="The 'setup' sub-command is used to setup a GEOSldas " \
             "experiment. The positional argument 'exphome' is used to create " \
-            "work_path (exphome+/output) and run_path (exphome+/run)."
+            "work_path (=exphome+/output) and run_path (=exphome+/run)."
         )
     p_setup.add_argument(
         '-v',
@@ -1767,37 +1772,40 @@ def parseCmdLine():
         'batinpfile',
         help='input file with arguments for SLURM',
         )
+
+    # the following command line arguments, if present, take precedence over what
+    #   is specified in the exeinp and batinp files
     p_setup.add_argument(
         '--account',
-        help='replace computing/sponsor account in batinp file',
+        help='overwrites computing/sponsor account from batinp file',
         type=str, default='None'
         )
     p_setup.add_argument(
         '--nymdb',
-        help='replaces BEG_DATE date in exeinp file ',
+        help='overwrites date in BEG_DATE from exeinp file',
         type=str, default='None'
         )
     p_setup.add_argument(
         '--nhmsb',
-        help='replaces BEG_DATE time in exeinp file ',
+        help='overwrites time in BEG_DATE from exeinp file',
         type=str, default='None'
         ) 
     p_setup.add_argument(
-        '--acoup',
-        help='coupling with adas_det (1) or adas_ens (2)',
+        '--ladas_cpl',
+        help='specifies LDAS/ADAS coupling mode: (1) ADAS deterministic member or (2) ADAS ensemble',
         type=str, default='None'
         )
     p_setup.add_argument(
-        '--adomain',
-        help='adas exp domain for coupling ldas EXP_DOMAIN',
+        '--agcm_res',
+        help='specifies AGCM resolution of coupled ADAS component',
         type=str, default='None'
         )
     p_setup.add_argument(
-        '--ldasrs',
-        help='ldas restart exp path/expid',
+        '--rstdir',
+        help='specifies LDAS restart dir (exp path/exp id)',
         type=str, default='None'
         )
-
+    
     p_setup.add_argument(
         '--runmodel',
         help='Obsolete.',
