@@ -879,7 +879,7 @@ class LDASsetup:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        if (RESTART_str != '1' and self.with_land):
+        if (RESTART_str != '1' and (self.with_land or self.with_landice)):
            bcs_path = self.rqdExeInp['BCS_PATH']
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
            bc_base    = os.path.dirname(bcs_path)
@@ -894,7 +894,8 @@ class LDASsetup:
            config['input']['surface']['catch_tilefile']  = self.in_tilefile
            config['input']['shared']['expid']            = self.rqdExeInp['RESTART_ID']
            config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-           config['input']['shared']['rst_dir']          = os.path.dirname(self.in_rstfile)+'/'
+           if RESTART_str != 'M':
+             config['input']['shared']['rst_dir']        = os.path.dirname(self.in_rstfile)+'/'
            config['input']['surface']['wemin']           = wemin_in
            config['input']['surface']['catch_model']     = self.catch
 
@@ -936,9 +937,10 @@ class LDASsetup:
              config['input']['shared']['MERRA-2']    = True
              config['input']['surface']['catch_tilefile'] = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles/GM4/geometry/CF0180x6C_DE1440xPE0720/CF0180x6C_DE1440xPE0720-Pfafstetter.til'
 
-           catch_obj = catchANDcn(config_obj = config)
-           catch_obj.remap()
-           if (self.with_landice):
+           if self.with_land:
+             catch_obj = catchANDcn(config_obj = config)
+             catch_obj.remap()
+           if self.with_landice:
              config['output']['surface']['remap_water'] = True
              config['input']['surface']['zoom'] = '2'
              landice_obj = lake_landice_saltwater(config_obj = config)
@@ -972,9 +974,10 @@ class LDASsetup:
                     if not os.path.isfile(vegdynRstFile): # no vegdyn restart from LDASsa
                        if not os.path.isfile(vegdynRstFile0):
                          vegdynRstFile = glob.glob(self.bcs_land + 'vegdyn_*.dat')[0]
-            else :
+            else:
                 vegdynRstFile = glob.glob(self.bcs_land + 'vegdyn_*.dat')[0]
-                catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
+                if self.with_land:
+                  catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
 
             # catchment restart file
             if os.path.isfile(catchRstFile) and self.with_land :
