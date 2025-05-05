@@ -91,8 +91,9 @@ class LDASsetup:
         self.nymdb              = cmdLineArgs['nymdb']
         self.nhmsb              = cmdLineArgs['nhmsb']
         self.agcm_res           = cmdLineArgs['agcm_res']
+        self.landBC_ver         = cmdLineArgs['landBC_ver']
         self.ladas_cpl          = cmdLineArgs['ladas_cpl']
-        self.rstdir             = cmdLineArgs['rstdir']
+        self.rstloc             = cmdLineArgs['rstloc']
         self.verbose            = cmdLineArgs['verbose']
         self.runmodel           = cmdLineArgs['runmodel']
         if self.runmodel :
@@ -160,10 +161,12 @@ class LDASsetup:
             self.rqdExeInp['LADAS_COUPLING'] = self.lacase 
         if cmdLineArgs['agcm_res'] != 'None' : 
             self.adasdomain = self.agcm_res
-        if cmdLineArgs['rstdir'] != 'None' :
-            rstdir_ = cmdLineArgs['rstdir'].rstrip('/')      # remove trailing '/'
-            assert os.path.isdir(rstdir_)                    # ldas exp for rs  should exist
-            self.rstdir = os.path.abspath(rstdir_)
+        if cmdLineArgs['landBC_ver'] != 'None' : 
+            self.landbcver = self.landBC_ver
+        if cmdLineArgs['rstloc'] != 'None' :
+            rstloc_ = cmdLineArgs['rstloc'].rstrip('/')      # remove trailing '/'
+            assert os.path.isdir(rstloc_)                    # ldas exp for rs  should exist
+            self.rstloc = os.path.abspath(rstloc_)
 
         # print rqd exe inputs
         if self.verbose:
@@ -191,35 +194,32 @@ class LDASsetup:
                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
                self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
-               self.nens = 24
+               self.nens = 24 
            elif self.ladas_coupling == 2 :
                # ldas coupled with ensemble component of adas
                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
                self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
-               self.nens = 32
+               self.nens = 32 
            else :
                exit("Error. Unknown value of ladas_coupling.\n")
            self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
            self.first_ens_id                          = 1
            self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id 
-           self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.adasdomain +'x6C_GLOBAL'
+           self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.adasdomain +'x6C_GLOBAL' 
+           uptotiles = os.path.dirname(self.rqdExeInp['BCS_PATH'].rstrip('/'))
+           self.rqdExeInp['BCS_PATH']                 = uptotiles + '/' + self.landbcver 
+           if self.landbcver == "Icarus-NLv3" :
+              self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
            self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.adasdomain +'x6C_CF'     + self.adasdomain +'x6C'
            self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.adasdomain +'x6C_GLOBAL' 
-           self.rsdir                                 = os.path.dirname(self.rstdir)
-           self.rqdExeInp[ 'RESTART_PATH' ]           = self.rsdir 
-           self.rqdExeInp[ 'RESTART_ID'   ]           = os.path.basename(self.rstdir)
+           self.rqdExeInp[ 'RESTART_PATH' ]           = os.path.dirname(self.rstloc) 
+           self.rqdExeInp[ 'RESTART_ID'   ]           = os.path.basename(self.rstloc)
            # the following are not in default rqdExeInp list 
-           self.met_hinterp                           = int(self.rqdExeInp.get('MET_HINTERP',0))
            self.rqdExeInp['MET_HINTERP']              = 0
-           self.landassim_dt                          = str(self.rqdExeInp.get('LANDASSIM_DT', "10800"))
            self.rqdExeInp['LANDASSIM_DT']             = "10800"
-           self.landassim_t0                          = str(self.rqdExeInp.get('LANDASSIM_T0', "013000"))
            self.rqdExeInp['LANDASSIM_T0']             = "013000"
-           jobsgmtdef                                 = "00000000 060000"
-           self.jobsgmt                               = str(self.rqdExeInp.get('JOB_SGMT', jobsgmtdef ))
-           self.rqdExeInp['JOB_SGMT']                 = jobsgmtdef
-           self.num_sgmt                              = int(self.rqdExeInp.get('NUM_SGMT', 1))
+           self.rqdExeInp['JOB_SGMT']                 = "00000000 060000"
            self.rqdExeInp['NUM_SGMT']                 = 1
         ### 
          
@@ -1796,8 +1796,13 @@ def parseCmdLine():
         type=str, default='None'
         )
     p_setup.add_argument(
-        '--rstdir',
-        help='specifies LDAS restart dir (exp path/exp id)',
+        '--landBC_ver',
+        help='specifies land BCs version of coupled ADAS component',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--rstloc',
+        help='specifies LDAS restart location (exp path/exp id)',
         type=str, default='None'
         )
     
