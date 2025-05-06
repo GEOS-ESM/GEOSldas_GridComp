@@ -181,7 +181,7 @@ class LDASsetup:
         _mydir = None
         self.first_ens_id = int(self.rqdExeInp.get('FIRST_ENS_ID',0))
 
-        ### check if ldas is coupled to adas; if so, set input parameters accordingly
+        ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
         self.ladas_coupling                           = int(self.rqdExeInp.get('LADAS_COUPLING',0))
         self.adas_expdir                              = ''
         if self.ladas_coupling > 0 :
@@ -194,13 +194,12 @@ class LDASsetup:
                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
                self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
-               self.nens                              = 24 
            elif self.ladas_coupling == 2 :
                # ldas coupled with ensemble component of adas
                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
                self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
-               self.nens                              = 32 
+               self.nens                              = 32           # for now, hardwire nens for atm ens
            else :
                exit("Error. Unknown value of ladas_coupling.\n")
            self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
