@@ -64,12 +64,10 @@ def compute_monthly_stats(expdir_list,expid_list,domain,this_month,tc,obsparam_l
                     else:
                         is_valid = OFA['obs_species'] == this_species
 
-                    masked_tilenum = OFA['obs_tilenum'][is_valid]
+                    tile_idx = OFA['obs_tilenum'][is_valid]-1
                     for var in var_list:
                         masked_data[var] = OFA[var][is_valid]
           
-                    tile_idx = np.where(np.isin(tc['tile_id'], masked_tilenum))[0]
-
                     for var in var_list:
                         data_tile[var][tile_idx, ispec] = masked_data[var]         
 
