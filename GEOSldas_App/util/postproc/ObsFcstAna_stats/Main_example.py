@@ -29,7 +29,7 @@ import os
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import numpy as np
-from netCDF4 import Dataset
+from netCDF4 import Dataset, num2date
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 
@@ -54,6 +54,8 @@ end_time = datetime(2016,4,1)
 # multiple require identical tilecoords and numbe/order of observation species
 # if the default "species" number/order don't match, need to set the *optional*
 # "select_species" key to get a match, i.e. same species sequences
+# This capability is required to enable calculating OmF/OmA statistics for one experiment
+# using observations from another experiment. See note below.
 
 exp_1 = { 'expdir' : '//gpfsm/dnb05/projects/p15/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
                     'expid' : 'DAv8_SMOSSMAP',
@@ -68,7 +70,10 @@ exp_2 = { 'expdir' : '//gpfsm/dnb05/projects/p15/iau/merra_land/SMAP_runs/SMAP_N
                     'species_list': [1,2,3,4]  }
 
 # Uses forecasts/analyses from first experiment in list;
-# observations from experiment specified by 'obs_from' parameter
+# observations from experiment specified by 'obs_from' parameter.
+# The mostly likely use case for this is that _scaled_ observations from a DA experiment
+# are used to compute OmF etc diagnostics for a corresponding open loop experiment.
+
 exp_list = [exp_1, exp_2]
 obs_from = 1 # obs is from "exp_2"
 if obs_from >= len(exp_list):
@@ -263,3 +268,135 @@ fig.savefig(out_path+'Map_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
 plt.show()
 plt.close(fig)
 
+
+#  ==========================================================================
+#  Examples of calculating monthly OmF etc statistics from previously generated monthly sums
+#  i.e.     # Step 1: Computer and save monthly sums 
+#           prep.save_monthly_sum(out_path_mo)
+#  has already been run succesfully
+#  ==========================================================================
+
+#  ==========================================================================
+# 1. Compute monthly mean and stdv of OmF, OmA, etc. from monthly sums for all species
+#  ==========================================================================
+
+omf_stats_file  = stats_file.replace('tmp_stats','tmp_omf_stats')
+
+if not os.path.isfile(omf_stats_file):
+    # Initialize the preprocess object
+    prep = obsfcstana_prep(exp_list, start_time, end_time,obs_from=obs_from)
+
+    omf_stats = prep.calculate_monthly_omf(mo_path=out_path_mo, write_to_nc=True, filename=omf_stats_file)
+else:
+    print('reading omf stats nc4 file '+omf_stats_file)
+    omf_stats = {}
+    with Dataset(omf_stats_file,'r') as nc:
+        for key, value in nc.variables.items():
+            omf_stats[key] = value[:].filled(np.nan)
+
+# Plotting example
+OmF_stdv = omf_stats['OmF_stdv'][:, :, 0]  # shape: (time, tile, species)
+area = tc['area']                          # shape: (tile,)
+time = omf_stats['time']                   # list of datetime.datetime
+
+time = num2date(time, 'days since 1900-01-01 00:00:00', calendar='standard')
+
+
+time = [datetime(t.year, t.month, t.day, t.hour, t.minute, t.second) for t in time]
+
+# Compute area-weighted mean over time
+wmean_series = []
+for i in range(OmF_stdv.shape[0]):
+    data = OmF_stdv[i, :]
+    weights = np.where(~np.isnan(data), area, 0.0)
+    wmean = np.nansum(data * area) / np.nansum(weights)
+    wmean_series.append(wmean)
+
+# Plot
+plt.figure(figsize=(8, 4))
+plt.plot(time, wmean_series, marker='o', label='Species 1 OmF stdv (area-weighted)')
+plt.ylabel('OmF StdDv (K)')
+plt.xlabel('Date')
+plt.title('Global area-weighted mean OmF Std Dev (Species 1)')
+plt.grid(True)
+plt.tight_layout()
+plt.legend()
+# Save figure to file
+fig.savefig(out_path+'Monthly_species_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
+                    end_time.strftime('%Y%m')+'.png')
+plt.show()
+
+#  ==========================================================================
+# 2. Compute monthly mean and stdv of OmF, OmA, etc. from monthly sums for species grouped by sensor
+#  ==========================================================================
+
+omf_grouped_stats_file  = stats_file.replace('tmp_stats','tmp_omf_grouped_stats')
+
+sensor_groups = {k:v for k,v in {
+    'SMOS':  [int(param['species'])-1 for param in obsparam if 'SMOS_fit_Tb' in param['descr']],
+    'SMAP':  [int(param['species'])-1 for param in obsparam if 'SMAP_L1C_Tb' in param['descr']],
+    'ASCAT': [int(param['species'])-1 for param in obsparam if 'ASCAT' in param['descr']],
+    'MODIS': [int(param['species'])-1 for param in obsparam if 'MOD10C1' in param['descr'] or 'MYD10C1' in param['descr']]
+}.items() if v}
+
+if not os.path.isfile(omf_grouped_stats_file):
+    # Initialize the preprocess object
+    prep = obsfcstana_prep(exp_list, start_time, end_time,obs_from=obs_from)     
+    omf_stats_by_sensor = prep.calculate_monthly_omf_by_sensor(sensor_groups, mo_path=out_path_mo, write_to_nc=True, filename=omf_grouped_stats_file)
+else:
+    print('reading omf grouped stats nc4 file '+omf_grouped_stats_file)
+    omf_stats_by_sensor = {}
+    with Dataset(omf_grouped_stats_file,'r') as nc:
+        # Read and convert time
+        time_var = nc.variables['time']
+        times = num2date(time_var[:], time_var.units, calendar=time_var.calendar)
+        
+        # Read group names - handle masked arrays
+        group_names_raw = nc.variables['group_name'][:]
+        group_names = []
+        for name_chars in group_names_raw:
+            valid_chars = name_chars.data[~name_chars.mask] if hasattr(name_chars, 'mask') else name_chars
+            group_names.append(''.join(valid_chars.astype(str)))
+        
+        # Initialize container
+        omf_stats_by_sensor = {}
+        
+        # Read metrics into group-specific dictionaries
+        metrics = ['N_data', 'OmF_mean', 'OmF_stdv', 'OmF_norm_mean', 'OmF_norm_stdv', 'OmA_mean', 'OmA_stdv']
+        for g_idx, group in enumerate(group_names):
+            omf_stats_by_sensor[group] = {
+                metric: nc.variables[metric][:, :, g_idx].filled(np.nan)
+                for metric in metrics
+            }
+        
+        # Add time array
+        omf_stats_by_sensor['time'] = times            
+
+# Plotting example
+OmF_stdv = omf_stats_by_sensor['SMAP']['OmF_stdv']  # shape: (time, tile)
+area = tc['area']                                    # shape: (tile,)
+time = omf_stats_by_sensor['time']                   # list of datetime.datetime
+
+time = [datetime(t.year, t.month, t.day, t.hour, t.minute, t.second) for t in time]
+
+# Compute area-weighted mean over time
+wmean_series = []
+for i in range(OmF_stdv.shape[0]):
+    data = OmF_stdv[i, :]
+    weights = np.where(~np.isnan(data), area, 0.0)
+    wmean = np.nansum(data * area) / np.nansum(weights)
+    wmean_series.append(wmean)
+
+# Plot
+plt.figure(figsize=(8, 4))
+plt.plot(time, wmean_series, marker='o', label='SMAP OmF stdv (area-weighted)')
+plt.ylabel('OmF Std Dev')
+plt.xlabel('Date')
+plt.title('Global area-weighted mean OmF Std Dev (SMAP)')
+plt.grid(True)
+plt.tight_layout()
+plt.legend()
+# Save figure to file
+fig.savefig(out_path+'Monthly_sensor_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
+                    end_time.strftime('%Y%m')+'.png')
+plt.show()
