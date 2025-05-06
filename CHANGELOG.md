@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added more default settings and command line arguments for integrated land-atm DAS setup ([PR #94](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/94)).
+
 ### Changed
 
 ### Fixed
