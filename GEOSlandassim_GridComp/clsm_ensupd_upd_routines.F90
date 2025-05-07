@@ -1438,8 +1438,11 @@ contains
                 call qc_model_based_for_Tb( N_catl, precip, Tb_v_l(:,j,n_e) )
                 
              end do
-             
+
           end if
+
+          if (get_asnow_lH) &
+               call qc_model_based_for_asnow( N_catl, tp_l(1,:), asnow_l(:,n_e) )   
 
        end if
 
@@ -2389,6 +2392,47 @@ contains
     end do
     
   end subroutine qc_model_based_for_Tb
+
+    ! *****************************************************************
+  
+  subroutine qc_model_based_for_asnow( N_cat, tp1, asnow )
+    
+   ! Model-based quality control for MODIS SCF observations
+   ! Sets "asnow" to no-data when soil layer 1 temperature exceeds a threshold.
+   !
+   ! amfox, 7 May 2025
+   !
+   ! --------------------------------------------------------------
+   
+   implicit none
+   
+   integer,                   intent(in)    :: N_cat
+   
+   real,    dimension(N_cat), intent(in)    :: tp1              ! soil temperature [C]
+   
+   real,    dimension(N_cat), intent(inout) :: asnow            ! snow cover fraction [0-1]    
+   
+   ! local variables
+   
+   ! relatively large threshold for precip indirectly screens for standing water
+   
+   real, parameter          :: temperature_threshold = 20.      ! [C]
+   
+   integer :: i
+   
+   ! ---------------------------------------    
+
+   do i=1,N_cat
+      
+      ! delete obs 
+      ! - if the soil layer 1 temperature exceeds temperature threshold
+      
+      if ( (tp1(i) > temperature_threshold) )               & 
+         asnow(i) = nodata_generic
+
+   end do
+   
+ end subroutine qc_model_based_for_asnow
   
   ! *********************************************************************
 
