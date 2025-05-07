@@ -158,15 +158,17 @@ class LDASsetup:
 
         for key in rqdExeInpKeys :
             assert key in self.rqdExeInp,' "%s" is required in the input file %s' % (key,self.exeinpfile)
+        # process command line args that may be useful independent of the value of LADAS_COUPLING
         if self.nymdb != 'None' and self.nhmsb != 'None' :
-            self.date  = f"{self.nymdb} {self.nhmsb}"
-            self.rqdExeInp[ 'BEG_DATE' ] = self.date
+            self.rqdExeInp['BEG_DATE']       = f"{self.nymdb} {self.nhmsb}"
         if self.ladas_cpl != 'None' :
             self.rqdExeInp['LADAS_COUPLING'] = self.ladas_cpl
         if self.rstloc != 'None' :
-            rstloc_ = self.rstloc.rstrip('/')      # remove trailing '/'
-            assert os.path.isdir(rstloc_)                    # ldas exp for rs  should exist
+            rstloc_ = self.rstloc.rstrip('/')                # remove trailing '/'
+            assert os.path.isdir(rstloc_)                    # make sure rstloc_ is a valid directory
             self.rstloc = os.path.abspath(rstloc_)
+            self.rqdExeInp['RESTART_PATH']   = os.path.dirname( self.rstloc) 
+            self.rqdExeInp['RESTART_ID']     = os.path.basename(self.rstloc)
 
         # print rqd exe inputs
         if self.verbose:
@@ -185,7 +187,7 @@ class LDASsetup:
         self.ladas_coupling                           = int(self.rqdExeInp.get('LADAS_COUPLING',0))
         self.adas_expdir                              = ''
         if self.ladas_coupling > 0 :
-           self.adas_expdir                           = os.path.dirname(self.exphome)
+           self.adas_expdir                           = os.path.dirname( self.exphome)
            self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
            self.adas_expid                            = os.path.basename(self.adas_expdir)
            self.rqdExeInp['MET_TAG']                  = self.adas_expid + '__bkg'
@@ -208,14 +210,14 @@ class LDASsetup:
            self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.agcm_res +'x6C_GLOBAL' 
 
            # when coupled to ADAS, "BCS_PATH" in exeinp file must EXCLUDE bcs version info  
-           uptotiles = os.path.dirname(self.rqdExeInp['BCS_PATH'].rstrip('/'))
-           self.rqdExeInp['BCS_PATH']                 = uptotiles + '/' + self.bcs_version 
+           tmppath_ = os.path.dirname(self.rqdExeInp['BCS_PATH'].rstrip('/'))
+           assert os.path.isdir(tmppath_)
+           self.rqdExeInp['BCS_PATH']                 = tmppath_ + '/' + self.bcs_version 
            if self.bcs_version == "Icarus-NLv3" :
               self.rqdExeInp['BCS_PATH']              = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
            self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.agcm_res +'x6C_CF'     + self.agcm_res +'x6C'
-           self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.agcm_res +'x6C_GLOBAL' 
-           self.rqdExeInp['RESTART_PATH']             = os.path.dirname( self.rstloc) 
-           self.rqdExeInp['RESTART_ID']               = os.path.basename(self.rstloc)
+           self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.agcm_res +'x6C_GLOBAL'
+           
            # the following are not in default rqdExeInp list 
            self.rqdExeInp['MET_HINTERP']              = 0
            self.rqdExeInp['LANDASSIM_DT']             = "10800"
