@@ -296,7 +296,7 @@ else:
     # Convert time
     omf_stats['time'] = num2date(omf_stats['time'], 'days since 1900-01-01 00:00:00', calendar='standard')
 
-# Plotting example
+# Plotting example for first species
 OmF_stdv = omf_stats['OmF_stdv'][:, :, 0]  # shape: (time, tile, species)
 area = tc['area']                          # shape: (tile,)
 time = omf_stats['time']                   # list of datetime.datetime
@@ -312,7 +312,8 @@ for i in range(OmF_stdv.shape[0]):
     wmean_series.append(wmean)
 
 # Plot
-plt.figure(figsize=(8, 4))
+fig = plt.figure(figsize=(8, 4))
+
 plt.plot(time, wmean_series, marker='o', label='Species 1 OmF stdv (area-weighted)')
 plt.ylabel('OmF StdDv (K)')
 plt.xlabel('Date')
@@ -324,6 +325,7 @@ plt.legend()
 fig.savefig(out_path+'Monthly_species_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
                     end_time.strftime('%Y%m')+'.png')
 plt.show()
+plt.close(fig)
 
 #  ==========================================================================
 # 2. Compute monthly mean and stdv of OmF, OmA, etc. from monthly sums for species grouped by sensor
@@ -387,9 +389,10 @@ for i in range(OmF_stdv.shape[0]):
     wmean_series.append(wmean)
 
 # Plot
-plt.figure(figsize=(8, 4))
+fig = plt.figure(figsize=(8, 4))
+
 plt.plot(time, wmean_series, marker='o', label='SMAP OmF stdv (area-weighted)')
-plt.ylabel('OmF Std Dev')
+plt.ylabel('OmF Std Dev (K)')
 plt.xlabel('Date')
 plt.title('Global area-weighted mean OmF Std Dev (SMAP)')
 plt.grid(True)
@@ -399,3 +402,4 @@ plt.legend()
 fig.savefig(out_path+'Monthly_sensor_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
                     end_time.strftime('%Y%m')+'.png')
 plt.show()
+plt.close(fig)
