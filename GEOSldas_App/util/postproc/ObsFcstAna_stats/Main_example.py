@@ -293,14 +293,13 @@ else:
     with Dataset(omf_stats_file,'r') as nc:
         for key, value in nc.variables.items():
             omf_stats[key] = value[:].filled(np.nan)
+    # Convert time
+    omf_stats['time'] = num2date(omf_stats['time'], 'days since 1900-01-01 00:00:00', calendar='standard')
 
 # Plotting example
 OmF_stdv = omf_stats['OmF_stdv'][:, :, 0]  # shape: (time, tile, species)
 area = tc['area']                          # shape: (tile,)
 time = omf_stats['time']                   # list of datetime.datetime
-
-time = num2date(time, 'days since 1900-01-01 00:00:00', calendar='standard')
-
 
 time = [datetime(t.year, t.month, t.day, t.hour, t.minute, t.second) for t in time]
 
