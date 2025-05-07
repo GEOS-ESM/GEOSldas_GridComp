@@ -3091,6 +3091,10 @@ contains
     !                               - updated comments
     !
     ! qliu+reichle,      5 Dec 2023 - added GEOS-IT 
+    ! 
+    ! rreichle,         18 Dec 2024 - added M21C
+    !
+    ! sqzhang+rreichle,  8 Apr 2025 - added "bkg.lfo_[inst,tavg]" for coupled land/atm DAS (replacing "Nx+-")
     !
     ! -----------------------------------
     !
@@ -3163,6 +3167,7 @@ contains
     integer, parameter :: N_MERRA_vars   = 13
     integer, parameter :: N_MERRA2_vars  = 12   ! same as for G5DAS (excl Aerosol vars)
     integer, parameter :: N_Aerosol_vars = 60   ! additional aerosol forcing vars for GOSWIM (w/ MERRA-2 only for now)
+    integer, parameter :: N_M21C_vars    = 12  
 
     integer, parameter :: N_MERRA2plusAerosol_vars = N_MERRA2_vars + N_Aerosol_vars
     
@@ -3170,11 +3175,16 @@ contains
 
     real,    parameter :: nodata_GEOSgcm = 1.e15   
     
-    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: G5DAS_defs
+    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: G5DAS_defs 
+    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: G5BKG_defs
     character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: GEOSIT_defs
     character(40), dimension(N_MERRA_vars,              N_defs_cols) :: MERRA_defs
     character(40), dimension(N_MERRA2plusAerosol_vars,  N_defs_cols) :: M2INT_defs
     character(40), dimension(N_MERRA2plusAerosol_vars,  N_defs_cols) :: M2COR_defs
+    character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CINT_defs
+    character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CCOR_defs
+    character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CCSINT_defs
+    character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CCSCOR_defs
 
     character(40), dimension(:,:), allocatable :: GEOSgcm_defs
 
@@ -3205,7 +3215,7 @@ contains
     
     integer :: j, k, GEOSgcm_var, fid, km, lm, nvars, ngatts, rc, YYYYMMDD, HHMMSS
 
-    logical :: minimize_shift, use_prec_corr, use_Predictor, tmp_init
+    logical :: minimize_shift, use_prec_corr, use_bkg, tmp_init
 
     logical :: daily_met_files, daily_precipcorr_files
     
@@ -3245,6 +3255,46 @@ contains
     G5DAS_defs(11,:)=[character(len=40):: 'QLML    ','inst','inst1_2d_lfo_Nx','diag','S']    
     G5DAS_defs(12,:)=[character(len=40):: 'SPEEDLML','inst','inst1_2d_lfo_Nx','diag','S']    
 
+
+    ! -----------------------------------------------------------------------
+    !
+    ! define coupled land/atm DAS file specs (i.e., use bkg.lfo_* files) 
+    !
+    ! same as G5DAS except for file tag (column 3)
+
+    G5BKG_defs = G5DAS_defs
+
+    ! character(40):
+    !                            1         2         3         4
+    !                   1234567890123456789012345678901234567890     
+
+    G5BKG_defs( 1,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 2,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 3,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 4,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 5,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 6,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 7,3) = 'bkg.lfo_tavg                        '
+    G5BKG_defs( 8,3) = 'bkg.lfo_inst                        '
+    G5BKG_defs( 9,3) = 'bkg.lfo_inst                        '
+    G5BKG_defs(10,3) = 'bkg.lfo_inst                        '
+    G5BKG_defs(11,3) = 'bkg.lfo_inst                        '
+    G5BKG_defs(12,3) = 'bkg.lfo_inst                        '
+  
+    G5BKG_defs( 1,4) = 'rs                                      '
+    G5BKG_defs( 2,4) = 'rs                                      '
+    G5BKG_defs( 3,4) = 'rs                                      '
+    G5BKG_defs( 4,4) = 'rs                                      '
+    G5BKG_defs( 5,4) = 'rs                                      '
+    G5BKG_defs( 6,4) = 'rs                                      '
+    G5BKG_defs( 7,4) = 'rs                                      '
+    G5BKG_defs( 8,4) = 'rs                                      '
+    G5BKG_defs( 9,4) = 'rs                                      '
+    G5BKG_defs(10,4) = 'rs                                      '
+    G5BKG_defs(11,4) = 'rs                                      '
+    G5BKG_defs(12,4) = 'rs                                      '
+
+
     ! -----------------------------------------------------------------------
     !
     ! define GEOS-IT file specs 
@@ -3253,8 +3303,7 @@ contains
     
     GEOSIT_defs = G5DAS_defs
 
-    ! GEOSIT character(40):
-    !
+    ! character(40):
     !                             1         2         3         4
     !                    1234567890123456789012345678901234567890     
 
@@ -3272,6 +3321,91 @@ contains
     GEOSIT_defs(12,3) = 'lfo_inst_1hr_glo_L576x361_slv           '
 
 
+    ! -----------------------------------------------------------------------
+    !
+    ! define M21C file specs 
+    !
+    ! M21C file specs with uncorrected (AGCM) precip from the "int" Collection
+    !  (ie, the precip generated by the AGCM within the M21C system)
+    !
+    ! NOTE: This is *NOT* the precipitation seen by the land surface in the M21C system.
+
+    M21CINT_defs(   1,:)=[character(len=40):: 'SWGDN     ',    'tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']  
+    M21CINT_defs(   2,:)=[character(len=40):: 'LWGAB     ',    'tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']
+    M21CINT_defs(   3,:)=[character(len=40):: 'PARDR     ',    'tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']
+    M21CINT_defs(   4,:)=[character(len=40):: 'PARDF     ',    'tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']
+    M21CINT_defs(   5,:)=[character(len=40):: 'PRECRAINCU',    'tavg','int_tavg_1hr_glo_L1152x721_slv', 'diag','F']  ! uncorrected
+    M21CINT_defs(   6,:)=[character(len=40):: 'PRECRAINLS',    'tavg','int_tavg_1hr_glo_L1152x721_slv', 'diag','F']  ! uncorrected
+    M21CINT_defs(   7,:)=[character(len=40):: 'PRECSNO   ',    'tavg','int_tavg_1hr_glo_L1152x721_slv', 'diag','F']  ! uncorrected
+    M21CINT_defs(   8,:)=[character(len=40):: 'PS        ',    'inst','lfo_inst_1hr_glo_L1152x721_slv', 'diag','S']  
+    M21CINT_defs(   9,:)=[character(len=40):: 'HLML      ',    'inst','lfo_inst_1hr_glo_L1152x721_slv', 'diag','S']
+    M21CINT_defs(  10,:)=[character(len=40):: 'TLML      ',    'inst','lfo_inst_1hr_glo_L1152x721_slv', 'diag','S']    
+    M21CINT_defs(  11,:)=[character(len=40):: 'QLML      ',    'inst','lfo_inst_1hr_glo_L1152x721_slv', 'diag','S']    
+    M21CINT_defs(  12,:)=[character(len=40):: 'SPEEDLML  ',    'inst','lfo_inst_1hr_glo_L1152x721_slv', 'diag','S']    
+
+    ! same but for cube-sphere lfo (only works when using matching c360 tile space for simulation)
+
+    M21CCSINT_defs = M21CINT_defs
+
+    ! character(40):
+    !                                                                           1         2         3         4
+    !                                                                  1234567890123456789012345678901234567890     
+
+    M21CCSINT_defs( 1,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '             
+    M21CCSINT_defs( 2,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs( 3,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs( 4,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs( 5,3) =                                            'int_tavg_1hr_glo_C360x360x6_slv         '     ! uncorrected
+    M21CCSINT_defs( 6,3) =                                            'int_tavg_1hr_glo_C360x360x6_slv         '     ! uncorrected
+    M21CCSINT_defs( 7,3) =                                            'int_tavg_1hr_glo_C360x360x6_slv         '     ! uncorrected
+    M21CCSINT_defs( 8,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '             
+    M21CCSINT_defs( 9,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '           
+    M21CCSINT_defs(10,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '               
+    M21CCSINT_defs(11,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '               
+    M21CCSINT_defs(12,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '               
+
+    ! M21C file specs with corrected precip, which could be either
+    !  - native (ie, the precip seen by the land surface in the M21C system), or
+    !  - corrected in post-processing using M21C (uncorrected) precip as the background
+    ! The default is to use M21C native precip corrections.  If the "met_tag" includes
+    ! an optional "__prec[xyz]" string, the precip corrections specified by [xyz] are used.
+    !
+    ! NOTE: This is *NOT* the same as the corrected precipitation of the off-line 
+    !       spin-up run used to generate the M21C land surface initial conditions 
+    !       for each stream.  These precip files used for that have a MERRA-2 background.
+    
+    M21CCOR_defs = M21CINT_defs
+    
+    M21CCOR_defs(   5,:)=[character(len=40):: 'PRECRAINCUCORR','tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']  ! M21C built-in corrections
+    M21CCOR_defs(   6,:)=[character(len=40):: 'PRECRAINLSCORR','tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']  ! M21C built-in corrections
+    M21CCOR_defs(   7,:)=[character(len=40):: 'PRECSNOCORR   ','tavg','lfo_tavg_1hr_glo_L1152x721_slv', 'diag','F']  ! M21C built-in corrections
+
+    ! same but for cube-sphere lfo (only works when using matching c360 tile space for simulation)
+
+    M21CCSCOR_defs = M21CCOR_defs
+
+    ! character(40):
+    !                                                                           1         2         3         4
+    !                                                                  1234567890123456789012345678901234567890     
+
+    M21CCSCOR_defs( 1,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '    
+    M21CCSCOR_defs( 2,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs( 3,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs( 4,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs( 5,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '     ! M21C built-in corrections
+    M21CCSCOR_defs( 6,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '     ! M21C built-in corrections
+    M21CCSCOR_defs( 7,3) =                                            'lfo_tavg_1hr_glo_C360x360x6_slv         '     ! M21C built-in corrections
+    M21CCSCOR_defs( 8,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '    
+    M21CCSCOR_defs( 9,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '  
+    M21CCSCOR_defs(10,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '      
+    M21CCSCOR_defs(11,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '      
+    M21CCSCOR_defs(12,3) =                                            'lfo_inst_1hr_glo_C360x360x6_slv         '      
+
+
+    ! -----------------------------------------------------------------------
+    !
+    ! define MERRA-2 file specs 
+    !
     ! MERRA-2 file specs with uncorrected (AGCM) precip from the "int" Collection
     !  (ie, the precip generated by the AGCM within the MERRA-2 system)
     !
@@ -3443,8 +3577,10 @@ contains
     M2COR_defs(71,:)=[character(len=40):: 'SSSD004    ','tavg','tavg1_2d_adg_Nx','diag','F']
     M2COR_defs(72,:)=[character(len=40):: 'SSSD005    ','tavg','tavg1_2d_adg_Nx','diag','F']
 
-    
-    ! MERRA file specs
+
+    ! -----------------------------------------------------------------------
+    !
+    ! define (original) MERRA file specs 
     !
     ! use *only* "tavg" files b/c "bkg.sfc" files are available only every 6h
     !
@@ -3549,6 +3685,47 @@ contains
        call parse_MERRA_met_tag( met_path, met_tag, date_time_bkwd,          &
             met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr )
 
+
+    elseif (met_tag(1:4)=='M21C') then    ! M21C (must check M21C before MERRA-2 because MERRA2 uses "M2")
+       
+       N_GEOSgcm_vars = N_M21C_vars
+          
+       allocate(GEOSgcm_defs(N_GEOSgcm_vars,N_defs_cols))
+       
+       if     (met_tag(1:7)=='M21CINT') then
+          
+          GEOSgcm_defs(1:N_GEOSgcm_vars,:) = M21CINT_defs(  1:N_GEOSgcm_vars,:)
+
+       elseif (met_tag(1:7)=='M21CCOR') then
+          
+          GEOSgcm_defs(1:N_GEOSgcm_vars,:) = M21CCOR_defs(  1:N_GEOSgcm_vars,:)
+
+       elseif (met_tag(1:9)=='M21CCSINT') then
+          
+          GEOSgcm_defs(1:N_GEOSgcm_vars,:) = M21CCSINT_defs(1:N_GEOSgcm_vars,:)
+
+       elseif (met_tag(1:9)=='M21CCSCOR') then
+          
+          GEOSgcm_defs(1:N_GEOSgcm_vars,:) = M21CCSCOR_defs(1:N_GEOSgcm_vars,:)
+
+       else
+          
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown "M21C[xxx]" met_tag')
+ 
+       end if
+       
+       daily_met_files = .false.  ! might change to daily upon public distribution?
+       
+       call parse_M21C_met_tag( met_path, met_tag, date_time_inst,         &
+            met_path_inst, prec_path_inst, met_tag_inst, use_prec_corr )
+  
+       call parse_M21C_met_tag( met_path, met_tag, date_time_fwd,          &
+            met_path_fwd,  prec_path_fwd,  met_tag_fwd,  use_prec_corr )
+
+       call parse_M21C_met_tag( met_path, met_tag, date_time_bkwd,         &
+            met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr )
+
+
     elseif (met_tag(1:2)=='M2') then      ! MERRA-2
        
        select case (AEROSOL_DEPOSITION)
@@ -3595,47 +3772,51 @@ contains
 
        call parse_MERRA2_met_tag( met_path, met_tag, date_time_bkwd,         &
             met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr )
+
        
-    else     ! GEOS ADAS (FP)
+    else     ! GEOS ADAS (FP, GEOSIT)
+
+       call parse_G5DAS_met_tag( met_path, met_tag, date_time_inst,          &
+            met_path_inst, prec_path_inst, met_tag_inst, use_prec_corr,      &
+            use_bkg )
        
+       call parse_G5DAS_met_tag( met_path, met_tag, date_time_fwd,           &
+            met_path_fwd,  prec_path_fwd,  met_tag_fwd,  use_prec_corr,      &
+            use_bkg )
+       
+       call parse_G5DAS_met_tag( met_path, met_tag, date_time_bkwd,          &
+            met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr,      &
+            use_bkg )
+              
        ! AEROSOL_DEPOSITION /= 0 is NOT supported
        
        N_GEOSgcm_vars = N_G5DAS_vars 
        
        allocate(GEOSgcm_defs(N_GEOSgcm_vars,N_defs_cols))
 
-       if ( (index(met_tag, 'GEOSIT') > 0) .or. (index(met_tag, 'geosit') > 0) ) then
+       if      ( (index(met_tag, 'GEOSIT') > 0) .or. (index(met_tag, 'geosit') > 0) ) then
           GEOSgcm_defs(1:N_G5DAS_vars,:) = GEOSIT_defs
-       else
+       else if ( use_bkg )                                                            then
+          GEOSgcm_defs(1:N_G5DAS_vars,:) = G5BKG_defs
+          
+          ! +++++++++++++++++++++++++++++
+          ! for now, keep 'Nx+-' to ensure backward compatibility w/ regression tests; 'Nx+-' is obsolete otherwise
+          ! - reichle, 14 Apr 2025
+          if (index(met_tag, 'Nx+-') > 0) then   ! "met_tag" here is as specified in LDAS.rc, incl. optional tag segments
+             GEOSgcm_defs(1:N_G5DAS_vars,:) = G5DAS_defs             
+             ! append "+-" to GCM file tag (ie, replace "Nx" with "Nx+-")
+             do j=1,N_GEOSgcm_vars
+                GEOSgcm_defs(j,3) = trim(GEOSgcm_defs(j,3)) // '+-'
+             end do
+          end if
+          ! +++++++++++++++++++++++++++++          
+          
+       else 
           GEOSgcm_defs(1:N_G5DAS_vars,:) = G5DAS_defs
        end if
 
-       call parse_G5DAS_met_tag( met_path, met_tag, date_time_inst,          &
-            met_path_inst, prec_path_inst, met_tag_inst, use_prec_corr,      &
-            use_Predictor )
-
-       call parse_G5DAS_met_tag( met_path, met_tag, date_time_fwd,           &
-            met_path_fwd,  prec_path_fwd,  met_tag_fwd,  use_prec_corr,      &
-            use_Predictor )
-
-       call parse_G5DAS_met_tag( met_path, met_tag, date_time_bkwd,          &
-            met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr,      &
-            use_Predictor )
-              
-       if (use_Predictor) then
-          
-          ! append "+-" to GCM file tag (ie, replace "Nx" with "Nx+-")
-          
-          do j=1,N_GEOSgcm_vars
-             
-             GEOSgcm_defs(j,3) = trim(GEOSgcm_defs(j,3)) // '+-'
-             
-          end do
-          
-       end if
-       
     end if
-    
+
     allocate(force_array(N_catd,N_GEOSgcm_vars))
     
     ! ---------------------------------------------------------------------------
@@ -4625,10 +4806,165 @@ contains
   end subroutine parse_MERRA2_met_tag
   
   ! ****************************************************************
+
+  subroutine parse_M21C_met_tag( met_path_in, met_tag_in, date_time, &
+       met_path_default, met_path_prec, met_tag_out, use_prec_corr )
+    
+    ! reichle, 15 Jan 2025
+    
+    ! parse M21C "met_tag", extract M21C stream, assemble data paths
+    !
+    !   met_tag  = "M21C[CS][xxx]_[STREAM]{__prec[PREC]}"
+    !
+    ! where {__prec[PREC]} is optional and where
+    !
+    !       [xxx]    = 'INT' or 'COR'
+    !       [CS]     = cube-sphere forcing (optional; works only with matching c360 tile space for simulation)
+    !       [STREAM] = 'jan98', 'jan08', 'jan18', or 'cross'
+    !       [PREC]   = indicates corrected precip dataset
+    !
+    ! examples:
+    !
+    !   STREAM  = 'jan08'            : use only Stream 2 M21C data
+    !   STREAM  = 'cross'            : integrate across more than one M21C stream
+    !
+    ! ---------------------------------------------------------------------------    
+
+    implicit none
+    
+    character(*), intent(in)  :: met_path_in
+    character(*), intent(in)  :: met_tag_in
+    
+    type(date_time_type), intent(in) :: date_time
+    
+    character(200), intent(out) :: met_path_default, met_path_prec
+    character( 80), intent(out) :: met_tag_out
+    
+    logical,        intent(out) :: use_prec_corr
+    
+    ! local variables
+
+    integer :: is, tmpind
+    
+    type(date_time_type) :: dt1, dt2
+    
+    character( 5) :: tmpstream
+    character(16) :: stream
+    character(80) :: prec_tag
+    
+    character(len=*), parameter :: Iam = 'parse_M21C_met_tag'
+    character(len=400) :: err_msg
+
+    ! ----------------------------------------------------------
+    
+    ! define intervals that determine which MERRA-2 stream is used
+    ! in integrations that "cross" multiple streams
+    !    
+    ! 1/1/1998 - 12/31/2007:  e5303_m21c_jan98 (Stream 1)
+    ! 1/1/2008 - 12/31/2017:  e5303_m21c_jan08 (Stream 2)
+    ! 1/1/2018 - present:     e5303_m21c_jan18 (Stream 3)
+    
+    ! dates before dt1 use Stream 1
+    
+    dt1%year  = 2008
+    dt1%month = 1
+    dt1%day   = 1
+    dt1%hour  = 0
+    dt1%min   = 0
+    dt1%sec   = 0
+    
+    ! otherwise, dates before dt2 use Stream 2
+    
+    dt2%year  = 2018
+    dt2%month = 1
+    dt2%day   = 1
+    dt2%hour  = 0
+    dt2%min   = 0
+    dt2%sec   = 0
+
+    ! ----------------------------------------------------
+    
+    ! initialize
+    
+    met_tag_out = repeat(' ', len(met_tag_out))
+    
+    stream      = repeat(' ', len(stream     ))
+    
+    ! define which stream to use
+    
+    tmpind = 9
+
+    if (met_tag_in(5:6) == 'CS') tmpind = tmpind + 2
+
+    tmpstream = met_tag_in(tmpind:tmpind+4)
+
+    if (tmpstream=='cross') then
+       
+       if     (datetime_lt_refdatetime( date_time, dt1 )) then
+          
+          tmpstream = 'jan98'
+          
+       elseif (datetime_lt_refdatetime( date_time, dt2 )) then
+          
+          tmpstream = 'jan08'
+
+       else
+
+          tmpstream = 'jan18'
+          
+       end if
+       
+    end if
+       
+    met_tag_out = 'e5303_m21c_' // tmpstream
+    
+    met_path_default = trim(met_path_in) // '/' 
+    
+    ! -----------------------------------------------------
+    !
+    ! identify which precip corrections to use, 
+    ! assemble met_path accordingly
+    !
+    !   met_tag = "M21C[CS][xxx]_[STREAM]{__prec[PREC]}"
+    !
+    ! where {__prec[PREC]} is optional
+
+    is = index( met_tag_in, '__')
+    
+    if (is>0) then    ! using precip corrections
+       
+       prec_tag      = met_tag_in(is+6:len(met_tag_in))
+       
+       met_path_prec = trim(met_path_in) // '/precip_corr_' // trim(prec_tag) // '/'
+       
+       use_prec_corr = .true.
+       
+    else              ! not using precip corrections
+       
+       prec_tag      = repeat(' ', len(prec_tag))
+       
+       met_path_prec = met_path_default
+       
+       use_prec_corr = .false.
+
+       ! check if prec_tag was accidentally appended with a single underscore
+       
+       if (len_trim(met_tag_in)>tmpind+6) then
+          
+          err_msg = 'questionable met_tag_in, not enough double underscores'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+   
+       end if
+       
+    end if
+
+  end subroutine parse_M21C_met_tag
   
-  subroutine parse_G5DAS_met_tag( met_path_in, met_tag_in, date_time, &
-       met_path_default, met_path_prec, met_tag_out, use_prec_corr,   &
-       use_Predictor )
+  ! ****************************************************************
+  
+  subroutine parse_G5DAS_met_tag( met_path_in, met_tag_in, date_time,    &
+       met_path_default, met_path_prec, met_tag_out, use_prec_corr,      &
+       use_bkg )
     
     ! parse G5DAS "met_tag"
     !
@@ -4659,13 +4995,14 @@ contains
     ! reichle, 17 Jan 2020: added FP transition from f522 to f525
     ! reichle,  3 Apr 2020: added FP transition from f525 to f525_p5
     ! qliu+reichle,  5 Dec 2023: added GEOS-IT
-    !    
+    ! sqz+reichle,   8 Apr 2025: added G5BKG (replacing "Nx+-")
+    !
     ! ---------------------------------------------------------------------------    
 
     implicit none
 
-    character(*),       intent(in)  :: met_path_in
-    character(*),       intent(in)  :: met_tag_in
+    character(*),         intent(in)  :: met_path_in
+    character(*),         intent(in)  :: met_tag_in
 
     type(date_time_type), intent(in)  :: date_time
 
@@ -4673,7 +5010,7 @@ contains
     character( 80),       intent(out) :: met_tag_out
     
     logical,              intent(out) :: use_prec_corr
-    logical,              intent(out) :: use_Predictor
+    logical,              intent(out) :: use_bkg
 
     ! local variables
 
@@ -4927,7 +5264,7 @@ contains
 
     use_prec_corr = .false.
 
-    use_Predictor = .false.
+    use_bkg       = .false.
 
     ! -----------------------------------------------------
     !
@@ -5110,11 +5447,15 @@ contains
           use_prec_corr = .true.
           
           prec_tag      = tmp_tag(ii)(5:len(tmp_tag(ii)))
-          
-       elseif (tmp_tag(ii)(1:4)=='Nx+-') then
-          
-          use_Predictor = .true.
 
+       elseif ( (tmp_tag(ii)(1:3)=='bkg') .or. (tmp_tag(ii)(1:4)=='Nx+-') ) then
+          !                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          ! for now, keep 'Nx+-' to ensure backward compatibility w/ regression tests; 'Nx+-' is obsolete otherwise
+          ! - reichle, 14 Apr 2025
+          ! +++++++++++++++++++++++++++++
+          
+          use_bkg = .true.
+          
        else
           
           err_msg = 'invalid met_tag_in, unknown optional tag segment'
@@ -5143,7 +5484,7 @@ contains
     ! Double-check if optional tag segments were somehow missed, e.g., 
     !  because they were accidentally appended with single underscores.
     ! Assumes that "prec" and "Nx+-" never appear in GEOS-5 product names.
-    ! Does NOT protect against spelling errors, e.g., "__perc" or "__Nx-+".
+    ! Does NOT protect against spelling errors, e.g., "__perc" or "__bgk" or "__Nx-+".
     ! - reichle, 24 Nov 2015
     
     if ((.not. use_prec_corr) .and. (index( met_tag_in, 'prec')>0)) then
@@ -5153,13 +5494,22 @@ contains
     
     end if
 
-    if ((.not. use_Predictor) .and. (index( met_tag_in, 'Nx+-')>0)) then
+    if ((.not. use_bkg) .and. (index( met_tag_in, 'bkg')>0)) then
        
-       err_msg = 'questionable met_tag_in: includes "Nx+-" but use_Predictor=.false.'
+       err_msg = 'questionable met_tag_in: includes "bkg" but use_bkg=.false.'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    
+       
     end if
-               
+
+    ! +++++++++++++++++++++++++++++
+    ! for now, keep 'Nx+-' to ensure backward compatibility w/ regression tests; 'Nx+-' is obsolete otherwise
+    ! - reichle, 14 Apr 2025
+    if ((.not. use_bkg) .and. (index( met_tag_in, 'Nx+-')>0)) then
+       err_msg = 'questionable met_tag_in: includes "Nx+-" but use_bkg=.false.'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+    ! +++++++++++++++++++++++++++++
+    
   end subroutine parse_G5DAS_met_tag
   
   ! ****************************************************************
@@ -5214,12 +5564,19 @@ contains
        
        time_stamp(1:8)  = YYYY // MM // DD
        
-    elseif (index(met_tag,'GEOSIT') > 0 .or. index(met_tag,'geosit') > 0)  then
+    elseif (                                                                    & 
+         index(met_tag,'GEOSIT') > 0  .or.  index(met_tag,'geosit') > 0  .or.   &
+         index(met_tag,'M21C'  ) > 0  .or.  index(met_tag,'m21c'  ) > 0         &
+         )  then
+       
+       ! newer time stamp format (GEOS-IT, M21C, ...)
        
        time_stamp(1:16) = YYYY //'-'// MM //'-'// DD // 'T' // trim(HHMM) // 'Z'
-
+       
     else
 
+       ! old time stamp format (MERRA, MERRA-2, FP)
+       
        time_stamp(1:14) = YYYY // MM // DD // '_' // trim(HHMM) // 'z'
        
     end if
@@ -5287,7 +5644,6 @@ contains
     if (file_exists) return                            ! done
       
     fname_full_tmp2 = trim(fname_full)                 ! remember for error log below
-
 
     ! last try: for GEOS FP with generic file names, try product counter '.V02.' in year/month/day dir
  
@@ -6336,8 +6692,7 @@ program ut_parse_G5DAS_met_tag
   character( 80) :: met_tag_out
   
   logical        :: use_prec_corr
-  logical        :: use_Predictor
-  
+  logical        :: use_bkg
 
   ! other
   integer :: ii
@@ -6348,11 +6703,12 @@ program ut_parse_G5DAS_met_tag
   
   met_tag_in_vec = (/                              &
        'gcmexpname' ,                          &
-       'gcmexpname__Nx+-' ,                    &
+       'gcmexpname__bkg' ,                    &
+       'gcmexpname__bkg' ,                     &
        'gcmexpname__precCORRPREC',             &
-       'gcmexpname__precCORRPREC__Nx+-' ,            &
-       'gcmexpname__Nx+-__precCORRPREC' ,            &
-       'gcmexpname__qrecCORRPREC__Nx+-'    /)            
+       'gcmexpname__precCORRPREC__bkg' ,            &
+       'gcmexpname__bkg__precCORRPREC' ,            &
+       'gcmexpname__qrecCORRPREC__bgk'    /)            
   
 
   do ii=1,N_met_tag_in
@@ -6364,13 +6720,13 @@ program ut_parse_G5DAS_met_tag
      write (*,*) 'met_tag_in       = ', trim(met_tag_in)          
 
      call parse_G5DAS_met_tag( met_path_in, met_tag_in, &
-          met_path_default, met_path_prec, met_tag_out, use_prec_corr, use_Predictor )
+          met_path_default, met_path_prec, met_tag_out, use_prec_corr, use_bkg )
           
      write (*,*) 'met_path_default = ', trim(met_path_default)    
      write (*,*) 'met_path_prec    = ', trim(met_path_prec)       
      write (*,*) 'met_tag_out      = ', trim(met_tag_out)         
-     write (*,*) 'use_prec_corr    = ', use_prec_corr       
-     write (*,*) 'use_Predictor    = ', use_Predictor
+     write (*,*) 'use_prec_corr    = ', use_prec_corr
+     write (*,*) 'use_bkg          = ', use_bkg       
      
   end do
   
