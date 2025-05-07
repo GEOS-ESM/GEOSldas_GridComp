@@ -1668,6 +1668,9 @@ def _printExeInputKeys(rqdExeInpKeys):
          if ( 5<=i_ and i_<=21) :     # ignore lines 5-21 - may need to change if GEOS_SurfaceGridComp.rc is edited
             i_ +=1
             continue
+         if 'GEOSagcm=>' in line:     # ignore lines with defaults for GEOSagcm 
+            i_ +=1
+            continue
          if '"GEOSldas=>"' in line:
            sys.stdout.write(line)
          elif 'GEOSldas=>' in line:
