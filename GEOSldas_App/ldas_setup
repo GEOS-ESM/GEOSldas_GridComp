@@ -210,9 +210,7 @@ class LDASsetup:
            self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.agcm_res +'x6C_GLOBAL' 
 
            # when coupled to ADAS, "BCS_PATH" in exeinp file must EXCLUDE bcs version info  
-           tmppath_ = os.path.dirname(self.rqdExeInp['BCS_PATH'].rstrip('/'))
-           assert os.path.isdir(tmppath_)
-           self.rqdExeInp['BCS_PATH']                 = tmppath_ + '/' + self.bcs_version 
+           self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'].rstrip('/') + '/' + self.bcs_version 
            if self.bcs_version == "Icarus-NLv3" :
               self.rqdExeInp['BCS_PATH']              = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
            self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.agcm_res +'x6C_CF'     + self.agcm_res +'x6C'
