@@ -589,7 +589,7 @@ COLLECTIONS:
                                 'WESNPREC'    , 'LANDICE' ,
                                  ::
 
-  tavg24_1d_glc_Nt.descr:         'Tile-space, Daily, Time-Averaged, Single-level,Land Ice  Outputs',
+  tavg24_1d_glc_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Land Ice Diagnostics',
   tavg24_1d_glc_Nt.nbits:         12,
   tavg24_1d_glc_Nt.template:      '%y4%m2%d2_%h2%n2z.bin' ,
   tavg24_1d_glc_Nt.mode:          'time-averaged' ,
