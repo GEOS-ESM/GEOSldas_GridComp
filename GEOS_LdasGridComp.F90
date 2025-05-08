@@ -9,28 +9,28 @@ module GEOS_LdasGridCompMod
   use ESMF
   use MAPL_Mod
 
-  use GEOS_MetforceGridCompMod, only: MetforceSetServices => SetServices
-  use GEOS_LandGridCompMod, only: LandSetServices => SetServices
-  use GEOS_LandPertGridCompMod, only: LandPertSetServices => SetServices
-  use GEOS_EnsGridCompMod, only: EnsSetServices => SetServices
+  use GEOS_MetforceGridCompMod,  only: MetforceSetServices  => SetServices
+  use GEOS_LandGridCompMod,      only: LandSetServices      => SetServices
+  use GEOS_LandPertGridCompMod,  only: LandPertSetServices  => SetServices
+  use GEOS_EnsGridCompMod,       only: EnsSetServices       => SetServices
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
-  use GEOS_LandiceGridCompMod,   only : LandiceSetServices  => SetServices
+  use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
 
-  use EASE_conv, only: ease_inverse
-  use LDAS_TileCoordType, only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
-  use LDAS_TileCoordType, only: grid_def_type, io_grid_def_type, operator (==)
+  use EASE_conv,              only: ease_inverse
+  use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
+  use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
   use LDAS_TileCoordRoutines, only: get_minExtent_grid, get_ij_ind_from_latlon, io_domain_files
-  use LDAS_ConvertMod, only: esmf2ldas, string2tile_types
-  use LDAS_PertRoutinesMod, only: get_pert_grid
-  use LDAS_ensdrv_functions,ONLY:  get_io_filename 
-  use LDAS_DateTimeMod,ONLY: date_time_type
-  use LDAS_ensdrv_mpi, only: MPI_tile_coord_type, MPI_grid_def_type
-  use LDAS_ensdrv_mpi, only: init_MPI_types,mpicomm,numprocs,myid 
-  use LDAS_ensdrv_mpi, only: root_proc
-  use LDAS_ensdrv_Globals, only: logunit,logit,root_logit,echo_clsm_ensdrv_glob_param, get_ensid_string
-  use catch_constants, only: echo_catch_constants  
-  use StieglitzSnow, only: StieglitzSnow_echo_constants
-  use SurfParams,    only: SurfParams_init
+  use LDAS_ConvertMod,        only: esmf2ldas, string2tile_types
+  use LDAS_PertRoutinesMod,   only: get_pert_grid
+  use LDAS_ensdrv_functions,  only:  get_io_filename 
+  use LDAS_DateTimeMod,       only: date_time_type
+  use LDAS_ensdrv_mpi,        only: MPI_tile_coord_type, MPI_grid_def_type
+  use LDAS_ensdrv_mpi,        only: init_MPI_types,mpicomm,numprocs,myid 
+  use LDAS_ensdrv_mpi,        only: root_proc
+  use LDAS_ensdrv_Globals,    only: logunit,logit,root_logit,echo_clsm_ensdrv_glob_param, get_ensid_string
+  use catch_constants,        only: echo_catch_constants  
+  use StieglitzSnow,          only: StieglitzSnow_echo_constants
+  use SurfParams,             only: SurfParams_init
 
   implicit none
 
@@ -61,8 +61,9 @@ module GEOS_LdasGridCompMod
   logical :: land_assim
   logical :: mwRTM
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
-  logical :: with_landice
-  logical :: with_land
+  logical :: with_landice       ! true if landice tiles requested by config
+  logical :: with_land          ! true if land    tiles requested by config
+  
 contains
 
   !BOP
@@ -175,14 +176,14 @@ contains
     land_assim = (trim(LAND_ASSIM_STR) /= 'NO')
 
     if (land_assim .and. .not. with_land) then
-       _ASSERT( .false., "No land for land assimilation")
+       _ASSERT( .false., "Inconsistent configuration: Land assimilation requested but no land tiles requested.")
     endif
 
     call MAPL_GetResource ( MAPL, mwRTM_file, Label="LANDASSIM_INTERNAL_RESTART_FILE:", DEFAULT='', RC=STATUS)
     VERIFY_(STATUS)
     mwRTM = ( len_trim(mwRTM_file) /= 0 )
     if (mwRTM .and. .not. with_land) then
-       print*, "No land for assimilation, no mwRTM file is necessary"
+       print*, "Warning: Requested mwRTM file is not necessary because no land tiles requested."
        mwRTM = .false.
     endif
 
@@ -197,7 +198,7 @@ contains
        allocate(METFORCE(1))
     endif
 
-    if (with_land)    allocate(LAND(NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
+    if (with_land)    allocate(LAND(   NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
     if (with_landice) allocate(LANDICE(NUM_ENSEMBLE))
 
     ! ens_id_with = 2 + number of digits = total number of chars in ensid_string ("_eXXXX")
@@ -951,7 +952,7 @@ contains
        if (.not. ensemble_forcing) exit
     enddo
 
-    ! distribute force. ( export of focrce to the import of land, landpert and landice)
+    ! distribute surface met forcing (export forcing to imports of land, landpert, and landice)
     do i = 1, NUM_ENSEMBLE
        k = 1
        if (ensemble_forcing) k = i
@@ -959,9 +960,9 @@ contains
        call MAPL_TimerOn(MAPL, gcnames(igc))
 
        if (with_land) then
-          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAND(i)),       clock=clock, phase=2, userRC=status)
+          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAND(i)),     clock=clock, phase=2, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDPERT(i)),   clock=clock, phase=3, userRC=status)
+          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDPERT(i)), clock=clock, phase=3, userRC=status)
           VERIFY_(status)
        endif
 
