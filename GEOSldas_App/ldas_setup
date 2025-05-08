@@ -20,7 +20,7 @@ from datetime import timedelta
 from collections import OrderedDict
 from dateutil.relativedelta import relativedelta
 from remap_utils import *
-from remap_catchANDcn  import *
+from remap_catchANDcn import *
 from remap_lake_landice_saltwater import *
 from lenkf_j_template import *
 """
@@ -125,8 +125,8 @@ class LDASsetup:
         self.bcs_land = ''
         self.bcs_geom = ''
         self.bcs_landshared = ''
-        self.tile_types =''
-        self.with_land   = False
+        self.tile_types = ''
+        self.with_land = False
         self.with_landice = False
 
         # ------
@@ -167,7 +167,7 @@ class LDASsetup:
         self.tile_types = [tile_types[x.strip().upper()] for x in self.rqdExeInp.get('TILE_TYPES','LAND').split(',')]
         if "100" in self.tile_types :
           self.with_land = True
-        if "20" in self.tile_types :
+        if  "20" in self.tile_types :
           self.with_landice = True
 
         # nens is an integer and =1 for model run
@@ -356,7 +356,7 @@ class LDASsetup:
                 if os.path.isfile(ldas_domain):
                     _numd = int(linecache.getline(ldas_domain, 1).strip())
                     txt_tile = glob.glob(self.bcs_geom + '*.til')
-                    nc4_tile  = glob.glob(self.bcs_geom + '*.nc4')
+                    nc4_tile = glob.glob(self.bcs_geom + '*.nc4')
                     if tile_file_format.upper() == 'TXT'     : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
                     if tile_file_format.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
@@ -790,7 +790,7 @@ class LDASsetup:
         if self.isZoomIn:
             newZoominTile = tile+'.domain'
             print ("\nCreating local tile file :"+ newZoominTile)
-            print ("\nExcluding tiles not in the domain by adding 1000 to the type ...\n")
+            print ("\nAdding 1000 to type of tiles to be excluded from domain...\n")
             cmd = self.bindir +'/preprocess_ldas.x zoomin_tile ' + tile + ' ' + newZoominTile + ' '+ tmp_f2g_file.name
             print ("cmd:   " + cmd)
             sp.call(shlex.split(cmd))
@@ -1019,7 +1019,7 @@ class LDASsetup:
             if self.with_landice :
                if self.rqdExeInp['RESTART'].isdigit():
                   if int(self.rqdExeInp['RESTART']) == 0 or int(self.rqdExeInp['RESTART']) == 2 :
-                     print(" landice type does not support REATART=0 or 2 option. please use M option(MERRA-2)")
+                     print("RESTART=0 and RESTART=2 not supported for landice tiles. Please use RESTART=M (MERRA-2).")
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
                else:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
@@ -1027,7 +1027,7 @@ class LDASsetup:
             if os.path.isfile(landiceRstFile) :
                landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
                if self.isZoomIn :
-                  print ("Creating coom in landice restart file... \n")
+                  print ("Creating zoom-in of landice restart file... \n")
                   cmd=self.bindir + '/preprocess_ldas.x zoomin_landicerst '+ landiceRstFile +' ' + landiceLocal + ' '+ tmp_f2g_file.name
                   print ("cmd:   " + cmd)
                   sp.call(shlex.split(cmd))
@@ -1048,15 +1048,15 @@ class LDASsetup:
                 pertRstFile = pertLocal
 
             if self.with_land :
-               print ('catchRstFile: ' +  catchRstFile)
+               print ('catchRstFile: '  +  catchRstFile)
                print ('vegdynRstFile: ' +  vegdynRstFile)
-               os.symlink(catchRstFile, myCatchRst)
+               os.symlink(catchRstFile,   myCatchRst)
                os.symlink(vegdynRstFile,  myVegRst)
             if self.with_landice :
                print("link landice restart: " + myLandiceRst)
-               os.symlink(landiceRstFile,  myLandiceRst)
+               os.symlink(landiceRstFile, myLandiceRst)
             if ( self.has_geos_pert and  self.perturb == 1 ):
-               os.symlink(pertRstFile,  myPertRst)
+               os.symlink(pertRstFile,    myPertRst)
 
         # catch_param restar file
         catch_param_file = self.bcsdir+'/'+ y4m2+'/'+self.rqdExeInp['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
