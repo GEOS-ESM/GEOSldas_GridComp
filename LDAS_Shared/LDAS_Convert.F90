@@ -22,9 +22,9 @@ contains
 
   subroutine esmf2ldas_time(esmf_dt, ldas_dt, rc)
     
-    type(ESMF_Time), intent(in) :: esmf_dt
+    type(ESMF_Time),      intent(in)  :: esmf_dt
     type(date_time_type), intent(out) :: ldas_dt
-    integer, optional, intent(out) :: rc
+    integer, optional,    intent(out) :: rc
 
     character(len=*), parameter :: Iam = 'emsf2ldas_time'
     integer :: status
@@ -47,15 +47,24 @@ contains
 
   end subroutine esmf2ldas_time
 
-  ! delimiter ","
+  ! --------------------------------------------
+  
   subroutine string2tile_types( string, tile_types)
+
+    ! break string with list of (comma-separated) tile types into vector of strings
+
     character(len=ESMF_MAXSTR), intent(in)   :: string
     character(10), allocatable, intent(out)  :: tile_types(:)
+    
     character(10)  :: outs4(4)
-    integer :: ntype , j, j0
-    j  = index(string, ',')
+    integer        :: ntype , j, j0
+
+    j  = index(string, ',')      ! identify positions of commas (delimiter)
     ntype  = 1
     j0 = 0
+
+    ! loop through positions of commas
+    
     do while (.true.)
        if (j == 0) then
          outs4(ntype) = trim(adjustl(string(j0+1:)))
@@ -67,7 +76,15 @@ contains
        j = index(string(j0+1:), ',')
        ntype = ntype+1
     enddo
+
+    ! assemble output vector of strings
+    
     allocate(tile_types(ntype), source=outs4(1:ntype))
+    
   end subroutine string2tile_types
 
+  ! --------------------------------------------
+  
 end module LDAS_ConvertMod
+
+! ========= EOF ===========================================================
