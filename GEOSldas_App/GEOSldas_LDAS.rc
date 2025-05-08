@@ -29,7 +29,7 @@ CATCHMENT_OFFLINE: 1
 CATCHMENT_SPINUP: 0
 
 
-# ---- Choice of land surface model
+# ---- Choice of land surface model (for LAND tiles)
 #
 #    1 : Catchment model   (default)
 #    2 : CatchmentCN-CLM4.0
@@ -37,19 +37,24 @@ CATCHMENT_SPINUP: 0
 LSM_CHOICE: 1
 
 
-# ---- Choice of tile types for the model
-#  There should not have space between types
-#  LAND,LANDICE
+# ---- Choice of tile type(s)
+#
+#  Comma-separated list of tile types to be included in simulation.
+#  Do not use space before/after comma.  Examples:
+#
+#    LAND         : include only land tiles
+#    LAND,LANDICE : include land and landice tiles
+#    LANDICE      : include only landice tiles
 #
 TILE_TYPES: LAND
 
 
-# ---- Choice of tile file format (from bcs directory)
+# ---- Format of tile file (from bcs directory)
 #
-#  DEFAULT : Use nc4 tile file if it exists, txt tile file otherwise 
-#  TXT     : Use txt tile file (e.g., for 0-diff testing)
+#    DEFAULT : Use nc4 tile file if it exists, txt tile file otherwise 
+#    TXT     : Use txt tile file (e.g., for 0-diff testing)
 # 
-TILE_FILE_FORMAT: default 
+TILE_FILE_FORMAT: DEFAULT 
 
 
 # ---- Domain definition
