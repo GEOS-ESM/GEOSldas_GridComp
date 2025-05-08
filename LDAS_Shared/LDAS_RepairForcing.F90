@@ -57,7 +57,7 @@ contains
 
     ! min/max values for allowable range of forcing fields
 
-    real, parameter :: min_Tair           =    180. ! [K]
+    real, parameter :: min_Tair           =    180. ! [K]     ! changed from 190 K to 180 K to accommodate landice, lcandre2, May 2025
     real, parameter :: max_Tair           =    340. ! [K]
 
     real, parameter :: max_PSurf          = 115000. ! [Pa]
