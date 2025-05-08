@@ -74,9 +74,9 @@ module GEOS_MetforceGridCompMod
   integer, parameter :: k_aerosol = 18
   integer, parameter :: k_landice = 15
   character(len=7), dimension(k_force) :: export_name = ['Tair   ', 'Qair   ', 'Psurf  ', &
-                                                          'Rainf_C', 'Snowf  ', 'LWdown ', &
-                                                          'PARdrct', 'PARdffs', 'Wind   ', &
-                                                          'RefH   ', 'Rainf  ', 'SWdown ']
+                                                         'Rainf_C', 'Snowf  ', 'LWdown ', &
+                                                         'PARdrct', 'PARdffs', 'Wind   ', &
+                                                         'RefH   ', 'Rainf  ', 'SWdown ']
   character(len=4), dimension(k_aerosol) :: aerosol_name = [                              &
                         'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',            &
                         'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',            &
@@ -133,7 +133,7 @@ module GEOS_MetforceGridCompMod
          )
     VERIFY_(status)
 
-    ! phase 1 get force
+    ! phase 1 get forcing
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
@@ -145,7 +145,7 @@ module GEOS_MetforceGridCompMod
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
-         DistributeForcetoLand,                                                 &
+         DistributeForcingToLand,                                               &
          rc=status                                                              &
          )
     VERIFY_(status)
@@ -154,7 +154,7 @@ module GEOS_MetforceGridCompMod
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
-         DistributeForcetoLandPert,                                             &
+         DistributeForcingToLandPert,                                           &
          rc=status                                                              &
          )
     VERIFY_(status)
@@ -163,7 +163,7 @@ module GEOS_MetforceGridCompMod
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
-         DistributeForcetoLandIce,                                                                   &
+         DistributeForcingToLandIce,                                            &
          rc=status                                                              &
          )
     VERIFY_(status)
@@ -605,7 +605,7 @@ module GEOS_MetforceGridCompMod
     type(tile_coord_type), pointer :: tile_coord(:)=>null()
 
     ! Misc variables
-    integer :: locat_nt, k, NUM_ENSEMBLE, i1, i2, j1, j2
+    integer :: local_nt, k, NUM_ENSEMBLE, i1, i2, j1, j2
     integer :: ForceDtStep
     type(met_force_type) :: mf_nodata
     logical :: MERRA_file_specs, ensemble_forcing
@@ -653,7 +653,7 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
          locstream,                                                             &
-         NT_LOCAL=locat_nt,                                                     &
+         NT_LOCAL=local_nt,                                                     &
          TILELATS=TileLats,                                                     &
          TILELONS=TileLons,                                                     &
          TILETYPE=tiletype,                                                     &
@@ -716,12 +716,12 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
     ! -allocate-memory-for-metforcing-data-
     mf_nodata = nodata_generic
-    allocate(mf%DataPrv(locat_nt), source=mf_nodata, stat=status)
+    allocate(mf%DataPrv(local_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
-    allocate(mf%DataNxt(locat_nt), source=mf_nodata, stat=status)
+    allocate(mf%DataNxt(local_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
     ! -allocate-memory-for-avg-zenith-angle
-    allocate(mf%zenav(locat_nt), source=nodata_generic, stat=status)
+    allocate(mf%zenav(local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
     call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
@@ -763,7 +763,7 @@ module GEOS_MetforceGridCompMod
          ForceDtStep,                                                           &
          internal%mf%Path,                                                      &
          internal%mf%Tag,                                                       &
-         locat_nt,                                                              &
+         local_nt,                                                              &
          tile_coord,                                                            &
          internal%mf%hinterp,                                                   &
          AEROSOL_DEPOSITION,                                                    &
@@ -840,7 +840,7 @@ module GEOS_MetforceGridCompMod
     type(tile_coord_type), pointer :: tile_coord(:)
 
     ! Misc variables
-    integer :: locat_nt ! number of tiles in local PE
+    integer :: local_nt ! number of tiles in local PE
     integer :: comm
     logical :: IAmRoot
     integer :: fdtstep
@@ -928,9 +928,9 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
          locstream,                                                             &
-         NT_LOCAL=locat_nt,                                                &
-         TILELATS=TileLats,                                                 &
-         TILELONS=TileLons,                                                 &
+         NT_LOCAL=local_nt,                                                     &
+         TILELATS=TileLats,                                                     &
+         TILELONS=TileLons,                                                     &
          rc=status                                                              &
          )
     VERIFY_(status)
@@ -939,11 +939,11 @@ module GEOS_MetforceGridCompMod
     call MAPL_Get(MAPL, orbit=orbit)
 
     ! Allocate memory for zenith angle
-    allocate(zth(locat_nt), source=nodata_generic, stat=status)
+    allocate(zth(    local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
-    allocate(slr(locat_nt), source=nodata_generic, stat=status)
+    allocate(slr(    local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
-    allocate(zth_tmp(locat_nt), source=nodata_generic, stat=status)
+    allocate(zth_tmp(local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
 
     ! Convert forcing time interval to seconds
@@ -990,7 +990,7 @@ module GEOS_MetforceGridCompMod
             fdtstep,                                                            &
             internal%mf%Path,                                                   &
             internal%mf%Tag,                                                    &
-            locat_nt,                                                      &
+            local_nt,                                                           &
             tile_coord,                                                         &
             internal%mf%hinterp,                                                &
             AEROSOL_DEPOSITION,                                                 &
@@ -1025,7 +1025,7 @@ module GEOS_MetforceGridCompMod
       !          dayOfYear=DAY_OF_YEAR, RC=STATUS)
       ! VERIFY_(STATUS) 
 
-      ! call zenith(DAY_OF_YEAR,SEC_OF_DAY,fdtstep,ModelTimeStep,locat_nt,tile_coord%com_lon,                                                    &
+      ! call zenith(DAY_OF_YEAR,SEC_OF_DAY,fdtstep,ModelTimeStep,local_nt,tile_coord%com_lon,                                                    &
       !         tile_coord%com_lat,internal%mf%zenav)
 
 
@@ -1057,7 +1057,7 @@ module GEOS_MetforceGridCompMod
     !call ESMF_TimeGet(ModelTimeNxt, YY=YEAR, S=SEC_OF_DAY, &
     !          dayOfYear=DAY_OF_YEAR, RC=STATUS)
     !VERIFY_(STATUS)
-    !do n=1, locat_nt
+    !do n=1, local_nt
     !  call solar(tile_coord(n)%com_lon,tile_coord(n)%com_lat, DAY_OF_YEAR,SEC_OF_DAY,zth(n),slr(n))
     !enddo
 
@@ -1080,7 +1080,7 @@ module GEOS_MetforceGridCompMod
 
     ! Allocate memory for interpolated MetForcing data
     mf_nodata = nodata_generic
-    allocate(mfDataNtp(locat_nt), source=mf_nodata, stat=status)
+    allocate(mfDataNtp(local_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
 
     ! Interpolate MetForcing data to the end of model integration time step
@@ -1274,18 +1274,20 @@ module GEOS_MetforceGridCompMod
 
   end subroutine Run
 
-  subroutine DistributeForcetoLand(gc, export, land_import, clock, rc)
-    type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
-    type(ESMF_State),    intent(inout) :: export ! Export state
+  subroutine DistributeForcingToLand(gc, export, land_import, clock, rc)
+    
+    type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
+    type(ESMF_State),    intent(inout) :: export      ! Export state
     type(ESMF_State),    intent(inout) :: land_import ! Import state
-    type(ESMF_Clock),    intent(inout) :: clock  ! The clock
-    integer, optional,   intent(  out) :: rc     ! Error code
+    type(ESMF_Clock),    intent(inout) :: clock       ! The clock
+    integer, optional,   intent(  out) :: rc          ! Error code
+    
     real, pointer :: out1d(:), in1d(:)
     real, pointer :: out2d(:,:), in2d(:,:)
     integer :: k, AEROSOL_DEPOSITION, status
     type(MAPL_MetaComp), pointer :: MAPL
     character(len=ESMF_MAXSTR) :: Iam
-    Iam = "metForce::DistributeForcetoLand"
+    Iam = "metForce::DistributeForcingToLand"
 
     call MAPL_GetObjectFromGC(gc, MAPL, _RC)
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC) 
@@ -1304,19 +1306,21 @@ module GEOS_MetforceGridCompMod
     call MAPL_GetPointer(land_import, in1d,  'DZ',   _RC)
     in1d = out1d(1:NUM_LAND_TILE)
     RETURN_(ESMF_SUCCESS)
-  end subroutine DistributeForcetoLand
+    
+  end subroutine DistributeForcingToLand
 
-  subroutine DistributeForcetoLandPert(gc, export, landpert_import, clock, rc)
-    type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
-    type(ESMF_State),    intent(inout) :: export ! Export state
+  subroutine DistributeForcingToLandPert(gc, export, landpert_import, clock, rc)
+    
+    type(ESMF_GridComp), intent(inout) :: gc              ! Gridded component
+    type(ESMF_State),    intent(inout) :: export          ! Export state
     type(ESMF_State),    intent(inout) :: landpert_import ! Import state
-    type(ESMF_Clock),    intent(inout) :: clock  ! The clock
-    integer, optional,   intent(  out) :: rc     ! Error code
+    type(ESMF_Clock),    intent(inout) :: clock           ! The clock
+    integer, optional,   intent(  out) :: rc              ! Error code
 
     real, pointer :: out1d(:), in1d(:)
     integer :: k, status
     character(len=ESMF_MAXSTR) :: Iam
-    Iam = "metForce::DistributeForcetoLandPert"
+    Iam = "metForce::DistributeForcingToLandPert"
 
     do k = 1, k_force
        call MAPL_GetPointer(export,          out1d, trim(export_name(k)), _RC)
@@ -1324,21 +1328,24 @@ module GEOS_MetforceGridCompMod
        in1d = out1d(1:NUM_LAND_TILE)
     enddo
     RETURN_(ESMF_SUCCESS)
-  end subroutine DistributeForcetoLandPert
+    
+  end subroutine DistributeForcingToLandPert
 
-  subroutine DistributeForcetoLandIce(gc, export, landice_import, clock, rc)
-    type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
-    type(ESMF_State),    intent(inout) :: export ! Export state
+  subroutine DistributeForcingToLandIce(gc, export, landice_import, clock, rc)
+
+    type(ESMF_GridComp), intent(inout) :: gc             ! Gridded component
+    type(ESMF_State),    intent(inout) :: export         ! Export state
     type(ESMF_State),    intent(inout) :: landice_import ! Import state
-    type(ESMF_Clock),    intent(inout) :: clock  ! The clock
-    integer, optional,   intent(  out) :: rc     ! Error code
+    type(ESMF_Clock),    intent(inout) :: clock          ! The clock
+    integer, optional,   intent(  out) :: rc             ! Error code
+    
     integer :: k, i1, i2, AEROSOL_DEPOSITION, status
     real, pointer :: out1d(:), in1d(:), tmp(:)
     real, pointer :: out2d(:,:), in2d(:,:)
     real, allocatable :: tmpreal(:)
     type(MAPL_MetaComp), pointer :: MAPL
     character(len=ESMF_MAXSTR) :: Iam
-    Iam = "metForce::DistributeForcetoLandice"
+    Iam = "metForce::DistributeForcingToLandice"
 
     if (NUM_LANDICE_TILE == 0) then
       RETURN_(ESMF_SUCCESS)
@@ -1392,7 +1399,8 @@ module GEOS_MetforceGridCompMod
     deallocate(tmpreal)
 
     RETURN_(ESMF_SUCCESS)
-  end subroutine DistributeForcetoLandIce
+    
+  end subroutine DistributeForcingToLandIce
 
   !BOP
 
