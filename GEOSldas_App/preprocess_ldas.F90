@@ -46,18 +46,19 @@ program main
   character(len=512) :: f2g_file
   character(len=12 ) :: ymdhm
   character(len=12 ) :: SURFLAY
-  character(len=:), allocatable :: new_r, orig_r
-  integer, allocatable :: int_types(:)
   
-  call get_command_argument(1,option)
-  call get_command_argument(2,arg1)
-  call get_command_argument(3,arg2)
-  call get_command_argument(4,arg3)
-  call get_command_argument(5,arg4)
-  call get_command_argument(6,arg5)
-  call get_command_argument(7,arg6)
-  call get_command_argument(8,arg7)
-  call get_command_argument(9,arg8)
+  character(len=:), allocatable :: new_r, orig_r
+  integer,          allocatable :: int_types(:)
+  
+  call get_command_argument( 1,option)
+  call get_command_argument( 2,arg1)
+  call get_command_argument( 3,arg2)
+  call get_command_argument( 4,arg3)
+  call get_command_argument( 5,arg4)
+  call get_command_argument( 6,arg5)
+  call get_command_argument( 7,arg6)
+  call get_command_argument( 8,arg7)
+  call get_command_argument( 9,arg8)
   call get_command_argument(10,arg9)
   
   if( trim(option) == "c_f2g") then
@@ -153,8 +154,10 @@ program main
 contains
 
   subroutine get_tile_types(str_types, int_types)
-    character(*), intent(in) :: str_types
-    integer, allocatable, intent(out) :: int_types(:)
+    
+    character(*),              intent(in)  :: str_types
+    integer,      allocatable, intent(out) :: int_types(:)
+
     integer :: n, Length, from, to, i
     n = 1
     Length = len(str_types)
