@@ -20,11 +20,29 @@ module preprocess_ldas_routines
   !      - is_in_domain()                        [from LDAS_ensdrv_functions.F90]
   !      - word_count()                          [from LDAS_ensdrv_functions.F90]
   !      - open_land_param_file()                [from LDAS_ensdrv_functions.F90]
-
-  !  xxx_g or _global include all tiles in the types()
-  !  r2g ( restart to global) 
-  !  f2r ( simualtion to restart)
-  !  f2g ( simulation to global), f2g = r2g(f2r) 
+  !
+  ! Domains:
+  !
+  !    g = *g*lobal  domain         : list of tiles defined in tile file from boundary conditions
+  !    r = *r*estart domain         : list of tiles included in restart file(s)
+  !    f = *f*ull simulation domain : list of tiles included in simulation domain
+  !                                   ("full" domain as opposed to a "local" subdomain assigned to a given processor)
+  !
+  !    The simulation and restart domains can be subsets of the global domain ("zoom-in"), 
+  !      as long as the simulation domain is a subset of the restart domain.
+  !
+  ! Mapping between domains: 
+  !
+  !    r2g : restart    domain to global  domain 
+  !    f2r : simulation domain to restart domain
+  !    f2g : simulation domain to global  domain, f2g = r2g(f2r) 
+  !
+  ! Number of tiles:
+  !
+  !    N_tiles_[g,r,f]      : number of        tiles included in [g,r,f] domain (across all tile types)
+  !    N_tiles_land_[g,r,f] : number of *land* tiles included in [g,r,f] domain
+  !
+  ! ----------------------------------------------------------
   
   use netcdf
   
@@ -97,69 +115,70 @@ module preprocess_ldas_routines
   character(10), private :: tmpstring10
   character(40), private :: tmpstring40
   
-  ! Tile type for land that is to be excluded from the simulation domain.
-  ! (GEOSldas  allows for non-global simulations and repeated "zooming"
-  !  of the domain while MAPL generally assumes a complete (global) tile
-  !  space.  The MAP_ExcludeFromDomain is added to the origial tile type and  makes it possible to work
-  !  with complete (global) tile files (ie, make use of MAPL functionality)
-  !  and also maintain GEOSldas functionality.
+  ! GEOSldas allows for non-global simulations and repeated "zooming" of 
+  ! the domain, while MAPL generally assumes a complete (global) tile space.
+  ! By adding the integer ExcludeFromDomain to the original MAPL_* tile 
+  ! type for all tiles that should be excluded from the simulation domain, we 
+  ! can work with global tile files (i.e., use MAPL tools) and also maintain
+  ! the non-global domain unctionality of GEOSldas.
   
-  integer, parameter :: MAPL_ExcludeFromDomain = 1000 ! added to original tile type to be excluded
+  integer, parameter :: ExcludeFromDomain = 1000  ! for tiles to be excluded from the simulation domain, this number is added to tile type
   
 contains
   
   ! ********************************************************************
 
-  subroutine create_mapping(orig_tile,domain_def,out_path,catch_def_file,exp_id,ymdhm, SURFLAY, mapping_file, types)
+  subroutine create_mapping( orig_tile, domain_def, out_path, catch_def_file, exp_id, ymdhm, SURFLAY, mapping_file, types)
     
-    implicit none
-    character(*) :: orig_tile
-    character(*) :: domain_def
-    character(*) :: out_path
-    character(*) :: catch_def_file
-    character(*) :: exp_id
-    character(*) :: ymdhm
-    character(*) :: SURFLAY
-    character(*) :: mapping_file
+    character(*), intent(in)  :: orig_tile
+    character(*), intent(in)  :: domain_def
+    character(*), intent(in)  :: out_path
+    character(*), intent(in)  :: catch_def_file
+    character(*), intent(in)  :: exp_id
+    character(*), intent(in)  :: ymdhm
+    character(*), intent(in)  :: SURFLAY
+    character(*), intent(in)  :: mapping_file
+    
     integer, dimension(:), optional, intent(in) :: types
     
-
-    real :: minlon,maxlon,minlat,maxlat
-    character(len=512):: exclude_file,include_file
-    character(len=512):: bcs_path
-    logical :: file_exist
-    logical :: d_exist,c_exist
+    ! ----------------------------------------------------
     
-    type(grid_def_type) :: tile_grid_g,tile_grid_f
-    type(tile_coord_type), dimension(:), pointer :: tile_coord_r => null()
-    type(tile_coord_type), dimension(:), pointer :: tile_coord_f => null()
-    integer, dimension(:), pointer     :: f2r => null()
-    integer, dimension(:), pointer     :: r2g => null() ! restart domain to global
-    integer :: N_catg, N_types, n, n1, N_catf
-    integer, allocatable, dimension(:) :: tile_types
-    integer, allocatable, dimension(:) :: N_tiles_r, N_tiles_f 
+    real               :: minlon,maxlon,minlat,maxlat
+    character(len=512 ):: exclude_file,include_file
+    character(len=512 ):: bcs_path
+    logical            :: file_exist
+    logical            :: d_exist,c_exist
+    
+    type(grid_def_type)                              :: tile_grid_g,tile_grid_f
+    type(tile_coord_type), dimension(:), pointer     :: tile_coord_r => null()
+    type(tile_coord_type), dimension(:), pointer     :: tile_coord_f => null()
+    integer,               dimension(:), pointer     :: f2r => null()
+    integer,               dimension(:), pointer     :: r2g => null() ! restart domain to global
+    integer                                          :: N_tiles_land_g, N_types, n, n1, N_tiles_land_f
+    integer,               dimension(:), allocatable :: tile_types
+    integer,               dimension(:), allocatable :: N_tiles_r, N_tiles_f 
     type(cat_param_type),  dimension(:), allocatable :: cp
-    real :: dzsf
+    real                                             :: dzsf
     
-    namelist / domain_inputs /                              &
+    namelist / domain_inputs /                             &
          minlon, maxlon,minlat,maxlat,                     &
          exclude_file,include_file
     
     inquire(file=trim(orig_tile),exist=file_exist)
-    if( .not. file_exist) stop ("original tile file not exist")
+    if( .not. file_exist) stop("original tile file does not exist")
     
     inquire(file=trim(domain_def),exist=d_exist)
     if( .not. d_exist) then
-       print*,"no domain definition file"
+       print*, "domain definition file does not exist", trim(domain_def)
     endif
     
     inquire(file=trim(catch_def_file),exist=c_exist)
     if( .not. c_exist) then
-       print*,"no catchment definition file:" , catch_def_file
+       print*,"catchment [land tile supplemental] definition file does not exist:" , trim(catch_def_file)
     endif
 
     if (present(types)) then
-      ! reorder tile types so it matches the tile file
+      ! reorder tile types so it matches the tile file (first LAND then LAKE then LANDICE)
       allocate(tile_types(size(types)))
       n = 1
       if (any(types == MAPL_LAND)) then
@@ -177,7 +196,7 @@ contains
       tile_types = [MAPL_LAND]
     endif
     
-    call LDAS_read_til_file(orig_tile,catch_def_file, tile_grid_g, tile_coord_r, r2g, N_catg, tile_types)
+    call LDAS_read_til_file( orig_tile, catch_def_file, tile_grid_g, tile_coord_r, r2g, N_tiles_land_g, tile_types)
     
     ! include and exclude files are absolute
     if(d_exist) then
@@ -186,33 +205,33 @@ contains
        close(10)
     else
        minlon = -180.
-       maxlon = 180.
-       minlat = -90.
-       maxlat = 90.
+       maxlon =  180.
+       minlat =  -90.
+       maxlat =   90.
        exclude_file = ' '
        include_file = ' '
     endif
     
     call domain_setup(                                                &
-         tile_coord_r,                                     &
+         tile_coord_r,                                                &
          tile_grid_g,                                                 &
          ' ', exclude_file, ' ', include_file,                        &
          trim(out_path), 'exp_domain ', trim(exp_id),                 &
          minlon, minlat, maxlon, maxlat,                              &
-         f2r, tile_coord_f,                                &
+         f2r, tile_coord_f,                                           &
          tile_grid_f)
    
-    N_catf  = count(tile_coord_f(:)%typ == MAPL_LAND)
+    N_tiles_land_f  = count(tile_coord_f(:)%typ == MAPL_LAND)
 
-    allocate(cp(N_catf))
+    allocate(cp(N_tiles_land_f))
     
     read(SURFLAY,*) dzsf
     print*, "SURFLAY: ", dzsf
     n1 = index(catch_def_file,'/clsm/')
     bcs_path(1:n1-1) = catch_def_file(1:n1-1)
-    call read_cat_param( N_catg, N_catf, tile_coord_f, dzsf, bcs_path(1:n1-1), bcs_path(1:n1-1),bcs_path(1:n1-1),  &
+    call read_cat_param( N_tiles_land_g, N_tiles_land_f, tile_coord_f, dzsf, bcs_path(1:n1-1), bcs_path(1:n1-1),bcs_path(1:n1-1),  &
          cp )
-    call write_cat_param(cp,N_catf)
+    call write_cat_param(cp,N_tiles_land_f)
 
     N_types = size(tile_types)
     allocate(N_tiles_r(N_types), N_tiles_f(N_types))
@@ -248,8 +267,6 @@ contains
       
       ! reichle, 2 May 2003
       
-      implicit none
-      
       integer :: N_list, this_one
       integer, dimension(N_list) :: list
       
@@ -274,34 +291,32 @@ contains
     logical function is_in_domain(                                               &
          this_cat_exclude, this_cat_include, this_cat_in_box )
       
-      ! determine whether catchment is in domain
+      ! determine whether tile is in domain
       !
-      ! The domain is set up using (if present) an "ExcludeList" of catchments 
-      ! to be excluded, an "IncludeList" (if present) of catchments to be included,
+      ! The domain is set up using (if present) an "ExcludeList" of tiles 
+      ! to be excluded, an "IncludeList" (if present) of tiles to be included,
       ! and the bounding box of a rectangular "zoomed" area (as specified
       ! in the "exeinp" file used in ldas_setup). 
       !
       ! order of precedence:
-      !  1. exclude catchments on ExcludeList
-      !  2. include catchments on IncludeList or catchments within rectangular domain
-      ! (i.e., catchments in ExcludeList are *always* excluded)    
+      !  1. exclude tiles on ExcludeList
+      !  2. include tiles on IncludeList or tiles within rectangular domain
+      ! (i.e., tiles in ExcludeList are *always* excluded)    
       !
       ! reichle, 7 May 2003
       ! reichle, 9 May 2005 - redesign (no more continents)
       !
       ! ----------------------------------------------------------------
       
-      implicit none
-      
       logical :: this_cat_include, this_cat_exclude, this_cat_in_box
       
       is_in_domain = .false.
       
-      ! if catchment is NOT in ExcludeList 
+      ! if tile is NOT in ExcludeList 
       
       if (.not. this_cat_exclude)  then     
          
-         ! if catchment is within bounding box OR in IncludeList
+         ! if tile is within bounding box OR in IncludeList
          
          if ((this_cat_in_box) .or. (this_cat_include)) then
             
@@ -318,9 +333,7 @@ contains
          this_minlon, this_minlat, this_maxlon, this_maxlat,       &
          minlon, minlat, maxlon, maxlat        )
       
-      ! determine whether catchment is within bounding box - reichle, 7 May 2003
-      
-      implicit none
+      ! determine whether tile is within bounding box - reichle, 7 May 2003
       
       real :: this_minlon, this_minlat, this_maxlon, this_maxlat
       real :: minlon, minlat, maxlon, maxlat
@@ -347,21 +360,21 @@ contains
          f2r, tile_coord_f, tile_grid_f )
       
       ! Set up modeling domain and determine index vectors mapping from the
-      ! domain to global catchment space.
+      ! domain to global tile space.
       ! Determine actual bounding box for domain.
       ! Also return tile_coord for domain and tile_grid_d for domain.
       !
       ! -----------------------
       !
-      ! The domain is set up using (if present) an "ExcludeList" of catchments 
-      ! to be excluded, an "IncludeList" (if present) of catchments to be included,
+      ! The domain is set up using (if present) an "ExcludeList" of tiles 
+      ! to be excluded, an "IncludeList" (if present) of tiles to be included,
       ! and the bounding box of a rectangular "zoomed" area (as specified
       ! in the "exeinp" file used in ldas_setup). 
       !
       ! order of precedence:
-      !  1. exclude catchments in ExcludeList
-      !  2. include catchments in IncludeList or catchments within rectangular domain
-      ! (i.e., catchments in ExcludeList are *always* excluded)
+      !  1. exclude tiles in ExcludeList
+      !  2. include tiles in IncludeList or tiles within rectangular domain
+      ! (i.e., tiles in ExcludeList are *always* excluded)
       !
       ! input: 
       !
@@ -372,16 +385,12 @@ contains
       !                        latitude -90:90
       !
       ! output:
-      !  N_cat_domain = number of catchments in zoomed domain
-      !                   (for which model integration is conducted) 
-      !  d2g          = index from domain to global tiles
+      !  f2r          = index mapping from (full) simulation domain to restart domain
       !  tile_coord_d = tile_coord vector for domain 
       !  tile_grid_d  = def of smallest subgrid of global tile_grid_g that contains
-      !                  all catchments (or tiles) in the domain (tile_grid_d%i_offg, 
+      !                  all tiles (or tiles) in the domain (tile_grid_d%i_offg, 
       !                  tile_grid_d%j_offg are offsets in indices between tile_grid_g
       !                  and tile_grid_d)
-      !  N_catd_cont  = number of catchments of (full) domain on each continent 
-      !
       !
       ! - reichle, May  7, 2003
       ! - reichle, Nov  7, 2003 - computation of bounding box of actual domain
@@ -392,8 +401,6 @@ contains
       ! - reichle, Jul 23, 2010 - major overhaul
       !
       ! ----------------------------------------------------------
-      
-      implicit none
       
       type(tile_coord_type), dimension(:), pointer :: tile_coord_r ! input
       type(grid_def_type),   intent(in)            :: tile_grid_g
@@ -408,9 +415,9 @@ contains
       real,                  intent(in)            :: minlon, minlat  ! from nml inputs
       real,                  intent(in)            :: maxlon, maxlat  ! from nml inputs
       
-      integer,               dimension(:), pointer :: f2r        ! output
+      integer,               dimension(:), pointer :: f2r             ! output
       
-      type(tile_coord_type), dimension(:), pointer :: tile_coord_f ! output
+      type(tile_coord_type), dimension(:), pointer :: tile_coord_f    ! output
       
       type(grid_def_type),   intent(out)           :: tile_grid_f
 
@@ -464,13 +471,13 @@ contains
          print*, "Creating domain..., reading IncludeList and ExludeList if present..." 
          ! ------------------------------------------------------------
          !
-         ! load ExcludeList: catchments listed in this file will *always* be excluded
+         ! load ExcludeList: tiles listed in this file will *always* be excluded
          
          fname = trim(exclude_path) // '/' // trim(exclude_file)
           
          call read_exclude_or_includelist(fname, ExcludeList) 
          
-         ! load IncludeList: catchments listed in this file will be included
+         ! load IncludeList: tiles listed in this file will be included
          ! (unless excluded via ExcludeList)
          
          fname = trim(include_path) // '/' // trim(include_file)
@@ -478,7 +485,7 @@ contains
          call read_exclude_or_includelist(fname, IncludeList) 
          ! -----------------
          !
-         ! find and count catchments that are in the domain
+         ! find and count tiles that are in the domain
          
          c3_grid = .false.
          if(index(tile_grid_g%gridtype,"c3")/=0) c3_grid = .true.
@@ -526,7 +533,7 @@ contains
          n_tiles_f    = indomain
          
          if (n_tiles_f .eq. 0) then
-            err_msg = 'No catchments found in domain'
+            err_msg = 'No tiles found in domain'
             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
          else
             if (logit) then
@@ -537,9 +544,9 @@ contains
          
          ! -------------------------------------------------------------------
          !
-         ! assemble d2g, tile_coord, tile_grid_d
+         ! assemble f2r, tile_coord, tile_grid_d
          
-         allocate(f2r(       n_tiles_f))
+         allocate(f2r(         n_tiles_f))
          allocate(tile_coord_f(n_tiles_f))
          
          f2r(1:n_tiles_f) = tmp_f2r(1:n_tiles_f)
@@ -547,9 +554,9 @@ contains
          
          ! finalize extent of actual domain:
          !  determine smallest subgrid of tile_grid_d that contains all
-         !  catchments/tiles in domain
+         !  tiles in domain
          
-         tile_grid_f = get_minExtent_grid( n_tiles_f, tile_coord_f%i_indg, tile_coord_f%j_indg, &
+         tile_grid_f = get_minExtent_grid( n_tiles_f, tile_coord_f%i_indg, tile_coord_f%j_indg,        &
               tile_coord_f%min_lon, tile_coord_f%min_lat, tile_coord_f%max_lon, tile_coord_f%max_lat,  &
               tile_grid_g) 
          
@@ -581,19 +588,17 @@ contains
     
     ! *************************************************************************
     
-    subroutine read_exclude_or_includelist(fname, MyList) 
+    subroutine read_exclude_or_includelist( fname, MyList) 
       
-      ! read numbers/IDs of catchments in MyList (ExcludeList or IncludeList)
+      ! read numbers/IDs of tiles in MyList (ExcludeList or IncludeList)
       !
       ! format of MyList file: ASCII list of tile IDs
       !
-      ! N_list = number of catchments in MyList
+      ! N_list = number of tiles in MyList
       !
       ! reichle, 2 May 2003
       !
       ! --------------------------------------------------------------
-      
-      implicit none
       
       character(*), intent(in)  :: fname
       integer, dimension(:), allocatable, intent(out) :: MyList
@@ -665,8 +670,6 @@ contains
       !
       ! - reichle, 31 Mar 2015
       
-      implicit none
-      
       character(len=*) :: mystring
       
       integer :: N_words, N_string, ii
@@ -712,8 +715,6 @@ contains
       !               for file fname
       
       ! ignore_stop = optional input, if present and .true., skip call to "stop_it()" 
-      
-      implicit none
       
       integer                                  :: unitnumber, N_search_dir
       
@@ -814,8 +815,8 @@ contains
     
     ! *****************************************************************************************
     
-    subroutine read_cat_param(                                                    &
-         N_catg, N_catf, tile_coord_f, dzsf, veg_path, soil_path, top_path,  &
+    subroutine read_cat_param(                                                                &
+         N_tiles_land_g, N_tiles_land_f, tile_coord_f, dzsf, veg_path, soil_path, top_path,   &
          cp )
       
       ! Reads soil properties and topographic parameters from global files 
@@ -836,19 +837,17 @@ contains
       ! 
       ! -------------------------------------------------------------------
       
-      implicit none
+      integer,                                          intent(in)  :: N_tiles_land_g, N_tiles_land_f
       
-      integer,                                  intent(in)  :: N_catg, N_catf
+      type(tile_coord_type), dimension(:),      pointer             :: tile_coord_f ! intent(in)
       
-      type(tile_coord_type), dimension(:),      pointer     :: tile_coord_f ! intent(in)
+      real,                                             intent(in)  :: dzsf
       
-      real,                                     intent(in)  :: dzsf
+      character(*),                                     intent(in)  :: veg_path
+      character(*),                                     intent(in)  :: soil_path
+      character(*),                                     intent(in)  :: top_path
       
-      character(*),                             intent(in)  :: veg_path
-      character(*),                             intent(in)  :: soil_path
-      character(*),                             intent(in)  :: top_path
-      
-      type(cat_param_type),  dimension(N_catf), intent(out) :: cp
+      type(cat_param_type),  dimension(N_tiles_land_f), intent(out) :: cp
       
       ! local variables
       
@@ -862,9 +861,9 @@ contains
       
       integer :: n, k, m, dummy_int, dummy_int2, istat, N_search_dir, N_col, gid
       
-      integer, dimension(N_catg)                  :: tmpint, tmpint2, tmptileid
+      integer, dimension(N_tiles_land_g)                :: tmpint, tmpint2, tmptileid
       
-      real,    dimension(N_catg,N_col_real_max)   :: tmpreal
+      real,    dimension(N_tiles_land_g,N_col_real_max) :: tmpreal
       
       real    :: dummy_real, dummy_real2, z_in_m, term1, term2
       
@@ -927,7 +926,7 @@ contains
          
          if (logit) write (logunit,*) 'Using vegetation height look-up table'
          
-         do n=1,N_catg
+         do n=1,N_tiles_land_g
             
             read (10,*) tmptileid(n), dummy_int, tmpint(n)
             
@@ -940,7 +939,7 @@ contains
             
          end if
          
-         do n=1,N_catg
+         do n=1,N_tiles_land_g
             
             tmpreal(n,1) = VGZ2( tmpint(n) )
             
@@ -953,7 +952,7 @@ contains
          
          if (logit) write (logunit,*) 'reading vegetation height from file'
          
-         do n=1,N_catg
+         do n=1,N_tiles_land_g
             
             ! 7-th column contains veg height in m
             ! 8-th column contains ASCAT z0 values (IGNORED for now, reichle, 31 Oct 2017)
@@ -975,10 +974,10 @@ contains
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
 
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          
          ! this check works only for "SiB2_V2" and newer versions
-         gid = tile_coord_f(k)%tile_id
+         gid = tile_coord_f(k)%tile_id                               ! id of tile in *g*lobal tile file
          if (gid /=tmptileid(gid)) then
             err_msg = 'something wrong with veg parameters'
             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -1029,7 +1028,7 @@ contains
       
       tmpreal   = nodata_generic
       
-      do n=1,N_catg
+      do n=1,N_tiles_land_g
          
          ! "SiB2_V2" version  
          
@@ -1043,7 +1042,7 @@ contains
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
       
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          gid = tile_coord_f(k)%tile_id 
          if (tile_coord_f(k)%tile_id/=tmptileid(gid)) then
             err_msg = 'something wrong with soil parameters'
@@ -1075,7 +1074,7 @@ contains
          
          ! "Icarus-NLv4" has 20 columns (new, last column is peat fraction, ignore for now)
          
-         do k=1,N_catf
+         do k=1,N_tiles_land_f
             gid = tile_coord_f(k)%tile_id
             cp(k)%gravel30 = tmpreal(gid, 7)
             cp(k)%orgC30   = tmpreal(gid, 8)
@@ -1091,7 +1090,7 @@ contains
          
       case default
          
-         do k=1,N_catf
+         do k=1,N_tiles_land_f
             
             cp(k)%gravel30 = nodata_generic
             cp(k)%orgC30   = nodata_generic
@@ -1122,7 +1121,7 @@ contains
       
       tmpreal   = nodata_generic
       
-      do n=1,N_catg
+      do n=1,N_tiles_land_g
          
          read (10,*) tmptileid(n), dummy_int, (tmpreal(n,m), m=1,4)
          
@@ -1133,7 +1132,7 @@ contains
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
       
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          
          ! this check works only for "SiB2_V2" version
          gid = tile_coord_f(k)%tile_id
@@ -1190,7 +1189,7 @@ contains
       
       tmpreal   = nodata_generic
       
-      do n=1,N_catg
+      do n=1,N_tiles_land_g
          
          read (10,*) tmptileid(n), dummy_int, (tmpreal(n,m), m=1,12)
          
@@ -1201,7 +1200,7 @@ contains
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
       
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          
          ! this check works only for "SiB2_V2" version
          gid = tile_coord_f(k)%tile_id 
@@ -1238,7 +1237,7 @@ contains
       
       tmpreal   = nodata_generic
       
-      do n=1,N_catg
+      do n=1,N_tiles_land_g
          
          read (10,*) tmptileid(n), dummy_int, (tmpreal(n,m), m=1,4)
          
@@ -1249,7 +1248,7 @@ contains
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
       
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          
          ! this check works only for "SiB2_V2" version
          gid = tile_coord_f(k)%tile_id
@@ -1283,7 +1282,7 @@ contains
       
       tmpreal   = nodata_generic
       
-      do n=1,N_catg
+      do n=1,N_tiles_land_g
          
          read (10,*) tmptileid(n), dummy_int, (tmpreal(n,m), m=1,5)
          
@@ -1293,7 +1292,7 @@ contains
       
       if (logit) write (logunit,*) 'done reading'
       if (logit) write (logunit,*)
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          
          ! this check works only for "SiB2_V2" version
          
@@ -1321,7 +1320,7 @@ contains
       if (logit) write (logunit,*) 'computing derived land surface parameters...'
       if (logit) write (logunit,*)
       
-      do k=1,N_catf
+      do k=1,N_tiles_land_f
          
          ! Three soil depths for soil moisture model: 
          !
@@ -1394,9 +1393,9 @@ contains
     
     ! **********************************************************************************
   
-    subroutine write_cat_param(cat_param, N_catd)
+    subroutine write_cat_param(cat_param, N_land_tiles_f)
       type(cat_param_type), intent(in) :: cat_param(:)
-      integer,intent(in) :: N_catd
+      integer,intent(in) :: N_land_tiles_f
       character(len=512):: fname
       type(date_time_type) :: start_time
       
@@ -1418,65 +1417,65 @@ contains
       
       print*, 'Writing catparam file : ' // trim(fname)
       
-      write (10) (cat_param(n)%dpth,       n=1,N_catd)
+      write (10) (cat_param(n)%dpth,       n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%dzsf,       n=1,N_catd)
-      write (10) (cat_param(n)%dzrz,       n=1,N_catd)
-      write (10) (cat_param(n)%dzpr,       n=1,N_catd)
+      write (10) (cat_param(n)%dzsf,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%dzrz,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%dzpr,       n=1,N_land_tiles_f)
       
       do k=1,N_gt
-         write (10) (cat_param(n)%dzgt(k), n=1,N_catd)
+         write (10) (cat_param(n)%dzgt(k), n=1,N_land_tiles_f)
       end do
       
-      write (10) (cat_param(n)%poros,      n=1,N_catd)
-      write (10) (cat_param(n)%cond,       n=1,N_catd)
-      write (10) (cat_param(n)%psis,       n=1,N_catd)
-      write (10) (cat_param(n)%bee,        n=1,N_catd)
+      write (10) (cat_param(n)%poros,      n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%cond,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%psis,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%bee,        n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%wpwet,      n=1,N_catd)
+      write (10) (cat_param(n)%wpwet,      n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%gnu,        n=1,N_catd)
+      write (10) (cat_param(n)%gnu,        n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%vgwmax,     n=1,N_catd)
+      write (10) (cat_param(n)%vgwmax,     n=1,N_land_tiles_f)
       
-      write (10) (real(cat_param(n)%vegcls),     n=1,N_catd)
-      write (10) (real(cat_param(n)%soilcls30),  n=1,N_catd)
-      write (10) (real(cat_param(n)%soilcls100), n=1,N_catd)
+      write (10) (real(cat_param(n)%vegcls),     n=1,N_land_tiles_f)
+      write (10) (real(cat_param(n)%soilcls30),  n=1,N_land_tiles_f)
+      write (10) (real(cat_param(n)%soilcls100), n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%bf1,        n=1,N_catd)
-      write (10) (cat_param(n)%bf2,        n=1,N_catd)
-      write (10) (cat_param(n)%bf3,        n=1,N_catd)
-      write (10) (cat_param(n)%cdcr1,      n=1,N_catd)
-      write (10) (cat_param(n)%cdcr2,      n=1,N_catd)
-      write (10) (cat_param(n)%ars1,       n=1,N_catd)
-      write (10) (cat_param(n)%ars2,       n=1,N_catd)
-      write (10) (cat_param(n)%ars3,       n=1,N_catd)
-      write (10) (cat_param(n)%ara1,       n=1,N_catd)
-      write (10) (cat_param(n)%ara2,       n=1,N_catd)
-      write (10) (cat_param(n)%ara3,       n=1,N_catd)
-      write (10) (cat_param(n)%ara4,       n=1,N_catd)
-      write (10) (cat_param(n)%arw1,       n=1,N_catd)
-      write (10) (cat_param(n)%arw2,       n=1,N_catd)
-      write (10) (cat_param(n)%arw3,       n=1,N_catd)
-      write (10) (cat_param(n)%arw4,       n=1,N_catd)
-      write (10) (cat_param(n)%tsa1,       n=1,N_catd)
-      write (10) (cat_param(n)%tsa2,       n=1,N_catd)
-      write (10) (cat_param(n)%tsb1,       n=1,N_catd)
-      write (10) (cat_param(n)%tsb2,       n=1,N_catd)
-      write (10) (cat_param(n)%atau,       n=1,N_catd)
-      write (10) (cat_param(n)%btau,       n=1,N_catd)
+      write (10) (cat_param(n)%bf1,        n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%bf2,        n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%bf3,        n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%cdcr1,      n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%cdcr2,      n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ars1,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ars2,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ars3,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ara1,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ara2,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ara3,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%ara4,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%arw1,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%arw2,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%arw3,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%arw4,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%tsa1,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%tsa2,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%tsb1,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%tsb2,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%atau,       n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%btau,       n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%gravel30,   n=1,N_catd)
-      write (10) (cat_param(n)%orgC30  ,   n=1,N_catd)
-      write (10) (cat_param(n)%orgC    ,   n=1,N_catd)
-      write (10) (cat_param(n)%sand30  ,   n=1,N_catd)
-      write (10) (cat_param(n)%clay30  ,   n=1,N_catd)
-      write (10) (cat_param(n)%sand    ,   n=1,N_catd)
-      write (10) (cat_param(n)%clay    ,   n=1,N_catd)
-      write (10) (cat_param(n)%wpwet30 ,   n=1,N_catd)
-      write (10) (cat_param(n)%poros30 ,   n=1,N_catd)
+      write (10) (cat_param(n)%gravel30,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%orgC30  ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%orgC    ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%sand30  ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%clay30  ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%sand    ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%clay    ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%wpwet30 ,   n=1,N_land_tiles_f)
+      write (10) (cat_param(n)%poros30 ,   n=1,N_land_tiles_f)
       
-      write (10) (cat_param(n)%veghght ,   n=1,N_catd)
+      write (10) (cat_param(n)%veghght ,   n=1,N_land_tiles_f)
       
       close (10,status='keep')
       
@@ -1486,16 +1485,17 @@ contains
   
   ! ********************************************************************
   
-  subroutine read_mapping(mapping_file, N_types,  tile_types,  N_tiles_r, N_tiles_f, f2r, r2g)
+  subroutine read_mapping( mapping_file, N_types,  tile_types,  N_tiles_r, N_tiles_f, f2r, r2g)
     
-    implicit none
-    character(*), intent(in):: mapping_file
-    integer, intent(out)    :: N_types
+    character(*),                                 intent(in)  :: mapping_file
+    integer,                                      intent(out) :: N_types
     integer, dimension(:), allocatable, optional, intent(out) :: tile_types
     integer, dimension(:), allocatable, optional, intent(out) :: N_tiles_r
     integer, dimension(:), allocatable, optional, intent(out) :: N_tiles_f
     integer, dimension(:), allocatable, optional, intent(out) :: f2r
     integer, dimension(:), allocatable, optional, intent(out) :: r2g
+
+    ! ------------------------------
     
     logical :: file_exist
     integer, dimension(:), allocatable :: N_tiles_r_tmp, N_tiles_f_tmp
@@ -1521,13 +1521,13 @@ contains
           allocate(f2r(sum(N_tiles_f_tmp)))
           read(40,*) f2r
        else
-          read(40,*)! read off f2r
+          read(40,*)         ! skip over f2r
        endif
        if (present(r2g)) then
           allocate(r2g(sum(N_tiles_r_tmp)))
           read(40,*) r2g
        else
-          read(40,*)! read off r2g
+          read(40,*)         ! skip over r2g
        endif
        
        if (present(N_tiles_r)) N_tiles_r = N_tiles_r_tmp
@@ -1535,18 +1535,20 @@ contains
 
        close(40)
     else
-       print*, " wrong, no mapping file"
+       print*, "ERROR, mapping file does not exist: ", trim(mapping_file)
     endif
+    
   end subroutine read_mapping
   
   ! ********************************************************************
   
-  subroutine createZoominTilefile(mapping_file, orig_tile, new_tile)
+  subroutine createZoominTilefile( mapping_file, orig_tile, new_tile)
     
-    implicit none
     character(*), intent(in) :: mapping_file
     character(*), intent(in) :: orig_tile
     character(*), intent(in) :: new_tile
+
+    ! ---------------------------------------
     
     character(len=256) :: line
     
@@ -1588,7 +1590,7 @@ contains
       do n = 1, n_tiles
         if (any(tile_types == iTable(n,0))) then
            if (f2g(f_id) /= n) then
-              iTable(n,0) = iTable(n,0) + MAPL_ExcludeFromDomain
+              iTable(n,0) = iTable(n,0) + ExcludeFromDomain
            else
               f_id = f_id + 1
               if (f_id > size(f2g)) exit 
@@ -1637,7 +1639,7 @@ contains
                 write(typ_str, '(I0)') ty
                 typ_str = adjustr(typ_str)
                 n=index(line, typ_str)
-                write(typ_str_exclude, '(I0)') ty + MAPL_ExcludeFromDomain
+                write(typ_str_exclude, '(I0)') ty + ExcludeFromDomain
                 line(n:n+3) = typ_str_exclude
              else
                 f_id = f_id + 1
@@ -1657,24 +1659,25 @@ contains
   
   subroutine createZoominBC(mapping_file, orig_BC, new_BC)
     
-    implicit none
     character(*),intent(in) :: mapping_file
     character(*),intent(in) :: orig_BC
     character(*),intent(in) :: new_BC
+
+    ! -------------------------------------------
     
     real,dimension(14) :: tmprealvec14
     real,allocatable ::   tmpvec(:)  
-    integer :: istat, N_catr, N_catf, N_types
+    integer :: istat, N_tiles_land_r, N_tiles_land_f, N_types
     integer,dimension(:),allocatable :: f2r_land, f2r, r2g, tile_types, N_tiles_r, N_tiles_f
 
     call read_mapping( mapping_file, N_types, tile_types=tile_types, N_tiles_r=N_tiles_r, N_tiles_f=N_tiles_f, f2r=f2r, r2g=r2g)
     if (tile_types(1) /= MAPL_LAND)   return
     if (N_tiles_r(1) == N_tiles_f(1) ) return
-    N_catf =  N_tiles_f(1)   
-    N_catr =  N_tiles_r(1)
-    f2r_land = f2r(1:N_catf)
+    N_tiles_land_f =  N_tiles_f(1)   
+    N_tiles_land_r =  N_tiles_r(1)
+    f2r_land = f2r(1:N_tiles_land_f)
     
-    allocate(tmpvec(N_catr))
+    allocate(tmpvec(N_tiles_land_r))
     open(10,file=trim(orig_BC),form='unformatted',action='read',status='old',iostat=istat)
     open(20,file=trim(new_BC),form='unformatted',action='write')
     
@@ -1690,14 +1693,17 @@ contains
     deallocate(tmpvec)
   end subroutine createZoominBC
 
-! ***************************************
+  ! ***************************************
+  
   subroutine createZoominRestart(mapping_file, orig_rst, new_rst, tile_type)
     
-    implicit none
-    character(*),intent(in):: mapping_file
-    character(*),intent(in):: orig_rst
-    character(*),intent(in):: new_rst
-    integer, intent(in)    :: tile_type
+    character(*), intent(in) :: mapping_file
+    character(*), intent(in) :: orig_rst
+    character(*), intent(in) :: new_rst
+    integer,      intent(in) :: tile_type
+
+    ! -------------------------------------------
+    
     integer :: istat, file_type, rc,i, j, ndims
     real,allocatable :: tmp1(:)
     type(Netcdf4_FileFormatter) :: InFmt,OutFmt
@@ -1804,19 +1810,21 @@ contains
  
   ! ********************************************************************
   
-  subroutine createZoominVegRestart(mapping_file, orig_veg, new_veg)
+  subroutine createZoominVegRestart( mapping_file, orig_veg, new_veg)
     
-    implicit none
-    character(*),intent(in):: mapping_file
-    character(*),intent(in):: orig_veg
-    character(*),intent(in):: new_veg
+    character(*), intent(in) :: mapping_file
+    character(*), intent(in) :: orig_veg
+    character(*), intent(in) :: new_veg
+
+    ! ------------------------------------------
+    
     integer :: istat
     real,allocatable :: rity(:)
     real,allocatable :: z2(:)
     real,allocatable :: ascatz0(:)
     real,allocatable :: tmp(:)
     
-    integer :: N_catr, N_catf, N_types
+    integer :: N_tiles_land_r, N_tiles_land_f, N_types
     integer,dimension(:),allocatable :: f2r, r2g, f2r_land, tile_types, N_tiles_r, N_tiles_f
 
     integer :: file_type
@@ -1834,14 +1842,14 @@ contains
 
     if (tile_types(1) /= MAPL_LAND)   return
     if (N_tiles_r(1) == N_tiles_f(1) ) return
-    N_catf =  N_tiles_f(1)
-    N_catr =  N_tiles_r(1)
+    N_tiles_land_f =  N_tiles_f(1)
+    N_tiles_land_r =  N_tiles_r(1)
 
-    allocate(rity(N_catr))
-    allocate(z2(N_catr))
-    allocate(ascatz0(N_catr))
+    allocate(rity(N_tiles_land_r))
+    allocate(z2(N_tiles_land_r))
+    allocate(ascatz0(N_tiles_land_r))
     
-    f2r_land = f2r(1:N_catf)
+    f2r_land = f2r(1:N_tiles_land_f)
 
     call MAPL_NCIOGetFileType(orig_veg, file_type,rc=rc)
     isNC4   = (file_type == MAPL_FILETYPE_NC4)
@@ -1864,14 +1872,14 @@ contains
        InCfg = InFmt%read(rc=rc)
        OutCfg = InCfg
        
-       call OutCfg%modify_dimension('tile', N_catf, rc=rc)
+       call OutCfg%modify_dimension('tile', N_tiles_land_f, rc=rc)
        
        call OutFmt%create(trim(new_veg),rc=rc)
        call OutFmt%write(OutCfg,rc=rc)
        
        variables => InCfg%get_variables()
        var_iter = variables%begin()
-       allocate(tmp(N_catr))
+       allocate(tmp(N_tiles_land_r))
        do while (var_iter /= variables%end())
           vname => var_iter%key()
           call MAPL_VarRead (InFmt,vname,tmp)
@@ -1901,9 +1909,11 @@ contains
     !
     ! - reichle,  2 Aug 2020
     
-    implicit none
     character(*),intent(in) :: orig_ease
     character(*),intent(in) :: new_ease
+
+    ! -------------------------------------
+    
     logical :: file_exist,is_oldEASE, isNC4
     integer :: i, n_tiles, n_grids, file_type, status
     character(len=256) :: tmpline
@@ -1946,6 +1956,7 @@ contains
        close(56)
        close(55)
     end if
+    
   end subroutine correctEase
   
   ! ********************************************************************
@@ -1976,13 +1987,12 @@ contains
   
   subroutine optimize_latlon(fname_tilefile, N_proc_string, optimized_file, run_dir, types)
     
-    implicit none
-    
-    character(*), intent(in) :: fname_tilefile  ! file name (with path) of tile file (*.til)
-    character(*), intent(in) :: N_proc_string   ! *string* w/ no. of processors (or tasks), excl. OSERVER tasks
-    character(*), intent(in) :: optimized_file  
-    character(*), intent(in) :: run_dir  
-    integer, optional, intent(in) :: types(:)    
+    character(*),           intent(in) :: fname_tilefile  ! file name (with path) of tile file (*.til)
+    character(*),           intent(in) :: N_proc_string   ! *string* w/ no. of processors (or tasks), excl. OSERVER tasks
+    character(*),           intent(in) :: optimized_file  
+    character(*),           intent(in) :: run_dir  
+    integer,      optional, intent(in) :: types(:)
+
     ! local variables
     integer :: N_proc
     integer :: n_tiles,N_lon,N_lat,n_grids
@@ -2422,8 +2432,10 @@ contains
     ! ---------------------------------------------------
     
     elemental function rms(rates) result (f)
-      real :: f
-      real,intent(in) :: rates
+      
+      real             :: f
+      real, intent(in) :: rates
+      
       integer :: tmpint,local
       integer :: n0,proc,n
       integer :: avg_tile
@@ -2472,8 +2484,10 @@ contains
     ! ---------------------------------------------------
     
     subroutine equal_partition(array, distribute)
+      
       integer, intent(in)    :: array(:)
       integer, intent(inout) :: distribute(:)
+
       integer, allocatable   :: ArraySum(:)
       integer, allocatable   :: table(:,:), partition(:,:)
       integer                :: n, k, tmp_max
@@ -2548,13 +2562,12 @@ end block
   
   subroutine convert_pert_rst(pfile_name,pfile_nc4,in_path,exp_id)
     
-    implicit none
     character(*),intent(in) :: pfile_name
     character(*),intent(in) :: in_path
     character(*),intent(in) :: exp_id
     character(*),intent(in) :: pfile_nc4
     
-    integer :: N_catf,N_lon,N_lat,N_lonf,N_latf
+    integer :: N_tiles_land_f,N_lon,N_lat,N_lonf,N_latf
     integer :: N_force_pert,N_progn_pert
     integer,pointer :: f2g(:)
     
@@ -2567,7 +2580,7 @@ end block
     real,allocatable :: Force_pert_ntrmdt_f(:,:,:)
     real,allocatable :: Progn_pert_ntrmdt_f(:,:,:)
     
-    call io_domain_files('r',in_path, trim(exp_id),N_catf,f2g,tile_coord_f,pert_grid_g,pert_grid_f,RC) 
+    call io_domain_files('r',in_path, trim(exp_id),N_tiles_land_f,f2g,tile_coord_f,pert_grid_g,pert_grid_f,RC) 
 
     N_lon = pert_grid_g%N_lon
     N_lat = pert_grid_g%N_lat
@@ -2583,6 +2596,7 @@ end block
     ! ***************************************************************************
     
     subroutine i_pert_ldas(rc)
+      
       integer,intent(inout),optional :: rc
       
       integer :: nrandseed_tmp
@@ -2661,7 +2675,9 @@ end block
     ! ********************************************************************
     
     subroutine o_pert_GEOSldas(rc)
+      
       integer,intent(inout) :: rc
+
       integer :: NCFOutID, STATUS
       integer :: seeddim,latdim, londim, Nforce,NProgn
       integer :: dims(3), seedid,forceid,prognid        
@@ -2753,7 +2769,7 @@ end block
 
   ! **************************************************************************************************
   
-  subroutine LDAS_read_til_file( tile_file, catch_file, tile_grid_g, tile_coord_r, r2g, N_tiles_land_g, types )
+  subroutine LDAS_read_til_file( tile_file, catch_def_file, tile_grid_g, tile_coord_r, r2g, N_tiles_land_g, types )
     
     ! read tile information from *.til file
     !
@@ -2762,18 +2778,18 @@ end block
     !  - was known as LDAS_read_land_tile() when in LDAS_TileCoordRoutines.F90.
     !
     ! inputs:
-    !  tile_file       : *.til tile definition file (full path + name)
-    !  catch_file      : catchment.def file         (full path + name)
+    !  tile_file      : *.til tile definition file (full path + name)
+    !  catch_def_file : catchment.def file         (full path + name)
     !
     ! outputs:
-    !  tile_grid_g     : parameters of tile definition grid
-    !  tile_coord_r    : coordinates of tiles (see tile_coord_type),
-    !                    implemented as pointer which is allocated in 
-    !                    this subroutine
+    !  tile_grid_g    : parameters of tile definition grid
+    !  tile_coord_r   : coordinates of tiles (see tile_coord_type),
+    !                   implemented as pointer which is allocated in 
+    !                   this subroutine
     !
     ! optional:
-    !  r2g             : the restart domain id to the global id
-    !  N_tiles_land_g  : Number of *land* tiles in global domain
+    !  r2g            : the restart domain id to the global id
+    !  N_tiles_land_g : Number of *land* tiles in global domain
 
     ! "tile_id" is no longer read from *.til file and is now set in this 
     ! subroutine to match order of tiles in *.til file
@@ -2788,10 +2804,8 @@ end block
     !
     ! -------------------------------------------------------------
 
-    implicit none
-
     character(*),                                          intent(in)   :: tile_file
-    character(*),                                          intent(in)   :: catch_file
+    character(*),                                          intent(in)   :: catch_def_file
     type(grid_def_type),                                   intent(inout):: tile_grid_g
     type(tile_coord_type), dimension(:),           pointer              :: tile_coord_r ! out
     integer,  intent(out)                                               :: N_tiles_land_g
@@ -2895,7 +2909,7 @@ end block
     
 
     if (isNC4 ) then
-       N_tiles_land_g  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + MAPL_ExcludeFromDomain))
+       N_tiles_land_g  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + ExcludeFromDomain))
        tile_coord_r(:)%typ     = iTable(r2g, 0)
        tile_coord_r(:)%i_indg  = iTable(r2g, 2) 
        tile_coord_r(:)%j_indg  = iTable(r2g, 3)
@@ -2932,9 +2946,9 @@ end block
           read(10,'(A)')  tmpline 
           read(tmpline,*) typ
    
-          if (typ == MAPL_LAND .or. typ == MAPL_LAND + MAPL_ExcludeFromDomain) N_tiles_land_g = N_tiles_land_g + 1
+          if (typ == MAPL_LAND .or. typ == MAPL_LAND + ExcludeFromDomain) N_tiles_land_g = N_tiles_land_g + 1
    
-          ! tile type "MAPL_ExcludeFromDomain" identifies tiles to exclude
+          ! adding "ExcludeFromDomain" to tile type identifies tiles to be excluded
           !  when non-global domain is created
    
           if (any( tile_types == typ))  then  ! all needed tiles
@@ -3052,7 +3066,7 @@ end block
        tile_coord_r%pert_i_indg = nint(nodata_generic)
        tile_coord_r%pert_j_indg = nint(nodata_generic)
        tile_coord_r%elev        =      nodata_generic
-       call read_catchment_def( catch_file, N_tiles_land_g, tile_coord_r )
+       call read_catchment_def( catch_def_file, N_tiles_land_g, tile_coord_r )
        
        ! ----------------------------------------------------------------------
        !
@@ -3066,8 +3080,8 @@ end block
        
        if ( tile_coord_r(1)%typ == MAPL_LAND .and. abs(tile_coord_r(1)%elev-nodata_generic)<nodata_tol_generic ) then
           
-          i=index(catch_file,'/clsm/')
-          fname = catch_file(1:i)//'topo_DYN_ave_*.data'
+          i=index(catch_def_file,'/clsm/')
+          fname = catch_def_file(1:i)//'topo_DYN_ave_*.data'
           call Execute_command_line('ls '//trim(fname) // ' >topo_DYN_ave.file')
           open(10,file='topo_DYN_ave.file', action='read')
           fname= ''
@@ -3101,12 +3115,10 @@ end block
       
       ! reichle,  8 Dec 2011: bug fix -- bin elev data is stored in single record
       
-      implicit none
+      character(*),          intent(in)            :: fname
+      type(grid_def_type),   intent(in)            :: tile_grid
+      integer,               intent(in)            :: n_tiles
       
-      character(*),        intent(in) :: fname
-      
-      type(grid_def_type), intent(in) :: tile_grid
-      integer,             intent(in) :: n_tiles
       type(tile_coord_type), dimension(:), pointer :: tile_coord ! inout
       
       ! local variables
@@ -3157,6 +3169,7 @@ end block
     end subroutine read_grid_elev
     
     ! *******************************************************************
+    
     subroutine fix_dateline_bug_in_tilecoord( n_tiles, tile_grid, tile_coord )
       
       ! bug in com_lon and minlon/maxlon for tiles straddling the dateline
@@ -3166,8 +3179,6 @@ end block
       !
       ! reichle,  5 Feb 2008
       
-      implicit none
-     
       integer,             intent(in) :: n_tiles
  
       type(grid_def_type), intent(in) :: tile_grid
@@ -3233,7 +3244,7 @@ end block
     
     ! **********************************************************************
     
-    subroutine read_catchment_def( catchment_def_file, N_catg, tile_coord_r )
+    subroutine read_catchment_def( catch_def_file, N_tiles_land_g, tile_coord_r )
       
       ! reichle, 17 May 2011: read elevation data if available
       
@@ -3245,11 +3256,9 @@ end block
       !
       ! Elevation [m] is ONLY available for EASE grid tile definitions
       
-      implicit none
+      character(*), intent(in) :: catch_def_file
       
-      character(*), intent(in) :: catchment_def_file
-      
-      integer,      intent(in) :: N_catg
+      integer,      intent(in) :: N_tiles_land_g
       
       type(tile_coord_type), dimension(:), pointer :: tile_coord_r ! inout
       
@@ -3268,7 +3277,7 @@ end block
       ! read file header 
       
       if (logit) write (logunit,'(400A)') &
-           'read_catchment_def(): reading from' // trim(catchment_def_file)
+           'read_catchment_def(): reading from' // trim(catch_def_file)
       if (logit) write (logunit,*)
       
       ! sweep=1: Try reading 7 columns.  If this fails, try again.
@@ -3278,12 +3287,12 @@ end block
          
          if (logit) write (logunit,*) 'starting sweep ', sweep
          
-         open (10, file=trim(catchment_def_file), form='formatted', action='read') 
+         open (10, file=trim(catch_def_file), form='formatted', action='read') 
          
          read (10,*) N_land_tile
          
-         if ( N_land_tile /= N_catg) then
-            err_msg = 'tile_coord_file and catchment_def_file mismatch. (1)'
+         if ( N_land_tile /= N_tiles_land_g) then
+            err_msg = 'tile_coord_file and catch_def_file mismatch. (1)'
             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
          endif
 
@@ -3325,7 +3334,7 @@ end block
                tile_coord_r(k)%max_lat = max_lat
                tile_coord_r(k)%elev    = elev
                if (tile_coord_r(k)%pfaf_index   /=tmp_pfaf) then
-                  err_msg = 'tile_coord_file and catchment_def_file mismatch. (2)'
+                  err_msg = 'tile_coord_file and catch_def_file mismatch. (2)'
                   call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
                endif
                k = k + 1
