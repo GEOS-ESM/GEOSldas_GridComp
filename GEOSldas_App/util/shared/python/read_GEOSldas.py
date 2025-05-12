@@ -1,7 +1,12 @@
+
+# collection of readers for GEOSldas output files
+
 import numpy as np
 import struct
 import os
 import numpy as np
+
+# ----------------------------------------------------------------------------
 
 def read_obs_param(fname):
     print(f"Reading {fname}")
@@ -12,51 +17,51 @@ def read_obs_param(fname):
         obs_param = []
         for _ in range(N_obs_param):
             param = {}
-            param['descr'] = fid.readline().strip().strip('"')
-            param['species'] = float(fid.readline().strip())
-            param['orbit'] = float(fid.readline().strip())
-            param['pol'] = float(fid.readline().strip())
-            param['N_ang'] = int(float(fid.readline().strip()))
+            param['descr']          =       fid.readline().strip().strip('"')
+            param['species']        = float(fid.readline().strip())
+            param['orbit']          = float(fid.readline().strip())
+            param['pol']            = float(fid.readline().strip())
 
-            param['ang'] = np.array([float(x) for x in fid.readline().split()])
+            param['N_ang']          = int(float(fid.readline().strip()))
 
-            param['freq'] = float(fid.readline().strip())
-            param['FOV'] = float(fid.readline().strip())
-            param['FOV_units'] = fid.readline().strip().strip('"')
-            param['assim'] = fid.readline().strip()
-            param['scale'] = fid.readline().strip()
-            param['getinnov'] = fid.readline().strip()
-            param['RTM_ID'] = float(fid.readline().strip())
-            param['bias_Npar'] = float(fid.readline().strip())
-            param['bias_trel'] = float(fid.readline().strip())
-            param['bias_tcut'] = float(fid.readline().strip())
-            param['nodata'] = float(fid.readline().strip())
-            param['varname'] = fid.readline().strip().strip('"')
-            param['units'] = fid.readline().strip().strip('"')
-            param['path'] = fid.readline().strip().strip('"')
-            param['name'] = fid.readline().strip().strip('"')
+            param['ang']            = np.array([float(x) for x in fid.readline().split()])
 
-            #if 'Vv80' in fname or 'OL80' in fname:
-            fid.readline()  # Skip two lines
-            fid.readline()
-
-            param['scalepath'] = fid.readline().strip().strip('"')
-            param['scalename'] = fid.readline().strip().strip('"')
-            param['flistpath'] = fid.readline().strip().strip('"')
-            param['flistname'] = fid.readline().strip().strip('"')
-            param['errstd'] = float(fid.readline().strip())
+            param['freq']           = float(fid.readline().strip())
+            param['FOV']            = float(fid.readline().strip())
+            param['FOV_units']      =       fid.readline().strip().strip('"')
+            param['assim']          =       fid.readline().strip()
+            param['scale']          =       fid.readline().strip()
+            param['getinnov']       =       fid.readline().strip()
+            param['RTM_ID']         = float(fid.readline().strip())
+            param['bias_Npar']      = float(fid.readline().strip())
+            param['bias_trel']      = float(fid.readline().strip())
+            param['bias_tcut']      = float(fid.readline().strip())
+            param['nodata']         = float(fid.readline().strip())
+            param['varname']        =       fid.readline().strip().strip('"')
+            param['units']          =       fid.readline().strip().strip('"')
+            param['path']           =       fid.readline().strip().strip('"')
+            param['name']           =       fid.readline().strip().strip('"')
+            param['maskpath']       =       fid.readline().strip().strip('"')
+            param['maskname']       =       fid.readline().strip().strip('"')
+            param['scalepath']      =       fid.readline().strip().strip('"')
+            param['scalename']      =       fid.readline().strip().strip('"')
+            param['flistpath']      =       fid.readline().strip().strip('"')
+            param['flistname']      =       fid.readline().strip().strip('"')
+            param['errstd']         = float(fid.readline().strip())
             param['std_normal_max'] = float(fid.readline().strip())
-            param['zeromean'] = fid.readline().strip()
-            param['coarsen_pert'] = fid.readline().strip()
-            param['xcorr'] = float(fid.readline().strip())
-            param['ycorr'] = float(fid.readline().strip())
-            param['adapt'] = float(fid.readline().strip())
+            param['zeromean']       =       fid.readline().strip()
+            param['coarsen_pert']   =       fid.readline().strip()
+            param['xcorr']          = float(fid.readline().strip())
+            param['ycorr']          = float(fid.readline().strip())
+            param['adapt']          = float(fid.readline().strip())
 
             obs_param.append(param)
 
     print(f"Done reading obs_param for {N_obs_param} species")
 
     return obs_param
+
+# ----------------------------------------------------------------------------
 
 def read_tilecoord(fname):
     int_precision = 'i'
@@ -77,8 +82,8 @@ def read_tilecoord(fname):
         Nt = tile_coord['N_tile']
 
         fields = ['tile_id', 'typ', 'pfaf', 'com_lon', 'com_lat', 'min_lon', 'max_lon',
-                      'min_lat', 'max_lat', 'i_indg', 'j_indg', 'frac_cell', 'frac_pfaf',
-                      'area', 'elev']
+                  'min_lat', 'max_lat', 'i_indg', 'j_indg', 'frac_cell', 'frac_pfaf',
+                  'area', 'elev']
 
         for field in fields:
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
@@ -88,6 +93,8 @@ def read_tilecoord(fname):
 
     print("done reading file")
     return tile_coord
+
+# ----------------------------------------------------------------------------
 
 def read_ObsFcstAna(fname, isLDASsa=False):
 
@@ -222,3 +229,4 @@ def read_ObsFcstAna(fname, isLDASsa=False):
             'obs_ana': obs_ana, 
             'obs_anavar': obs_anavar}
 
+# ================ EOF =================================================

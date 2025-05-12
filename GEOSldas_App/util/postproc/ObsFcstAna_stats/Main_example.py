@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 """
-Sample script for computing/plotting GEOSldas Data Assimilation (DA) Diagnostics
-
-This script computes and plots DA diagnostic maps from ObsFcstAna output.
+Sample script for computing/plotting data assimilation (DA) diagnostics from 
+GEOSldas ObsFcstAna output.
 
 Processing workflow:
-1. User provides experiment information and calls ObsFcstAna_prep to:
+1. User provides experiment information and calls postproc_ObsFcstAna to:
    - Calculate/save monthly sums of Obs/Fcst/Ana and squared/products
    - Calculate mean/stdv of Obs/Fcst/Ana
 2. User computes desired DA diagnostic statistics and creates plots
@@ -36,18 +35,18 @@ from mpl_toolkits.basemap import Basemap
 from read_GEOSldas import read_tilecoord, read_obs_param
 from util import make_folder, array2grid
 from plot import plotMap
-from easev2 import easev2_ind2latlon
+from EASEv2 import EASEv2_ind2latlon
 
-from ObsFcstAna_prep import obsfcstana_prep
+from postproc_ObsFcstAna import postproc_ObsFcstAna
 
 # Uncomment if to run the script in the background to see the standard output while running 
 # import io
 #sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
 #sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
 
-# Define time range for processing
+# Define time range for processing (Year, Month, Day [must be 1])
 start_time = datetime(2015,4,1)
-end_time = datetime(2016,4,1)
+end_time   = datetime(2016,4,1)
 
 # -------------------------------- Experiments Information -----------------------------------------
 # Supports single or multiple experiments;
@@ -57,13 +56,13 @@ end_time = datetime(2016,4,1)
 # This capability is required to enable calculating OmF/OmA statistics for one experiment
 # using observations from another experiment. See note below.
 
-exp_1 = { 'expdir' : '//gpfsm/dnb05/projects/p15/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
+exp_1 = { 'expdir' : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
                     'expid' : 'DAv8_SMOSSMAP',
                     'exptag': 'DAMulti_SMAP', 
                     'domain':  'SMAP_EASEv2_M36_GLOBAL',
                     'species_list': [5,6,7,8] }
 
-exp_2 = { 'expdir' : '//gpfsm/dnb05/projects/p15/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
+exp_2 = { 'expdir' : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
                     'expid' : 'DAv8_M36',
                     'exptag': 'DASMAP_SMAP', 
                     'domain':  'SMAP_EASEv2_M36_GLOBAL',
@@ -120,16 +119,16 @@ else:
               end_time.strftime('%Y%m%d')+'.nc4'
 
 #  =========================================================================
-#  Prepocess raw ObsFcstAna output data into monthly sums for simpler and faster postprocessing;
+#  Postprocess raw ObsFcstAna output data into monthly sums for simpler and faster postprocessing;
 #  computes mean, vairance from monthly sums that can be used to compute DA diagnostics directly
 
 if not os.path.isfile(stats_file):
-    # Initialize the preprocess object
-    prep = obsfcstana_prep(exp_list, start_time, end_time,obs_from=obs_from)
-    # Step 1: Computer and save monthly sums 
-    prep.save_monthly_sum(out_path_mo)
+    # Initialize the postprocessing object
+    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, obs_from=obs_from)
+    # Step 1: Compute and save monthly sums 
+    postproc.save_monthly_sum(out_path_mo)
     # Step 2: Compute statistics from monthly sums, option to save result to file
-    stats = prep.calculate_stats_fromsums(mo_path=out_path_mo, write_to_nc=True, filename=stats_file)
+    stats = postproc.calculate_stats_fromsums(mo_path=out_path_mo, write_to_nc=True, filename=stats_file)
 else:
     print('reading stats nc4 file '+stats_file)
     stats = {}
@@ -235,17 +234,17 @@ for i in np.arange(2):
             if 'normalized' in title_txt:
                 wabsmean = np.nanmean(np.abs(grid_data-1.))
                 
-            lat_M36, lon_M36 = easev2_ind2latlon(np.arange(406), np.arange(964),'M36')
+            lat_M36, lon_M36 = EASEv2_ind2latlon(np.arange(406), np.arange(964),'M36')
             lon_2d,lat_2d = np.meshgrid(lon_M36,lat_M36)
         else:
-            grid_data, uy,ux = array2grid(tile_data, lat = tc['com_lat'], lon = tc['com_lon'])
+            grid_data, uy, ux = array2grid(tile_data, lat = tc['com_lat'], lon = tc['com_lon'])
             lon_2d,lat_2d = np.meshgrid(ux, uy)
 
             # Aear weighted mean and mean(abs)
-            wmean = np.nansum(tile_data * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
-            wabsmean = np.nansum(np.abs(tile_data) * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
+            wmean    =     np.nansum(       tile_data     * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
+            wabsmean =     np.nansum(np.abs(tile_data)    * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
             if 'normalized' in title_txt:
-                wabsmean = np.nansum(np.abs(tile_data-1.)*tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
+                wabsmean = np.nansum(np.abs(tile_data-1.) * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
                 
         if 'normalized' in title_txt:
             title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (wmean, wabsmean)+' '+units
@@ -272,7 +271,7 @@ plt.close(fig)
 #  ==========================================================================
 #  Examples of calculating monthly OmF etc statistics from previously generated monthly sums
 #  i.e.     # Step 1: Computer and save monthly sums 
-#           prep.save_monthly_sum(out_path_mo)
+#           postproc.save_monthly_sum(out_path_mo)
 #  has already been run succesfully
 #  ==========================================================================
 
@@ -283,10 +282,10 @@ plt.close(fig)
 omf_stats_file  = stats_file.replace('tmp_stats','tmp_omf_stats')
 
 if not os.path.isfile(omf_stats_file):
-    # Initialize the preprocess object
-    prep = obsfcstana_prep(exp_list, start_time, end_time,obs_from=obs_from)
+    # Initialize the postprocessing object
+    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, obs_from=obs_from)
 
-    omf_stats = prep.calculate_monthly_omf(mo_path=out_path_mo, write_to_nc=True, filename=omf_stats_file)
+    omf_stats = postproc.calculate_monthly_omf(mo_path=out_path_mo, write_to_nc=True, filename=omf_stats_file)
 else:
     print('reading omf stats nc4 file '+omf_stats_file)
     omf_stats = {}
@@ -341,9 +340,9 @@ sensor_groups = {k:v for k,v in {
 }.items() if v}
 
 if not os.path.isfile(omf_grouped_stats_file):
-    # Initialize the preprocess object
-    prep = obsfcstana_prep(exp_list, start_time, end_time,obs_from=obs_from)     
-    omf_stats_by_sensor = prep.calculate_monthly_omf_by_sensor(sensor_groups, mo_path=out_path_mo, write_to_nc=True, filename=omf_grouped_stats_file)
+    # Initialize the postprocessing object
+    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, obs_from=obs_from)     
+    omf_stats_by_sensor = postproc.calculate_monthly_omf_by_sensor(sensor_groups, mo_path=out_path_mo, write_to_nc=True, filename=omf_grouped_stats_file)
 else:
     print('reading omf grouped stats nc4 file '+omf_grouped_stats_file)
     omf_stats_by_sensor = {}
@@ -403,3 +402,5 @@ fig.savefig(out_path+'Monthly_sensor_OmF_'+ expid +'_'+start_time.strftime('%Y%m
                     end_time.strftime('%Y%m')+'.png')
 plt.show()
 plt.close(fig)
+
+# ====================== EOF =========================================================

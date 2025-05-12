@@ -1,41 +1,49 @@
+
+# Tool to prepocess GEOSldas ObsFcstAna output into monthly sums, sums of squares, and sum of cross-products
+#
+# qliu, amfox, rreichle - May 2025
+
 import numpy as np
 import os
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from netCDF4 import  Dataset, date2num
 import sys
+
 sys.path.append('../../shared/python/')
 
-from util import make_folder
+from util                         import make_folder
 from helper.compute_monthly_stats import compute_monthly_stats
-from helper.write_nc4 import write_sums_nc4, write_stats_nc4, write_omf_stats_nc4, write_omf_grouped_stats_nc4
+from helper.write_nc4             import write_sums_nc4, write_stats_nc4, write_omf_stats_nc4, write_omf_grouped_stats_nc4
 
 import warnings; warnings.filterwarnings("ignore")
 
-class obsfcstana_prep:
+class postproc_ObsFcstAna:
     
     def __init__(self, exp_list, start_time, end_time, obs_from=0):
-        self.expdir_list = [item['expdir'] for item in exp_list]
-        self.expid_list = [item['expid'] for item in exp_list]
-        self.exptag_list = [item['exptag'] for item in exp_list]
-        self.domain   = exp_list[0]['domain']
-        self.start_time = start_time 
-        self.end_time = end_time 
-        self.var_list = ['obs_obs', 'obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
-        self.tilecoord = exp_list[0]['tilecoord']
+        self.expdir_list   = [item['expdir'] for item in exp_list]
+        self.expid_list    = [item['expid']  for item in exp_list]
+        self.exptag_list   = [item['exptag'] for item in exp_list]
+        self.domain        = exp_list[0]['domain']
+        self.start_time    = start_time 
+        self.end_time      = end_time 
+        self.var_list      = ['obs_obs','obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
+        self.tilecoord     = exp_list[0]['tilecoord']
         self.obsparam_list = [item['obsparam'] for item in exp_list]
-        self.obs_from = obs_from
+        self.obs_from      = obs_from
 
+    # ---------------------------------------------------------------------------
+        
     def save_monthly_sum(self, outpath='./'):
-        expdir_list  = self.expdir_list
-        expid_list = self.expid_list
-        exptag_list = self.exptag_list
-        domain = self.domain
-        var_list = self.var_list
-        tc = self.tilecoord
+        expdir_list   = self.expdir_list
+        expid_list    = self.expid_list
+        exptag_list   = self.exptag_list
+        domain        = self.domain
+        var_list      = self.var_list
+        tc            = self.tilecoord
         obsparam_list = self.obsparam_list
-        start_time = self.start_time
-        end_time = self.end_time
+        start_time    = self.start_time
+        end_time      = self.end_time
 
         start_month =  start_time.replace(day=1,hour=3)
         if end_time.day ==1:
@@ -87,11 +95,13 @@ class obsfcstana_prep:
                 print('file exist, skip '+fout)
                 
             current_month = current_month + relativedelta(months=1)      
-        
+
+    # ---------------------------------------------------------------------------
+            
     def calculate_stats_fromsums(self, mo_path='./', write_to_nc=True, filename='./stats.nc4'):
         
-        start_time = self.start_time
-        end_time = self.end_time
+        start_time  = self.start_time
+        end_time    = self.end_time
         exptag_list = self.exptag_list
         
         # Variable list for computing sum and sum of squared
@@ -102,9 +112,9 @@ class obsfcstana_prep:
         n_spec = len(self.obsparam_list[0])
 
         # Initialize statistical metrics 
-        data_sum = {}
+        data_sum  = {}
         data2_sum = {}
-        N_data = np.zeros((n_tile, n_spec))
+        N_data  = np.zeros((n_tile, n_spec))
         oxf_sum = np.zeros((n_tile, n_spec))
         oxa_sum = np.zeros((n_tile, n_spec))
         fxa_sum = np.zeros((n_tile, n_spec))
@@ -154,7 +164,7 @@ class obsfcstana_prep:
                 mdata_sum = {}
                 mdata2_sum = {}
                 with Dataset(fout,'r') as nc:
-                    mN_data = nc.variables['N_data'][:]
+                    mN_data  = nc.variables['N_data'][:]
                     moxf_sum = nc.variables['obsxfcst_sum'][:]
                     moxa_sum = nc.variables['obsxana_sum'][:]
                     mfxa_sum = nc.variables['fcstxana_sum'][:]
@@ -163,7 +173,7 @@ class obsfcstana_prep:
                         mdata2_sum[var] = nc.variables[var+'2_sum'][:]
                        
                 # Aggregate monthly data
-                N_data += mN_data
+                N_data  += mN_data
                 oxf_sum += moxf_sum
                 oxa_sum += moxa_sum
                 fxa_sum += mfxa_sum
@@ -177,19 +187,19 @@ class obsfcstana_prep:
             current_month =current_month + relativedelta(months=1)
 
         # Compute the basic statistics after finishing time loop based on the accumulated data.
-        data_mean ={}
+        data_mean  = {}
         data2_mean = {}
-        data_var = {}
+        data_var   = {}
 
         # calculation  
         for var in var_list:
-            data_sum[var][N_data == 0] = np.nan
+            data_sum[var][ N_data == 0] = np.nan
             data2_sum[var][N_data == 0] = np.nan
             
-            data_mean[var]  = data_sum[var] / N_data
-            data2_mean[var] = data2_sum[var] /N_data
+            data_mean[ var] = data_sum[var]  / N_data
+            data2_mean[var] = data2_sum[var] / N_data
             # var(x) = E[x2] - (E[x])^2
-            data_var[var] = data2_mean[var] - data_mean[var]**2
+            data_var[var]   = data2_mean[var] - data_mean[var]**2
             
         oxf_sum[N_data == 0] = np.nan
         oxa_sum[N_data == 0] = np.nan
@@ -201,12 +211,12 @@ class obsfcstana_prep:
 
         stats = {}
         for var in var_list:
-            stats[var[4:]+'_mean']= data_mean[var]
-            stats[var[4:]+'_variance'] = data_var[var]
+            stats[var[4:]+'_mean']     = data_mean[var]
+            stats[var[4:]+'_variance'] = data_var[ var]
         stats['oxf_mean'] = oxf_mean
         stats['oxa_mean'] = oxa_mean
         stats['fxa_mean'] = fxa_mean
-        stats['N_data'] = N_data
+        stats['N_data']   = N_data
 
         if write_to_nc:
             print('writing stats nc4 file: '+filename)
@@ -214,7 +224,8 @@ class obsfcstana_prep:
             
         return stats
 
-
+    # ---------------------------------------------------------------------------
+    
     def calculate_monthly_omf(self, mo_path='./', write_to_nc=True, filename='./omf_stats.nc4'):
         """
         Compute monthly observation-minus-forecast (OmF) and observation-minus-analysis (OmA) 
@@ -250,10 +261,10 @@ class obsfcstana_prep:
                 - 'time'              : List of datetime objects for each month
         """
 
-        start_time = self.start_time
-        end_time = self.end_time
+        start_time  = self.start_time
+        end_time    = self.end_time
         exptag_list = self.exptag_list
-        var_list = self.var_list  # variables to sum/sum-of-squares
+        var_list    = self.var_list  # variables to sum/sum-of-squares
 
         Nmin = 5
 
@@ -301,11 +312,11 @@ class obsfcstana_prep:
 
             # Load monthly accumulators
             with Dataset(fout, 'r') as nc:
-                N_data = nc.variables['N_data'][:]
-                oxf_sum = nc.variables['obsxfcst_sum'][:]
-                oxa_sum = nc.variables['obsxana_sum'][:]
-                fxa_sum = nc.variables['fcstxana_sum'][:]
-                data_sum = {var: nc.variables[var + '_sum'][:] for var in var_list}
+                N_data    = nc.variables['N_data'][:]
+                oxf_sum   = nc.variables['obsxfcst_sum'][:]
+                oxa_sum   = nc.variables['obsxana_sum'][:]
+                fxa_sum   = nc.variables['fcstxana_sum'][:]
+                data_sum  = {var: nc.variables[var + '_sum'][:] for var in var_list}
                 data2_sum = {var: nc.variables[var + '2_sum'][:] for var in var_list}
 
             # Compute the basic statistics after finishing time loop based on the accumulated data.
@@ -315,13 +326,13 @@ class obsfcstana_prep:
 
             # calculation  
             for var in var_list:
-                data_sum[var][N_data == 0] = np.nan
+                data_sum[var][ N_data == 0] = np.nan
                 data2_sum[var][N_data == 0] = np.nan
 
-                data_mean[var]  = data_sum[var] / N_data
-                data2_mean[var] = data2_sum[var] /N_data
+                data_mean[var]  = data_sum[var]  / N_data
+                data2_mean[var] = data2_sum[var] / N_data
                 # var(x) = E[x2] - (E[x])^2
-                data_var[var] = data2_mean[var] - data_mean[var]**2
+                data_var[var]   = data2_mean[var] - data_mean[var]**2
 
             oxf_sum[N_data == 0] = np.nan
             oxa_sum[N_data == 0] = np.nan
@@ -338,7 +349,7 @@ class obsfcstana_prep:
             stats['oxf_mean'] = oxf_mean
             stats['oxa_mean'] = oxa_mean
             stats['fxa_mean'] = fxa_mean
-            stats['N_data'] = N_data
+            stats['N_data']   = N_data
 
             # Then computer metrics of O-F, O-A, etc. based on above computed
             N_data = stats['N_data']
@@ -360,21 +371,21 @@ class obsfcstana_prep:
 
             # Mask out data points with insufficent observations using the Nmin threshold
             # Do NOT apply to N_data
-            OmF_mean[N_data < Nmin] = np.nan
-            OmF_stdv[N_data < Nmin] = np.nan
+            OmF_mean[     N_data < Nmin] = np.nan
+            OmF_stdv[     N_data < Nmin] = np.nan
             OmF_norm_mean[N_data < Nmin] = np.nan
             OmF_norm_stdv[N_data < Nmin] = np.nan
-            OmA_mean[N_data < Nmin] = np.nan
-            OmA_stdv[N_data < Nmin] = np.nan
+            OmA_mean[     N_data < Nmin] = np.nan
+            OmA_stdv[     N_data < Nmin] = np.nan
 
             omf_stats = {
-                'N_data': N_data,
-                'OmF_mean': OmF_mean,
-                'OmF_stdv': OmF_stdv,
+                'N_data':        N_data,
+                'OmF_mean':      OmF_mean,
+                'OmF_stdv':      OmF_stdv,
                 'OmF_norm_mean': OmF_norm_mean,
                 'OmF_norm_stdv': OmF_norm_stdv,
-                'OmA_mean': OmA_mean,
-                'OmA_stdv': OmA_stdv
+                'OmA_mean':      OmA_mean,
+                'OmA_stdv':      OmA_stdv
             }
 
             # Store into combined container
@@ -395,7 +406,8 @@ class obsfcstana_prep:
 
         return omf_stats_combined
 
-
+    # ---------------------------------------------------------------------------
+    
     def calculate_monthly_omf_by_sensor(self, sensor_groups, mo_path='./', write_to_nc=True, filename='./omf_group_stats.nc4'):
         
         """
@@ -417,10 +429,10 @@ class obsfcstana_prep:
         """        
        
         # Setup
-        start_time = self.start_time
-        end_time = self.end_time
+        start_time  = self.start_time
+        end_time    = self.end_time
         exptag_list = self.exptag_list
-        var_list = self.var_list
+        var_list    = self.var_list
 
         Nmin = 10
 
@@ -457,10 +469,10 @@ class obsfcstana_prep:
 
             # Load monthly accumulators
             with Dataset(fout, 'r') as nc:
-                N_data = nc.variables['N_data'][:]
-                oxf_sum = nc.variables['obsxfcst_sum'][:]
-                oxa_sum = nc.variables['obsxana_sum'][:]
-                data_sum = {var: nc.variables[var + '_sum'][:] for var in var_list}
+                N_data    = nc.variables['N_data'][:]
+                oxf_sum   = nc.variables['obsxfcst_sum'][:]
+                oxa_sum   = nc.variables['obsxana_sum'][:]
+                data_sum  = {var: nc.variables[var + '_sum'][:] for var in var_list}
                 data2_sum = {var: nc.variables[var + '2_sum'][:] for var in var_list}
 
             # --- Group-level analysis only ---
@@ -469,9 +481,9 @@ class obsfcstana_prep:
                 N_group[N_group == 0] = np.nan
 
                 # Mean and variance
-                mean = {var[4:]: np.sum(data_sum[var][:, indices], axis=1) / N_group for var in var_list}
+                mean  = {var[4:]: np.sum(data_sum[var][:, indices], axis=1) / N_group for var in var_list}
                 mean2 = {var[4:]: np.sum(data2_sum[var][:, indices], axis=1) / N_group for var in var_list}
-                var_ = {var[4:]: mean2[var[4:]] - mean[var[4:]]**2 for var in var_list}
+                var_  = {var[4:]: mean2[var[4:]] - mean[var[4:]]**2 for var in var_list}
 
                 # Covariance terms
                 oxf_mean = np.sum(oxf_sum[:, indices], axis=1) / N_group
@@ -489,21 +501,21 @@ class obsfcstana_prep:
 
                 # Mask out data points with insufficent observations using the Nmin threshold
                 # Do NOT apply to N_data
-                OmF_mean[N_group < Nmin] = np.nan
-                OmF_stdv[N_group < Nmin] = np.nan
-                OmA_mean[N_group < Nmin] = np.nan
-                OmA_stdv[N_group < Nmin] = np.nan
+                OmF_mean[     N_group < Nmin] = np.nan
+                OmF_stdv[     N_group < Nmin] = np.nan
+                OmA_mean[     N_group < Nmin] = np.nan
+                OmA_stdv[     N_group < Nmin] = np.nan
                 OmF_norm_mean[N_group < Nmin] = np.nan
                 OmF_norm_stdv[N_group < Nmin] = np.nan
 
                 # Aggregate monthly data
-                group_combined[group]['N_data'].append(N_group)
-                group_combined[group]['OmF_mean'].append(OmF_mean)
-                group_combined[group]['OmF_stdv'].append(OmF_stdv)
+                group_combined[group]['N_data'       ].append(N_group)
+                group_combined[group]['OmF_mean'     ].append(OmF_mean)
+                group_combined[group]['OmF_stdv'     ].append(OmF_stdv)
                 group_combined[group]['OmF_norm_mean'].append(OmF_norm_mean)
                 group_combined[group]['OmF_norm_stdv'].append(OmF_norm_stdv)
-                group_combined[group]['OmA_mean'].append(OmA_mean)
-                group_combined[group]['OmA_stdv'].append(OmA_stdv)
+                group_combined[group]['OmA_mean'     ].append(OmA_mean)
+                group_combined[group]['OmA_stdv'     ].append(OmA_stdv)
 
             month_list.append(current_month)
             current_month += relativedelta(months=1)
@@ -521,3 +533,5 @@ class obsfcstana_prep:
             write_omf_grouped_stats_nc4(filename, group_stats)
 
         return group_stats
+
+# ============== EOF ====================================================================

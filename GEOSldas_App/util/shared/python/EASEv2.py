@@ -61,7 +61,7 @@ import numpy as np
 #  Steven Chan, 11/2011
 #  Email: steven.k.chan@jpl.nasa.gov
     
-def easev2_ind2latlon(row=None,col=None,gridid=None,*args,**kwargs):
+def EASEv2_ind2latlon(row=None,col=None,gridid=None,*args,**kwargs):
 
     # Constants returned by EASE2_GRID_INFO.PRO
     projection=gridid[0]
@@ -196,3 +196,4 @@ def easev2_ind2latlon(row=None,col=None,gridid=None,*args,**kwargs):
             
     return lat, lon        
     
+# ============= EOF ============================================
