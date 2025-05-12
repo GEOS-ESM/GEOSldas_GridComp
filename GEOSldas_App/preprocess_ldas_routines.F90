@@ -165,7 +165,7 @@ contains
          exclude_file,include_file
     
     inquire(file=trim(orig_tile),exist=file_exist)
-    if( .not. file_exist) stop("original tile file does not exist")
+    if( .not. file_exist) stop ("original tile file does not exist")
     
     inquire(file=trim(domain_def),exist=d_exist)
     if( .not. d_exist) then
