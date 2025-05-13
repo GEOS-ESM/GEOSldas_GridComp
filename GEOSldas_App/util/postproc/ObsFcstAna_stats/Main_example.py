@@ -20,70 +20,71 @@ Usage on Discover:
 Author: Q. Liu
 Last Modified: Apr., 2025
 """
-import sys
-sys.path.append('../../shared/python/')
-import warnings; warnings.filterwarnings("ignore")
+
+import sys;       sys.path.append('../../shared/python/')
+import warnings;  warnings.filterwarnings("ignore")
 import os
 
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
-import numpy as np
-from netCDF4 import Dataset, num2date
+import numpy             as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
 
-from read_GEOSldas import read_tilecoord, read_obs_param
-from util import make_folder, array2grid
-from plot import plotMap
-from EASEv2 import EASEv2_ind2latlon
+from datetime               import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from netCDF4                import Dataset, num2date
+from mpl_toolkits.basemap   import Basemap
 
-from postproc_ObsFcstAna import postproc_ObsFcstAna
+from read_GEOSldas          import read_tilecoord, read_obs_param
+from util                   import make_folder, array2grid
+from plot                   import plotMap
+from EASEv2                 import EASEv2_ind2latlon
+
+from postproc_ObsFcstAna    import postproc_ObsFcstAna
 
 # Uncomment if to run the script in the background to see the standard output while running 
 # import io
 #sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
 #sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
 
-# Define time range for processing (Year, Month, Day [must be 1])
+# Define time range for processing (Year, Month, Day)
 start_time = datetime(2015,4,1)
 end_time   = datetime(2016,4,1)
 
 # -------------------------------- Experiments Information -----------------------------------------
-# Supports single or multiple experiments;
-# multiple require identical tilecoords and numbe/order of observation species
-# if the default "species" number/order don't match, need to set the *optional*
-# "select_species" key to get a match, i.e. same species sequences
+# Supports single experiment or multiple experiments.
+# All experiments must have identical tilecoords and number/order of observation species.
+# If the default "species" number/order do not match, need to set the *optional*
+#   "select_species" key to get a match, i.e. same species sequences.
 # This capability is required to enable calculating OmF/OmA statistics for one experiment
-# using observations from another experiment. See note below.
+#   using observations from another experiment. See note below.
 
-exp_1 = { 'expdir' : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
-                    'expid' : 'DAv8_SMOSSMAP',
-                    'exptag': 'DAMulti_SMAP', 
-                    'domain':  'SMAP_EASEv2_M36_GLOBAL',
-                    'species_list': [5,6,7,8] }
+exp_1 = { 'expdir'       : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
+          'expid'        : 'DAv8_SMOSSMAP',
+          'exptag'       : 'DAMulti_SMAP', 
+          'domain'       : 'SMAP_EASEv2_M36_GLOBAL',
+          'species_list' : [5,6,7,8] }
 
-exp_2 = { 'expdir' : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
-                    'expid' : 'DAv8_M36',
-                    'exptag': 'DASMAP_SMAP', 
-                    'domain':  'SMAP_EASEv2_M36_GLOBAL',
-                    'species_list': [1,2,3,4]  }
+exp_2 = { 'expdir'       : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
+          'expid'        : 'DAv8_M36',
+          'exptag'       : 'DASMAP_SMAP', 
+          'domain'       : 'SMAP_EASEv2_M36_GLOBAL',
+          'species_list' : [1,2,3,4]  }
 
-# Uses forecasts/analyses from first experiment in list;
-# observations from experiment specified by 'obs_from' parameter.
+# Uses forecasts/analyses from first experiment in list.
+# Observations from experiment specified by 'obs_from' index.
 # The mostly likely use case for this is that _scaled_ observations from a DA experiment
-# are used to compute OmF etc diagnostics for a corresponding open loop experiment.
+#   are used to compute OmF etc diagnostics for a corresponding open loop experiment.
 
 exp_list = [exp_1, exp_2]
-obs_from = 1 # obs is from "exp_2"
+obs_from = 1                            # obs is from "exp_2" (0-based indexing)
 if obs_from >= len(exp_list):
     raise ValueError('Invalid "obs_from" value')
 
 # Add tilecoord and obs_param information to each experiment
 for exp in exp_list:
-    expdir = exp['expdir']
-    expid = exp['expid']
-    domain = exp['domain']
-    fop = expdir+expid+'/output/'+domain+'/rc_out/Y2015/M04/'+expid+'.ldas_obsparam.20150401_0000z.txt'
+    expdir   = exp['expdir']
+    expid    = exp['expid']
+    domain   = exp['domain']
+    fop      = expdir+expid+'/output/'+domain+'/rc_out/Y2015/M04/'+expid+'.ldas_obsparam.20150401_0000z.txt'
     obsparam = read_obs_param(fop)
 
     # get the species list and default to list of all species if doesn't exist 
@@ -116,11 +117,11 @@ if len(exp_list) >1 :
                   end_time.strftime('%Y%m%d')+'.nc4'
 else:
     stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
-              end_time.strftime('%Y%m%d')+'.nc4'
+                  end_time.strftime('%Y%m%d')+'.nc4'
 
 #  =========================================================================
 #  Postprocess raw ObsFcstAna output data into monthly sums for simpler and faster postprocessing;
-#  computes mean, vairance from monthly sums that can be used to compute DA diagnostics directly
+#  computes mean, variance from monthly sums that can be used to compute DA diagnostics directly
 
 if not os.path.isfile(stats_file):
     # Initialize the postprocessing object
@@ -128,7 +129,7 @@ if not os.path.isfile(stats_file):
     # Step 1: Compute and save monthly sums 
     postproc.save_monthly_sum(out_path_mo)
     # Step 2: Compute statistics from monthly sums, option to save result to file
-    stats = postproc.calculate_stats_fromsums(mo_path=out_path_mo, write_to_nc=True, filename=stats_file)
+    stats = postproc.calculate_stats_from_sums(mo_path=out_path_mo, write_to_nc=True, filename=stats_file)
 else:
     print('reading stats nc4 file '+stats_file)
     stats = {}
@@ -151,10 +152,10 @@ OmA_mean = stats['obs_mean'] - stats['ana_mean']
 # var(x-y) = var(x) + var(y) - 2cov(x,y)
 # cov(x,y) = E[xy] - E[x]E[y]
 OmF_stdv  = np.sqrt(stats['obs_variance'] + stats['fcst_variance'] - \
-                       2 * (stats['oxf_mean'] - stats['obs_mean']*stats['fcst_mean']))
+                    2 * (stats['oxf_mean'] - stats['obs_mean']*stats['fcst_mean']))
                     
 OmA_stdv  = np.sqrt(stats['obs_variance'] + stats['ana_variance'] - \
-                       2 * (stats['oxa_mean'] - stats['obs_mean']*stats['ana_mean']))
+                    2 * (stats['oxa_mean'] - stats['obs_mean']*stats['ana_mean']))
 
  # "fcstvar" is assumed constant here for convenience. Modify if necessary
 OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean']) 
@@ -162,21 +163,21 @@ OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mea
   
 # Mask out data points with insufficent observations using the Nmin threshold
 # Do NOT apply to N_data
-OmF_mean[N_data < Nmin] = np.nan
-OmF_stdv[N_data < Nmin] = np.nan
+OmF_mean[     N_data < Nmin] = np.nan
+OmF_stdv[     N_data < Nmin] = np.nan
 OmF_norm_mean[N_data < Nmin] = np.nan
 OmF_norm_stdv[N_data < Nmin] = np.nan
-OmA_mean[N_data < Nmin] = np.nan
-OmA_stdv[N_data < Nmin] = np.nan
+OmA_mean[     N_data < Nmin] = np.nan
+OmA_stdv[     N_data < Nmin] = np.nan
 
 # Combine metrics of individual species using weighted averaging
-OmF_mean = np.nansum(OmF_mean*N_data, axis=1)/np.nansum(N_data,axis=1)
-OmF_stdv = np.nansum(OmF_stdv*N_data,axis=1)/np.nansum(N_data,axis=1)
+OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/np.nansum(N_data,axis=1)
+OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/np.nansum(N_data,axis=1)
 OmF_norm_mean = np.nansum(OmF_norm_mean*N_data, axis=1)/np.nansum(N_data,axis=1)
-OmF_norm_stdv = np.nansum(OmF_norm_stdv*N_data,axis=1)/np.nansum(N_data,axis=1)
-OmA_mean = np.nansum(OmA_mean*N_data, axis=1)/np.nansum(N_data,axis=1)
-OmA_stdv = np.nansum(OmA_stdv*N_data,axis=1)/np.nansum(N_data,axis=1)
-Nobs_data = np.nansum(N_data, axis=1)
+OmF_norm_stdv = np.nansum(OmF_norm_stdv*N_data, axis=1)/np.nansum(N_data,axis=1)
+OmA_mean      = np.nansum(OmA_mean     *N_data, axis=1)/np.nansum(N_data,axis=1)
+OmA_stdv      = np.nansum(OmA_stdv     *N_data, axis=1)/np.nansum(N_data,axis=1)
+Nobs_data     = np.nansum(              N_data, axis=1)
 
 # Plotting
 expid = exp_list[0]['exptag']

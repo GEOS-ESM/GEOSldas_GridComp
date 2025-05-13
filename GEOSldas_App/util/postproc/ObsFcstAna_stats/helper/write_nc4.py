@@ -1,3 +1,6 @@
+
+# collection of write routines for ObsFcstAna sums and stats
+
 from netCDF4 import Dataset, date2num
 import numpy as np
 
@@ -116,8 +119,8 @@ def write_omf_grouped_stats_nc4(file_path, group_stats):
     nc = Dataset(file_path, 'w', format='NETCDF4')
 
     # Create dimensions
-    nc.createDimension('time', n_time)
-    nc.createDimension('tile', n_tile)
+    nc.createDimension('time',  n_time)
+    nc.createDimension('tile',  n_tile)
     nc.createDimension('group', n_group)
 
     # Write time
@@ -144,4 +147,6 @@ def write_omf_grouped_stats_nc4(file_path, group_stats):
             data[:, :, g_idx] = group_stats[g_name][metric]
         var[:] = data
 
-    nc.close()    
+    nc.close()
+
+# ======================= EOF ========================================================= 

@@ -5,18 +5,18 @@
 
 import numpy as np
 import os
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
-from netCDF4 import  Dataset, date2num
-import sys
 
-sys.path.append('../../shared/python/')
+import sys;       sys.path.append('../../shared/python/')
 
-from util                         import make_folder
-from helper.compute_monthly_stats import compute_monthly_stats
-from helper.write_nc4             import write_sums_nc4, write_stats_nc4, write_omf_stats_nc4, write_omf_grouped_stats_nc4
+import warnings;  warnings.filterwarnings("ignore")
 
-import warnings; warnings.filterwarnings("ignore")
+from datetime                    import datetime, timedelta
+from dateutil.relativedelta      import relativedelta
+from netCDF4                     import Dataset, date2num
+
+from util                        import make_folder
+from helper.compute_monthly_sums import compute_monthly_sums
+from helper.write_nc4            import write_sums_nc4, write_stats_nc4, write_omf_stats_nc4, write_omf_grouped_stats_nc4
 
 class postproc_ObsFcstAna:
     
@@ -87,7 +87,7 @@ class postproc_ObsFcstAna:
                 print('computing monthly sums ...')
                 # compute monthly sum
                 mN_data, mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum = \
-                        compute_monthly_stats(expdir_list,expid_list,domain,month_range,tc,obsparam_list,var_list,self.obs_from)
+                    compute_monthly_sums(expdir_list,expid_list,domain,month_range,tc,obsparam_list,var_list,self.obs_from)
 
                 # save monthly sum in nc4 file
                 write_sums_nc4(fout, mN_data,mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum, obsparam_list[0])
@@ -98,7 +98,7 @@ class postproc_ObsFcstAna:
 
     # ---------------------------------------------------------------------------
             
-    def calculate_stats_fromsums(self, mo_path='./', write_to_nc=True, filename='./stats.nc4'):
+    def calculate_stats_from_sums(self, mo_path='./', write_to_nc=True, filename='./stats.nc4'):
         
         start_time  = self.start_time
         end_time    = self.end_time
