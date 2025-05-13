@@ -13,19 +13,20 @@ import resource
 import subprocess as sp
 import shlex
 import tempfile
-from dateutil import rrule
-from datetime import datetime
-from datetime import timedelta
-from collections import OrderedDict
+
+from dateutil               import rrule
+from datetime               import datetime
+from datetime               import timedelta
+from collections            import OrderedDict
 from dateutil.relativedelta import relativedelta
-from remap_utils import *
-from remap_catchANDcn  import *
-from lenkf_j_template import *
+from remap_utils            import *
+from remap_catchANDcn       import *
+from lenkf_j_template       import *
+
 """
 This script is intended to be run from any installed directory with GEOSldas.x and ldas_setup
 (The default setup is ../install/bin)
 """
-
 
 class LDASsetup:
 
@@ -52,7 +53,7 @@ class LDASsetup:
             'ADAS_EXPDIR', 'BCS_RESOLUTION' ]
 
 
-        self.GEOS_SITE       = "@GEOS_SITE@"
+        self.GEOS_SITE = "@GEOS_SITE@"
 
         # ------
         # Required resource manager input fields
@@ -73,7 +74,7 @@ class LDASsetup:
             # or:     {'exeinp': True,  'batinp': False} 
             if cmdLineArgs['ladas_cpl'] != 'None' :
                 ladas_cpl  = int(cmdLineArgs['ladas_cpl'])
-            if   cmdLineArgs['exeinp']:
+            if cmdLineArgs['exeinp']:
                 if ladas_cpl > 0:
                    _printExeInputKeys(rqdExeInpKeys,ladas_cpl)
                 else : 
@@ -609,7 +610,8 @@ class LDASsetup:
         else:
            self.optRmInp['writers-per-node'] = 0
 
-
+    # -----------------------------------------------------------------------------------
+           
     def _parseInputFile(self, inpfile):
         """
         Private method: parse input file and return a dict of options
@@ -657,7 +659,8 @@ class LDASsetup:
 
         return inpdict
 
-
+    # -----------------------------------------------------------------------------------
+           
     def _mkdir_p(self,path):
         """
         Private method: implement 'mkdir -p' functionality
@@ -668,6 +671,8 @@ class LDASsetup:
         else:
             os.makedirs(path)
 
+    # -----------------------------------------------------------------------------------
+           
     def createDirStructure(self):
         """
         Create required dir structure
@@ -733,6 +738,8 @@ class LDASsetup:
         status = True
         return status
 
+    # -----------------------------------------------------------------------------------
+           
     # create links to BCs, restarts, met forcing, ...
     def createLnRstBc(self) :
         # link bld dir
@@ -1078,6 +1085,8 @@ class LDASsetup:
         status = True
         return status
 
+    # -----------------------------------------------------------------------------------
+           
     def createRCFiles(self):
         """
         (1) get resource files form DEFAULT rc files from /etc
@@ -1346,6 +1355,8 @@ class LDASsetup:
         status=True
         return status
 
+    # -----------------------------------------------------------------------------------
+           
     def createBatchRun(self):
         """
         """
@@ -1401,7 +1412,8 @@ class LDASsetup:
         status = True
         return status
 
-
+    # -----------------------------------------------------------------------------------
+           
     def createRunScripts(self):
         """
         """
@@ -1490,6 +1502,8 @@ class LDASsetup:
         status = True
         return status
 
+# -----------------------------------------------------------------------------------
+           
 def _printdict(d):
     """
     Private method: print a 'flat' dictionary
@@ -1498,6 +1512,8 @@ def _printdict(d):
     for key, val in d.items():
         print (key.ljust(23), ':', val)
 
+# -----------------------------------------------------------------------------------
+    
 def _printExeInputKeys(rqdExeInpKeys,ladas_cpl):
     """
     Private method: print sample exe input
@@ -1671,6 +1687,8 @@ def _printExeInputKeys(rqdExeInpKeys,ladas_cpl):
     print ()
     print ()
 
+# -----------------------------------------------------------------------------------
+    
 def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     """
     Private method: print sample resource manager input
@@ -1695,8 +1713,8 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('# OPTIONAL inputs')
     print ('#')
     print ('# NOTE:')
-    print ('# - job_name   = name of experiment; default is "exp_id"')
-    print ('# - qos        = quality-of-service; do not specify by default; specify "debug" for faster but limited service.')
+    print ('# - job_name         = name of experiment; default is "exp_id"')
+    print ('# - qos              = quality-of-service; do not specify by default; specify "debug" for faster but limited service.')
     print ('# - oserver_nodes    = number of nodes for oserver ( default is 0 )')
     print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5 ),')
     print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
@@ -1705,6 +1723,8 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     for key in optRmInpKeys:
         print ('#'+key + ':')
 
+# -----------------------------------------------------------------------------------
+                   
 def parseCmdLine():
     """
     parse command line arguments and return a dict of options
@@ -1840,17 +1860,20 @@ if __name__=='__main__':
     status = ld.createDirStructure()
     assert(status)
 
-    print ("creating restart and bc")
+    print ("creating links to restarts, BCs, met forcing, ...")
     status = ld.createLnRstBc()
     assert(status)
 
     print ("creating RC Files")
-    status =ld.createRCFiles()
-    assert status
+    status = ld.createRCFiles()
+    assert(status)
 
     print ("creating gcm style batch Run scripts lenkf.j")
     status = ld.createRunScripts()
-
+    assert(status)
+    
     print ("creating batch Run scripts")
     status = ld.createBatchRun()
     assert (status)
+
+# =================== EOF =======================================================================
