@@ -2439,7 +2439,7 @@ contains
    
    ! relatively large threshold for precip indirectly screens for standing water
    
-   real, parameter          :: temperature_threshold = 20.      ! [C]
+   real, parameter          :: temperature_threshold = 10.      ! [C]
    
    integer :: i
    
