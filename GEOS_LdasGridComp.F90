@@ -170,11 +170,10 @@ contains
     with_landice = .false.
     with_land    = .false.
 !   with_lake    = .false.
-    do i = 1, size(tile_types)
-       if (tile_types(i) == MAPL_LANDICE) with_landice = .true.
-       if (tile_types(i) == MAPL_LAND)    with_land    = .true.
-!      if (tile_types(i) == MAPL_LAKE)    with_lake    = .true.
-    enddo
+
+    if (any(tile_types == MAPL_LANDICE)) with_landice = .true.
+    if (any(tile_types == MAPL_LAND   )) with_land    = .true.
+!   if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
 
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
