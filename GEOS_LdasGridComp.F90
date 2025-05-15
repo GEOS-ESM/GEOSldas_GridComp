@@ -20,7 +20,7 @@ module GEOS_LdasGridCompMod
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
   use LDAS_TileCoordRoutines, only: get_minExtent_grid, get_ij_ind_from_latlon, io_domain_files
-  use LDAS_ConvertMod,        only: esmf2ldas, string2tile_types
+  use LDAS_ConvertMod,        only: esmf2ldas
   use LDAS_PertRoutinesMod,   only: get_pert_grid
   use LDAS_ensdrv_functions,  only:  get_io_filename 
   use LDAS_DateTimeMod,       only: date_time_type
@@ -89,16 +89,17 @@ contains
     character(len=ESMF_MAXSTR) :: Iam
     character(len=ESMF_MAXSTR) :: comp_name
     character(len=ESMF_MAXSTR) :: ensid_string,childname
-    character(len=ESMF_MAXSTR) :: LAND_ASSIM_STR, mwRTM_file, ENS_FORCING_STR, TILE_TYPES_STR
+    character(len=ESMF_MAXSTR) :: LAND_ASSIM_STR, mwRTM_file, ENS_FORCING_STR
     integer                    :: ens_id_width
-    character(10), allocatable :: tile_types(:)
+    integer, allocatable       :: tile_types(:)
     ! Local variables
     type(T_TILECOORD_STATE), pointer :: tcinternal
     type(TILECOORD_WRAP) :: tcwrap
 
     type(ESMF_Config) :: CF
-    integer :: LSM_CHOICE
+    integer :: LSM_CHOICE, NRA
     integer :: FIRST_ENS_ID
+    logical :: isPresent
 
     ! Begin...
 
@@ -155,18 +156,24 @@ contains
     VERIFY_(STATUS)
     ensemble_forcing = (trim(ENS_FORCING_STR) == 'YES')
 
-    call MAPL_GetResource ( MAPL, TILE_TYPES_STR, Label="TILE_TYPES:", DEFAULT="LAND", RC=STATUS)
-    VERIFY_(STATUS)
-    TILE_TYPES_STR =  ESMF_UtilStringUpperCase(TILE_TYPES_STR, rc=STATUS)
-    VERIFY_(STATUS)
-    call string2tile_types(TILE_TYPES_STR, tile_types)
+    call ESMF_ConfigFindLabel( CF, LABEL="TILE_TYPES:", isPresent=isPresent, _RC)
+    if (isPresent) then
+       nra = ESMF_ConfigGetLen( CF, _RC)
+       allocate(tile_types(nra))
+       call ESMF_ConfigFindLabel( CF, LABEL="TILE_TYPES:", _RC)
+       call ESMF_ConfigGetAttribute( CF, valueList=tile_types, count=NRA, _RC)
+    else
+       ! default
+       tile_types = [MAPL_LAND] 
+    endif
+
     with_landice = .false.
     with_land    = .false.
 !    with_lake    = .false.
     do i = 1, size(tile_types)
-       if (trim(tile_types(i)) == 'LANDICE') with_landice = .true.
-       if (trim(tile_types(i)) == 'LAND')    with_land    = .true.
-!       if (trim(tile_types(i)) == 'LAKE')    with_lake    = .true.
+       if (tile_types(i) == MAPL_LANDICE) with_landice = .true.
+       if (tile_types(i) == MAPL_LAND)    with_land    = .true.
+!      if (tile_types(i) == MAPL_LAKE)    with_lake    = .true.
     enddo
 
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)

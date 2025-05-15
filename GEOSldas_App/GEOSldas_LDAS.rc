@@ -39,15 +39,14 @@ LSM_CHOICE: 1
 
 # ---- Choice of tile type(s)
 #
-#  Comma-separated list of tile types to be included in simulation.
-#  Do not use space before/after comma.  Examples:
+#  list of tile types to be included in simulation.
+#  use blank space as seperator if there are more than one type
 #
-#    LAND         : include only land tiles
-#    LAND,LANDICE : include land and landice tiles
-#    LANDICE      : include only landice tiles
+#    land tiles    100
+#    landice tiles 20
+#    lake tiles    29 (not yet implemented) 
 #
-TILE_TYPES: LAND
-
+TILE_TYPES: 100
 
 # ---- Format of tile file (from bcs directory)
 #
