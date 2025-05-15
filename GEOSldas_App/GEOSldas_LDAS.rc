@@ -39,12 +39,15 @@ LSM_CHOICE: 1
 
 # ---- Choice of tile type(s)
 #
-#  list of tile types to be included in simulation.
-#  use blank space as seperator if there are more than one type
+#  List of tile types to be included in simulation.
+#  Use blank space as separator if there is more than one type.
 #
-#    land tiles    100
-#    landice tiles 20
-#    lake tiles    29 (not yet implemented) 
+#    land    : 100 (non-glaciated land)
+#    landice :  20 (    glaciated land)
+#    lake    :  19                        [not yet implemented]
+#
+#  For example, include land and landice tiles as follows:
+#    TILE_TYPES: 100 20
 #
 TILE_TYPES: 100
 

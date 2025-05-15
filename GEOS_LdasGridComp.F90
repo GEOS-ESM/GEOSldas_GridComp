@@ -97,7 +97,7 @@ contains
     type(TILECOORD_WRAP) :: tcwrap
 
     type(ESMF_Config) :: CF
-    integer :: LSM_CHOICE, NRA
+    integer :: LSM_CHOICE, nra
     integer :: FIRST_ENS_ID
     logical :: isPresent
 
@@ -160,8 +160,8 @@ contains
     if (isPresent) then
        nra = ESMF_ConfigGetLen( CF, _RC)
        allocate(tile_types(nra))
-       call ESMF_ConfigFindLabel( CF, LABEL="TILE_TYPES:", _RC)
-       call ESMF_ConfigGetAttribute( CF, valueList=tile_types, count=NRA, _RC)
+       call ESMF_ConfigFindLabel(    CF, LABEL="TILE_TYPES:",             _RC)
+       call ESMF_ConfigGetAttribute( CF, valueList=tile_types, count=nra, _RC)
     else
        ! default
        tile_types = [MAPL_LAND] 
@@ -169,7 +169,7 @@ contains
 
     with_landice = .false.
     with_land    = .false.
-!    with_lake    = .false.
+!   with_lake    = .false.
     do i = 1, size(tile_types)
        if (tile_types(i) == MAPL_LANDICE) with_landice = .true.
        if (tile_types(i) == MAPL_LAND)    with_land    = .true.
