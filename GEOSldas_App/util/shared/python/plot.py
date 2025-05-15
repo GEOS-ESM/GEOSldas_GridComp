@@ -18,6 +18,7 @@ def plotMap(
     prj="cyl",
 ):
 
+    # color range
     if cRange is not None:
         vmin = cRange[0]
         vmax = cRange[1]
@@ -32,6 +33,7 @@ def plotMap(
         fig = plt.figure(figsize=figsize)
         ax = fig.subplots()
 
+    # map boundary
     if bounding is None:
         bounding = [
             np.min(lat) - 0.5,
@@ -40,6 +42,7 @@ def plotMap(
             np.max(lon) + 0.5,
         ]
 
+    # add basemap
     mm = basemap.Basemap(
         llcrnrlat=bounding[0],
         urcrnrlat=bounding[1],
@@ -52,17 +55,21 @@ def plotMap(
     mm.drawcoastlines()
     #mm.drawstates(linestyle="dashed")
     #mm.drawcountries(linewidth=1.0, linestyle="-.")
+    # plot data on basemap
     cs = mm.pcolormesh(lon, lat, data, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    # colorbar
     if clbar is True:
         cb = mm.colorbar(cs, pad="5%", location="bottom")
         if 'normalized' in title:
             cb.set_ticks(np.linspace(vmin,vmax,6))
             cb.set_ticklabels([f'{10**x:.2f}' for x in np.linspace(vmin, vmax, 6)])
 
+    # plot title, return objects in case plot needs adjustment after function call
     if title is not None:
         ax.set_title(title)
     if ax is None:
         return fig, ax, mm
     else:
-        return mm, cs
+       return mm, cs
 

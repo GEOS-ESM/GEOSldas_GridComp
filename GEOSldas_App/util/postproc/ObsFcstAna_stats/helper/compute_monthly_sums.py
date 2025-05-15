@@ -10,7 +10,7 @@ from datetime               import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from read_GEOSldas          import read_ObsFcstAna, read_tilecoord, read_obs_param
 
-def compute_monthly_sums(expdir_list,expid_list,domain,this_month,tc,obsparam_list,var_list,obs_from):
+def compute_monthly_sums(expdir_list,expid_list,domain,this_month,tc,obsparam_list,var_list,obs_from,da_dt=10800):
 
     n_tile = tc['N_tile']
     n_spec = len(obsparam_list[0])
@@ -103,7 +103,7 @@ def compute_monthly_sums(expdir_list,expid_list,domain,this_month,tc,obsparam_li
             data_sum[ var][is_valid] += data_tile[var][is_valid]
             data2_sum[var][is_valid] += data_tile[var][is_valid] **2
         
-        date_time = date_time + timedelta(seconds=10800)
+        date_time = date_time + timedelta(seconds=da_dt)
 
     return N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa_sum
 
