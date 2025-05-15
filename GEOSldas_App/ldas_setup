@@ -102,6 +102,9 @@ class LDASsetup:
         self.agcm_res           = cmdLineArgs['agcm_res']
         self.bcs_version        = cmdLineArgs['bcs_version']
         self.rstloc             = cmdLineArgs['rstloc']
+        self.adas_cyc           = cmdLineArgs['adas_cyc']
+        self.specnml_path       = cmdLineArgs['specnml_path']
+        self.mwrtm_path         = cmdLineArgs['mwrtm_path']
 
         # obsolete command line args
         self.runmodel           = cmdLineArgs['runmodel']
@@ -168,7 +171,7 @@ class LDASsetup:
             self.rstloc = os.path.abspath(rstloc_)
             self.rqdExeInp['RESTART_PATH']   = os.path.dirname( self.rstloc) 
             self.rqdExeInp['RESTART_ID']     = os.path.basename(self.rstloc)
-
+    
         ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
         self.adas_expdir                              = ''
         if self.ladas_cpl > 0 :
@@ -209,7 +212,10 @@ class LDASsetup:
            self.rqdExeInp['MET_HINTERP']              = 0
            self.rqdExeInp['LANDASSIM_DT']             = "10800"
            self.rqdExeInp['LANDASSIM_T0']             = "013000"
-           self.rqdExeInp['JOB_SGMT']                 = "00000000 060000"     # same as length of one ADAS cycle
+           self.rqdExeInp['JOB_SGMT']                 = "00000000 060000"  #default
+           # same as length of one ADAS cycle
+           if self.adas_cyc != 'None' :
+                 self.rqdExeInp['JOB_SGMT']                 = '00000000 '+ self.adas_cyc
            self.rqdExeInp['NUM_SGMT']                 = 1 
            self.rqdExeInp['FORCE_DTSTEP']             = 3600
 
@@ -219,9 +225,13 @@ class LDASsetup:
            _end_date = _beg_date + timedelta(hours=6) 
 
            self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
-
+           #default or input from command line 
            self.rqdExeInp['NML_INPUT_PATH']           = "/discover/nobackup/qzhang/LDAS_INPUTS/SPECnml/" 
-           self.rqdExeInp['MWRTM_PATH']               = "/discover/nobackup/qzhang/LDAS_INPUTS/MWRTM/"  
+           if self.specnml_path != 'None' :
+               self.rqdExeInp['NML_INPUT_PATH'] = self.specnml_path
+           self.rqdExeInp['MWRTM_PATH']               = "/discover/nobackup/qzhang/LDAS_INPUTS/MWRTM/" 
+           if self.mwrtm_path != 'None' :
+               self.rqdExeInp['MWRTM_PATH'] = self.mwrtm_path   
            
            # end if self.ladas_cpl > 0 
 
@@ -1843,6 +1853,22 @@ def parseCmdLine():
         help='location of LDAS restarts (restart_path/restart_id)',
         type=str, default='None'
         )
+    p_setup.add_argument(
+        '--adas_cyc',
+        help='ADAS analysis window ',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--specnml_path',
+        help='path to ldas spec nml ',
+        type=str, default='None'
+        )
+    p_setup.add_argument(
+        '--mwrtm_path',
+        help='path to ldas mwrtm parameters ',
+        type=str, default='None'
+        )
+
 
     # obsolete command line args
     p_setup.add_argument(
