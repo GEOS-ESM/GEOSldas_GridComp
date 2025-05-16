@@ -163,7 +163,7 @@ class LDASsetup:
             print ('\nInputs from execfile:\n')
             _printdict(self.rqdExeInp)
 
-        self.tile_types = self.rqdExeInp.get('TILE_TYPES',["100"]).split()
+        self.tile_types = self.rqdExeInp.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
           self.with_land = True
         if  "20" in self.tile_types :
