@@ -212,10 +212,11 @@ class LDASsetup:
            self.rqdExeInp['MET_HINTERP']              = 0
            self.rqdExeInp['LANDASSIM_DT']             = "10800"
            self.rqdExeInp['LANDASSIM_T0']             = "013000"
-           self.rqdExeInp['JOB_SGMT']                 = "00000000 060000"  #default
-           # same as length of one ADAS cycle
-           if self.adas_cyc != 'None' :
-                 self.rqdExeInp['JOB_SGMT']                 = '00000000 '+ self.adas_cyc
+           jsgmt1 = "00000000"
+           jsgmt2 = "060000" 
+           if self.adas_cyc != 'None' : #ADAS cycle
+              jsgmt2 = self.adas_cyc
+           self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
            self.rqdExeInp['NUM_SGMT']                 = 1 
            self.rqdExeInp['FORCE_DTSTEP']             = 3600
 
