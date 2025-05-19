@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added functionality to simulate landice tiles.
+- Added functionality to read nc4-formatted tile file.
+
 ### Changed
 
 ### Fixed
