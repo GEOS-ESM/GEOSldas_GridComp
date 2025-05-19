@@ -21,9 +21,9 @@ contains
 
   subroutine esmf2ldas_time(esmf_dt, ldas_dt, rc)
     
-    type(ESMF_Time), intent(in) :: esmf_dt
+    type(ESMF_Time),      intent(in)  :: esmf_dt
     type(date_time_type), intent(out) :: ldas_dt
-    integer, optional, intent(out) :: rc
+    integer, optional,    intent(out) :: rc
 
     character(len=*), parameter :: Iam = 'emsf2ldas_time'
     integer :: status
@@ -46,4 +46,8 @@ contains
 
   end subroutine esmf2ldas_time
 
+  ! --------------------------------------------
+  
 end module LDAS_ConvertMod
+
+! ========= EOF ===========================================================
