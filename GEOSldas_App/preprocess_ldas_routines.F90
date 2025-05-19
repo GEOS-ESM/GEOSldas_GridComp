@@ -1877,13 +1877,13 @@ contains
        call OutFmt%write(OutCfg,rc=rc)
 
        variables => InCfg%get_variables()
-       var_iter = variables%begin()
+       var_iter = variables%ftn_begin()
        allocate(tmp(N_tiles_land_r))
-       do while (var_iter /= variables%end())
-          vname => var_iter%key()
+       do while (var_iter /= variables%ftn_end())
+          call var_iter%next()
+          vname => var_iter%first()
           call MAPL_VarRead (InFmt,vname,tmp)
           call MAPL_VarWrite(OutFmt,vname,tmp(f2r_land))
-          call var_iter%next()
        enddo
 
        call inFmt%close(rc=rc)
