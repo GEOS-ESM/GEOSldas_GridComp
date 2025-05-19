@@ -126,7 +126,7 @@ class LDASsetup:
         self.out_path           = None
         self.inpdir             = None
         self.exefyl             = None
-        self.islocal            = False
+        self.isZoomIn           = False
         self.catch              = ''
         self.has_mwrtm          = False
         self.has_vegopacity     = False
@@ -357,7 +357,7 @@ class LDASsetup:
 
         # make sure catchment and vegdyn restart files ( at least one for each) exist
         if 'CATCH_DEF_FILE' not in self.rqdExeInp :
-           self.rqdExeInp['CATCH_DEF_FILE']= self.bcs_land + 'clsm/catchment.def'
+           self.rqdExeInp['CATCH_DEF_FILE']= self.bcs_dir_land + 'clsm/catchment.def'
         if (self.with_land) :
            assert os.path.isfile(self.rqdExeInp['CATCH_DEF_FILE']),"[%s] file does not exist " % self.rqdExeInp['CATCH_DEF_FILE']
 
@@ -379,30 +379,30 @@ class LDASsetup:
         self.rqdExeInp['LNFM_FILE'] = ''
         tile_file_format = self.rqdExeInp.get('TILE_FILE_FORMAT', 'DEFAULT')
         if int(self.rqdExeInp['RST_FROM_GLOBAL']) == 1 :
-           txt_tile = glob.glob(self.bcs_geom + '*.til')
-           nc4_tile = glob.glob(self.bcs_geom + '*.nc4')
-           if tile_file_format.upper() == 'TXT'     : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
+           txt_tile = glob.glob(self.bcs_dir_geom + '*.til')
+           nc4_tile = glob.glob(self.bcs_dir_geom + '*.nc4')
+           if tile_file_format.upper() == 'TXT'     : self.rqdExeInp['TILING_FILE'] =  txt_tile[0]
            if tile_file_format.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
-           self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
-           self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
-           tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+           self.rqdExeInp['GRN_FILE']    = glob.glob(self.bcs_dir_land + 'green_clim_*.data')[0]
+           self.rqdExeInp['LAI_FILE']    = glob.glob(self.bcs_dir_land + 'lai_clim_*.data'  )[0]
+           tmp_ = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data')
            if (len(tmp_) ==1) :
               self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-           self.rqdExeInp['NDVI_FILE'] = glob.glob(self.bcs_land + 'ndvi_clim_*.data')[0]
-           self.rqdExeInp['NIRDF_FILE']= glob.glob(self.bcs_land + 'nirdf_*.dat')[0]
-           self.rqdExeInp['VISDF_FILE']= glob.glob(self.bcs_land + 'visdf_*.dat')[0]
+           self.rqdExeInp['NDVI_FILE']   = glob.glob(self.bcs_dir_land + 'ndvi_clim_*.data' )[0]
+           self.rqdExeInp['NIRDF_FILE']  = glob.glob(self.bcs_dir_land + 'nirdf_*.dat'      )[0]
+           self.rqdExeInp['VISDF_FILE']  = glob.glob(self.bcs_dir_land + 'visdf_*.dat'      )[0]
         else :
            inpdir=self.rqdExeInp['RESTART_PATH']+self.rqdExeInp['RESTART_ID']+'/input/'
-           self.rqdExeInp['TILING_FILE'] =os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
-           self.rqdExeInp['GRN_FILE']=    os.path.realpath(glob.glob(inpdir+'green*data')[0])
-           self.rqdExeInp['LAI_FILE']=    os.path.realpath(glob.glob(inpdir+'lai*data')[0])
-           tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+           self.rqdExeInp['TILING_FILE'] = os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
+           self.rqdExeInp['GRN_FILE']    = os.path.realpath(glob.glob(inpdir+'green*data')[0])
+           self.rqdExeInp['LAI_FILE']    = os.path.realpath(glob.glob(inpdir+'lai*data'  )[0])
+           tmp_ = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data')
            if (len(tmp_) == 1) :
               self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-           self.rqdExeInp['NDVI_FILE']=    os.path.realpath(glob.glob(inpdir+'ndvi*data')[0])
-           self.rqdExeInp['NIRDF_FILE']=  os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
-           self.rqdExeInp['VISDF_FILE']=  os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
+           self.rqdExeInp['NDVI_FILE']   = os.path.realpath(glob.glob(inpdir+'ndvi*data' )[0])
+           self.rqdExeInp['NIRDF_FILE']  = os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
+           self.rqdExeInp['VISDF_FILE']  = os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
 
         if self.rqdExeInp['RESTART'].isdigit() :
             if int(self.rqdExeInp['RESTART']) == 2 :
@@ -423,20 +423,20 @@ class LDASsetup:
                 self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
                 if os.path.isfile(ldas_domain):
-                    txt_tile = glob.glob(self.bcs_geom + '*.til')
-                    nc4_tile = glob.glob(self.bcs_geom + '*.nc4')
+                    txt_tile = glob.glob(self.bcs_dir_geom + '*.til')
+                    nc4_tile = glob.glob(self.bcs_dir_geom + '*.nc4')
                     if tile_file_format.upper() == 'TXT'     : self.rqdExeInp['TILING_FILE'] = txt_tile[0]
                     if tile_file_format.upper() == 'DEFAULT' : self.rqdExeInp['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
-                    self.rqdExeInp['GRN_FILE']= glob.glob(self.bcs_land + 'green_clim_*.data')[0]
-                    self.rqdExeInp['LAI_FILE']= glob.glob(self.bcs_land + 'lai_clim_*.data')[0]
-                    tmp_ = glob.glob(self.bcs_land + 'lnfm_clim_*.data')
+                    self.rqdExeInp['GRN_FILE']   = glob.glob(self.bcs_dir_land + 'green_clim_*.data')[0]
+                    self.rqdExeInp['LAI_FILE']   = glob.glob(self.bcs_dir_land + 'lai_clim_*.data'  )[0]
+                    tmp_ = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data')
                     if (len(tmp_) == 1) :
                        self.rqdExeInp['LNFM_FILE'] = tmp_[0]
-                    self.rqdExeInp['LNFM_FILE']  = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data')[0]
-                    self.rqdExeInp['NDVI_FILE']  = glob.glob(self.bcs_dir_land + 'ndvi_clim_*.data')[0]
-                    self.rqdExeInp['NIRDF_FILE'] = glob.glob(self.bcs_dir_land + 'nirdf_*.dat')[0]
-                    self.rqdExeInp['VISDF_FILE'] = glob.glob(self.bcs_dir_land + 'visdf_*.dat')[0]
+                    self.rqdExeInp['LNFM_FILE']  = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data' )[0]
+                    self.rqdExeInp['NDVI_FILE']  = glob.glob(self.bcs_dir_land + 'ndvi_clim_*.data' )[0]
+                    self.rqdExeInp['NIRDF_FILE'] = glob.glob(self.bcs_dir_land + 'nirdf_*.dat'      )[0]
+                    self.rqdExeInp['VISDF_FILE'] = glob.glob(self.bcs_dir_land + 'visdf_*.dat'      )[0]
 
         if 'GRIDNAME' not in self.rqdExeInp :
             tmptile = os.path.realpath(self.rqdExeInp['TILING_FILE'])
@@ -920,7 +920,7 @@ class LDASsetup:
               os.symlink(bc,myBC)
 
            if ("catchcn" in self.catch):
-              os.symlink(self.bcs_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
+              os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
 
         # create and link restart
