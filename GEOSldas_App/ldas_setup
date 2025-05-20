@@ -227,8 +227,13 @@ class LDASsetup:
             # the following are not in default rqdExeInp list; hardwire for now
             self.rqdExeInp['LAND_ASSIM']               = "YES"
             self.rqdExeInp['MET_HINTERP']              = 0
-            self.rqdExeInp['LANDASSIM_DT']             = "10800"
-            self.rqdExeInp['LANDASSIM_T0']             = "013000"
+            self.landassim_dt                          = 10800                                    # seconds
+            # make sure ADAS analysis window [minutes] is multiple of LANDASSIM_DT [seconds]
+            if self.varwindow % self.landassim_dt/60 == 0 : 
+                self.rqdExeInp['LANDASSIM_DT']         = self.landassim_dt
+            else :
+                exit("Error. LANDASSIM_DT is inconsistent with ADAS analysis window.\n")
+            self.rqdExeInp['LANDASSIM_T0']             = "013000"                                 # HHMMSS
             jsgmt1                                     = "00000000"
             jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)       # convert minutes to HHMMSS
             self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
