@@ -680,19 +680,27 @@ class LDASsetup:
         inpdict = OrderedDict()
         errstr = "line [%d] of [%s] is not in the form 'key: value'"
 
+        # determine which default values to pick from GEOS_SurfaceGridComp.rc
+        if self.ladas_cpl == 0 :
+            use_rc_defaults = 'GEOSldas=>'    # use defaults for LDAS
+        else :
+            use_rc_defaults = 'GEOSagcm=>'    # use defaults for AGCM
+        
         fin = open(inpfile, 'r')
         linenum = 0
         for line in fin:
-            linenum += 1
+        linenum += 1
             line = line.strip()
             # blank line
             if not line:
-               continue
-            if '"GEOSldas=>"' in line:
-               continue
-            # get "GEOSldas=>" default in GEOS_LandGrid.rc
-            if 'GEOSldas=>' in line:
-               line = line.split('GEOSldas=>')[1]
+                continue
+            if '"GEOSagcm=>"' in line:        # echo lines that contain "GEOSagcm=>" (w/ quotation marks) [GEOS_SurfaceGridComp.rc]
+                continue
+            if '"GEOSldas=>"' in line:        # echo lines that contain "GEOSldas=>" (w/ quotation marks) [GEOS_SurfaceGridComp.rc]
+                continue
+            # get 'GEOSldas=>' or 'GEOSagcm=>' defaults in GEOS_SurfaceGridComp.rc
+            if use_rc_defaults in line:
+                line = line.split(use_rc_defaults)[1]
             # handle comments
             position = line.find('#')
             if position==0: # comment line
@@ -1784,15 +1792,17 @@ def _printExeInputKeys(rqdExeInpKeys,ladas_cpl):
     with open(_fn) as _f :
         i_ = 1
         for line in _f:
-            if ( 5<=i_ and i_<=21) :     # ignore lines 5-21 - may need to change if GEOS_SurfaceGridComp.rc is edited
+            if ( 5<=i_ and i_<=21) :         # skip over lines 5-21 - may need to change if GEOS_SurfaceGridComp.rc is edited
                 i_ +=1
                 continue
-            if '"GEOSagcm=>"' in line:                     # ignore odd occurrence of "GEOSgacm=>" in header lines
+            if   '"GEOSagcm=>"' in line:                             # echo lines that contain "GEOSagcm=>" (w/ quotation marks) 
                 sys.stdout.write(line)
-            elif use_rc_defaults in line:                  # process lines that contain string "use_rc_defaults"
+            elif '"GEOSldas=>"' in line:                             # echo lines that contain "GEOSldas=>" (w/ quotation marks) 
+                sys.stdout.write(line)
+            elif use_rc_defaults in line:                            # process lines that contain string "use_rc_defaults"
                 line0 = line.split(use_rc_defaults)[1]
                 sys.stdout.write(line0)
-            elif not line.strip() or line.strip().startswith('#'):
+            elif not line.strip() or line.strip().startswith('#'):   # echo all other lines
                 sys.stdout.write(line)
                 sys.stdout.flush()
                 i_ += 1
