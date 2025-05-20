@@ -98,14 +98,14 @@ class LDASsetup:
         self.exphome            = os.path.abspath(exphome_)
         self.verbose            = cmdLineArgs['verbose']
 
-        # command line args for coupled land-atm DAS
+        # command line args for coupled land-atm DAS (see "help" strings in parseCmdLine() for details)
         self.nymdb              = cmdLineArgs['nymdb']
         self.nhmsb              = cmdLineArgs['nhmsb']
         self.agcm_res           = cmdLineArgs['agcm_res']
         self.bcs_version        = cmdLineArgs['bcs_version']
         self.rstloc             = cmdLineArgs['rstloc']
-        self.adas_cyc           = cmdLineArgs['adas_cyc']
-        self.specnml_path       = cmdLineArgs['specnml_path']
+        self.varwindow          = cmdLineArgs['varwindow']
+        self.LDAS_nml_path      = cmdLineArgs['LDAS_nml_path']
         self.mwrtm_path         = cmdLineArgs['mwrtm_path']
 
         # obsolete command line args
@@ -181,64 +181,73 @@ class LDASsetup:
         ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
         self.adas_expdir                              = ''
         if self.ladas_cpl > 0 :
-           self.adas_expdir                           = os.path.dirname( self.exphome)
-           self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
-           self.adas_expid                            = os.path.basename(self.adas_expdir)
-           self.rqdExeInp['MET_TAG']                  = self.adas_expid + '__bkg'
-           if   self.ladas_cpl == 1 :
-               # ldas coupled with determistic component of adas
-               self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
-               self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
-               self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
-               self.nens                              = 24           # for now, hardwire nens for atm det  
-           elif self.ladas_cpl == 2 :
-               # ldas coupled with ensemble component of adas
-               self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
-               self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
-               self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
-               self.nens                              = 32           # for now, hardwire nens for atm ens
-           else :
-               exit("Error. Unknown value of self.ladas_cpl.\n")
-           self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
-           self.first_ens_id                          = 1
-           self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id 
-           self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.agcm_res +'x6C_GLOBAL' 
-           
-           # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info  
-           # hard-wired BCS_PATH for now 
-           self.rqdExeInp['BCS_PATH'] = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
-           self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'].rstrip('/') + '/' + self.bcs_version 
-           if self.bcs_version == "Icarus-NLv3" :
-              self.rqdExeInp['BCS_PATH']              = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
-           self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.agcm_res +'x6C_CF'     + self.agcm_res +'x6C'
-           self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.agcm_res +'x6C_GLOBAL'
-           
-           # the following are not in default rqdExeInp list; hardwire for now
-           self.rqdExeInp['LAND_ASSIM']               = "YES"
-           self.rqdExeInp['MET_HINTERP']              = 0
-           self.rqdExeInp['LANDASSIM_DT']             = "10800"
-           self.rqdExeInp['LANDASSIM_T0']             = "013000"
-           jsgmt1 = "00000000"
-           jsgmt2 = "060000" 
-           if self.adas_cyc != 'None' : #ADAS cycle
-              jsgmt2 = self.adas_cyc
-           self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
-           self.rqdExeInp['NUM_SGMT']                 = 1 
-           self.rqdExeInp['FORCE_DTSTEP']             = 3600
 
-           # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
-           _beg_date = datetime.strptime( self.rqdExeInp['BEG_DATE'], "%Y%m%d %H%M%S")
-           _hours    = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
-           _end_date = _beg_date + timedelta(hours=6) 
+            # make sure all necessary command line arguments were supplied
+            if self.nymdb         == 'None' : exit("Error. Must have command line arg nymdb         for coupled land-atm DAS.\n")
+            if self.nhmsb         == 'None' : exit("Error. Must have command line arg nhmsb         for coupled land-atm DAS.\n")
+            if self.agcm_res      == 'None' : exit("Error. Must have command line arg agcm_res      for coupled land-atm DAS.\n")
+            if self.bcs_version   == 'None' : exit("Error. Must have command line arg bcs_version   for coupled land-atm DAS.\n")
+            if self.rstloc        == 'None' : exit("Error. Must have command line arg rstloc        for coupled land-atm DAS.\n")
+            if self.varwindow     == 'None' : exit("Error. Must have command line arg varwindow     for coupled land-atm DAS.\n")
+            if self.LDAS_nml_path == 'None' : exit("Error. Must have command line arg LDAS_nml_path for coupled land-atm DAS.\n")
+            if self.mwrtm_path    == 'None' : exit("Error. Must have command line arg mwrtm_path    for coupled land-atm DAS.\n")
+            
+            self.adas_expdir                           = os.path.dirname( self.exphome)
+            self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
+            self.adas_expid                            = os.path.basename(self.adas_expdir)
+            self.rqdExeInp['MET_TAG']                  = self.adas_expid + '__bkg'
+            if   self.ladas_cpl == 1 :
+                # ldas coupled with determistic component of adas
+                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
+                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
+                self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
+                self.nens                              = 24           # for now, hardwire nens for atm det  
+            elif self.ladas_cpl == 2 :
+                # ldas coupled with ensemble component of adas
+                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
+                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
+                self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
+                self.nens                              = 32           # for now, hardwire nens for atm ens
+            else :
+                exit("Error. Unknown value of self.ladas_cpl.\n")
+            self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
+            self.first_ens_id                          = 1
+            self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id 
+            self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.agcm_res +'x6C_GLOBAL' 
+            
+            # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info  
+            # hard-wired BCS_PATH for now 
+            self.rqdExeInp['BCS_PATH'] = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
+            self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'].rstrip('/') + '/' + self.bcs_version 
+            if self.bcs_version == "Icarus-NLv3" :
+                self.rqdExeInp['BCS_PATH']             = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
+            self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.agcm_res +'x6C_CF'     + self.agcm_res +'x6C'
+            self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.agcm_res +'x6C_GLOBAL'
+           
+            # the following are not in default rqdExeInp list; hardwire for now
+            self.rqdExeInp['LAND_ASSIM']               = "YES"
+            self.rqdExeInp['MET_HINTERP']              = 0
+            self.rqdExeInp['LANDASSIM_DT']             = "10800"
+            self.rqdExeInp['LANDASSIM_T0']             = "013000"
+            jsgmt1                                     = "00000000"
+            jsgmt2                                     = hours_to_hhmmss(self.varwindow/60)       # convert minutes to HHMMSS
+            self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
+            self.rqdExeInp['NUM_SGMT']                 = 1 
+            self.rqdExeInp['FORCE_DTSTEP']             = 3600
 
-           self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
-           #default or input from command line 
-           self.rqdExeInp['NML_INPUT_PATH']           = "/discover/nobackup/qzhang/LDAS_INPUTS/SPECnml/" 
-           if self.specnml_path != 'None' :
-               self.rqdExeInp['NML_INPUT_PATH'] = self.specnml_path
-           self.rqdExeInp['MWRTM_PATH']               = "/discover/nobackup/qzhang/LDAS_INPUTS/MWRTM/" 
-           if self.mwrtm_path != 'None' :
-               self.rqdExeInp['MWRTM_PATH'] = self.mwrtm_path   
+            # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
+            _beg_date = datetime.strptime( self.rqdExeInp['BEG_DATE'], "%Y%m%d %H%M%S")
+            _hours    = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
+            _end_date = _beg_date + timedelta(hours=self.varwindow/60) 
+
+            self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
+            #default or input from command line 
+            self.rqdExeInp['NML_INPUT_PATH']           = "/discover/nobackup/qzhang/LDAS_INPUTS/SPECnml/" 
+            if self.LDAS_nml_path != 'None' :
+                self.rqdExeInp['NML_INPUT_PATH']       = self.LDAS_nml_path
+            self.rqdExeInp['MWRTM_PATH']               = "/discover/nobackup/qzhang/LDAS_INPUTS/MWRTM/" 
+            if self.mwrtm_path != 'None' :
+                self.rqdExeInp['MWRTM_PATH']           = self.mwrtm_path   
            
            # end if self.ladas_cpl > 0 
 
@@ -1274,16 +1283,8 @@ class LDASsetup:
                 for line in fileinput.input(tmprcfile,inplace=True):
                     print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
 
-            # take  HISTdet or HISTens if ladas 
-            if shortfile =='HISTdet.rc' and self.ladas_cpl == 1 :
-                tmprcfile=self.rundir+'/HISTORY.rc'
-                histrc_file=rcfile
-                shutil.copy2(rcfile, tmprcfile)
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('GEOSldas_expid',self.rqdExeInp['EXP_ID']))
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('GRIDNAME',self.rqdExeInp['GRIDNAME']))
-            if shortfile =='HISTens.rc' and self.ladas_cpl == 2 :
+            # if coupled land-atm DAS, always use either GEOSldas_HISTdet.rc or GEOSldas_HISTens.rc (depending on ladas_cpl)
+            if ( shortfile =='HISTdet.rc' and self.ladas_cpl == 1 ) or ( shortfile =='HISTens.rc' and self.ladas_cpl == 2 ):
                 tmprcfile=self.rundir+'/HISTORY.rc'
                 histrc_file=rcfile
                 shutil.copy2(rcfile, tmprcfile)
@@ -1939,18 +1940,18 @@ def parseCmdLine():
         type=str, default='None'
         )
     p_setup.add_argument(
-        '--adas_cyc',
-        help='ADAS analysis window ',
+        '--varwindow',
+        help='ADAS analysis window (minutes)',
         type=str, default='None'
         )
     p_setup.add_argument(
-        '--specnml_path',
-        help='path to ldas spec nml ',
+        '--LDAS_nml_path',
+        help='path to LDAS (special) nml input files',
         type=str, default='None'
         )
     p_setup.add_argument(
         '--mwrtm_path',
-        help='path to ldas mwrtm parameters ',
+        help='path to LDAS L-band microwave radiative transfer model (mwrtm) parameters ',
         type=str, default='None'
         )
 
@@ -1976,6 +1977,22 @@ def parseCmdLine():
         )
 
     return p.parse_args()
+
+
+
+def hours_to_hhmmss(hours):
+    
+    # Convert hours to timedelta
+    td = timedelta(hours=hours)
+    
+    # Extract hours, minutes, seconds
+    total_seconds = int(td.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    # Format as HHMMSS
+    return f"{hours:02d}{minutes:02d}{seconds:02d}"
+
 
 
 if __name__=='__main__':
