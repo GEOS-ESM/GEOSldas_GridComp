@@ -1213,8 +1213,9 @@ contains
           
        case('asnow')
 
-         get_asnow_l   = .true.
-         get_asnow_lH  = .true.
+          get_asnow_l   = .true.
+          get_asnow_lH  = .true.
+          get_tp_l      = .true.   ! needed for model-based QC
          
        case default
           
@@ -1365,7 +1366,7 @@ contains
 
           ! updated to new interface - reichle, 3 Apr 2012
           
-          call catch_calc_tp( N_catl, cat_param%poros,                  &
+          call catch_calc_tp( N_catl, cat_param%poros,                           &
                catprogn2ghtcnt(N_catl,cat_progn(:,n_e)), tp_l )
                     
        end if
@@ -2257,7 +2258,7 @@ contains
 
     do i=1,N_cat
        
-       ! delete obs 
+       ! delete Obs_pred 
        ! - if there is snow on the ground 
        ! - if it is raining/snowing
        ! - if surface temperature is around or below freezing
@@ -2340,7 +2341,7 @@ contains
     
     do i=1,N_cat
        
-       ! delete obs 
+       ! delete Obs_pred 
        ! - if there is snow on the ground 
        ! - if it is raining/snowing
        ! - if "avoid_frozen" and frozen
@@ -2394,7 +2395,7 @@ contains
 
     do i=1,N_cat
        
-       ! delete obs 
+       ! delete Obs_pred 
        ! - if there is heavy rain or snow
        
        ! NOTE: subroutine mwRTM_get_Tb already returns no-data-values
@@ -2420,8 +2421,8 @@ contains
   
   subroutine qc_model_based_for_asnow( N_cat, tp1, asnow )
     
-   ! Model-based quality control for MODIS SCF observations
-   ! Sets "asnow" to no-data when soil layer 1 temperature exceeds a threshold.
+   ! Model-based quality control for MODIS SCF observations.
+   ! Sets "asnow" to no-data when layer-1 soil temperature exceeds a threshold.
    !
    ! amfox, 7 May 2025
    !
@@ -2431,15 +2432,13 @@ contains
    
    integer,                   intent(in)    :: N_cat
    
-   real,    dimension(N_cat), intent(in)    :: tp1              ! soil temperature [C]
+   real,    dimension(N_cat), intent(in)    :: tp1              ! layer-1 soil temperature [C]
    
    real,    dimension(N_cat), intent(inout) :: asnow            ! snow cover fraction [0-1]    
    
    ! local variables
    
-   ! relatively large threshold for precip indirectly screens for standing water
-   
-   real, parameter          :: temperature_threshold = 10.      ! [C]
+   real, parameter :: temperature_threshold = 10.               ! [C]
    
    integer :: i
    
@@ -2447,11 +2446,10 @@ contains
 
    do i=1,N_cat
       
-      ! delete obs 
-      ! - if the soil layer 1 temperature exceeds temperature threshold
+      ! delete Obs_pred 
+      ! - if the layer-1 soil temperature exceeds threshold
       
-      if ( (tp1(i) > temperature_threshold) )               & 
-         asnow(i) = nodata_generic
+      if (tp1(i) > temperature_threshold)  asnow(i) = nodata_generic
 
    end do
    
