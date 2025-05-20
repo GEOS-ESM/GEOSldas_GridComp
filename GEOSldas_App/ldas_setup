@@ -689,7 +689,7 @@ class LDASsetup:
         fin = open(inpfile, 'r')
         linenum = 0
         for line in fin:
-        linenum += 1
+            linenum += 1
             line = line.strip()
             # blank line
             if not line:
