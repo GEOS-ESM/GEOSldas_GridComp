@@ -1795,17 +1795,14 @@ def _printExeInputKeys(rqdExeInpKeys,ladas_cpl):
             if ( 5<=i_ and i_<=21) :         # skip over lines 5-21 - may need to change if GEOS_SurfaceGridComp.rc is edited
                 i_ +=1
                 continue
-            if   '"GEOSagcm=>"' in line:                             # echo lines that contain "GEOSagcm=>" (w/ quotation marks) 
-                sys.stdout.write(line)
-            elif '"GEOSldas=>"' in line:                             # echo lines that contain "GEOSldas=>" (w/ quotation marks) 
-                sys.stdout.write(line)
-            elif use_rc_defaults in line:                            # process lines that contain string "use_rc_defaults"
+            if use_rc_defaults in line:                            # process lines that contain string "use_rc_defaults"
                 line0 = line.split(use_rc_defaults)[1]
                 sys.stdout.write(line0)
-            elif not line.strip() or line.strip().startswith('#'):   # echo all other lines
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                i_ += 1
+            if not '=>' in line :
+               if not line.strip() or line.strip().startswith('#'):   # echo all other lines
+                    sys.stdout.write(line)
+               sys.stdout.flush()
+            i_ += 1
 
     print ()
     print ()
