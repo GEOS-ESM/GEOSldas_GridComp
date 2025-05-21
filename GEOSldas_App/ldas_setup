@@ -229,7 +229,7 @@ class LDASsetup:
             self.rqdExeInp['MET_HINTERP']              = 0
             self.landassim_dt                          = 10800                                    # seconds
             # make sure ADAS analysis window [minutes] is multiple of LANDASSIM_DT [seconds]
-            if self.varwindow % self.landassim_dt/60 == 0 : 
+            if int(self.varwindow) % (self.landassim_dt/60) == 0 : 
                 self.rqdExeInp['LANDASSIM_DT']         = self.landassim_dt
             else :
                 exit("Error. LANDASSIM_DT is inconsistent with ADAS analysis window.\n")
