@@ -271,7 +271,7 @@ class LDASsetup:
 
         # print rqd exe inputs 
         if self.verbose:       
-            print ('\nInputs from execfile:\n')
+            print ('\nInputs from exeinp file:\n')
             _printdict(self.rqdExeInp)
 
         self.tile_types = self.rqdExeInp.get('TILE_TYPES',"100").split()
@@ -356,7 +356,6 @@ class LDASsetup:
 
         _difftime =timedelta(days = _years*365+_months*30+_days,hours = _hours,minutes=_mins,seconds=_seconds)
         _difftime = int(self.rqdExeInp['NUM_SGMT'])*_difftime
-        print (int(self.rqdExeInp['NUM_SGMT']))
         _d = self.begDates[0]
         _endDate = self.endDates[0]
         _d = _d + _difftime
@@ -1802,38 +1801,37 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
     with open(_fn) as _f :
         i_ = 1
         for line in _f:
-            if ( 5<=i_ and i_<=21) :         # skip over lines 5-21 - may need to change if GEOS_SurfaceGridComp.rc is edited
-                i_ +=1
+            i_ +=1
+            # skip over lines 5-21 (content does not apply after this processing) - may need to change if GEOS_SurfaceGridComp.rc is edited
+            if ( 5<=i_ and i_<=21 ) :        
                 continue
-            if use_rc_defaults in line:                            # process lines that contain string "use_rc_defaults"
-                line0 = line.split(use_rc_defaults)[1]
-                if ladas_cpl == 0:
-                   sys.stdout.write(line0)
-                   sys.stdout.flush()
-                else:
-                   lines.append(line0)
-            if not '=>' in line :
-               if not line.strip() or line.strip().startswith('#'):   # echo all other lines
-                    if ladas_cpl == 0:
-                      sys.stdout.write(line)
-                      sys.stdout.flush()
-                    else:
-                      lines.append(line)
-            i_ += 1
+            if ladas_cpl == 0:
+                # process lines that contain string "use_rc_defaults"
+                if use_rc_defaults in line:                            
+                    line0 = line.split(use_rc_defaults)[1]
+                    sys.stdout.write(line0)
+                    sys.stdout.flush()
+                # echo blank lines and comment lines (except if they contain 'GEOSldas=>' or 'GEOSagcm=>')
+                if (not 'GEOSldas=>' in line) and (not 'GEOSagcm=>' in line) :  
+                    if (not line.strip()) or line.strip().startswith('#') :   
+                        sys.stdout.write(line)
+                        sys.stdout.flush()
+            else:
+                # process lines that contain string "use_rc_defaults"
+                if use_rc_defaults in line:                            
+                    line0 = line.split(use_rc_defaults)[1]
+                    # strip out inline comment (if present)
+                    position = line0.find('#')
+                    if position>0:  
+                        line0 = line0[:position]
+                    # extract key/value pair and add to dictionary
+                    key, val = line0.split(":",1)
+                    out_dict[key.strip()] = val.strip()
+
 
     print ()
     print ()
 
-    if ladas_cpl > 0:
-       for line in lines:
-         line = line.strip()
-         if not line or line.startswith('#'):
-            continue
-         position = line.find('#')
-         if position>0:  # strip out comment
-            line = line[:position]
-         key, val = line.split(":",1)
-         out_dict[key.strip()] =val.strip()
 
 # -----------------------------------------------------------------------------------
     
