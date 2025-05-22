@@ -1767,9 +1767,15 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
 
        # end if ladas_cpl==0
        
-    # add defaults from GEOSldas_LDAS.rc
+    # add defaults from rc template files
+       
+    current_directory = os.path.dirname(__file__)    # path where ldas_setup is
 
-    _fn = '../etc/GEOSldas_LDAS.rc'          # run ldas_setup from ./install directory
+    # rc template files are in [current_directory]/../etc/
+
+    # add defaults from GEOSldas_LDAS.rc
+    
+    _fn = current_directory+'/../etc/GEOSldas_LDAS.rc'      
     lines = []
     with open(_fn) as _f:
        i_ = 1
@@ -1786,7 +1792,7 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
 
     # add land model parameter defaults from GEOS_SurfaceGridComp.rc
 
-    _fn = '../etc/GEOS_SurfaceGridComp.rc'   # run ldas_setup from ./install directory
+    _fn = current_directory+'/../etc/GEOS_SurfaceGridComp.rc'  
 
     if ladas_cpl == 0 :
         use_rc_defaults = 'GEOSldas=>'       # use defaults for LDAS
