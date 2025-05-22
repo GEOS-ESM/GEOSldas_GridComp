@@ -1749,22 +1749,8 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
        print ()
        print ('############################################################')
 
-       # LDAS coupled to ADAS:
-       #   exclude "required" inputs from sample exeinp file because they will be
-       #   provided by the ADAS setup script (fvsetup)
-         
-       print ('####################################################################################')
-       print ('#                                                                                  #')
-       print ('#     THE ABOVE PARAMETERS ARE NOT REQUIRED IF LDAS COUPLED WITH ADAS              #')
-       print ('#                                                                                  #')
-       print ('#     The ADAS setup script (fvsetup) provides EXP_ID, BEG_DATE, END_DATE, etc     #')
-       print ('#                                                                                  #')
-       print ('####################################################################################')
-
 
     # add defaults from GEOSldas_LDAS.rc
-
-    
     current_directory = os.path.dirname(__file__)
     _fn = current_directory[0:-6]+'/etc/GEOSldas_LDAS.rc'     # run ldas_setup from /bin directory
     lines = []
