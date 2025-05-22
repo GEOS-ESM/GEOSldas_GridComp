@@ -54,36 +54,47 @@ class LDASsetup:
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
             'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_FORMAT' ]
 
-
         self.GEOS_SITE = "@GEOS_SITE@"
 
         # ------
         # Required resource manager input fields
         # ------
-        rqdRmInpKeys = ['account', 'walltime', 'ntasks_model', 'ntasks-per-node']
+        rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model', 'ntasks-per-node']
         # ------
         # Optional resource manager input fields
         # ------
         optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node']
 
+        
+        # ===============================================================================================
+        #    
         # ------
-        # ./ldsetup.py sample ...
+        # ./ldas_setup sample ...
         # ------
-        if 'exeinp' in cmdLineArgs:
-            # sample sub-command
-            # by construction, we can have
-            # either: {'exeinp': False, 'batinp': True }
-            # or:     {'exeinp': True,  'batinp': False} 
+        #
+        # "sample" sub-command:
+        #   '--exeinp' and '--batinp' are mutually exclusive command line arguments.
+        #   Specifying one will set it to True and set the other one to False.
+        #   That is, we can have either: {'exeinp': False, 'batinp': True }
+        #                            or: {'exeinp': True,  'batinp': False} 
+        
+        if 'exeinp' in cmdLineArgs:     # 'exeinp' is always present in "sample" mode.
+            
             if   cmdLineArgs['exeinp']:
                 _produceExeInput()
             elif cmdLineArgs['batinp']:
                 _printRmInputKeys( rqdRmInpKeys,  optSlurmInpKeys)
             else:
                 raise Exception('unrecognized option')
+            #
+            # EXIT after completing "sample" sub-command
             sys.exit(0)
+            
 
+        # ===============================================================================================
+        #    
         # ------
-        # ./ldsetup.py setup ...
+        # ./ldas_setup setup ...
         # ------
         # Instance variables
         self.exeinpfile         = cmdLineArgs['exeinpfile']
@@ -569,7 +580,6 @@ class LDASsetup:
               self.has_vegopacity = True
               self.rqdExeInp['VEGOPACITY_FILE'] = vegopacity_file_
 
-        # DEAL WITH optional input from exec
 
         # ------
         # Read rm input file
@@ -579,46 +589,43 @@ class LDASsetup:
         # ------
         # re-using inpDictFromFile
 
-        inpDictFromFile = self._parseInputFile(cmdLineArgs['batinpfile'])
-
-        if self.ladas_cpl > 0 : 
-           self.rqdRmInp['walltime']        = "01:00:00" 
-           self.rqdRmInp['ntasks_model']    = 120
-           self.rqdRmInp['ntasks-per-node'] =  46                   # 46 works on Cascade Lake and Milan 
-        else :  
-           # REQUIRED inputs
-           for key in rqdRmInpKeys:
+        if self.ladas_cpl == 0 :
+            inpDictFromFile = self._parseInputFile(cmdLineArgs['batinpfile'])
+            # REQUIRED inputs
+            for key in rqdRmInpKeys:
                 self.rqdRmInp[key] = inpDictFromFile.pop(key)
 
-           # checks on rqd rm inputs
-           ## account and walltime should exist
-           assert self.rqdRmInp['account']
-           assert self.rqdRmInp['walltime']
-           ## ntasks_model is a +ve integer
-           _ntasks = int(self.rqdRmInp['ntasks_model'])
-           assert _ntasks>0
-           self.rqdRmInp['ntasks_model'] = _ntasks
-           _ntasks = None
+            # checks on rqd rm inputs
+            ## account and walltime should exist
+            assert self.rqdRmInp['account']
+            assert self.rqdRmInp['walltime']
+            ## ntasks_model is a +ve integer
+            _ntasks = int(self.rqdRmInp['ntasks_model'])
+            assert _ntasks>0
+            self.rqdRmInp['ntasks_model'] = _ntasks
+            _ntasks = None
 
-        if cmdLineArgs['account'] is not None:
-           self.rqdRmInp['account'] = cmdLineArgs['account']
+            # OPTIONAL inputs
+            for key in inpDictFromFile:
+                assert key in optSlurmInpKeys, \
+                    'unknown resource manager key [%s]' % key
+                self.optRmInp[key] = inpDictFromFile[key]
+        else :
+            self.rqdRmInp['account']         = cmdLineArgs['account']
+            self.rqdRmInp['walltime']        = "01:00:00" 
+            self.rqdRmInp['ntasks_model']    = 120
+            self.rqdRmInp['ntasks-per-node'] =  46                   # 46 works on Cascade Lake and Milan 
 
-        # print rqd rm inputs
+
+
+        # print rm inputs
         if self.verbose:
             print ('\n\nRequired inputs for resource manager:')
             _printdict(self.rqdRmInp)
-
-        # OPTIONAL inputs
-        for key in inpDictFromFile:
-            assert key in optSlurmInpKeys, \
-                    'unknown resource manager key [%s]' % key
-            self.optRmInp[key] = inpDictFromFile[key]
-
-        # print opt rm inputs
-        if self.verbose:
             print ('\n\nOptional inputs for resource manager:')
             _printdict(self.optRmInp)
-
+            print ('\n\n')
+            
         # ------
         # set top level directories
         #     rundir, inpdir, outdir, blddir
@@ -1201,11 +1208,11 @@ class LDASsetup:
             assert os.path.isdir(mydir), \
                 'dir [%s] does not exist!' % mydir
 
-        # first copy ldsetup input files to rundir
-        # if a file w/ the same name already exists at rundir
-        # append 1,2,3 etc, to the filename
-        ## exe inp file
-        if self.ladas_cpl == 0 : 
+        if self.ladas_cpl == 0:            
+            # copy ldas_setup exeinp and batinp input files to rundir (for the record)
+            # if a file w/ the same name already exists at rundir
+            # append 1,2,3 etc, to the filename
+            ## exe inp file
             exefilename = self.exeinpfile.rstrip('/').split('/')[-1]
             newfilename = exefilename
             _nens = self.nens
@@ -1223,6 +1230,8 @@ class LDASsetup:
                 newfilename = batfilename + '.%d' % ctr
             shutil.copy(self.batinpfile, self.rundir+'/'+newfilename)
 
+        # -----------------------------------    
+            
         etcdir = self.blddirLn + '/etc'
 
         #defalt nml
@@ -1624,13 +1633,19 @@ def _printdict(d):
     
 def _produceExeInput(out_dict=None,ladas_cpl=0):
     """
-    Private method: print sample exe input
+    Private method: (1) Print sample exeinp file to stdout for offline GEOSldas setup:
+                        _produceExeInput().
+                    *or* 
+                    (2) Create dictionary w/ default parameters from GEOSldas_LDAS.rc and 
+                        GEOS_SurfaceGridComp.rc for coupled land-atm DAS setup:
+                        _produceExeInput(out_dict, ladas_cpl=[1,2]).
     """
+    
     if ladas_cpl > 0:
       assert out_dict is not None , " Need out_dict to hold the default parameters"
 
     # stand-alone (offline) LDAS:
-    # sample exeinp file includes placeholders for inputs that the user needs to provide
+    #   sample exeinp file includes placeholders for inputs that the user needs to provide
     if ladas_cpl == 0:
        print ('####################################################################################')
        print ('#                                                                                  #')
@@ -1750,15 +1765,16 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
        print ()
        print ('############################################################')
 
-
+       # end if ladas_cpl==0
+       
     # add defaults from GEOSldas_LDAS.rc
-    current_directory = os.path.dirname(__file__)
-    _fn = current_directory[0:-4]+'/etc/GEOSldas_LDAS.rc'     # run ldas_setup from /bin directory
+
+    _fn = '../etc/GEOSldas_LDAS.rc'          # run ldas_setup from ./install directory
     lines = []
     with open(_fn) as _f:
        i_ = 1
        for line in _f:
-          if ( i_ < 5 or i_ >10):     # ignore lines 5-10 - may need to change if GEOSldas_LDAS.rc is edited
+          if ( i_ < 5 or i_ >10):            # ignore lines 5-10 - may need to change if GEOSldas_LDAS.rc is edited
              if ladas_cpl == 0:
                 sys.stdout.write(line)
                 sys.stdout.flush()
@@ -1769,7 +1785,8 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
     print ()
 
     # add land model parameter defaults from GEOS_SurfaceGridComp.rc
-    _fn = current_directory[0:-4]+'/etc/GEOS_SurfaceGridComp.rc'   # run ldas_setup from /bin directory
+
+    _fn = '../etc/GEOS_SurfaceGridComp.rc'   # run ldas_setup from ./install directory
 
     if ladas_cpl == 0 :
         use_rc_defaults = 'GEOSldas=>'       # use defaults for LDAS
@@ -1826,10 +1843,10 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('# - account          = computational project number')
     print ('#                      [At NCCS: Use command "getsponsor" to see available account number(s).]' )
     print ('# - walltime         = walltime requested; format is HH:MM:SS (hours/minutes/seconds)')
-    print ('# - ntasks_model     = number of processors requested for the model (typically 112; output server is not included)')
-    print ('# - ntasks-per-node  = number of tasks per node (typically 46 for cascade* and 40 for skylake nodes)')
-    print ('#                      [If >40, cascade nodes will be allocated, else cascade or skylake.]')
-    print ('#                      [*NCCS recommends <=46 cores per node on SCU16 (cascade) due to OS issues (as of 6 Oct 2021).]')
+    print ('# - ntasks_model     = number of processors requested for the model (typically 126; output server is not included)')
+    print ('# - ntasks-per-node  = number of tasks per node (typically 46 for Cascade Lake and 126 for Milan)')
+    print ('#                      [If >46, Milan nodes will be allocated, else Cascade Lake or Milan.]')
+    print ('#                      [NCCS recommends <=46 for Cascade Lake and <=126 for Milan.]')
     print ('#')
     for key in rqdRmInpKeys:
         print (key + ':')
@@ -1854,17 +1871,22 @@ def parseCmdLine():
     """
     parse command line arguments and return a dict of options
     """
+
     #print 'in: parseCmdLine'
     p = argparse.ArgumentParser(
         description= \
-            "Script to setup a GEOSldas experiment. The script requires "\
-            "two (2) input files, one for the experiment inputs and the " \
-            "other for the resource manager (SLURM). To create sample input " \
-            "files use './ldas_setup sample -h'.",
+            "Script to setup a GEOSldas experiment. "\
+            "To set up an *offline* GEOSldas experiment, the script requires "\
+            "two (2) input files, one for the experiment inputs ('exeinp') and the "\
+            "other for the (SLURM) resource manager ('batinp'). To create sample input "\
+            "files use './ldas_setup sample -h'. "\
+            "When used to set up a coupled land-atm DAS experiment, the script "\
+            "*ignores* the input files, but dummy strings must still be specified. "
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
     p_sub = p.add_subparsers(help='sub-command help')
 
+    
     # subparser: "sample" command
     p_sample = p_sub.add_parser(
         'sample',
