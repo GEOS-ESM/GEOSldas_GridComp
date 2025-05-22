@@ -1205,22 +1205,23 @@ class LDASsetup:
         # if a file w/ the same name already exists at rundir
         # append 1,2,3 etc, to the filename
         ## exe inp file
-        exefilename = self.exeinpfile.rstrip('/').split('/')[-1]
-        newfilename = exefilename
-        _nens = self.nens
-        ctr = 0
-        while os.path.isfile(self.rundir+'/'+newfilename):
-            ctr += 1
-            newfilename = exefilename + '.%d' % ctr
-        shutil.copy(self.exeinpfile, self.rundir+'/'+newfilename)
-        ## bat inp file
-        batfilename = self.batinpfile.rstrip('/').split('/')[-1]
-        newfilename = batfilename
-        ctr = 0
-        while os.path.isfile(self.rundir+'/'+newfilename):
-            ctr += 1
-            newfilename = batfilename + '.%d' % ctr
-        shutil.copy(self.batinpfile, self.rundir+'/'+newfilename)
+        if self.ladas_cpl == 0 : 
+            exefilename = self.exeinpfile.rstrip('/').split('/')[-1]
+            newfilename = exefilename
+            _nens = self.nens
+            ctr = 0
+            while os.path.isfile(self.rundir+'/'+newfilename):
+                ctr += 1
+                newfilename = exefilename + '.%d' % ctr
+            shutil.copy(self.exeinpfile, self.rundir+'/'+newfilename)
+            ## bat inp file
+            batfilename = self.batinpfile.rstrip('/').split('/')[-1]
+            newfilename = batfilename
+            ctr = 0
+            while os.path.isfile(self.rundir+'/'+newfilename):
+                ctr += 1
+                newfilename = batfilename + '.%d' % ctr
+            shutil.copy(self.batinpfile, self.rundir+'/'+newfilename)
 
         etcdir = self.blddirLn + '/etc'
 
@@ -1752,7 +1753,7 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
 
     # add defaults from GEOSldas_LDAS.rc
     current_directory = os.path.dirname(__file__)
-    _fn = current_directory[0:-6]+'/etc/GEOSldas_LDAS.rc'     # run ldas_setup from /bin directory
+    _fn = current_directory[0:-4]+'/etc/GEOSldas_LDAS.rc'     # run ldas_setup from /bin directory
     lines = []
     with open(_fn) as _f:
        i_ = 1
@@ -1768,7 +1769,7 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
     print ()
 
     # add land model parameter defaults from GEOS_SurfaceGridComp.rc
-    _fn = current_directory[0:-6]+'/etc/GEOS_SurfaceGridComp.rc'   # run ldas_setup from /bin directory
+    _fn = current_directory[0:-4]+'/etc/GEOS_SurfaceGridComp.rc'   # run ldas_setup from /bin directory
 
     if ladas_cpl == 0 :
         use_rc_defaults = 'GEOSldas=>'       # use defaults for LDAS
