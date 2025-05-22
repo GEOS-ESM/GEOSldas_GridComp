@@ -1881,7 +1881,7 @@ def parseCmdLine():
             "other for the (SLURM) resource manager ('batinp'). To create sample input "\
             "files use './ldas_setup sample -h'. "\
             "When used to set up a coupled land-atm DAS experiment, the script "\
-            "*ignores* the input files, but dummy strings must still be specified. "
+            "*ignores* the input files, but dummy strings must still be specified. ",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
     p_sub = p.add_subparsers(help='sub-command help')
