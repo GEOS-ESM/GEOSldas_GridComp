@@ -50,13 +50,19 @@ exp_main = { 'expdir'       : '/discover/nobackup/projects/gmao/merra/iau/merra_
           'expid'        : 'DAv8_SMOSSMAP',
           'exptag'       : 'DAMulti_SMAP', 
           'domain'       : 'SMAP_EASEv2_M36_GLOBAL',
-          'species_list' : [5,6,7,8] }
+          'da_t0'        : 3,                              # hour of first land analysis
+          'da_dt'        : 10800,                          # ObsFcstAna file interval in seconds            
+          'species_list' : [5,6,7,8],
+          'obsparam_time': "20150401_0000"                 # YYYYMMDD_HHMM
+}
 
 exp_sup1 = { 'expdir'       : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
           'expid'        : 'DAv8_M36',
           'exptag'       : 'DASMAP_SMAP', 
           'domain'       : 'SMAP_EASEv2_M36_GLOBAL',
-          'species_list' : [1,2,3,4]  }
+          'species_list' : [1,2,3,4],
+          'obsparam_time': "20150401_0000"                 # YYYYMMDD_HHMM
+}
 
 # User provided monthly sum files directory
 monthly_sums_path = '/discover/nobackup/qliu/SMAP_diag/' +exp_main['expid']+ \
@@ -77,7 +83,11 @@ for exp in exp_list:
     expdir   = exp['expdir']
     expid    = exp['expid']
     domain   = exp['domain']
-    fop      = expdir+expid+'/output/'+domain+'/rc_out/Y2015/M04/'+expid+'.ldas_obsparam.20150401_0000z.txt'
+
+    YYYY     = exp['obsparam_time'][0:4]
+    MM       = exp['obsparam_time'][4:6]
+    
+    fop      = expdir+expid+'/output/'+domain+'/rc_out/Y'+YYYY+'/M'+MM+'/'+expid+'.ldas_obsparam.'+exp['obsparam_time']+'z.txt'
     obsparam = read_obs_param(fop)
 
     # get the species list and default to list of all species if doesn't exist 
