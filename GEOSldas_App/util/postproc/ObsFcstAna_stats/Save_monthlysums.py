@@ -127,7 +127,7 @@ for exp in exp_list:
     YYYY     = exp['obsparam_time'][0:4]
     MM       = exp['obsparam_time'][4:6]
     
-    fop      = expdir+expid+'/output/'+domain+'/rc_out/Y'+YYYY+'/M'+MM+'/'+expid+'.ldas_obsparam.'+exp[obsparam_time]+'z.txt'
+    fop      = expdir+expid+'/output/'+domain+'/rc_out/Y'+YYYY+'/M'+MM+'/'+expid+'.ldas_obsparam.'+exp['obsparam_time']+'z.txt'
     obsparam = read_obs_param(fop)
 
     # get the species list and default to list of all species if doesn't exist 
