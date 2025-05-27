@@ -860,6 +860,16 @@ endif
 
 if ( $LADAS_COUPLING > 0 ) then
    if ( $rc == 0 ) then
+      ##update CAP.rc END_DATE in $HOMDIR/
+      set date  = `$GEOSBIN/tick $nymdf $nhmsf $dt`
+      set nymdend =  $date[1]
+      set nhmsend =  $date[2]
+      cd  $HOMDIR 
+      set oldstring = `cat CAP.rc | grep END_DATE:`
+      set newstring = "END_DATE: $nymdend $nhmsend"
+      /bin/mv CAP.rc CAP.tmp
+      cat CAP.tmp | sed -e "s?$oldstring?$newstring?g" > CAP.rc
+      /bin/rm -f CAP.tmp
       echo 'SUCCEEDED' > $HOMDIR/lenkf_job_completed.txt
    endif
 else
