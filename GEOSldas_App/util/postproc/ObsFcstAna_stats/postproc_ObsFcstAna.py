@@ -15,7 +15,7 @@ from dateutil.relativedelta      import relativedelta
 from netCDF4                     import Dataset, date2num
 
 from helper.compute_monthly_sums import compute_monthly_sums
-from helper.write_nc4            import write_sums_nc4, write_stats_nc4, write_omf_stats_nc4, write_omf_grouped_stats_nc4
+from helper.write_nc4            import write_sums_nc4, write_stats_nc4
 
 class postproc_ObsFcstAna:
     
