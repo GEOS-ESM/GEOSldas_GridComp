@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added more default settings and command line arguments for integrated land-atm DAS setup 
 - Added functionality for model-based QC of MODIS SCF observations using soil layer 1 temperature.
 - Added functionality to simulate landice tiles.
 - Added functionality to read nc4-formatted tile file.
