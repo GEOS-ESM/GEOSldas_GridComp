@@ -1,5 +1,8 @@
-import numpy as np
+# collection of py functions for plotting
+
+import numpy             as np
 import matplotlib.pyplot as plt
+
 from mpl_toolkits import basemap
 
 def plotMap(
@@ -24,14 +27,14 @@ def plotMap(
         vmax = cRange[1]
     else:
         temp = flatData(data)
-        vmin = np.percentile(temp, 5)
+        vmin = np.percentile(temp,  5)
         vmax = np.percentile(temp, 95)
         if cRangeint is True:
             vmin = int(round(vmin))
             vmax = int(round(vmax))
     if ax is None:
         fig = plt.figure(figsize=figsize)
-        ax = fig.subplots()
+        ax  = fig.subplots()
 
     # map boundary
     if bounding is None:
@@ -71,5 +74,7 @@ def plotMap(
     if ax is None:
         return fig, ax, mm
     else:
-       return mm, cs
+        return mm, cs
 
+
+# ================ EOF =================================================
