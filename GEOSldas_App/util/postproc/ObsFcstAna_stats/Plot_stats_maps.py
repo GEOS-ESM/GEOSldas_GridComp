@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from datetime               import timedelta
 
-from tile2grid             import tile2grid
+from remap_1d_to_2d         import remap_1d_to_2d
 from plot                   import plotMap
 from EASEv2                 import EASEv2_ind2latlon
 
@@ -125,7 +125,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 lat_M36, lon_M36 = EASEv2_ind2latlon(np.arange(406), np.arange(964),'M36')
                 lon_2d,lat_2d = np.meshgrid(lon_M36,lat_M36)
             else:
-                grid_data, uy, ux = tile2grid(tile_data, lat_1d = tc['com_lat'], lon_1d = tc['com_lon'])
+                grid_data, uy, ux = remap_1d_to_2d(tile_data, lat_1d = tc['com_lat'], lon_1d = tc['com_lon'])
                 lon_2d,lat_2d = np.meshgrid(ux, uy)
 
                 # Aear weighted mean and mean(abs)
