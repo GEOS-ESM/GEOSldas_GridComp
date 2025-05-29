@@ -25,7 +25,7 @@ module clsm_ensupd_read_obs
   use io_hdf5,                          ONLY:     &
        hdf5read 
 
-  use EASE_conv,                        ONLY:     &
+  use MAPL,                             ONLY:     &
        ease_convert,                              &
        ease_extent
   

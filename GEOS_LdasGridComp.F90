@@ -7,7 +7,7 @@ module GEOS_LdasGridCompMod
   ! !USES
 
   use ESMF
-  use MAPL_Mod
+  use MAPL
 
   use GEOS_MetforceGridCompMod,  only: MetforceSetServices  => SetServices
   use GEOS_LandGridCompMod,      only: LandSetServices      => SetServices
@@ -16,7 +16,6 @@ module GEOS_LdasGridCompMod
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
 
-  use EASE_conv,              only: ease_inverse
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
   use LDAS_TileCoordRoutines, only: get_minExtent_grid, get_ij_ind_from_latlon, io_domain_files

@@ -74,7 +74,7 @@ module clsm_ensupd_enkf_update
   use nr_ran2_gasdev,                   ONLY:     &
        NRANDSEED
 
-  use ease_conv,                        ONLY:     &
+  use MAPL,                             ONLY:     &
        ease_convert
 
   use my_matrix_functions,              ONLY:     &

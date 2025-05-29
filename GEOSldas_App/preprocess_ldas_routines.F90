@@ -2403,10 +2403,10 @@ contains
        end if
 
        open(10,file=optimized_file, action='write')
-       write(10,'(A)')    "GEOSldas.GRID_TYPE:  LatLon"
+       write(10,'(A)')    "GEOSldas.GRID_TYPE:  EASE"
        write(10,'(A)')    "GEOSldas.GRIDNAME:   "//trim(gridname)
        write(10,'(A)')    "GEOSldas.LM:         1"
-       write(10,'(A)')    "GEOSldas.POLE:       PE"
+       write(10,'(A)')    "GEOSldas.POLE:       XY"
        write(10,'(A)')    "GEOSldas.DATELINE:   DE"
        write(10,'(A,I6)') "GEOSldas.IM_WORLD:   ", N_lon
        write(10,'(A,I6)') "GEOSldas.JM_WORLD:   ", N_lat

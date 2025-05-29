@@ -26,7 +26,7 @@ module LDAS_TileCoordRoutines
   use MAPL_ConstantsMod,                ONLY:     &
        MAPL_RADIUS                                    ! Earth radius
   
-  use EASE_conv,                        ONLY:     &
+  use MAPL,                             ONLY:     &
        ease_convert,                              &
        ease_inverse,                              &
        ease_extent
