@@ -6,9 +6,9 @@ from GEOSldas ObsFcstAna output.  Data assimilation diagnostics such as the mean
 std-dev of the observation-minus-forecast residuals can be diagnosed quickly from these
 intermediate "sums" files. 
 
-Usage on Discover:
-    First, edit "user_config.py" with proper experiments inforamtion.
-    Then, run this script as follows
+Usage:
+    First, edit "user_config.py" with proper experiments information.
+    Then, run this script as follows (on Discover):
     $ module load python/GEOSpyD
     $ ./Save_monthlysums.py
     
@@ -27,7 +27,10 @@ import numpy as np
 
 from datetime               import timedelta
 from postproc_ObsFcstAna    import postproc_ObsFcstAna
-from user_config            import get_config
+from user_config            import get_config              # user-defined config info
+
+# ---
+#
 # If the script is run in the background, uncomment the following lines to see the redirected
 #   standard output in the out.log file immediately.  When the lines are commented out, the redirected
 #   standard output will not appear in the out.log file until the job has completed.
@@ -36,21 +39,21 @@ from user_config            import get_config
 #import io
 #sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
 #sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0), write_through=True)
-
+#
+# ---
 
 def main():
      
-    config = get_config()
+    config     = get_config()                 # edit user-defined inputs in user_config.py
     
-    exp_list = config['exp_list']
+    exp_list   = config['exp_list']
     start_time = config['start_time']
-    end_time = config['end_time']
-    obs_from = config['obs_from']
-    sum_path = config['sum_path']
-    out_path = config['out_path']
+    end_time   = config['end_time']
+    obs_from   = config['obs_from']
+    sum_path   = config['sum_path']
+    out_path   = config['out_path']
      
     # ------------------------------------------------------------------------------------
-    # First
     # Postprocess raw ObsFcstAna output data into monthly sums 
 
     # Initialize the postprocessing object
@@ -60,11 +63,11 @@ def main():
     postproc.save_monthly_sums()
 
     # --------------------------------------------------------------------------------------
-    # Next, there is an option to compute long-term temporal/spatial statistics and create plots.
-    # The plotting scripts can also run standalone using the individual Plot_xx.py scripts,
-    # as long as the monthly sum files are available.
+    # Optionally compute long-term temporal/spatial statistics and create plots.
+    # The plotting scripts can also run standalone using the individual Plot_stats_*.py scripts,
+    #   as long as the monthly sum files are available.
     
-    plot_maps = False
+    plot_maps       = False
     plot_timeseries = True
 
     if plot_maps:
