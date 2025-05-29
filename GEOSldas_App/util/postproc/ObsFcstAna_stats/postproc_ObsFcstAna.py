@@ -44,7 +44,7 @@ class postproc_ObsFcstAna:
     
     # ----------------------------------------------------------------------------------------------------------
     #
-    # Function to compute monthly sums from x-hourly ObsFcstAna data for a single month
+    # Function to compute monthly sums from x-hourly ObsFcstAna data for a single month.
 
     def compute_monthly_sums(self, date_time):
         
@@ -151,9 +151,9 @@ class postproc_ObsFcstAna:
 
     # ----------------------------------------------------------------------------------------------------------
     #
-    # Function to compute monthly sums and save results in nc4 files for months in [start_time, end_time].
+    # Function to compute monthly sums and save results in nc4 files for all months in [start_time, end_time].
     #
-    # Skips months for which output already exists.
+    # Skips computation/saving of monthly sums output if file already exists.
 
     def save_monthly_sums(self):
         expdir_list    = self.expdir_list
@@ -192,7 +192,9 @@ class postproc_ObsFcstAna:
 
     # ----------------------------------------------------------------------------------------------------------
     #
-    # Function to compute long-term temporal statistics of individual species based on monthly sums
+    # Function to compute long-term temporal statistics of individual species based on monthly sums.
+    #
+    # Assumes that monthly sums files have been saved [see save_monthly_sums()].
 
     def calc_temporal_stats_from_sums(self, write_to_nc=True, fout_stats='./stats.nc4'):
 
@@ -205,10 +207,7 @@ class postproc_ObsFcstAna:
                     stats[key] = value[:].filled(np.nan)
 
         else:
-            start_month  = self.start_time
-            end_month    = self.end_time
-            
-            # Variable list for computing sum and sum of squared
+            # Variable list for computing sum and sum-of-squares
             var_list = self.var_list 
 
             # Read tilecoord and obsparam for tile and obs species information
@@ -224,33 +223,33 @@ class postproc_ObsFcstAna:
             fxa_sum = np.zeros((n_tile, n_spec))
 
             for var in var_list:
-                data_sum[var] = np.zeros((n_tile, n_spec))
+                data_sum[ var] = np.zeros((n_tile, n_spec))
                 data2_sum[var] = np.zeros((n_tile, n_spec))
 
             # Time loop: processing data at monthly time step
             
-            current_month = start_month
-            # month loop
-            while current_month < end_month:
-                
-                fpath = self.sum_path + '/Y'+ current_month.strftime('%Y') + '/M' + current_month.strftime('%m') + '/'
-                    
-                fout = self.outid + '.ens_avg.ldas_ObsFcstAna.' + current_month.strftime('%Y%m') +'_sums.nc4'
+            date_time = self.start_time
 
-                fout = fpath + fout
+            while date_time < self.end_time:      # loop through months
+                
+                fpath = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
+                    
+                fout  = self.outid + '.ens_avg.ldas_ObsFcstAna.' + date_time.strftime('%Y%m') +'_sums.nc4'
+
+                fout  = fpath + fout
                                 
-                # Read monthly data if file exists, otherwise compute monthly statistics first   
+                # Read monthly data 
                 if os.path.isfile(fout):
-                    print('read sums from  monthly file: '+fout)
-                    mdata_sum = {}
+                    print('read sums from monthly file: '+fout)
+                    mdata_sum  = {}
                     mdata2_sum = {}
                     with Dataset(fout,'r') as nc:
-                        mN_data  = nc.variables['N_data'][:]
+                        mN_data  = nc.variables['N_data'      ][:]
                         moxf_sum = nc.variables['obsxfcst_sum'][:]
-                        moxa_sum = nc.variables['obsxana_sum'][:]
+                        moxa_sum = nc.variables['obsxana_sum' ][:]
                         mfxa_sum = nc.variables['fcstxana_sum'][:]
                         for var in var_list:
-                            mdata_sum[var] = nc.variables[var+'_sum'][:]
+                            mdata_sum[ var] = nc.variables[var+'_sum' ][:]
                             mdata2_sum[var] = nc.variables[var+'2_sum'][:]
                            
                     # Aggregate monthly data
@@ -260,14 +259,14 @@ class postproc_ObsFcstAna:
                     fxa_sum += mfxa_sum
                    
                     for var in var_list:
-                        data_sum[var] += mdata_sum[var] 
+                        data_sum[ var] += mdata_sum[ var] 
                         data2_sum[var] += mdata2_sum[var]  
                 else:
-                    raise FileNotFoundError(f"File {fout} does not exist, run save_monthly_sum first")
+                    raise FileNotFoundError(f"File {fout} does not exist, run save_monthly_sums() first")
                      
-                current_month =current_month + relativedelta(months=1)
+                date_time = date_time + relativedelta(months=1)
 
-            # Compute the basic statistics after finishing time loop based on the accumulated data.
+            # Compute stats (DA diagnostics) from accumulated sums data.
             data_mean  = {}
             data2_mean = {}
             data_var   = {}
@@ -277,7 +276,7 @@ class postproc_ObsFcstAna:
                 data_sum[var][ N_data == 0] = np.nan
                 data2_sum[var][N_data == 0] = np.nan
                 
-                data_mean[ var] = data_sum[var]  / N_data
+                data_mean[ var] = data_sum[ var] / N_data
                 data2_mean[var] = data2_sum[var] / N_data
                 # var(x) = E[x2] - (E[x])^2
                 data_var[var]   = data2_mean[var] - data_mean[var]**2
@@ -307,32 +306,35 @@ class postproc_ObsFcstAna:
 
     # ----------------------------------------------------------------------------------------------------------
     #
-    # Function to compute the O-F/O-A spatial statistics for one month based on
-    # previously saved monthly sums.
+    # Function to compute the O-F/O-A *spatial* statistics for a *single* month based on
+    #   previously saved monthly sums.
     # Individual temporal and grid cell DA diagnostic values within a month are aggregated first;
-    # the monthly Ndata/mean/stdv are derived from the aggregated sample.
+    #   the monthly Ndata/mean/stdv are derived from the aggregated sample.  Consequently, in the
+    #   final DA diagnostics, each obs value gets equal weight. Note that this differs from computing
+    #   the straight spatial avg across a map of a given DA diagnostic.  The latter approach gives 
+    #   the same weight to each location, regardless of how many obs are available at the location.
 
-    def calc_spatial_stats_from_sums(self, month):
+    def calc_spatial_stats_from_sums(self, date_time):
 
         var_list = ['obs_obs', 'obs_fcst','obs_ana']
         
-        mo_path = self.sum_path + '/Y'+ month.strftime('%Y') + '/M' + month.strftime('%m') + '/'            
-        fnc4_sums = mo_path + self.outid + '.ens_avg.ldas_ObsFcstAna.' + month.strftime('%Y%m') +'_sums.nc4'
-
+        mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'            
+        fnc4_sums = mo_path + self.outid + '.ens_avg.ldas_ObsFcstAna.' + date_time.strftime('%Y%m') +'_sums.nc4'
+        
         mdata_sum = {}
         mdata2_sum = {}
 
         try:
             with Dataset(fnc4_sums,'r') as nc:
-                mN_data = nc.variables['N_data'][:]
-                moxf_sum = nc.variables['obsxfcst_sum'][:]
-                moxa_sum = nc.variables['obsxana_sum'][:]
+                mN_data                = nc.variables['N_data'      ][:]
+                moxf_sum               = nc.variables['obsxfcst_sum'][:]
+                moxa_sum               = nc.variables['obsxana_sum' ][:]
                 moxf_sum[mN_data == 0] = np.nan
                 moxa_sum[mN_data == 0] = np.nan
                 for var in var_list:
-                    mdata_sum[var] = nc.variables[var+'_sum'][:]
-                    mdata2_sum[var] = nc.variables[var+'2_sum'][:]
-                    mdata_sum[var][mN_data == 0] = np.nan
+                    mdata_sum[ var]               = nc.variables[var+'_sum' ][:]
+                    mdata2_sum[var]               = nc.variables[var+'2_sum'][:]
+                    mdata_sum[ var][mN_data == 0] = np.nan
                     mdata2_sum[var][mN_data == 0] = np.nan
         except FileNotFoundError:
             print(f"Error: File '{filename}' not found.")
@@ -343,26 +345,26 @@ class postproc_ObsFcstAna:
 
         # Make sure only aggregate tiles with valid values for all variables
         for var in var_list:
-            mN_data = mN_data.astype(float)
+            mN_data                           = mN_data.astype(float)
             mN_data[np.isnan(mdata_sum[var])] = np.nan
-            mN_data[mN_data == 0] = np.nan
+            mN_data[mN_data == 0]             = np.nan
 
         # cross mask before aggregating tile values   
         for var in var_list:
-            mdata_sum[var][np.isnan(mN_data)] = np.nan
+            mdata_sum[ var][np.isnan(mN_data)] = np.nan
             mdata2_sum[var][np.isnan(mN_data)] = np.nan
-            moxf_sum[np.isnan(mN_data)] = np.nan
-            moxa_sum[np.isnan(mN_data)] = np.nan
+            moxf_sum[np.isnan(mN_data)]        = np.nan
+            moxa_sum[np.isnan(mN_data)]        = np.nan
 
         # Aggregate data of all tiles
-        N_data = np.nansum(mN_data,axis=0)
-        OxF_mean = np.nansum(moxf_sum,axis=0)/N_data
-        OxA_mean = np.nansum(moxa_sum,axis=0)/N_data
-        data_mean = {}
+        N_data     = np.nansum(mN_data, axis=0)
+        OxF_mean   = np.nansum(moxf_sum,axis=0)/N_data
+        OxA_mean   = np.nansum(moxa_sum,axis=0)/N_data
+        data_mean  = {}
         data2_mean = {}
-        data_var = {}
+        data_var   = {}
         for var in var_list:
-            data_mean[var] = np.nansum(mdata_sum[var],axis=0)/N_data
+            data_mean[ var] = np.nansum(mdata_sum[var ],axis=0)/N_data
             data2_mean[var] = np.nansum(mdata2_sum[var],axis=0)/N_data
             # var(x) = E[x2] - (E[x])^2
             data_var[var] = data2_mean[var] - data_mean[var]**2
@@ -371,9 +373,10 @@ class postproc_ObsFcstAna:
         O_mean = data_mean['obs_obs']
         F_mean = data_mean['obs_fcst']
         A_mean = data_mean['obs_ana']
-        O_var = data_var['obs_obs']
-        F_var = data_var['obs_fcst']
-        A_var = data_var['obs_ana']
+
+        O_var  = data_var[ 'obs_obs']
+        F_var  = data_var[ 'obs_fcst']
+        A_var  = data_var[ 'obs_ana']
 
         # mean(x-y) = E[x] - E[y]   
         OmF_mean = O_mean - F_mean
