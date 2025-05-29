@@ -25,8 +25,7 @@ import os
 
 import numpy as np
 
-from datetime               import datetime, timedelta
-from read_GEOSldas          import read_tilecoord, read_obs_param
+from datetime               import timedelta
 from postproc_ObsFcstAna    import postproc_ObsFcstAna
 from user_config            import get_config
 # If the script is run in the background, uncomment the following lines to see the redirected
@@ -66,7 +65,7 @@ def main():
     # as long as the monthly sum files are available.
     
     plot_maps = False
-    plot_timeseries = False
+    plot_timeseries = True
 
     if plot_maps:
         # Compute long-term temporal stats and plot maps
