@@ -7,6 +7,8 @@ import os
 import numpy as np
 
 # ----------------------------------------------------------------------------
+#
+# reader for GEOSldas obsparam file (ASCII)
 
 def read_obs_param(fname):
     print(f"Reading {fname}")
@@ -62,22 +64,24 @@ def read_obs_param(fname):
     return obs_param
 
 # ----------------------------------------------------------------------------
+#
+# reader for GEOSldas tilecoord file (binary)
 
 def read_tilecoord(fname):
-    int_precision = 'i'
+    int_precision   = 'i'
     float_precision = 'f'
 
-    # Determine endianness
-    machfmt = '<'  # '>' for big-endian, '<' for little-endian
+    # SPECIFY endianness
+    machfmt = '<'                    # '>' for big-endian, '<' for little-endian
 
     print(f"reading from {fname}")
 
     tile_coord = {}
 
     with open(fname, 'rb') as ifp:
-        fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+        fortran_tag          = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
         tile_coord['N_tile'] = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-        fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+        fortran_tag          = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
         Nt = tile_coord['N_tile']
 
@@ -86,15 +90,18 @@ def read_tilecoord(fname):
                   'area', 'elev']
 
         for field in fields:
-            fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            dtype = int_precision if field in ['tile_id', 'typ', 'pfaf', 'i_indg', 'j_indg'] else float_precision
-            tile_coord[field] = np.frombuffer(ifp.read(Nt * 4), dtype=f'{machfmt}{dtype}')
-            fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+            this_dtype        = int_precision if field in ['tile_id', 'typ', 'pfaf', 'i_indg', 'j_indg'] else float_precision
+            
+            fortran_tag       = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+            tile_coord[field] = np.frombuffer(ifp.read(Nt * 4), dtype=f'{machfmt}{this_dtype}')
+            fortran_tag       = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
     print("done reading file")
     return tile_coord
 
 # ----------------------------------------------------------------------------
+#
+# reader for GEOSldas ObsFcstAna file (binary)
 
 def read_ObsFcstAna(fname, isLDASsa=False):
 
@@ -102,49 +109,49 @@ def read_ObsFcstAna(fname, isLDASsa=False):
     nodata = -9999
 
     date_time = {
-        'year': nodata,
-        'month': nodata,
-        'day': nodata,
-        'hour': nodata,
-        'min': nodata,
-        'sec': nodata,
-        'dofyr': nodata,
+        'year'  : nodata,
+        'month' : nodata,
+        'day'   : nodata,
+        'hour'  : nodata,
+        'min'   : nodata,
+        'sec'   : nodata,
+        'dofyr' : nodata,
         'pentad': nodata
     }
 
-    obs_assim = []
+    obs_assim   = []
     obs_species = []
     obs_tilenum = []
-    obs_lon = []
-    obs_lat = []
-    obs_obs = []
-    obs_obsvar = []
-    obs_fcst = []
+    obs_lon     = []
+    obs_lat     = []
+    obs_obs     = []
+    obs_obsvar  = []
+    obs_fcst    = []
     obs_fcstvar = []
-    obs_ana = []
-    obs_anavar = []
+    obs_ana     = []
+    obs_anavar  = []
 
-    # Determine endianness
-    machfmt = '>' if isLDASsa else '<'  # '>' for big-endian, '<' for little-endian
-
+    # SPECIFY endianness
+    machfmt = '<'                    # '>' for big-endian, '<' for little-endian
+    
     if os.path.exists(fname):
         print(f"reading from {fname}")
 
         with open(fname, 'rb') as ifp:
             # Read N_obs and time stamp entry
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            N_obs = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+            N_obs       = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
             year, month, day, hour, minute, second, dofyr, pentad = struct.unpack(f'{machfmt}8i', ifp.read(32))
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             date_time = {
-                'year': year,
-                'month': month,
-                'day': day,
-                'hour': hour,
-                'min': minute,
-                'sec': second,
-                'dofyr': dofyr,
+                'year'  : year,
+                'month' : month,
+                'day'   : day,
+                'hour'  : hour,
+                'min'   : minute,
+                'sec'   : second,
+                'dofyr' : dofyr,
                 'pentad': pentad
             }
 
@@ -168,27 +175,27 @@ def read_ObsFcstAna(fname, isLDASsa=False):
 
             # Read longitude
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_lon = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_lon     = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # Read latitude
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_lat = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_lat     = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # Read observation value
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_obs = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_obs     = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # Read observation variance
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_obsvar = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_obsvar  = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # Read observation-space model forecast value
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_fcst = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_fcst    = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # Read observation-space model forecast variance
@@ -198,35 +205,35 @@ def read_ObsFcstAna(fname, isLDASsa=False):
 
             # Read observation-space analysis value
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_ana = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_ana     = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # Read observation-space analysis variance
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            obs_anavar = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
+            obs_anavar  = np.frombuffer(ifp.read(N_obs * 4), dtype=f'{machfmt}f').copy()
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # No-data check
-            obs_obsvar[obs_obsvar == nodata] = np.nan
-            obs_fcst[obs_fcst == nodata] = np.nan
+            obs_obsvar[ obs_obsvar  == nodata] = np.nan
+            obs_fcst[   obs_fcst    == nodata] = np.nan
             obs_fcstvar[obs_fcstvar == nodata] = np.nan
-            obs_ana[obs_ana == nodata] = np.nan
-            obs_anavar[obs_anavar == nodata] = np.nan
+            obs_ana[    obs_ana     == nodata] = np.nan
+            obs_anavar[ obs_anavar  == nodata] = np.nan
 
     else:
         print(f"file does not exist: {fname}")
 
-    return {'date_time': date_time, 
-            'obs_assim': obs_assim, 
+    return {'date_time'  : date_time, 
+            'obs_assim'  : obs_assim, 
             'obs_species': obs_species, 
             'obs_tilenum': obs_tilenum, 
-            'obs_lon': obs_lon, 
-            'obs_lat': obs_lat,
-            'obs_obs': obs_obs, 
-            'obs_obsvar': obs_obsvar, 
-            'obs_fcst': obs_fcst, 
+            'obs_lon'    : obs_lon, 
+            'obs_lat'    : obs_lat,
+            'obs_obs'    : obs_obs, 
+            'obs_obsvar' : obs_obsvar, 
+            'obs_fcst'   : obs_fcst, 
             'obs_fcstvar': obs_fcstvar, 
-            'obs_ana': obs_ana, 
-            'obs_anavar': obs_anavar}
+            'obs_ana'    : obs_ana, 
+            'obs_anavar' : obs_anavar}
 
 # ================ EOF =================================================
