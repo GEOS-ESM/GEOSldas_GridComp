@@ -466,12 +466,15 @@ class LDASsetup:
             extension = os.path.splitext(tmptile)[1]
             if extension == '.domain':
               extension = os.path.splitext(tmptile)[0]
-               
+            gridname_ =''
             if extension == '.til':
-               self.rqdExeInp['GRIDNAME']  = linecache.getline(tmptile, 3).strip()
+               gridname_ = linecache.getline(tmptile, 3).strip()
             else:
                nc_file = netCDF4.Dataset(tmptile,'r')
-               self.rqdExeInp['GRIDNAME'] = nc_file.getncattr('Grid_Name')
+               gridname_ = nc_file.getncattr('Grid_Name')
+            # in case it is an old name: SMAP-EASEvx-Mxx
+            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
+            self.rqdExeInp['GRIDNAME']  = gridname_
                
         if 'LSM_CHOICE' not in self.rqdExeInp:
             self.rqdExeInp['LSM_CHOICE'] = 1
