@@ -2402,6 +2402,12 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)          
        end if
 
+       if (index(gridname, 'SMAP') /=0 ) then
+          gridname = trim(adjustl(gridname))
+          gridname = gridname(6:)
+          gridname(7:7) = '_' ! replace '-' with '_'
+       endif
+
        open(10,file=optimized_file, action='write')
        write(10,'(A)')    "GEOSldas.GRID_TYPE:  EASE"
        write(10,'(A)')    "GEOSldas.GRIDNAME:   "//trim(gridname)
