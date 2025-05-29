@@ -1,5 +1,5 @@
 
-# Tool to prepocess GEOSldas ObsFcstAna output into monthly sums, sums of squares, and sum of cross-products
+# Tool to preprocess GEOSldas ObsFcstAna output into monthly sums, sums of squares, and sums of cross-products
 #
 # qliu, amfox, rreichle - May 2025
 
@@ -20,7 +20,7 @@ from helper.write_nc4            import write_sums_nc4, write_stats_nc4
 class postproc_ObsFcstAna:
     
     def __init__(self, exp_list, start_time, end_time, obs_from=0, sum_path='./', outid=None):
-        self.exp_list = exp_list
+        self.exp_list      = exp_list
         self.expdir_list   = [item['expdir'] for item in exp_list]
         self.expid_list    = [item['expid']  for item in exp_list]
         self.exptag_list   = [item['exptag'] for item in exp_list]
@@ -42,25 +42,26 @@ class postproc_ObsFcstAna:
             if self.obs_from  > 0:
                 self.outid = self.outid + '_Obs_from_' + self.exptag_list[self.obs_from]
     
-    # ---------------------------------------------------------------------------
-    # Function to compute monthly sums from hourly ObsFcstAna data for a given month
-    def compute_monthly_sums(self, month):
+    # ----------------------------------------------------------------------------------------------------------
+    #
+    # Function to compute monthly sums from x-hourly ObsFcstAna data for a single month
+
+    def compute_monthly_sums(self, date_time):
         
-        expdir_list = self.expdir_list
-        expid_list = self.expid_list
-        domain = self.domain
-        tc = self.tilecoord
+        expdir_list   = self.expdir_list
+        expid_list    = self.expid_list
+        domain        = self.domain
+        tc            = self.tilecoord
         obsparam_list = self.obsparam_list
-        var_list =self.var_list
-        obs_from = self.obs_from
-        da_dt = self.da_dt
+        var_list      = self.var_list
+        obs_from      = self.obs_from
+        da_dt         = self.da_dt
         
         n_tile = tc['N_tile']
         n_spec = len(obsparam_list[0])
 
-        start_time = month
-        start_time = start_time.replace(hour=self.da_t0)
-        end_time   = start_time + relativedelta(months=1) 
+        date_time = date_time.replace(hour=self.da_t0)
+        end_time  = date_time + relativedelta(months=1) 
         
         data_sum  = {}
         data2_sum = {}
@@ -74,7 +75,6 @@ class postproc_ObsFcstAna:
             data_sum[ var] = np.zeros((n_tile, n_spec))
             data2_sum[var] = np.zeros((n_tile, n_spec))
 
-        date_time = start_time
         while date_time < end_time:
             
             # read the list of experiments at each time step (OFA="ObsFcstAna")
@@ -149,47 +149,51 @@ class postproc_ObsFcstAna:
 
         return N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa_sum
 
-    # ---------------------------------------------------------------------------
-    # Function to assemble file path structures for monthly sums files and save results in nc4 files     
-    def save_monthly_sums(self):
-        expdir_list   = self.expdir_list
-        expid_list    = self.expid_list
-        exptag_list   = self.exptag_list
-        domain        = self.domain
-        var_list      = self.var_list
-        tc            = self.tilecoord
-        obsparam_list = self.obsparam_list
-        start_month    = self.start_time
-        end_month      = self.end_time
+    # ----------------------------------------------------------------------------------------------------------
+    #
+    # Function to compute monthly sums and save results in nc4 files for months in [start_time, end_time].
+    #
+    # Skips months for which output already exists.
 
-        current_month = start_month
-        # month loop
-        while current_month < end_month:
+    def save_monthly_sums(self):
+        expdir_list    = self.expdir_list
+        expid_list     = self.expid_list
+        exptag_list    = self.exptag_list
+        domain         = self.domain
+        var_list       = self.var_list
+        tc             = self.tilecoord
+        obsparam_list  = self.obsparam_list
+
+        date_time   = self.start_time
+
+        while date_time < self.end_time           # loop through months
             
             # make monthly file output directory 
-            mo_path = self.sum_path + '/Y'+ current_month.strftime('%Y') + '/M' + current_month.strftime('%m') + '/'
+            mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
             os.makedirs(mo_path, exist_ok=True)
     
-            fout = self.outid + '.ens_avg.ldas_ObsFcstAna.' + current_month.strftime('%Y%m') +'_sums.nc4'
+            fout = self.outid + '.ens_avg.ldas_ObsFcstAna.' + date_time.strftime('%Y%m') +'_sums.nc4'
 
             fout = mo_path + fout
             
             # skip if output file already exists
             if  not os.path.isfile(fout):
-                print('computing monthly sums ...')
+                print('computing monthly sums...')
                 # compute monthly sums
                 mN_data, mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum = \
-                    self.compute_monthly_sums(current_month)
+                    self.compute_monthly_sums(date_time)
 
                 # save monthly sums in nc4 file
                 write_sums_nc4(fout, mN_data,mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum, obsparam_list[0])
             else:
-                print('file exist, skip '+fout)
+                print('file exists, skipping '+fout)
                 
-            current_month = current_month + relativedelta(months=1)      
+            date_time = date_time + relativedelta(months=1)      
 
-    # ---------------------------------------------------------------------------
-    # Fucntion to compute long-term temporal statistics of individual species based on monthly sums
+    # ----------------------------------------------------------------------------------------------------------
+    #
+    # Function to compute long-term temporal statistics of individual species based on monthly sums
+
     def calc_temporal_stats_from_sums(self, write_to_nc=True, fout_stats='./stats.nc4'):
 
         if os.path.isfile(fout_stats):
@@ -301,11 +305,13 @@ class postproc_ObsFcstAna:
             
         return stats
 
-    # ---------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------------------
+    #
     # Function to compute the O-F/O-A spatial statistics for one month based on
     # previously saved monthly sums.
     # Individual temporal and grid cell DA diagnostic values within a month are aggregated first;
     # the monthly Ndata/mean/stdv are derived from the aggregated sample.
+
     def calc_spatial_stats_from_sums(self, month):
 
         var_list = ['obs_obs', 'obs_fcst','obs_ana']
