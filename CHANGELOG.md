@@ -11,10 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added more default settings and command line arguments for integrated land-atm DAS setup 
-- Added functionality for model-based QC of MODIS SCF observations using soil layer 1 temperature.
-- Added functionality to simulate landice tiles.
-- Added functionality to read nc4-formatted tile file.
 - Added python package for post-processing ObsFcstAna output.
 
 ### Changed
@@ -26,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 -----------------------------
+
+## [v3.0.0] - 2025-05-28
+
+- 0-diff vs. v2.0.0.
+
+### Added
+
+- Added functionality to simulate landice tiles ([PR #18](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/18)).
+- Added functionality to read nc4-formatted tile file ([PR #18](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/18)).
+- Added model-based QC of (MODIS) snow cover area fraction observations using layer-1 soil temperature ([PR #96](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/96)).
+- Added default settings and command line args for coupled land-atm DAS ([PR #94](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/94)).
+
+------------------------------
 
 ## [v2.0.0] - 2025-04-15
 
