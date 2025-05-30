@@ -49,7 +49,6 @@ def main():
     exp_list   = config['exp_list']
     start_time = config['start_time']
     end_time   = config['end_time']
-    obs_from   = config['obs_from']
     sum_path   = config['sum_path']
     out_path   = config['out_path']
      
@@ -57,7 +56,7 @@ def main():
     # Postprocess raw ObsFcstAna output data into monthly sums 
 
     # Initialize the postprocessing object
-    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, obs_from=obs_from, sum_path=sum_path)
+    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
 
     # Compute and save monthly sums
     postproc.save_monthly_sums()

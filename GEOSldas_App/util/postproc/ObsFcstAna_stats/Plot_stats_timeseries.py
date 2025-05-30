@@ -99,7 +99,6 @@ if __name__ == "__main__":
     exp_list = config['exp_list']
     start_time = config['start_time']
     end_time = config['end_time']
-    obs_from = config['obs_from']
     sum_path = config['sum_path']
     out_path = config['out_path']
      
@@ -108,7 +107,7 @@ if __name__ == "__main__":
     # Postprocess raw ObsFcstAna output data into monthly sums 
 
     # Initialize the postprocessing object
-    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, obs_from=obs_from, sum_path=sum_path)
+    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
 
     Plot_monthly_OmF_bars(postproc, fig_path=out_path)
 

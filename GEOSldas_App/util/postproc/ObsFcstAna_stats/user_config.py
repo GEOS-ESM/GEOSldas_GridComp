@@ -40,12 +40,18 @@ def get_config():
     # All optional experiments and the main experiment must have identical tilecoords.
     # If the default "species" number/order do not match, set "species_list" accordingly to force a match.
     # Output will be cross-masked between all specified experiments.    
-    
+
+    # Forecasts and analyses are always from the main experiment.
+    # Observations can be from experiment indicated by 'use_obs' set to True.
+    # The mostly likely use case for this is that _scaled_ observations from a DA experiment
+    # are used to compute OmF etc diagnostics for a corresponding open loop experiment.
+
     exp_sup1 = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
         'expid'         : 'DAv8_M36',
         'exptag'        : 'DASMAP_SMAP', 
         'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
+        'use_obs'     : True,
         'species_list'  : [1,2,3,4],
         'obsparam_time' : "20150401_0000"                 # time stamp of obsparam file (YYYYMMDD_HHMM)
     }
@@ -54,13 +60,6 @@ def get_config():
 
     exp_list = [exp_main, exp_sup1]
     
-    # Forecasts and analyses are always from the main experiment.
-    # Observations can be from experiment indicated by 'obs_from' index (0-based).
-    # The mostly likely use case for this is that _scaled_ observations from a DA experiment
-    #   are used to compute OmF etc diagnostics for a corresponding open loop experiment.
-
-    obs_from = 1              # 0-based index of exp in exp_list from which obs are extracted
-
     # Top level directory to store monthly sum files; can use the experiment directory or a different path;
     # /Yyyyy/Mmm/ is added automatically for individual months
 
@@ -70,13 +69,6 @@ def get_config():
 
     #
     # ===================== end of user-defined inputs =================================================
-
-    
-    # some minor checks and processing of user-defined inputs
-    
-    if obs_from >= len(exp_list):
-        print('Invalid "obs_from" value')
-        sys.exit()
 
     # process time range info;  end_time is first of month after (end_year, end_month)
 
@@ -122,7 +114,6 @@ def get_config():
         'exp_list'   : exp_list,
         'start_time' : start_time,
         'end_time'   : end_time,
-        'obs_from'   : obs_from,
         'sum_path'   : sum_path,
         'out_path'   : out_path,
         }

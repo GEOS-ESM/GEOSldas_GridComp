@@ -19,7 +19,7 @@ from helper.write_nc4            import write_sums_nc4, write_stats_nc4
 
 class postproc_ObsFcstAna:
     
-    def __init__(self, exp_list, start_time, end_time, obs_from=0, sum_path='./', outid=None):
+    def __init__(self, exp_list, start_time, end_time, sum_path='./', outid=None):
         self.exp_list      = exp_list
         self.expdir_list   = [item['expdir'] for item in exp_list]
         self.expid_list    = [item['expid']  for item in exp_list]
@@ -32,8 +32,23 @@ class postproc_ObsFcstAna:
         self.var_list      = ['obs_obs','obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
         self.tilecoord     = exp_list[0]['tilecoord']
         self.obsparam_list = [item['obsparam'] for item in exp_list]
-        self.obs_from      = obs_from
         self.sum_path      = sum_path
+
+        # by default, obs data are from the main experiment, i.e. exp_list[0]
+        # with the exception that "use_obs" = True in exp_sup
+        self.obs_from = 0
+
+        # loop through exp_list to check if 'use_obs' is provided
+        for exp_idx, exp in enumerate(exp_list):
+            if exp_idx > 0 and exp.get('use_obs', None): # found 'use_obs' == True
+                if self.obs_from == 0: # check to make sure 'use_obs' == True only in 1 exp.
+                    self.obs_from = exp_idx
+                else:
+                    print("'use_obs' is True in more than 1 experiments, edit user config to remove conflict" )
+                    sys.exit()
+
+        if self.obs_from > 0:
+            print(f"obs data are from  {self.exptag_list[self.obs_from]}")   
 
         # If not provided, assemble filename of monthly sums, including info. of all experiments
         if outid is None:
@@ -166,7 +181,7 @@ class postproc_ObsFcstAna:
 
         date_time   = self.start_time
 
-        while date_time < self.end_time           # loop through months
+        while date_time < self.end_time:           # loop through months
             
             # make monthly file output directory 
             mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'

@@ -152,7 +152,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     # Save figure to file
     fig.savefig(fig_path+'Map_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
                         (end_time+timedelta(days=-1)).strftime('%Y%m')+'.png')
-    plt.show()
+    #plt.show()
     plt.close(fig)
 
 if __name__ == '__main__':
@@ -164,7 +164,6 @@ if __name__ == '__main__':
     exp_list = config['exp_list']
     start_time = config['start_time']
     end_time = config['end_time']
-    obs_from = config['obs_from']
     sum_path = config['sum_path']
     out_path = config['out_path']
      
@@ -173,12 +172,12 @@ if __name__ == '__main__':
     # Postprocess raw ObsFcstAna output data into monthly sums 
 
     # Initialize the postprocessing object
-    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, obs_from=obs_from, sum_path=sum_path)
+    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
 
     # Compute long-term temporal stats and plot maps
     if len(exp_list) >1 :
         stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_obsfrom_'+ \
-                      exp_list[obs_from]['exptag']+'_'+start_time.strftime('%Y%m%d')+'_'+ \
+                      exp_list[postproc.obs_from]['exptag']+'_'+start_time.strftime('%Y%m%d')+'_'+ \
                       (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
     else:
         stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
