@@ -100,9 +100,12 @@ def get_config():
         
         # reorder obsparam to match across experiments
         obsparam_new = []
+        print(f"get the following obs species from {expid}")
         for i in range(len(obsparam)):
             if int(obsparam[i]['species']) in species_list:
-                   obsparam_new.append(obsparam[i])              
+                print(obsparam[i]['descr'])
+                obsparam_new.append(obsparam[i])
+                
         obsparam = obsparam_new
         
         ftc = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilecoord.bin'
@@ -110,6 +113,10 @@ def get_config():
 
         exp.update({'tilecoord':tc, 'obsparam':obsparam})
 
+    if len(exp_list) > 0:
+        print("verify that the above obs species match across experiments")
+        print(" =======================================")
+                          
     config ={
         'exp_list'   : exp_list,
         'start_time' : start_time,
