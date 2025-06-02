@@ -104,6 +104,9 @@ setenv MKL_CBWR "AVX2"
 setenv LD_LIBRARY_PATH ${{BASEDIR}}/${{ARCH}}/lib:${{ESMADIR}}/lib:${{LD_LIBRARY_PATH}}
 
 module load nco
+# the nco module prepends to UDUNITS2_XML_PATH which Baselibs/g5_modules has already set
+# So here we reset to the one in Baselibs
+setenv UDUNITS2_XML_PATH ${{BASEDIR}}/${{ARCH}}/share/udunits/udunits2.xml
 
 setenv RUN_CMD "$GEOSBIN/esma_mpirun -np "
 
