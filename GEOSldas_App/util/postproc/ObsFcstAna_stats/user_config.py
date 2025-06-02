@@ -29,13 +29,13 @@ def get_config():
         'expid'         : 'DAv8_SMOSSMAP',
         'exptag'        : 'DAMulti_SMAP', 
         'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
-        'da_t0'         : 3,                              # hour of first land analysis
+        'da_t0'         : 3,                              # (fractional) UTC hour of first land analysis 
         'da_dt'         : 10800,                          # ObsFcstAna file interval in seconds
-        'species_list'  : [5,6,7,8],
+        'species_list'  : [5,6,7,8],                      # indices of species to be processed 
         'obsparam_time' : "20150401_0000"                 # time stamp of obsparam file (YYYYMMDD_HHMM)
     }
 
-    # Optional experiment(s) can be added for cross masking or extracting obs from a different experiment.
+    # Optional experiment(s) can be added for cross-masking or extracting obs from a different experiment.
     #
     # All optional experiments and the main experiment must have identical tilecoords.
     # If the default "species" number/order do not match, set "species_list" accordingly to force a match.
@@ -53,7 +53,7 @@ def get_config():
         'exptag'        : 'DASMAP_SMAP', 
         'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
         'use_obs'       : True,                           # if True, use obs data from this exp
-        'species_list'  : [1,2,3,4],
+        'species_list'  : [1,2,3,4],                      # indices of species to be processed 
         'obsparam_time' : "20150401_0000"                 # time stamp of obsparam file (YYYYMMDD_HHMM)
     }
 

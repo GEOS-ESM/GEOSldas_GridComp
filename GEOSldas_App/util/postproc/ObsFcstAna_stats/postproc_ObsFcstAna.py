@@ -46,7 +46,7 @@ class postproc_ObsFcstAna:
         if self.obs_from < 0: self.obs_from = 0       # by default, obs data are from exp_list[0]
         print(f"obs data are from {self.exptag_list[self.obs_from]}")   
 
-        # If not provided, assemble filename of monthly sums, including info. of all experiments
+        # If not provided, assemble filename of monthly sums, including info of all experiments
         if outid is None:
             self.outid =  '_'.join([item for item in self.exptag_list])
             # append "obs_from" info if obs data are from supplemental experiment 
@@ -183,7 +183,7 @@ class postproc_ObsFcstAna:
             mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
             os.makedirs(mo_path, exist_ok=True)
     
-            fout = self.outid + '.ens_avg.ldas_ObsFcstAna.' + date_time.strftime('%Y%m') +'_sums.nc4'
+            fout = self.outid + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
 
             fout = mo_path + fout
             
@@ -245,7 +245,7 @@ class postproc_ObsFcstAna:
                 
                 fpath = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
                     
-                fout  = self.outid + '.ens_avg.ldas_ObsFcstAna.' + date_time.strftime('%Y%m') +'_sums.nc4'
+                fout  = self.outid + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
 
                 fout  = fpath + fout
                                 
@@ -330,7 +330,7 @@ class postproc_ObsFcstAna:
         var_list = ['obs_obs', 'obs_fcst','obs_ana']
         
         mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'            
-        fnc4_sums = mo_path + self.outid + '.ens_avg.ldas_ObsFcstAna.' + date_time.strftime('%Y%m') +'_sums.nc4'
+        fnc4_sums = mo_path + self.outid + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
         
         mdata_sum = {}
         mdata2_sum = {}
