@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Sample script to compute spatially averaged monthly statistics
-based on pre-saved monthly sums.
-
+Sample script for plotting monthly time series of spatially averaged data assimilation diagnostics.
+Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
 """
 
 import sys;       sys.path.append('../../shared/python/')
@@ -37,8 +36,8 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
         OmF_mean =[]
         OmF_stdv =[]
         OmA_mean =[]
-        OmA_stdv=[]
-        Ndata =[]
+        OmA_stdv =[]
+        Ndata    =[]
         date_vec =[]
 
         # Time loop 
@@ -49,25 +48,26 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
             OmFm,OmFs,OmAm,OmAs,Nobsm = postproc_obj.calc_spatial_stats_from_sums(current_month)
 
             # Average individual species into a single value
-            Nobsm = np.nansum(Nobsm)
-            OmFm = np.nansum(OmFm*Nobsm)/Nobsm
-            OmFs = np.nansum(OmFs*Nobsm)/Nobsm
-            OmAm = np.nansum(OmAm*Nobsm)/Nobsm
-            OmAs = np.nansum(OmAs*Nobsm)/Nobsm
+            Nobsm = np.nansum(     Nobsm)
+            OmFm  = np.nansum(OmFm*Nobsm)/Nobsm
+            OmFs  = np.nansum(OmFs*Nobsm)/Nobsm
+            OmAm  = np.nansum(OmAm*Nobsm)/Nobsm
+            OmAs  = np.nansum(OmAs*Nobsm)/Nobsm
       
+            Ndata.append(Nobsm)
+
             OmF_mean.append(OmFm)
             OmF_stdv.append(OmFs)
             OmA_mean.append(OmAm)
             OmA_stdv.append(OmAs)
-            Ndata.append(Nobsm)
 
             date_vec.append(current_month.strftime('%Y%m'))
             current_month = current_month + relativedelta(months=1)
 
         # Store stats in a dictionary for easier saving and referencing  
         stats_dict = {"OmF_mean":OmF_mean, "OmF_stdv":OmF_stdv,
-                             "OmA_mean":OmA_mean, "OmA_stdv":OmA_stdv,
-                             "Ndata": Ndata, "date_vec":date_vec}
+                      "OmA_mean":OmA_mean, "OmA_stdv":OmA_stdv,
+                      "Ndata": Ndata, "date_vec":date_vec}
         
         if stats_file is not None:
             with open(stats_file,'wb') as file:
@@ -92,23 +92,24 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     plt.close()
 
 if __name__ == "__main__":
+
     from postproc_ObsFcstAna    import postproc_ObsFcstAna
     from user_config            import get_config
-    config = get_config()
+
+    config     = get_config()                 # edit user-defined inputs in user_config.py
     
-    exp_list = config['exp_list']
+    exp_list   = config['exp_list']
     start_time = config['start_time']
-    end_time = config['end_time']
-    sum_path = config['sum_path']
-    out_path = config['out_path']
+    end_time   = config['end_time']
+    sum_path   = config['sum_path']
+    out_path   = config['out_path']
      
     # ------------------------------------------------------------------------------------
-    # First
-    # Postprocess raw ObsFcstAna output data into monthly sums 
-
+    #
     # Initialize the postprocessing object
     postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
 
+    # Compute spatial stats and plot monthly O-F stats bars
     Plot_monthly_OmF_bars(postproc, fig_path=out_path)
 
 

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Sample script for computing/plotting data assimilation (DA) diagnostics from 
-pre-saved monthly sums.
-
+Sample script for plotting maps of long-term data assimilation diagnostics.
+Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
 """
 
 import sys;       sys.path.append('../../shared/python/')
@@ -21,9 +20,9 @@ from EASEv2                 import EASEv2_ind2latlon
 def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     
     start_time = postproc_obj.start_time
-    end_time = postproc_obj.end_time
-    domain = postproc_obj.domain
-    tc = postproc_obj.tilecoord
+    end_time   = postproc_obj.end_time
+    domain     = postproc_obj.domain
+    tc         = postproc_obj.tilecoord
     
     # Sample of final compuation of selected diagnostic metrics 
      
@@ -155,22 +154,22 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     #plt.show()
     plt.close(fig)
 
+# -----------------------------------------------------------------------------------------------
+    
 if __name__ == '__main__':
+    
     from postproc_ObsFcstAna    import postproc_ObsFcstAna
     from user_config            import get_config
     
-    config = get_config()
+    config     = get_config()                 # edit user-defined inputs in user_config.py
     
-    exp_list = config['exp_list']
+    exp_list   = config['exp_list']
     start_time = config['start_time']
-    end_time = config['end_time']
-    sum_path = config['sum_path']
-    out_path = config['out_path']
+    end_time   = config['end_time']
+    sum_path   = config['sum_path']
+    out_path   = config['out_path']
      
     # ------------------------------------------------------------------------------------
-    # First
-    # Postprocess raw ObsFcstAna output data into monthly sums 
-
     # Initialize the postprocessing object
     postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
 
@@ -190,3 +189,4 @@ if __name__ == '__main__':
 
     plot_OmF_maps(postproc, temporal_stats, fig_path=out_path )
 
+# ====================== EOF =========================================================

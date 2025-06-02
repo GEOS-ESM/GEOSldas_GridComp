@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 
 """
-Sample script for computing and storing monthly sums and sums of squares and cross-products
-from GEOSldas ObsFcstAna output.  Data assimilation diagnostics such as the mean and
-std-dev of the observation-minus-forecast residuals can be diagnosed quickly from these
-intermediate "sums" files. 
+Sample script for post-processing GEOSldas ObsFcstAna output into data assimilation diagnostics.
+First, compute and store monthly sums and sums of squares and cross-products of raw ObsFcstAna output.  
+Data assimilation diagnostics ("stats") such as the mean and std-dev of the observation-minus-forecast 
+residuals can then be diagnosed quickly from these intermediate "sums" files. 
+Sample script optionally computes and plots:
+- Maps of long-term data assimilation diagnostics (see also Plot_stats_maps.py).
+- Monthly time series of spatially averaged data assimilation diagnostics (see also Plot_stats_timeseries.py).
 
 Usage:
-    First, edit "user_config.py" with proper experiments information.
-    Then, run this script as follows (on Discover):
+    1. Edit "user_config.py" with experiments information.
+    2. Run this script as follows (on Discover):
     $ module load python/GEOSpyD
-    $ ./Save_monthlysums.py
+    $ ./Get_ObsFcstAna_stats.py
     
     # Background execution:
-    $ nohup ./Save_monthlysums.py > out.log &
+    $ nohup ./Get_ObsFcstAna_stats.py > out.log &
 
 Authors: Q. Liu, R. Reichle, A. Fox
 Last Modified: May 2025
@@ -67,7 +70,7 @@ def main():
     #   as long as the monthly sum files are available.
     
     plot_maps       = False
-    plot_timeseries = True
+    plot_timeseries = False
 
     if plot_maps:
         # Compute long-term temporal stats and plot maps
@@ -90,7 +93,7 @@ def main():
 
 
     if plot_timeseries:
-        # Example to compute spatial stats and plot monthly O-F stats bars
+        # Compute spatially averaged stats and plot monthly time series of stats
         from Plot_stats_timeseries import Plot_monthly_OmF_bars
         Plot_monthly_OmF_bars(postproc, fig_path=out_path)
 
