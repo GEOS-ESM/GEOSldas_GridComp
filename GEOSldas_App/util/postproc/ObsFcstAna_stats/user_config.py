@@ -42,10 +42,10 @@ def get_config():
     # Output will be cross-masked between all specified experiments.    
 
     # Forecasts and analyses are always from the main experiment.
-    # Observations are from the experiment with 'use_obs' set to True (default is exp_main).  The nmost
+    # Observations are from the experiment with 'use_obs' set to True (default is exp_main).  The most
     #   likely use case for reading obs from a supplemental experiment is when computing OmF etc diagnostics
-    #   for an open loop experiment that only has unscaled obs, and _scaled_ obs are from a coresponding
-    #   DA experiment. 
+    #   for an open loop experiment that only has unscaled obs, and _scaled_ obs must be read from a 
+    #   coresponding DA experiment.
 
     exp_sup1 = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
@@ -86,38 +86,47 @@ def get_config():
     # Get tilecoord and obsparam information for each experiment
     
     for exp in exp_list:
-        expdir   = exp['expdir']
-        expid    = exp['expid']
-        domain   = exp['domain']
+        expdir        = exp['expdir']
+        expid         = exp['expid']
+        domain        = exp['domain']
 
-        YYYY     = exp['obsparam_time'][0:4]
-        MM       = exp['obsparam_time'][4:6]
+        YYYY          = exp['obsparam_time'][0:4]
+        MM            = exp['obsparam_time'][4:6]
         
-        fop      = expdir+expid+'/output/'+domain+'/rc_out/Y'+YYYY+'/M'+MM+'/'+expid+'.ldas_obsparam.'+exp['obsparam_time']+'z.txt'
-        obsparam = read_obs_param(fop)
+        fop           = expdir+expid+'/output/'+domain+'/rc_out/Y'+YYYY+'/M'+MM+'/'+expid+'.ldas_obsparam.'+exp['obsparam_time']+'z.txt'
+        obsparam_orig = read_obs_param(fop)
 
-        # get the species list and default to list of all species if doesn't exist 
-        species_list = exp.get('species_list',[int(obsparam[i]['species']) for i in range(len(obsparam))])
+        # get the species list, default is all species 
+        species_list = exp.get('species_list', [ int(obsparam[i]['species']) for i in range(len(obsparam)) ])
         
-        # reorder obsparam to match across experiments
-        obsparam_new = []
-        print(f"get the following obs species from {expid}")
-        for i in range(len(obsparam)):
-            if int(obsparam[i]['species']) in species_list:
-                print(obsparam[i]['descr'])
-                obsparam_new.append(obsparam[i])
-                
-        obsparam = obsparam_new
+        # subset obsparam_orig based on species_list; keep order of obsparam_orig (independent of order of species_list)
+        obsparam = []
+        for i in range(len(obsparam_orig)):
+            if int(obsparam_orig[i]['species']) in species_list:
+                obsparam.append(obsparam_orig[i])
         
         ftc = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilecoord.bin'
         tc  = read_tilecoord(ftc)
 
+        # add tilecoord and obsparam into to exp        
         exp.update({'tilecoord':tc, 'obsparam':obsparam})
 
-    if len(exp_list) > 0:
-        print("verify that the above obs species match across experiments")
-        print(" =======================================")
-                          
+    # verify that obs species match across experiments
+    for exp_idx, exp in enumerate(exp_list) :
+        obsparam = exp.get('obsparam')
+        if exp_idx==0 :
+            obsparam_main = obsparam
+        else:
+            if len(obsparam) != len(obsparam_main) :
+                print("ERROR: 'obsparam' mismatch (length)!  Check 'select_species' input in user_config.py." )
+                sys.exit()
+            else:
+                for a, b in zip(obsparam, obsparam_main) :
+                    if a['descr'] != b['descr'] :
+                        print("ERROR: 'obsparam' mismatch (descr)!  Check 'select_species' input in user_config.py." )
+                        sys.exit()
+
+    # wrap up config
     config ={
         'exp_list'   : exp_list,
         'start_time' : start_time,
