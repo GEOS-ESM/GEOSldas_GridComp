@@ -34,27 +34,23 @@ class postproc_ObsFcstAna:
         self.obsparam_list = [item['obsparam'] for item in exp_list]
         self.sum_path      = sum_path
 
-        # by default, obs data are from the main experiment, i.e. exp_list[0]
-        # with the exception that "use_obs" = True in exp_sup
-        self.obs_from = 0
-
-        # loop through exp_list to check if 'use_obs' is provided
+        # determine experiment that supplies obs data
+        self.obs_from = -1
         for exp_idx, exp in enumerate(exp_list):
-            if exp_idx > 0 and exp.get('use_obs', None): # found 'use_obs' == True
-                if self.obs_from == 0: # check to make sure 'use_obs' == True only in 1 exp.
-                    self.obs_from = exp_idx
-                else:
-                    print("'use_obs' is True in more than 1 experiments, edit user config to remove conflict" )
+            if exp.get('use_obs', None):              # found use_obs=True 
+                if self.obs_from >= 0:          
+                    print("ERROR: use_obs=True in multiple experiments. Edit user_config.py to remove conflict." )
                     sys.exit()
-
-        if self.obs_from > 0:
-            print(f"obs data are from  {self.exptag_list[self.obs_from]}")   
+                else:
+                    self.obs_from = exp_idx
+        if self.obs_from < 0: self.obs_from = 0       # by default, obs data are from exp_list[0]
+        print(f"obs data are from {self.exptag_list[self.obs_from]}")   
 
         # If not provided, assemble filename of monthly sums, including info. of all experiments
         if outid is None:
             self.outid =  '_'.join([item for item in self.exptag_list])
-
-            if self.obs_from  > 0:
+            # append "obs_from" info if obs data are from supplemental experiment 
+            if self.obs_from > 0:
                 self.outid = self.outid + '_Obs_from_' + self.exptag_list[self.obs_from]
     
     # ----------------------------------------------------------------------------------------------------------

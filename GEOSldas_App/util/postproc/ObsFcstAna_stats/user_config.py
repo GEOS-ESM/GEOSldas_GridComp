@@ -42,16 +42,17 @@ def get_config():
     # Output will be cross-masked between all specified experiments.    
 
     # Forecasts and analyses are always from the main experiment.
-    # Observations can be from experiment indicated by 'use_obs' set to True.
-    # The mostly likely use case for this is that _scaled_ observations from a DA experiment
-    # are used to compute OmF etc diagnostics for a corresponding open loop experiment.
+    # Observations are from the experiment with 'use_obs' set to True (default is exp_main).  The nmost
+    #   likely use case for reading obs from a supplemental experiment is when computing OmF etc diagnostics
+    #   for an open loop experiment that only has unscaled obs, and _scaled_ obs are from a coresponding
+    #   DA experiment. 
 
     exp_sup1 = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
         'expid'         : 'DAv8_M36',
         'exptag'        : 'DASMAP_SMAP', 
         'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
-        'use_obs'     : True,
+        'use_obs'       : True,                           # if True, use obs data from this exp
         'species_list'  : [1,2,3,4],
         'obsparam_time' : "20150401_0000"                 # time stamp of obsparam file (YYYYMMDD_HHMM)
     }
