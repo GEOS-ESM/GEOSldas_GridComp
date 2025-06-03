@@ -75,8 +75,8 @@ def main():
     if plot_maps:
         # Compute long-term temporal stats and plot maps
         if len(exp_list) >1 :
-            stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_obsfrom_'+ \
-                          exp_list[obs_from]['exptag']+'_'+start_time.strftime('%Y%m%d')+'_'+ \
+            stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+ \
+                          '_'+start_time.strftime('%Y%m%d')+'_'+ \
                           (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
         else:
             stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
