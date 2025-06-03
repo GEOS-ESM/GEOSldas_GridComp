@@ -97,7 +97,7 @@ def get_config():
         obsparam_orig = read_obs_param(fop)
 
         # get the species list, default is all species 
-        species_list = exp.get('species_list', [ int(obsparam[i]['species']) for i in range(len(obsparam)) ])
+        species_list = exp.get('species_list', [ int(obsparam_orig[i]['species']) for i in range(len(obsparam_orig)) ])
         
         # subset obsparam_orig based on species_list; keep order of obsparam_orig (independent of order of species_list)
         obsparam = []
