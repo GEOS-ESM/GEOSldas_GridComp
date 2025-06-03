@@ -9,11 +9,10 @@
 !                7 May 2021 - removed "dtstep_assim" and "centered_update"; replaced with MAPL
 !                             resource parameters "LANDASSIM_DT" and "LANDASSIM_T0" (in LDAS.rc)
 !
-! --------------------------------------------------------------------
+! ----------------------------------------------------------------------
 
 &ens_upd_inputs			
 	
-		
 ! ----------------------------------------------------------------------
 !
 ! update type - for details see subroutine cat_enkf_update()
@@ -23,18 +22,23 @@
 !
 !   # = no longer supported
 !
-!   update_type =  0: NO assimilation, NO bias correction 
-! # update_type =  1: 1d soil moisture analysis;                                             sfmc obs
-! # update_type =  2: 3d soil moisture analysis;                                             sfmc obs
-!   update_type =  3: 1d Tskin (assim incr NOT applied, use w/ bias corr) analysis;          Tskin obs
-!   update_type =  4: 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr) analysis;  Tskin obs
-!   update_type =  5: 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr) analysis;     Tskin obs
-!   update_type =  6: 1d soil moisture/Tskin/ght(1);                                         TB obs
-!   update_type =  7: 3d Tskin/ght1 update;                                                  Tskin obs 
-!   update_type =  8: 3d soil moisture/Tskin/ght(1);                                         TB obs
-!   update_type =  9: 1d Tskin/ght1 update;                                                  FT obs
-!   update_type = 10: 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile;       TB obs
-!   update_type = 13: 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile;       sfmc and TB obs
+!   update_type | analysis state vector                                            | assimilated obs
+!   -------------------------------------------------------------------------------------------------
+!        0      | NO assimilation, NO bias correction                              | n/a
+!     #  1      | 1d soil moisture                                                 | sfmc
+!     #  2      | 3d soil moisture                                                 | sfmc
+!        3      | 1d Tskin (assim incr NOT applied, use w/ bias corr)              | Tskin
+!        4      | 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr)      | Tskin
+!        5      | 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr)         | Tskin
+!        6      | 1d soil moisture/Tskin/ght(1)                                    | Tb
+!        7      | 3d Tskin/ght1 update                                             | Tskin 
+!        8      | 3d soil moisture/Tskin/ght(1)                                    | Tb
+!        9      | 1d Tskin/ght1 update                                             | FT
+!       10      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | Tb
+!       11      | 1d snow analysis (Toure et al. 2018 empirical gain)              | SCF
+!       12      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb, SCF
+!               |   & 1d snow analysis (Toure et al. 2018 empirical gain)          | 
+!       13      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb
 
 update_type = 0
 
@@ -2154,7 +2158,13 @@ obs_param_nml(48)%xcorr          = 0.1875
 obs_param_nml(48)%ycorr          = 0.1875
 obs_param_nml(48)%adapt          = 0
 
-! --------------------------------------------------------------------
+! --------------------------------------------------------------------------------------------------------------
+!
+! ASCAT_MET[X]_SM soil moisture observations from EUMETSAT
+!
+! Leave %name blank.  Provide text files that contain file names via %flistpath and %flistname.
+!
+! -------------------
 !
 !  49 = ASCAT_META_SM (ASCAT soil moisture ascending and descending orbits)
 !
@@ -2178,7 +2188,7 @@ obs_param_nml(49)%nodata         = -9999.
 obs_param_nml(49)%varname        = 'sfds'
 obs_param_nml(49)%units          = '%'
 obs_param_nml(49)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/ASCAT_EUMETSAT/Metop_A/'
-obs_param_nml(49)%name           = 'M02-ASCA-ASCSMO02'
+obs_param_nml(49)%name           = ''
 obs_param_nml(49)%maskpath       = ''
 obs_param_nml(49)%maskname       = ''
 obs_param_nml(49)%scalepath      = ''
@@ -2217,7 +2227,7 @@ obs_param_nml(50)%nodata         = -9999.
 obs_param_nml(50)%varname        = 'sfds'
 obs_param_nml(50)%units          = '%'
 obs_param_nml(50)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/ASCAT_EUMETSAT/Metop_B/'
-obs_param_nml(50)%name           = 'M01-ASCA-ASCSMO02'
+obs_param_nml(50)%name           = ''
 obs_param_nml(50)%maskpath       = ''
 obs_param_nml(50)%maskname       = ''
 obs_param_nml(50)%scalepath      = ''
@@ -2256,7 +2266,7 @@ obs_param_nml(51)%nodata         = -9999.
 obs_param_nml(51)%varname        = 'sfds'
 obs_param_nml(51)%units          = '%'
 obs_param_nml(51)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/ASCAT_EUMETSAT/Metop_C/'
-obs_param_nml(51)%name           = 'M03-ASCA-ASCSMO02'
+obs_param_nml(51)%name           = ''
 obs_param_nml(51)%maskpath       = ''
 obs_param_nml(51)%maskname       = ''
 obs_param_nml(51)%scalepath      = ''
@@ -2353,8 +2363,86 @@ obs_param_nml(53)%xcorr          = 0.
 obs_param_nml(53)%ycorr          = 0.
 obs_param_nml(53)%adapt          = 0
 
+! --------------------------------------------------------------------------------------------------------------
+!
+!  54 = CYGNSS_SM_6hr (CYGNSS Level 3 soil moisture version 3.2)
+!
+! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2
+
+obs_param_nml(54)%descr          = 'CYGNSS_SM_6hr'
+obs_param_nml(54)%orbit          = 3
+obs_param_nml(54)%pol            = 0
+obs_param_nml(54)%N_ang          = 0
+obs_param_nml(54)%freq           = 0
+obs_param_nml(54)%FOV            = 20.
+obs_param_nml(54)%FOV_units      = 'km'
+obs_param_nml(54)%assim          = .false.
+obs_param_nml(54)%scale          = .false.
+obs_param_nml(54)%getinnov       = .false.
+obs_param_nml(54)%RTM_ID         = 0
+obs_param_nml(54)%bias_Npar      = 0
+obs_param_nml(54)%bias_trel      = 864000
+obs_param_nml(54)%bias_tcut      = 432000
+obs_param_nml(54)%nodata         = -9999.
+obs_param_nml(54)%varname        = 'sfmc'
+obs_param_nml(54)%units          = 'm3 m-3'
+obs_param_nml(54)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/CYGNSS/'
+obs_param_nml(54)%name           = ''
+obs_param_nml(54)%maskpath       = ''
+obs_param_nml(54)%maskname       = ''
+obs_param_nml(54)%scalepath      = ''
+obs_param_nml(54)%scalename      = ''
+obs_param_nml(54)%flistpath      = ''
+obs_param_nml(54)%flistname      = ''
+obs_param_nml(54)%errstd         = 0.04
+obs_param_nml(54)%std_normal_max = 2.5
+obs_param_nml(54)%zeromean       = .true.
+obs_param_nml(54)%coarsen_pert   = .true.
+obs_param_nml(54)%xcorr          = 0.25
+obs_param_nml(54)%ycorr          = 0.25
+obs_param_nml(54)%adapt          = 0
+
+! --------------------------------------------------------------------------------------------------------------
+!
+!  55 = CYGNSS_SM_daily (CYGNSS Level 3 soil moisture version 3.2)
+!
+! https://podaac.jpl.nasa.gov/dataset/CYGNSS_L3_SOIL_MOISTURE_V3.2
+
+obs_param_nml(55)%descr          = 'CYGNSS_SM_daily'
+obs_param_nml(55)%orbit          = 3
+obs_param_nml(55)%pol            = 0
+obs_param_nml(55)%N_ang          = 0
+obs_param_nml(55)%freq           = 0
+obs_param_nml(55)%FOV            = 20.
+obs_param_nml(55)%FOV_units      = 'km'
+obs_param_nml(55)%assim          = .false.
+obs_param_nml(55)%scale          = .false.
+obs_param_nml(55)%getinnov       = .false.
+obs_param_nml(55)%RTM_ID         = 0
+obs_param_nml(55)%bias_Npar      = 0
+obs_param_nml(55)%bias_trel      = 864000
+obs_param_nml(55)%bias_tcut      = 432000
+obs_param_nml(55)%nodata         = -9999.
+obs_param_nml(55)%varname        = 'sfmc'
+obs_param_nml(55)%units          = 'm3 m-3'
+obs_param_nml(55)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/CYGNSS/'
+obs_param_nml(55)%name           = ''
+obs_param_nml(55)%maskpath       = ''
+obs_param_nml(55)%maskname       = ''
+obs_param_nml(55)%scalepath      = ''
+obs_param_nml(55)%scalename      = ''
+obs_param_nml(55)%flistpath      = ''
+obs_param_nml(55)%flistname      = ''
+obs_param_nml(55)%errstd         = 0.04
+obs_param_nml(55)%std_normal_max = 2.5
+obs_param_nml(55)%zeromean       = .true.
+obs_param_nml(55)%coarsen_pert   = .true.
+obs_param_nml(55)%xcorr          = 0.25
+obs_param_nml(55)%ycorr          = 0.25
+obs_param_nml(55)%adapt          = 0
 
 ! --------------------------------------------------------------------
+
 
 /
 

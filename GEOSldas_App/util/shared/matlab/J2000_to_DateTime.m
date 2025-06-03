@@ -6,14 +6,15 @@ function [yr, mm, dd, hr, mn, ss, doy, pen] = J2000_to_DateTime( J2000_seconds, 
 %
 % See also GEOSldas module LDAS_DateTimeMod.F90
 %
-% reichle, 28 Jul 2028
+% reichle,      28 Jul 2023
+% qliu+reichle, 21 May 2024 - improved efficiency
 %
 % ---------------------------------------------------------------------------
 
 if ~exist( 'epoch_id', 'var' )  epoch_id = 'TT12';  end    % default is what SMAP uses
 
-date_time_epoch = J2000_epoch( epoch_id );
-    
+J2000_seconds = round( J2000_seconds );                    % ignore milliseconds
+
 N   = length(J2000_seconds);
 
 yr  = zeros(N,1);
@@ -28,11 +29,16 @@ pen = zeros(N,1);
 % Loop through elements of J2000_seconds for now.  In future, should vectorize 
 %  augment_date_time.m, is_leap_year.m, days_in_month.m, get_dofyr_pentad.m
 
+% Assume that all times in J2000_seconds are close to each other (relative to their 
+%  difference from J2000_epoch).  Minimize the work done by augment_date_time() by 
+%  using delta between subsequent elements of J2000_seconds.
+
+date_time_last = J2000_epoch( epoch_id );                  % initialize loop
+J2000_sec_last = 0;
+
 for ii = 1:N
  
-  % add (rounded) J2000_seconds to date_time_epoch
-
-  date_time = augment_date_time( round(J2000_seconds), date_time_epoch ); 
+  date_time = augment_date_time( J2000_seconds(ii) - J2000_sec_last, date_time_last ); 
 
   yr( ii) = date_time.year  ;
   mm( ii) = date_time.month ;
@@ -42,6 +48,9 @@ for ii = 1:N
   ss( ii) = date_time.sec   ;   
   pen(ii) = date_time.pentad;
   doy(ii) = date_time.dofyr ;
+
+  J2000_sec_last = J2000_seconds(ii);
+  date_time_last = date_time; 
 
 end
 

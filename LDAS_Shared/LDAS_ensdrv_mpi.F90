@@ -129,7 +129,7 @@ contains
     !     integer :: tile_id      ! unique tile ID
     !     integer :: f_num        ! full domain ID
     !     integer :: typ          ! (0=MAPL_Ocean, 100=MAPL_Land, 19=MAPL_Lake, 20=MAPL_LandIce) 
-    !     integer :: pfaf         ! Pfafstetter number (for land tiles, NOT unique)
+    !     integer :: pfaf_index   ! index of Pfafstetter catchment (for land tiles, NOT unique)
     !     real    :: com_lon      ! center-of-mass longitude
     !     real    :: com_lat      ! center-of-mass latitude
     !     real    :: min_lon      ! minimum longitude (bounding box for tile)
