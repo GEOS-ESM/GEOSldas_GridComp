@@ -1,0 +1,372 @@
+! 
+! namelist of EnKF inputs for land EnKF update
+!
+! reichle, 28 Jan 2005
+! reichle, 13 Jun 2011 - updated for SMOS angles and downscaling ("FOV")
+! reichle,  8 Jun 2017 - added "%flistpath" and "%flistname"; updated comments
+!
+! --------------------------------------------------------------------
+
+&ens_upd_inputs			
+	
+		
+! ----------------------------------------------------------------------
+!
+! update type - for details see subroutine cat_enkf_update()
+!               (note: all 3d updates use compact support)
+!
+! local = "1d", regional = "3d"
+!
+! update_type =  0: NO assimilation, NO bias correction 
+! update_type =  1: 1d soil moisture analysis;                                             sfmc obs
+! update_type =  2: 3d soil moisture analysis;                                             sfmc obs
+! update_type =  3: 1d Tskin (assim incr NOT applied, use w/ bias corr) analysis;          Tskin obs
+! update_type =  4: 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr) analysis;  Tskin obs
+! update_type =  5: 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr) analysis;     Tskin obs
+! update_type =  6: 1d soil moisture/Tskin/ght(1);                                         TB obs
+! update_type =  7: 3d Tskin/ght1 update;                                                  Tskin obs 
+! update_type =  8: 3d soil moisture/Tskin/ght(1);                                         TB obs
+! update_type =  9: 1d Tskin/ght1 update;                                                  FT obs
+! update_type = 10: 3d soil moisture excl catdef/Tskin/ght(1);                             TB obs
+
+update_type = 10
+
+out_ObsFcstAna  = .true.
+out_smapL4SMaup = .false.
+out_obslog      = .true.
+
+! ---------------------------------------------------------------------
+!
+! Compact support parameters - for 3d updates
+!
+! All correlations vanish outside of an ellipse with semi-axes xcompact 
+!  and ycompact
+
+xcompact = 1.25           ! [deg] longitude
+ycompact = 1.25           ! [deg] latitude
+
+! ---------------------------------------------------------------------
+!		
+! Definition of measurement species and parameters
+!
+! NOTE: When additional types of measurements are included here, 
+!       at least the following parameters and subroutines must be adapted:
+!
+!       - N_obs_species_nml in clsm_ensupd_glob_param.f90
+!       [- read_ens_upd_inputs()]
+!       [- collect_obs()]
+!       - read_obs()
+!       - get_obs_pred()
+!	- cat_enkf_update()
+!
+!
+! Definition of obs_param_nml fields (see also enkf_types.F90):
+!
+! %descr          = description
+! %species        = identifier for type of measurement
+! %orbit          = type of (half-)orbit
+!                     0 = n/a  [eg., in situ obs]
+!                     1 = ascending
+!                     2 = descending
+!                     3 = ascending and descending
+!                     4 = geostationary
+! %pol            = polarization
+!                     0 = n/a  [eg., multi-pol. retrieval]
+!                     1 = horizontal
+!                     2 = vertical 
+!                     3 = ...
+! %N_ang          = # angles in species
+! %ang            = vector of angles
+! %freq           = frequency [Hz]
+! %FOV            = field-of-view *radius*, see NOTES below
+!                   (if FOV==0. equate obs footprint w/ tile)
+! %FOV_units      = field-of-view units ('km' or 'deg'), see NOTES below
+! %assim          = Should this obs type be assimilated (state update)? (logical)
+! %scale          = Should this obs be scaled? (logical)
+! %getinnov       = Should innov be computed for this obs type (logical)
+!                   (innovations are always computed if assim==.true.)
+! %RTM_ID         = ID of radiative transfer model to use for Tb forward modeling
+!                   (subroutine get_obs_pred()) 
+!                     0 = none
+!                     1 = tau-omega model as in De Lannoy et al. 2013 (doi:10.1175/JHM-D-12-092.1)
+!                     2 = same as 1 but without Pellarin atmospheric corrections
+!                     3 = ...
+! %bias_Npar      = number of obs bias states tracked per day (integer)
+! %bias_trel      = e-folding time scale of obs bias memory [s]
+! %bias_tcut      = cutoff time for confident obs bias estimate [s]
+! %nodata         = no-data-value
+! %varname        = equivalent model variable name (for "Obs_pred")
+! %units          = units  (eg., 'K' or 'm3/m3')
+! %path           = path to measurement files
+! %name           = name identifier for file containing measurements
+! %scalepath      = path to file(s) with scaling parameters
+! %scalename      = filename for scaling parameters
+! %flistpath      = path to file with list of obs file names
+! %flistname      = name of file with lis of obs file names
+! %errstd         = default obs error std
+! %std_normal_max = maximum allowed perturbation (relative to N(0,1))
+! %zeromean       = enforce zero mean across ensemble
+! %coarsen_pert   = generate obs perturbations on coarser grid (see pert_param_type%coarsen)
+! %xcorr          = correlation length (deg) in longitude direction
+! %ycorr          = correlation length (deg) in latitude direction
+!    
+! For observation perturbations, always use:
+!
+!   tcorr = 0.  (never temporally correlated)
+!   typ   = 0   (always additive)
+!   ccorr = 0.  (never cross-correlated)
+!
+! (these are specified in get_obs_pert_inputs() and not here)
+!
+!
+! NOTES: 
+!
+! Field-of-view (FOV) can be specified in units of [km] or [deg] lat/lon. 
+! Note the special case of FOV=0. below.
+! If FOV is specified in units of [km], the FOV in units of [deg] lat/lon that 
+!  is used to compute observation predictions will depend on latitude.
+! If FOV is specified in units of [deg] lat/lon, its value remains constant and 
+!  is independent of latitude.
+! The choice of units also determines the shape function that is used to 
+!  compute the observation predictions.
+! Units of [km] are meant for observations that are based on relatively 
+!  coarse-scale measurements (such as microwave data). The resolution of such obs
+!  in units of [km] is approximately constant across the globe and independent
+!  of latitude.  Observation predictions are computed by averaging tile-based
+!  model forecasts out to a distance of fac_search_FOV_km*FOV using a Gaussian kernel, 
+!  where fac_search_FOV_km=2.0 as of 28 March 2015.
+!  Specifically, the normalized square distance is defined as
+! 
+!      ndist2 = dx^2/FOV_x^2 + dy^2/FOV_y^2
+!
+!  where FOV_x and dx are the meridional FOV and the meridional distance between the obs
+!  and the tile (in units of deg lat/lon), with FOV_x proportional to 1/cos(lat).  
+!  FOV_y and dy are the corresponding zonal values.  
+!  The weights are then proportional to 
+!
+!      exp( -0.5*ndist2 )
+!
+!  The averaging is therefore over an ellipse in lat/lon space, with weights 
+!  decreasing away from the center of the observation.
+!  A 2.0*FOV averaging footprint encapsulates about 91% of the power.  A 1.0*FOV 
+!  averaging footprint would encapsulate about 47% of the power.  These numbers
+!  are meant to be approximately consistent with FOV numbers for microwave radiometers
+!  (see 3 Dec 2014 email from Ed Kim reproduced below).
+!  Note that weights are further adjusted based on tile area.
+! Units of [deg] lat/lon are meant for observations that are based on
+!  relatively high-resolution measurements (such as infrared data).  Such 
+!  observations are often available on a lat/lon grid that is much coarser than
+!  the footprint of the underlying observations.  The assimilated data product
+!  therefore has a resolution that varies with latitude.  Observation predictions are 
+!  computed by averaging over a constant kernel out to a distance of FOV.  
+!  The averaging is therefore over a circle in lat/lon space, with weights that do not
+!  depend on the distance from the center of the observation.
+!  (Note that weights are further adjusted based on tile area.)
+! If FOV=0., observation predictions are computed by assigning the model forecast
+!  associated with the tile to which the observation is formally assigned.
+!  This is useful if the resolution of the assimilated observations is higher
+!  than that of the model tile space.  This might be the case for snow-cover-fraction 
+!  observations. FOV=0 can also be useful for tile-based synthetic observations.
+!
+!
+! ------------------------------------------------------------------------
+!
+! Date: Wed, 3 Dec 2014 11:21:30 -0600
+! From: <edward.j.kim@nasa.gov>
+! To: <rolf.h.reichle@nasa.gov>, <gabrielle.j.delannoy@nasa.gov>
+! Subject: FW: [SMAP] antenna pattern question
+! 
+! Hi Rolf & Gabrielle,
+! 
+! First, a little terminology: the weighted integral is what Level 1 folks call 
+! "beam efficiency".  So, apparently, Steven is assuming the "-3dB beam efficiency" 
+! is ~50%.   The calculated [SMAP] beam efficiency within the -3dB contour is 
+! 53.40% (v-pol), 53.83% (h-pol).
+! If you draw the -3dB contour on the Earth's surface, for h-pol, 53.83% of the energy 
+! comes from inside the contour, and 100-53.83 = 46.17% comes from outside the contour.
+! The accuracy of the 1/10 and 1/100 digits is questionable, anyway.
+! So, if you used 53% for v-pol and 54% for h-pol, you should be fine.
+! I guess this means Steven was not far off, if he is using "50%."
+! This -3dB beam efficiency means we have significant energy coming from outside 
+! the 3dB footprint, which is the footprint we use to come up with the "40 km" footprint 
+! size number.
+! And, this is why many folks who use microwave instruments prefer to use a contour that 
+! encloses a higher % of the beam energy as a better measure of the footprint size.
+! One such measure is the "main beam efficiency (MBE)."  This beamwidth is usually taken 
+! to be 2.5 times the 3dB beamwidth.   The corresponding footprint size is then 
+! 2.5x 40km = 100km.
+! The last calculation put the MBE at 89.23 for V-pol and 89.33 for H-pol.
+! So, for h-pol, 89.33% of the energy comes from inside a 100km footprint, 
+! and 100-89.33 = 10.67% from outside. 
+! - Ed
+!
+! ------------------------------------------------------------------------
+!
+! IMPORTANT: The number of measurement species defined below must *match* 
+!            global parameter "N_obs_species_nml" 
+!
+!            Multi-angular observations (eg., SMOS) are defined as a single
+!            species here (in the nml file) and are later split into
+!            multiple species, each having a unique incidence angle
+!            (see subroutine read_ens_upd_inputs())
+!
+!
+! --------------------------------------------------------------------
+!
+! SMAP L1C_TB brightness temperature (36 km EASE grid)
+! 
+! "A"   = ascending  (6pm *SMAP* overpass)
+! "D"   = descending (6am *SMAP* overpass)
+!
+! "Tbh" = h-pol Tb
+! "Tbv" = v-pol Tb 
+!
+! -------------------
+!
+!  31 = SMAP_L1C_Tbh_A
+
+obs_param_nml(31)%descr          = 'SMAP_L1C_Tbh_A'
+obs_param_nml(31)%orbit          = 1
+obs_param_nml(31)%pol            = 1
+obs_param_nml(31)%N_ang          = 1
+obs_param_nml(31)%ang(1)         = 40.
+obs_param_nml(31)%freq           = 1.41e9
+obs_param_nml(31)%FOV            = 20.
+obs_param_nml(31)%FOV_units      = 'km'
+obs_param_nml(31)%assim          = .true.
+obs_param_nml(31)%scale          = .true.
+obs_param_nml(31)%getinnov       = .true.
+obs_param_nml(31)%RTM_ID         = 4
+obs_param_nml(31)%bias_Npar      = 0
+obs_param_nml(31)%bias_trel      = 864000
+obs_param_nml(31)%bias_tcut      = 432000
+obs_param_nml(31)%nodata         = -9999.
+obs_param_nml(31)%varname        = 'Tb'
+obs_param_nml(31)%units          = 'K'
+obs_param_nml(31)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
+obs_param_nml(31)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
+obs_param_nml(31)%name           = ''
+obs_param_nml(31)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
+obs_param_nml(31)%scalename      = 'ScMO_SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(31)%flistname      = 'SMAP_L1C_TB_A_list.txt'
+obs_param_nml(31)%errstd         = 4.
+obs_param_nml(31)%std_normal_max = 2.5
+obs_param_nml(31)%zeromean       = .true.
+obs_param_nml(31)%coarsen_pert   = .true.
+obs_param_nml(31)%xcorr          = 0.25
+obs_param_nml(31)%ycorr          = 0.25
+obs_param_nml(31)%adapt          = 0
+
+! -------------------
+!
+!  32 = SMAP_L1C_Tbh_D  
+
+obs_param_nml(32)%descr          = 'SMAP_L1C_Tbh_D'
+obs_param_nml(32)%orbit          = 2
+obs_param_nml(32)%pol            = 1
+obs_param_nml(32)%N_ang          = 1
+obs_param_nml(32)%ang(1)         = 40.
+obs_param_nml(32)%freq           = 1.41e9
+obs_param_nml(32)%FOV            = 20.
+obs_param_nml(32)%FOV_units      = 'km'
+obs_param_nml(32)%assim          = .true.
+obs_param_nml(32)%scale          = .true.
+obs_param_nml(32)%getinnov       = .true.
+obs_param_nml(32)%RTM_ID         = 4
+obs_param_nml(32)%bias_Npar      = 0
+obs_param_nml(32)%bias_trel      = 864000
+obs_param_nml(32)%bias_tcut      = 432000
+obs_param_nml(32)%nodata         = -9999.
+obs_param_nml(32)%varname        = 'Tb'
+obs_param_nml(32)%units          = 'K'
+obs_param_nml(32)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
+obs_param_nml(32)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
+obs_param_nml(32)%name           = ''
+obs_param_nml(32)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
+obs_param_nml(32)%scalename      = 'ScMO_SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(32)%flistname      = 'SMAP_L1C_TB_D_list.txt'
+obs_param_nml(32)%errstd         = 4.
+obs_param_nml(32)%std_normal_max = 2.5
+obs_param_nml(32)%zeromean       = .true.
+obs_param_nml(32)%coarsen_pert   = .true.
+obs_param_nml(32)%xcorr          = 0.25
+obs_param_nml(32)%ycorr          = 0.25
+obs_param_nml(32)%adapt          = 0
+
+! -------------------
+!
+!  33 = SMAP_L1C_Tbv_A  
+
+obs_param_nml(33)%descr          = 'SMAP_L1C_Tbv_A'
+obs_param_nml(33)%orbit          = 1
+obs_param_nml(33)%pol            = 2
+obs_param_nml(33)%N_ang          = 1
+obs_param_nml(33)%ang(1)         = 40.
+obs_param_nml(33)%freq           = 1.41e9
+obs_param_nml(33)%FOV            = 20.
+obs_param_nml(33)%FOV_units      = 'km'
+obs_param_nml(33)%assim          = .true.
+obs_param_nml(33)%scale          = .true.
+obs_param_nml(33)%getinnov       = .true.
+obs_param_nml(33)%RTM_ID         = 4
+obs_param_nml(33)%bias_Npar      = 0
+obs_param_nml(33)%bias_trel      = 864000
+obs_param_nml(33)%bias_tcut      = 432000
+obs_param_nml(33)%nodata         = -9999.
+obs_param_nml(33)%varname        = 'Tb'
+obs_param_nml(33)%units          = 'K'
+obs_param_nml(33)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
+obs_param_nml(33)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
+obs_param_nml(33)%name           = ''
+obs_param_nml(33)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
+obs_param_nml(33)%scalename      = 'ScMO_SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(33)%flistname      = 'SMAP_L1C_TB_A_list.txt'
+obs_param_nml(33)%errstd         = 4.
+obs_param_nml(33)%std_normal_max = 2.5
+obs_param_nml(33)%zeromean       = .true.
+obs_param_nml(33)%coarsen_pert   = .true.
+obs_param_nml(33)%xcorr          = 0.25
+obs_param_nml(33)%ycorr          = 0.25
+obs_param_nml(33)%adapt          = 0
+
+! -------------------
+!
+!  34 = SMAP_L1C_Tbv_D  
+
+obs_param_nml(34)%descr          = 'SMAP_L1C_Tbv_D'
+obs_param_nml(34)%orbit          = 2
+obs_param_nml(34)%pol            = 2
+obs_param_nml(34)%N_ang          = 1
+obs_param_nml(34)%ang(1)         = 40.
+obs_param_nml(34)%freq           = 1.41e9
+obs_param_nml(34)%FOV            = 20.
+obs_param_nml(34)%FOV_units      = 'km'
+obs_param_nml(34)%assim          = .true.
+obs_param_nml(34)%scale          = .true.
+obs_param_nml(34)%getinnov       = .true.
+obs_param_nml(34)%RTM_ID         = 4
+obs_param_nml(34)%bias_Npar      = 0
+obs_param_nml(34)%bias_trel      = 864000
+obs_param_nml(34)%bias_tcut      = 432000
+obs_param_nml(34)%nodata         = -9999.
+obs_param_nml(34)%varname        = 'Tb'
+obs_param_nml(34)%units          = 'K'
+obs_param_nml(34)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
+obs_param_nml(34)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
+obs_param_nml(34)%name           = ''
+obs_param_nml(34)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
+obs_param_nml(34)%scalename      = 'SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(34)%flistname      = 'SMAP_L1C_TB_D_list.txt'
+obs_param_nml(34)%errstd         = 4.
+obs_param_nml(34)%std_normal_max = 2.5
+obs_param_nml(34)%zeromean       = .true.
+obs_param_nml(34)%coarsen_pert   = .true.
+obs_param_nml(34)%xcorr          = 0.25
+obs_param_nml(34)%ycorr          = 0.25
+obs_param_nml(34)%adapt          = 0
+
+! --------------------------------------------------------------------
+
+/
+
+! =========================== EOF =======================================
