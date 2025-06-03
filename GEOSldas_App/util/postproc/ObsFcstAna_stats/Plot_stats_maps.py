@@ -42,7 +42,12 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmA_stdv  = np.sqrt(stats['obs_variance'] + stats['ana_variance'] - \
                         2 * (stats['oxa_mean'] - stats['obs_mean']*stats['ana_mean']))
 
-     # "fcstvar" is assumed constant here for convenience. Modify if necessary
+    # The computation of mean/standard deviation of normalized O-F time series differs from the previous 
+    # matlab script approach. Previously, O-F was normalized at each time step with sqrt(obsvar+fcstvar),
+    # and then the mean/standard deviation of the normalized time series was computed. In this implementation, 
+    # we first compute the mean/standard deviation of the O-F time series, then normalize using the temporal 
+    # mean of "obsvar" and "fcstvar". Since "fcstvar" varies with time, this approach produces slightly 
+    # different results from the previous method.
     OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean']) 
     OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mean']) )
       
