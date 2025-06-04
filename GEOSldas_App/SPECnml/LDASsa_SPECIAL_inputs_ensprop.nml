@@ -1,13 +1,7 @@
 ! 
 ! namelist of EnKF inputs
 !
-! reichle, 23 Mar 2004
-! reichle, 10 May 2005
-! reichle, 21 Nov 2014 - re-interpreted progn_pert as perturbation flux forcing
-!                      - renamed force_pert_type fields for consistency w/ met_force_type
-!                          %tmp2m --> %tair  (but note lower-case!)
-!                          %dpt2m --> %qair  (but note lower-case!)
-!                          %wnd   --> %wind  (but note lower-case!)
+! CUSTOM version for coupled land-atm DAS with soil moisture analysis based on SMAP Tb obs
 !
 ! --------------------------------------------------------------------
 	    				      				      	
@@ -70,9 +64,9 @@ coarsen_force_pert%lw    = .true.
 ! (limits on range of random numbers: specify max absolute value
 !  allowed to be drawn from a standard normal distribution)
 
-std_normal_max_force_pert%pcp   = 3.0
-std_normal_max_force_pert%sw    = 3.0
-std_normal_max_force_pert%lw    = 3.0
+std_normal_max_force_pert%pcp   = 3.
+std_normal_max_force_pert%sw    = 3.
+std_normal_max_force_pert%lw    = 2.5
   
 ! spatial correlation of forcing perturbations
   
@@ -166,8 +160,8 @@ coarsen_progn_pert%srfexc   = .false.
 ! (limits on range of random numbers: specify max absolute value
 !  allowed to be drawn from a standard normal distribution)
 
-std_normal_max_progn_pert%catdef   = 3.0    
-std_normal_max_progn_pert%srfexc   = 3.0   
+std_normal_max_progn_pert%catdef   = 2.5    
+std_normal_max_progn_pert%srfexc   = 2.5    
   
 ! model error spatial correlation [deg]
 ! (x runs east-west, y runs north-south)
