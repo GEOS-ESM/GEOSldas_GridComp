@@ -1,39 +1,44 @@
 ! 
 ! namelist of EnKF inputs for land EnKF update
 !
-! reichle, 28 Jan 2005
-! reichle, 13 Jun 2011 - updated for SMOS angles and downscaling ("FOV")
-! reichle,  8 Jun 2017 - added "%flistpath" and "%flistname"; updated comments
+! CUSTOM version for coupled land-atm DAS with soil moisture analysis based on SMAP Tb obs
 !
-! --------------------------------------------------------------------
+! ----------------------------------------------------------------------
 
 &ens_upd_inputs			
 	
-		
 ! ----------------------------------------------------------------------
 !
 ! update type - for details see subroutine cat_enkf_update()
 !               (note: all 3d updates use compact support)
 !
-! local = "1d", regional = "3d"
+!   local = "1d", regional = "3d"
 !
-! update_type =  0: NO assimilation, NO bias correction 
-! update_type =  1: 1d soil moisture analysis;                                             sfmc obs
-! update_type =  2: 3d soil moisture analysis;                                             sfmc obs
-! update_type =  3: 1d Tskin (assim incr NOT applied, use w/ bias corr) analysis;          Tskin obs
-! update_type =  4: 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr) analysis;  Tskin obs
-! update_type =  5: 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr) analysis;     Tskin obs
-! update_type =  6: 1d soil moisture/Tskin/ght(1);                                         TB obs
-! update_type =  7: 3d Tskin/ght1 update;                                                  Tskin obs 
-! update_type =  8: 3d soil moisture/Tskin/ght(1);                                         TB obs
-! update_type =  9: 1d Tskin/ght1 update;                                                  FT obs
-! update_type = 10: 3d soil moisture excl catdef/Tskin/ght(1);                             TB obs
+!   # = no longer supported
+!
+!   update_type | analysis state vector                                            | assimilated obs
+!   -------------------------------------------------------------------------------------------------
+!        0      | NO assimilation, NO bias correction                              | n/a
+!     #  1      | 1d soil moisture                                                 | sfmc
+!     #  2      | 3d soil moisture                                                 | sfmc
+!        3      | 1d Tskin (assim incr NOT applied, use w/ bias corr)              | Tskin
+!        4      | 1d Tskin/ght1 (assim incr applied, use w/ or w/o bias corr)      | Tskin
+!        5      | 1d Tskin/ght1 (assim incr NOT applied, use w/ bias corr)         | Tskin
+!        6      | 1d soil moisture/Tskin/ght(1)                                    | Tb
+!        7      | 3d Tskin/ght1 update                                             | Tskin 
+!        8      | 3d soil moisture/Tskin/ght(1)                                    | Tb
+!        9      | 1d Tskin/ght1 update                                             | FT
+!       10      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | Tb
+!       11      | 1d snow analysis (Toure et al. 2018 empirical gain)              | SCF
+!       12      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb, SCF
+!               |   & 1d snow analysis (Toure et al. 2018 empirical gain)          | 
+!       13      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb
 
 update_type = 10
 
+out_obslog      = .true.
 out_ObsFcstAna  = .true.
 out_smapL4SMaup = .false.
-out_obslog      = .true.
 
 ! ---------------------------------------------------------------------
 !
@@ -44,6 +49,17 @@ out_obslog      = .true.
 
 xcompact = 1.25           ! [deg] longitude
 ycompact = 1.25           ! [deg] latitude
+
+! ---------------------------------------------------------------------
+!
+! forecast error covariance inflaction factor 
+!
+! - assigns more weight to observations in analysis by inflating forecast error covariance 
+! - works on std-dev, i.e.,  var_inflated = var * inflation_fac**2   
+! - typical values: 1 <= inflation_fac <= 1.5
+! - to turn off, set to any negative real number 
+
+fcsterr_inflation_fac = -9999.
 
 ! ---------------------------------------------------------------------
 !		
@@ -68,15 +84,15 @@ ycompact = 1.25           ! [deg] latitude
 !                     0 = n/a  [eg., in situ obs]
 !                     1 = ascending
 !                     2 = descending
-!                     3 = ascending and descending
+!                     3 = ascending or descending
 !                     4 = geostationary
 ! %pol            = polarization
 !                     0 = n/a  [eg., multi-pol. retrieval]
 !                     1 = horizontal
 !                     2 = vertical 
 !                     3 = ...
-! %N_ang          = # angles in species
-! %ang            = vector of angles
+! %N_ang          = # satellite viewing angles in species (radiance obs only)
+! %ang            = vector of satellite viewing angles
 ! %freq           = frequency [Hz]
 ! %FOV            = field-of-view *radius*, see NOTES below
 !                   (if FOV==0. equate obs footprint w/ tile)
@@ -88,9 +104,10 @@ ycompact = 1.25           ! [deg] latitude
 ! %RTM_ID         = ID of radiative transfer model to use for Tb forward modeling
 !                   (subroutine get_obs_pred()) 
 !                     0 = none
-!                     1 = tau-omega model as in De Lannoy et al. 2013 (doi:10.1175/JHM-D-12-092.1)
-!                     2 = same as 1 but without Pellarin atmospheric corrections
-!                     3 = ...
+!                     1 = L-band tau-omega model as in De Lannoy et al. 2013 (doi:10.1175/JHM-D-12-092.1) (SMOS)
+!                     2 = same as 1 but without Pellarin atm corr (SMAP)
+!                     3 = same as 1 but with Mironov and SMAP L2_SM pol mixing (SMOS)
+!                     4 = same as 3 but without Pellarin atm corr (targeted for SMAP L4_SM Version 8)
 ! %bias_Npar      = number of obs bias states tracked per day (integer)
 ! %bias_trel      = e-folding time scale of obs bias memory [s]
 ! %bias_tcut      = cutoff time for confident obs bias estimate [s]
@@ -99,10 +116,12 @@ ycompact = 1.25           ! [deg] latitude
 ! %units          = units  (eg., 'K' or 'm3/m3')
 ! %path           = path to measurement files
 ! %name           = name identifier for file containing measurements
+! %maskpath       = path to obs mask file
+! %maskname       = filename for obs mask 
 ! %scalepath      = path to file(s) with scaling parameters
 ! %scalename      = filename for scaling parameters
 ! %flistpath      = path to file with list of obs file names
-! %flistname      = name of file with lis of obs file names
+! %flistname      = name of file with list of obs file names
 ! %errstd         = default obs error std
 ! %std_normal_max = maximum allowed perturbation (relative to N(0,1))
 ! %zeromean       = enforce zero mean across ensemble
@@ -211,6 +230,9 @@ ycompact = 1.25           ! [deg] latitude
 !            (see subroutine read_ens_upd_inputs())
 !
 !
+! ------------------------------------------------------------------------
+
+
 ! --------------------------------------------------------------------
 !
 ! SMAP L1C_TB brightness temperature (36 km EASE grid)
@@ -244,10 +266,12 @@ obs_param_nml(31)%nodata         = -9999.
 obs_param_nml(31)%varname        = 'Tb'
 obs_param_nml(31)%units          = 'K'
 obs_param_nml(31)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
-obs_param_nml(31)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(31)%name           = ''
-obs_param_nml(31)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
-obs_param_nml(31)%scalename      = 'ScMO_SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(31)%maskpath       = ''
+obs_param_nml(31)%maskname       = ''
+obs_param_nml(31)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/<CFnnnn>x6C_GLOBAL/'
+obs_param_nml(31)%scalename      = 'ScMO_SMAP<CFnnnn>e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(31)%flistpath      = '/discover/nobackup/projects/gmao/smap/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(31)%flistname      = 'SMAP_L1C_TB_A_list.txt'
 obs_param_nml(31)%errstd         = 4.
 obs_param_nml(31)%std_normal_max = 2.5
@@ -280,10 +304,12 @@ obs_param_nml(32)%nodata         = -9999.
 obs_param_nml(32)%varname        = 'Tb'
 obs_param_nml(32)%units          = 'K'
 obs_param_nml(32)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
-obs_param_nml(32)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(32)%name           = ''
-obs_param_nml(32)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
-obs_param_nml(32)%scalename      = 'ScMO_SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(32)%maskpath       = ''
+obs_param_nml(32)%maskname       = ''
+obs_param_nml(32)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/<CFnnnn>x6C_GLOBAL/'
+obs_param_nml(32)%scalename      = 'ScMO_SMAP<CFnnnn>e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(32)%flistpath      = '/discover/nobackup/projects/gmao/smap/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(32)%flistname      = 'SMAP_L1C_TB_D_list.txt'
 obs_param_nml(32)%errstd         = 4.
 obs_param_nml(32)%std_normal_max = 2.5
@@ -316,10 +342,12 @@ obs_param_nml(33)%nodata         = -9999.
 obs_param_nml(33)%varname        = 'Tb'
 obs_param_nml(33)%units          = 'K'
 obs_param_nml(33)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
-obs_param_nml(33)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(33)%name           = ''
-obs_param_nml(33)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
-obs_param_nml(33)%scalename      = 'ScMO_SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(33)%maskpath       = ''
+obs_param_nml(33)%maskname       = ''
+obs_param_nml(33)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/<CFnnnn>x6C_GLOBAL/'
+obs_param_nml(33)%scalename      = 'ScMO_SMAP<CFnnnn>e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(33)%flistpath      = '/discover/nobackup/projects/gmao/smap/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(33)%flistname      = 'SMAP_L1C_TB_A_list.txt'
 obs_param_nml(33)%errstd         = 4.
 obs_param_nml(33)%std_normal_max = 2.5
@@ -352,10 +380,12 @@ obs_param_nml(34)%nodata         = -9999.
 obs_param_nml(34)%varname        = 'Tb'
 obs_param_nml(34)%units          = 'K'
 obs_param_nml(34)%path           = '/discover/nobackup/projects/gmao/smap/SMAP_L4/SMAP/OPS/L1C_TB/'
-obs_param_nml(34)%flistpath      = '/gpfsm/dnb05/projects/p51/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(34)%name           = ''
-obs_param_nml(34)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/CF0180x6C_GLOBAL/'
-obs_param_nml(34)%scalename      = 'SMAPc180e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(34)%maskpath       = ''
+obs_param_nml(34)%maskname       = ''
+obs_param_nml(34)%scalepath      = '/discover/nobackup/qzhang/LDAS_INPUTS/ZSCOREstats/<CFnnnn>x6C_GLOBAL/'
+obs_param_nml(34)%scalename      = 'ScMO_SMAP<CFnnnn>e24_zscore_stats_2015_p19_2020_p18_hscale_0.00_W_9p_Nmin_20'
+obs_param_nml(34)%flistpath      = '/discover/nobackup/projects/gmao/smap/Operations/SPL4SM/SPL4SM_OL7000/import/obs/SMAP/L1C_TB/'
 obs_param_nml(34)%flistname      = 'SMAP_L1C_TB_D_list.txt'
 obs_param_nml(34)%errstd         = 4.
 obs_param_nml(34)%std_normal_max = 2.5
@@ -365,7 +395,9 @@ obs_param_nml(34)%xcorr          = 0.25
 obs_param_nml(34)%ycorr          = 0.25
 obs_param_nml(34)%adapt          = 0
 
+
 ! --------------------------------------------------------------------
+
 
 /
 
