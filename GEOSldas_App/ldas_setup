@@ -112,7 +112,7 @@ class LDASsetup:
         self.bcs_version        = cmdLineArgs['bcs_version']
         self.rstloc             = cmdLineArgs['rstloc']
         self.varwindow          = cmdLineArgs['varwindow'] 
-        self.atm_nens           = cmdLineArgs['atm_nens']
+        self.nens               = cmdLineArgs['nens']
 
         # obsolete command line args
         self.runmodel           = cmdLineArgs['runmodel']
@@ -190,20 +190,20 @@ class LDASsetup:
         if self.ladas_cpl > 0 :
 
            # make sure all necessary command line arguments were supplied
-           assert self.nymdb         is not None, "Error. Must have command line arg nymdb         for coupled land-atm DAS.\n"
-           assert self.nhmsb         is not None, "Error. Must have command line arg nhmsb         for coupled land-atm DAS.\n"
-           assert self.agcm_res      is not None, "Error. Must have command line arg agcm_res      for coupled land-atm DAS.\n"
-           assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version   for coupled land-atm DAS.\n"
-           assert self.rstloc        is not None, "Error. Must have command line arg rstloc        for coupled land-atm DAS.\n"
-           assert self.varwindow     is not None, "Error. Must have command line arg varwindow     for coupled land-atm DAS.\n"
-           assert self.atm_nens     is not None, "Error. Must have command line arg atm_nens     for coupled land-atm DAS.\n"
+           assert self.nymdb         is not None, "Error. Must have command line arg nymdb       for coupled land-atm DAS.\n"
+           assert self.nhmsb         is not None, "Error. Must have command line arg nhmsb       for coupled land-atm DAS.\n"
+           assert self.agcm_res      is not None, "Error. Must have command line arg agcm_res    for coupled land-atm DAS.\n"
+           assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version for coupled land-atm DAS.\n"
+           assert self.rstloc        is not None, "Error. Must have command line arg rstloc      for coupled land-atm DAS.\n"
+           assert self.varwindow     is not None, "Error. Must have command line arg varwindow   for coupled land-atm DAS.\n"
+           assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atm DAS.\n"
            
-           self.rqdExeInp['BEG_DATE']       = f"{self.nymdb} {self.nhmsb}"
-           rstloc_ = self.rstloc.rstrip('/')                # remove trailing '/'
-           assert os.path.isdir(rstloc_)                    # make sure rstloc_ is a valid directory
-           self.rstloc = os.path.abspath(rstloc_)
-           self.rqdExeInp['RESTART_PATH']   = os.path.dirname( self.rstloc) 
-           self.rqdExeInp['RESTART_ID']     = os.path.basename(self.rstloc)
+           self.rqdExeInp['BEG_DATE']                 = f"{self.nymdb} {self.nhmsb}"
+           rstloc_                                    = self.rstloc.rstrip('/')                  # remove trailing '/'
+           assert os.path.isdir(rstloc_)                                                         # make sure rstloc_ is a valid directory
+           self.rstloc                                = os.path.abspath(rstloc_)
+           self.rqdExeInp['RESTART_PATH']             = os.path.dirname( self.rstloc) 
+           self.rqdExeInp['RESTART_ID']               = os.path.basename(self.rstloc)
 
            self.adas_expdir                           = os.path.dirname( self.exphome)
            self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
@@ -215,30 +215,32 @@ class LDASsetup:
                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
                self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
-               self.nens                              = 24           # for now, hardwire nens for atm det  
            elif self.ladas_cpl == 2 :
                # ldas coupled with ensemble component of adas
                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
                self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
-               self.nens                              = self.atm_nens           
            else :
                exit("Error. Unknown value of self.ladas_cpl.\n")
+               
            self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
            self.first_ens_id                          = 1
-           self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id 
-           self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.agcm_res +'x6C_GLOBAL'
+           self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id
+
+           _agcm_res                                  = 'CF' + self.agcm_res
+           self.rqdExeInp['EXP_DOMAIN']               = _agcm_res +'x6C_GLOBAL'
            
            # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info  
            # hard-wired BCS_PATH for now 
-           self.rqdExeInp['BCS_PATH'] = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
+           self.rqdExeInp['BCS_PATH']                 = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
            self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'].rstrip('/') + '/' + self.bcs_version 
            if self.bcs_version == "Icarus-NLv3" :
                self.rqdExeInp['BCS_PATH']             = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
-           self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.agcm_res +'x6C_CF'     + self.agcm_res +'x6C'
-           self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.agcm_res +'x6C_GLOBAL'
+           self.rqdExeInp['BCS_RESOLUTION']           = _agcm_res +'x6C_'     + _agcm_res +'x6C'
+           self.rqdExeInp['RESTART_DOMAIN']           = _agcm_res +'x6C_GLOBAL'
 
            # the following are not in default rqdExeInp list; hardwire for now
+           self.rqdExeInp['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/bcs/RTM_params/RTMParam_L2DCA_R19/'
            self.rqdExeInp['LAND_ASSIM']               = "YES"
            self.rqdExeInp['MET_HINTERP']              = 0
            self.landassim_dt                          = 10800                                    # seconds
@@ -249,29 +251,33 @@ class LDASsetup:
                exit("Error. LANDASSIM_DT is inconsistent with ADAS analysis window.\n")
            self.rqdExeInp['LANDASSIM_T0']             = "013000"                                 # HHMMSS
            jsgmt1                                     = "00000000"
-           jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)       # convert minutes to HHMMSS
+           jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)  # convert minutes to HHMMSS
            self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
            self.rqdExeInp['NUM_SGMT']                 = 1 
            self.rqdExeInp['FORCE_DTSTEP']             = 3600
 
            # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
-           _beg_date = datetime.strptime( self.rqdExeInp['BEG_DATE'], "%Y%m%d %H%M%S")
-           _hours    = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
-           _end_date = _beg_date + timedelta(hours=int(self.varwindow)/60) 
-
+           _beg_date                                  = datetime.strptime( self.rqdExeInp['BEG_DATE'], "%Y%m%d %H%M%S")
+           _hours                                     = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
+           _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60) 
            self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
 
-           #default special nml path
-           current_directory = os.path.dirname(__file__)   
-           geosdir = current_directory.rsplit('/',2)[0]
-           self.LDAS_nml_path = geosdir +'/src/Components/@GEOSldas_GridComp/GEOSldas_App/SPECnml/'
-           self.rqdExeInp['NML_INPUT_PATH']           = self.LDAS_nml_path
-
-           # default mwrtm path 
-           self.mwrtm_path = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/bcs/RTM_params/RTMParam_L2DCA_R19/'
-           self.rqdExeInp['MWRTM_PATH']               = self.mwrtm_path   
+           # process LDAS special nml input files
+           # FOR NOW, DEFINE/CREATE etc AND run DIRECTORIES HERE; NOTE THAT self.rundir IS DEFINED
+           # IN __init__() BELOW AND etcdir IS DEFINED IN createRCFiles().
+           current_directory                          = os.path.dirname(__file__)
+           _etcdir                                    = current_directory.rsplit('/',2)[0] + '/etc/'
+           _rundir                                    = self.exphome  + '/' + self.rqdExeInp['EXP_ID'] + '/run/'
+           self._mkdir_p(_rundir)
+           # copy nml files to run directory
+           shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensprop.nml', _rundir)
+           shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensupd.nml' , _rundir)
+           # edit resolution info in ensupd nml file
+           sp.run(['sed', '-i', 's/<CFnnnn>/'+_agcm_res+'/g', _etcdir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
+           self.rqdExeInp['NML_INPUT_PATH']           = _rundir
            
-           # end if self.ladas_cpl > 0 
+           
+           # end if self.ladas_cpl > 0 --------------------------------------------------------------------
 
         for key in rqdExeInpKeys :
            assert key in self.rqdExeInp,' "%s" is required in the input file %s' % (key,self.exeinpfile)
@@ -639,22 +645,22 @@ class LDASsetup:
         #     exefyl
         # ------
 
-        self.bindir  = os.path.dirname(os.path.realpath(__file__))
-        self.blddir = self.bindir.rsplit('/',1)[0]
-        exefyl = '/bin/GEOSldas.x'
-        tmp_execfyl= self.blddir+exefyl
+        self.bindir     = os.path.dirname(os.path.realpath(__file__))
+        self.blddir     = self.bindir.rsplit('/',1)[0]
+        exefyl          = '/bin/GEOSldas.x'
+        tmp_execfyl     = self.blddir   + exefyl
         assert os.path.isfile(tmp_execfyl),\
             'Executable [%s] does not exist!' % tmp_execfyl
-        self.expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
-        self.rundir = self.expdir + '/run'
-        self.inpdir = self.expdir + '/input'
-        self.outdir = self.expdir + '/output'
-        self.scratchdir = self.expdir + '/scratch'
-        self.blddirLn = self.expdir + '/build'
-        self.out_path = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']
-        self.bcsdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
-        self.rstdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
-        self.exefyl = self.blddirLn+exefyl
+        self.expdir     = self.exphome  + '/' + self.rqdExeInp['EXP_ID']
+        self.rundir     = self.expdir   + '/run'
+        self.inpdir     = self.expdir   + '/input'
+        self.outdir     = self.expdir   + '/output'
+        self.scratchdir = self.expdir   + '/scratch'
+        self.blddirLn   = self.expdir   + '/build'
+        self.out_path   = self.outdir   + '/'+self.rqdExeInp['EXP_DOMAIN']
+        self.bcsdir     = self.outdir   + '/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
+        self.rstdir     = self.outdir   + '/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
+        self.exefyl     = self.blddirLn + exefyl
 
         my_ntasks_per_node = int(self.rqdRmInp['ntasks-per-node'])
 
@@ -1967,7 +1973,7 @@ def parseCmdLine():
         ) 
     p_setup.add_argument(
         '--agcm_res',
-        help='AGCM resolution associated with boundary conditions: xxxx (4 digits). Required when exeinp is dummy',
+        help='AGCM resolution associated with boundary conditions: nnnn (4 digits). Required when exeinp is dummy',
         type=str
         )
     p_setup.add_argument(
@@ -1986,8 +1992,8 @@ def parseCmdLine():
         type=str
         )
     p_setup.add_argument(
-        '--atm_nens',
-        help='ADAS number of ensemble members (Required when exeinp is dummy',          
+        '--nens',
+        help='number of ensemble members. Required when exeinp is dummy',          
         type=str
         )  
 
