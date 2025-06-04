@@ -59,7 +59,7 @@ class LDASsetup:
         # ------
         # Required resource manager input fields
         # ------
-        rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model', 'ntasks-per-node']
+        rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model']
         # ------
         # Optional resource manager input fields
         # ------
@@ -613,8 +613,6 @@ class LDASsetup:
             self.rqdRmInp['account']         = cmdLineArgs['account']
             self.rqdRmInp['walltime']        = "01:00:00" 
             self.rqdRmInp['ntasks_model']    = 120
-            self.rqdRmInp['ntasks-per-node'] =  46                   # 46 works on Cascade Lake and Milan 
-
 
 
         # print rm inputs
@@ -649,18 +647,9 @@ class LDASsetup:
         self.rstdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
         self.exefyl = self.blddirLn+exefyl
 
-        my_ntasks_per_node = int(self.rqdRmInp['ntasks-per-node'])
-
-        # default number of nodes
-        my_nodes = self.rqdRmInp['ntasks_model'] // my_ntasks_per_node
-        if self.rqdRmInp['ntasks_model'] % my_ntasks_per_node > 0 :
-           my_nodes = my_nodes + 1
-
         # default is set to 0 ( no output server)
         if 'oserver_nodes' not in self.optRmInp :
            self.optRmInp['oserver_nodes'] = 0
-
-        self.optRmInp['nodes'] = my_nodes + int(self.optRmInp['oserver_nodes'])
 
         if (int(self.optRmInp['oserver_nodes']) >=1) :
            self.rqdExeInp['WRITE_RESTART_BY_OSERVER'] = "YES"
@@ -1588,8 +1577,7 @@ class LDASsetup:
                   SBATCHQSUB         = SBATCHQSUB,
                   MY_ACCOUNT         = self.rqdRmInp['account'],
                   MY_WALLTIME        = self.rqdRmInp['walltime'],
-                  MY_NODES           = str(self.optRmInp['nodes']),
-                  MY_NTASKS_PER_NODE = str(self.rqdRmInp['ntasks-per-node']),
+                  MY_NTASKS_MODEL    = str(self.rqdRmInp['ntasks_model']),
                   MY_CONSTRAINT      = constraint,
                   MY_OSERVER_NODES   = str(self.optRmInp['oserver_nodes']),
                   MY_WRITERS_NPES    = str(self.optRmInp['writers-per-node']),
@@ -1848,9 +1836,6 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('#                      [At NCCS: Use command "getsponsor" to see available account number(s).]' )
     print ('# - walltime         = walltime requested; format is HH:MM:SS (hours/minutes/seconds)')
     print ('# - ntasks_model     = number of processors requested for the model (typically 126; output server is not included)')
-    print ('# - ntasks-per-node  = number of tasks per node (typically 46 for Cascade Lake and 126 for Milan)')
-    print ('#                      [If >46, Milan nodes will be allocated, else Cascade Lake or Milan.]')
-    print ('#                      [NCCS recommends <=46 for Cascade Lake and <=126 for Milan.]')
     print ('#')
     for key in rqdRmInpKeys:
         print (key + ':')
@@ -1861,8 +1846,8 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('# NOTE:')
     print ('# - job_name         = name of experiment; default is "exp_id"')
     print ('# - qos              = quality-of-service; do not specify by default; specify "debug" for faster but limited service.')
-    print ('# - oserver_nodes    = number of nodes for oserver ( default is 0 )')
-    print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5 ),')
+    print ('# - oserver_nodes    = number of nodes for oserver ( default is 0, for future use )')
+    print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5, for future use ),')
     print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
     print ('#      Jobs will hang when oserver_nodes = writers-per-node = 1.')
     print ('#')

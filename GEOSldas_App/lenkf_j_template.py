@@ -12,7 +12,7 @@ job_directive = {"NCCS": '''#!/bin/csh -f
 #SBATCH --error={MY_EXPDIR}/scratch/GEOSldas_err_txt
 #SBATCH --account={MY_ACCOUNT}
 #SBATCH --time={MY_WALLTIME}
-#SBATCH --nodes={MY_NODES} --ntasks-per-node={MY_NTASKS_PER_NODE}
+#SBATCH --ntasks={MY_NTASKS_MODEL}
 #SBATCH --job-name={MY_JOB}
 #SBATCH --qos={MY_QOS}
 #SBATCH --constraint={MY_CONSTRAINT}
