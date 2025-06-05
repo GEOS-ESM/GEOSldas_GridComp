@@ -188,8 +188,8 @@ coarsen_force_pert%wind  = .false.
 ! (limits on range of random numbers: specify max absolute value
 !  allowed to be drawn from a standard normal distribution)
 
-std_normal_max_force_pert%pcp   = 2.5
-std_normal_max_force_pert%sw    = 2.5
+std_normal_max_force_pert%pcp   = 3.
+std_normal_max_force_pert%sw    = 3.
 std_normal_max_force_pert%lw    = 2.5
 std_normal_max_force_pert%tair  = 2.5
 std_normal_max_force_pert%qair  = 2.5
