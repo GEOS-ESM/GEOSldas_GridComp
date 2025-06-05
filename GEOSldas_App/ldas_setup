@@ -273,7 +273,7 @@ class LDASsetup:
            shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensprop.nml', _rundir)
            shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensupd.nml' , _rundir)
            # edit resolution info in ensupd nml file
-           sp.run(['sed', '-i', 's/<CFnnnn>/'+_agcm_res+'/g', _etcdir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
+           sp.run(['sed', '-i', 's/<CFnnnn>/'+_agcm_res+'/g', _rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
            self.rqdExeInp['NML_INPUT_PATH']           = _rundir
            
            
