@@ -261,19 +261,6 @@ class LDASsetup:
            _hours                                     = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
            _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60) 
            self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
-
-           # process LDAS special nml input files
-           # FOR NOW, DEFINE/CREATE etc AND run DIRECTORIES HERE; NOTE THAT self.rundir IS DEFINED
-           # IN __init__() BELOW AND etcdir IS DEFINED IN createRCFiles().
-           current_directory                          = os.path.dirname(__file__)
-           _etcdir                                    = current_directory.rsplit('/',2)[0] + '/etc/'
-           _rundir                                    = self.exphome  + '/' + self.rqdExeInp['EXP_ID'] + '/run/'
-           self._mkdir_p(_rundir)
-           # copy nml files to run directory
-           shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensprop.nml', _rundir)
-           shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensupd.nml' , _rundir)
-           # edit resolution info in ensupd nml file
-           sp.run(['sed', '-i', 's/<CFnnnn>/'+_agcm_res+'/g', _rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
            
            # end if self.ladas_cpl > 0 --------------------------------------------------------------------
 
@@ -1249,15 +1236,22 @@ class LDASsetup:
         for nmlfile in default_nml:
             shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
             shutil.copy2(nmlfile, shortfile)
-         # special nml
-        if self.ladas_cpl == 0:
-            special_nml=[]
-            if 'NML_INPUT_PATH' in self.rqdExeInp :
+        # special nml
+        special_nml=[]
+        if self.ladas_cpl > 0:
+            special_nml= glob.glob(etcdir+'/LDASsa_SPECIAL_inputs_*.nml')
+        else : 
+            if 'NML_INPUT_PATH' in self.rqdExeInp : 
                 special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/LDASsa_SPECIAL_inputs_*.nml')
-            for nmlfile in special_nml:
-                shortfile=nmlfile.split('/')[-1]
-                shutil.copy2(nmlfile, self.rundir+'/'+shortfile)
 
+        for nmlfile in special_nml:
+             shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
+             shutil.copy2(nmlfile, shortfile)   
+
+        if self.ladas_cpl > 0:
+           # edit resolution info in ensupd nml file
+           sp.run(['sed', '-i', 's/<CFnnnn>/'+ self.agcm_res+'/g', self.rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
+ 
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
         print  ("Optimizing... decomposition of processes.... \n")
