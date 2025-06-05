@@ -240,7 +240,7 @@ class LDASsetup:
            self.rqdExeInp['RESTART_DOMAIN']           = _agcm_res +'x6C_GLOBAL'
 
            # the following are not in default rqdExeInp list; hardwire for now
-           self.rqdExeInp['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/SMAP_Nature/bcs/RTM_params/RTMParam_L2DCA_R19/'
+           self.rqdExeInp['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/'
            self.rqdExeInp['LAND_ASSIM']               = "YES"
            self.rqdExeInp['MET_HINTERP']              = 0
            self.landassim_dt                          = 10800                                    # seconds
@@ -274,8 +274,6 @@ class LDASsetup:
            shutil.copy(_etcdir+'/LDASsa_SPECIAL_inputs_ensupd.nml' , _rundir)
            # edit resolution info in ensupd nml file
            sp.run(['sed', '-i', 's/<CFnnnn>/'+_agcm_res+'/g', _rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
-           self.rqdExeInp['NML_INPUT_PATH']           = _rundir
-           
            
            # end if self.ladas_cpl > 0 --------------------------------------------------------------------
 
@@ -1252,15 +1250,13 @@ class LDASsetup:
             shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
             shutil.copy2(nmlfile, shortfile)
          # special nml
-        special_nml=[]
-        if 'NML_INPUT_PATH' in self.rqdExeInp :
-            special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/LDASsa_SPECIAL_inputs_*.nml')
-            if self.ladas_cpl > 0: 
-               special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/'+ self.rqdExeInp['EXP_DOMAIN'] + '/LDASsa_SPECIAL_inputs_*.nml') 
-  
-        for nmlfile in special_nml:
-            shortfile=nmlfile.split('/')[-1]
-            shutil.copy2(nmlfile, self.rundir+'/'+shortfile)
+        if self.ladas_cpl == 0:
+            special_nml=[]
+            if 'NML_INPUT_PATH' in self.rqdExeInp :
+                special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/LDASsa_SPECIAL_inputs_*.nml')
+            for nmlfile in special_nml:
+                shortfile=nmlfile.split('/')[-1]
+                shutil.copy2(nmlfile, self.rundir+'/'+shortfile)
 
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
