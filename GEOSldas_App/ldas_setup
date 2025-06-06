@@ -196,8 +196,7 @@ class LDASsetup:
            assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version for coupled land-atm DAS.\n"
            assert self.rstloc        is not None, "Error. Must have command line arg rstloc      for coupled land-atm DAS.\n"
            assert self.varwindow     is not None, "Error. Must have command line arg varwindow   for coupled land-atm DAS.\n"
-           if self.ladas_cpl == 2:
-               assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atmensDAS.\n"
+           assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atmensDAS.\n"
            
            self.rqdExeInp['BEG_DATE']                 = f"{self.nymdb} {self.nhmsb}"
            rstloc_                                    = self.rstloc.rstrip('/')                  # remove trailing '/'
@@ -261,13 +260,8 @@ class LDASsetup:
            _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60) 
            self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
 
-           # find nens  from  ldas ICS
-           rstdir=self.rqdExeInp['RESTART_PATH']+'/'+self.rqdExeInp['RESTART_ID']+'/output/'+ self.rqdExeInp['RESTART_DOMAIN'] 
-           enslist = glob.glob(os.path.join(rstdir, "rs", "ens????"))  
-           self.rqdExeInp['NUM_LDAS_ENSEMBLE']         = len(enslist) 
-           # if fvsetup send atm_nens via commandline, use that
-           if self.ladas_cpl == 2 :
-              self.rqdExeInp['NUM_LDAS_ENSEMBLE']      = self.nens 
+           # fvsetup pass nens via commandline to self.nens when ladas_cpl > 0
+           self.rqdExeInp['NUM_LDAS_ENSEMBLE']      = self.nens 
            
            # end if self.ladas_cpl > 0 --------------------------------------------------------------------
 
