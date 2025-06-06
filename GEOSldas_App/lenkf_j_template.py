@@ -63,6 +63,8 @@ setenv argv
 
 source $GEOSBIN/g5_modules
 
+setenv BASEBIN ${{BASEDIR}}/Linux/bin
+
 setenv MPI_STACK {DETECTED_MPI_STACK}
 
 if ( ${{MPI_STACK}} == "openmpi" ) then
@@ -102,8 +104,6 @@ setenv MKL_CBWR "AVX2"
 #setenv LD_LIBRARY_PATH ${{LD_LIBRARY_PATH}}:${{BASEDIR}}/${{ARCH}}/lib
 # reversed sequence for LADAS_COUPLING (Sep 2020)  (needed when coupling with ADAS using different BASEDIR)
 setenv LD_LIBRARY_PATH ${{BASEDIR}}/${{ARCH}}/lib:${{ESMADIR}}/lib:${{LD_LIBRARY_PATH}}
-
-module load nco
 
 setenv RUN_CMD "$GEOSBIN/esma_mpirun -np "
 
@@ -602,9 +602,9 @@ EOF
 
              sed -i -e "s/NT/$LEN_SUB/g" timestamp.cdl
              sed -i -e "s/DATAVALUES/$tstep2/g" timestamp.cdl
-             ncgen -k4 -o timestamp.nc4 timestamp.cdl
-             ncrcat -h $EXPID.$ThisCol.${{YYYY}}${{MM}}${{DD}}_* ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
-             ncks -4 -h -v time_stamp timestamp.nc4 -A ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
+             $BASEBIN/ncgen -k4 -o timestamp.nc4 timestamp.cdl
+             $BASEBIN/ncrcat -h $EXPID.$ThisCol.${{YYYY}}${{MM}}${{DD}}_* ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
+             $BASEBIN/ncks -4 -h -v time_stamp timestamp.nc4 -A ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
              /bin/rm timestamp.cdl
              /bin/rm timestamp.nc4
              # rudimentary check for desired nc4 file;  if ok, delete sub-daily files
@@ -745,7 +745,7 @@ EOF
           set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
 	  # copy generic restart file to final location/name but remove lat/lon variables
 	  #  (lat/lon variables are not correct when running in EASE-grid tile space)
-          ncks -4 -O -C -x -v lat,lon ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
+          $BASEBIN/ncks -4 -O -C -x -v lat,lon ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
           /bin/rm -f ${{rstf}}${{ENSID}}_internal_checkpoint
           set old_rst = `/usr/bin/readlink -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst`
           /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
@@ -777,7 +777,7 @@ EOF
           set TM = `echo $ThisTime | cut -c5-6`
           set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{TY}}/M${{TM}}/
           if (! -e $THISDIR            ) mkdir -p $THISDIR
-             (ncks -4 -O -C -x -v lat,lon $rfile ${{THISDIR}}${{EXPID}}.landpert_internal_rst.${{ThisTime}}.nc4;\\
+             ($BASEBIN/ncks -4 -O -C -x -v lat,lon $rfile ${{THISDIR}}${{EXPID}}.landpert_internal_rst.${{ThisTime}}.nc4;\\
                /usr/bin/gzip ${{THISDIR}}${{EXPID}}.landpert_internal_rst.${{ThisTime}}.nc4; \\
                /bin/rm -f $rfile) &
        end
