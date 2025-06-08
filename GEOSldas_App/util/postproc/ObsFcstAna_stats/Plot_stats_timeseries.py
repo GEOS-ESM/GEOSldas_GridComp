@@ -21,7 +21,7 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     start_month = postproc_obj.start_time
     end_month = postproc_obj.end_time
 
-    stats_file = fig_path + 'spa_stats_'+expid+'_'+start_month.strftime('%Y%m')+ \
+    stats_file = fig_path + 'spatial_stats_'+expid+'_'+start_month.strftime('%Y%m')+ \
             '_'+(end_month+timedelta(days=-1)).strftime('%Y%m')+'.pkl'
     
     if os.path.isfile(stats_file):

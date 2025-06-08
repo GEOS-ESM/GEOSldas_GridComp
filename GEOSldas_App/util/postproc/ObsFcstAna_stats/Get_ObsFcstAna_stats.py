@@ -72,11 +72,9 @@ def main():
     plot_maps       = False
     plot_timeseries = False
 
-    if plot_maps:
-        # Compute long-term temporal stats and plot maps
+    if plot_maps:            # Compute long-term temporal stats and plot maps
 
-        # Get output file name
-        stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+ '_'+start_time.strftime('%Y%m%d')+'_'+ \
+        stats_file  = out_path + 'temporal_stats_'+exp_list[0]['exptag']+ '_'+start_time.strftime('%Y%m%d')+'_'+ \
             (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
 
         # temporal_stats is a dictionary that contains all mean/variances fields for computing long-term O-F/O-A stats
@@ -88,9 +86,8 @@ def main():
         from Plot_stats_maps import plot_OmF_maps
         plot_OmF_maps(postproc, temporal_stats, fig_path=out_path )
 
+    if plot_timeseries:      # Compute spatially averaged stats and plot monthly time series of stats
 
-    if plot_timeseries:
-        # Compute spatially averaged stats and plot monthly time series of stats
         from Plot_stats_timeseries import Plot_monthly_OmF_bars
         Plot_monthly_OmF_bars(postproc, fig_path=out_path)
 
