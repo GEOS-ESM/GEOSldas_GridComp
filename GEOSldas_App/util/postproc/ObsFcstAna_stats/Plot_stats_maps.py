@@ -42,14 +42,18 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmA_stdv  = np.sqrt(stats['obs_variance'] + stats['ana_variance'] - \
                         2 * (stats['oxa_mean'] - stats['obs_mean']*stats['ana_mean']))
 
-    # The computation of mean/standard deviation of normalized O-F time series differs from the previous 
-    # matlab script approach. Previously, O-F was normalized at each time step with sqrt(obsvar+fcstvar),
-    # and then the mean/standard deviation of the normalized time series was computed. In this implementation, 
-    # we first compute the mean/standard deviation of the O-F time series, then normalize using the temporal 
-    # mean of "obsvar" and "fcstvar". Since "fcstvar" varies with time, this approach produces slightly 
-    # different results from the previous method.
-    OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean']) 
-    OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mean']) )
+    # ***************************************************************************************
+    # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATE!
+    # ***************************************************************************************
+    # Here, we first compute the stats of the OmF time series and then normalize using 
+    # the time-avg "obsvar" and "fcstvar" values.
+    # Since "fcstvar" changes with time, the OmF values should be normalized at each time 
+    # step (as in the older matlab scripts), and then the time series stats can be computed. 
+    # To compute the exact stats with this python package, the sum and sum-of-squares of 
+    # the normalized OmF values would need to be added into the sums files. 
+    #
+    OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean'])         # APPROXIMATE stat!
+    OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mean']) )   # APPROXIMATE stat!
       
     # Mask out data points with insufficent observations using the Nmin threshold
     # Do NOT apply to N_data
@@ -100,7 +104,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 tile_data = OmF_norm_stdv
                 crange =[0, 15]
                 colormap = plt.get_cmap ('jet',15)
-                title_txt = expid + ' Tb normalized O-F stdv '+ start_time.strftime('%Y%m%d')+'_'+end_time.strftime('%Y%m%d')
+                title_txt = expid + ' Tb normalized O-F stdv (approx!) '+ start_time.strftime('%Y%m%d')+'_'+end_time.strftime('%Y%m%d')
 
             colormap.set_bad(color='0.9') # light grey, 0-black, 1-white
 
