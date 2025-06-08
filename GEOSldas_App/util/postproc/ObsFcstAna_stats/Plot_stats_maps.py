@@ -3,6 +3,7 @@
 """
 Sample script for plotting maps of long-term data assimilation diagnostics.
 Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
+Stats of *normalized* OmFs are approximated!
 """
 
 import sys;       sys.path.append('../../shared/python/')
@@ -42,9 +43,9 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmA_stdv  = np.sqrt(stats['obs_variance'] + stats['ana_variance'] - \
                         2 * (stats['oxa_mean'] - stats['obs_mean']*stats['ana_mean']))
 
-    # ***************************************************************************************
-    # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATE!
-    # ***************************************************************************************
+    # *****************************************************************************************
+    # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATED!
+    # *****************************************************************************************
     # Here, we first compute the stats of the OmF time series and then normalize using 
     # the time-avg "obsvar" and "fcstvar" values.
     # Since "fcstvar" changes with time, the OmF values should be normalized at each time 
@@ -52,8 +53,8 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     # To compute the exact stats with this python package, the sum and sum-of-squares of 
     # the normalized OmF values would need to be added into the sums files. 
     #
-    OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean'])         # APPROXIMATE stat!
-    OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mean']) )   # APPROXIMATE stat!
+    OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean'])         # APPROXIMATED stat!
+    OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mean']) )   # APPROXIMATED stat!
       
     # Mask out data points with insufficent observations using the Nmin threshold
     # Do NOT apply to N_data
