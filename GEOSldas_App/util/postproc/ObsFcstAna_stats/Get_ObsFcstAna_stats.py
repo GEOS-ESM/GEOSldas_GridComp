@@ -74,13 +74,10 @@ def main():
 
     if plot_maps:
         # Compute long-term temporal stats and plot maps
-        if len(exp_list) >1 :
-            stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+ \
-                          '_'+start_time.strftime('%Y%m%d')+'_'+ \
-                          (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
-        else:
-            stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
-                          (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
+
+        # Get output file name
+        stats_file  = out_path + 'tmp_stats_'+exp_list[0]['exptag']+ '_'+start_time.strftime('%Y%m%d')+'_'+ \
+            (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
 
         # temporal_stats is a dictionary that contains all mean/variances fields for computing long-term O-F/O-A stats
         # each field has the dimension [N_tile, N_species]
