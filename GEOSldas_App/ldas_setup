@@ -29,6 +29,14 @@ from lenkf_j_template             import *
 This script is intended to be run from any installed directory with GEOSldas.x and ldas_setup
 (The default setup is ../install/bin)
 """
+# ------
+# Required resource manager input fields
+# ------
+rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model', 'ntasks-per-node']
+# ------
+# Optional resource manager input fields
+# ------
+optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node']
 
 class LDASsetup:
 
@@ -56,40 +64,7 @@ class LDASsetup:
 
         self.GEOS_SITE = "@GEOS_SITE@"
 
-        # ------
-        # Required resource manager input fields
-        # ------
-        rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model', 'ntasks-per-node']
-        # ------
-        # Optional resource manager input fields
-        # ------
-        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node']
-
         
-        # ===============================================================================================
-        #    
-        # ------
-        # ./ldas_setup sample ...
-        # ------
-        #
-        # "sample" sub-command:
-        #   '--exeinp' and '--batinp' are mutually exclusive command line arguments.
-        #   Specifying one will set it to True and set the other one to False.
-        #   That is, we can have either: {'exeinp': False, 'batinp': True }
-        #                            or: {'exeinp': True,  'batinp': False} 
-        
-        if 'exeinp' in cmdLineArgs:     # 'exeinp' is always present in "sample" mode.
-            
-            if   cmdLineArgs['exeinp']:
-                _produceExeInput()
-            elif cmdLineArgs['batinp']:
-                _printRmInputKeys( rqdRmInpKeys,  optSlurmInpKeys)
-            else:
-                raise Exception('unrecognized option')
-            #
-            # EXIT after completing "sample" sub-command
-            sys.exit(0)
-            
 
         # ===============================================================================================
         #    
@@ -2027,14 +2002,42 @@ def hours_to_hhmmss(hours):
     # Format as HHMMSS
     return f"{hours:02d}{minutes:02d}{seconds:02d}"
 
-
+def printInputfileSample(cmdLineArgs):
+   '''
+     ./ldas_setup sample ...
+    
+     "sample" sub-command:
+       '--exeinp' and '--batinp' are mutually exclusive command line arguments.
+       Specifying one will set it to True and set the other one to False.
+       That is, we can have either: {'exeinp': False, 'batinp': True }
+                                or: {'exeinp': True,  'batinp': False} 
+   '''
+   if cmdLineArgs['exeinp']:
+      _produceExeInput()
+   elif cmdLineArgs['batinp']:
+      _printRmInputKeys( rqdRmInpKeys,  optSlurmInpKeys)
+   else:
+      raise Exception('unrecognized sample option')
 
 if __name__=='__main__':
 
     resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
-    #print "reading params...."
-    args = vars(parseCmdLine()) # vars converts to dict
+    #convert command line to dictionary
+    args = vars(parseCmdLine())
+   
+    #./ldas_setup sample sub-command
+    # print input sample file then exit 
+    if 'exeinp' in args:
+      printInputfileSample(args)
+      sys.exit(0)
+
+    # start ./ldas_setup setup sub-command
+
     ld = LDASsetup(args)
+
+    # step 1
+    # step 2
+    # step 3
 
     print ("creating dir structure")
     status = ld.createDirStructure()
