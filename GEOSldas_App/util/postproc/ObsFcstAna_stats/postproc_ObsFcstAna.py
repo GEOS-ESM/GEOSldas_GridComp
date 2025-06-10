@@ -5,6 +5,7 @@
 
 import numpy as np
 import os
+import yaml
 
 import sys;       sys.path.append('../../shared/python/')
 
@@ -34,7 +35,7 @@ class postproc_ObsFcstAna:
         self.obsparam_list = [item['obsparam'] for item in exp_list]
         self.sum_path      = sum_path
 
-        # determine experiment that supplies obs data
+        # Determine experiment that supplies obs data
         self.obs_from = -1
         for exp_idx, exp in enumerate(exp_list):
             if exp.get('use_obs', None):              # found use_obs=True 
@@ -46,13 +47,37 @@ class postproc_ObsFcstAna:
         if self.obs_from < 0: self.obs_from = 0       # by default, obs data are from exp_list[0]
         print(f"obs data are from {self.exptag_list[self.obs_from]}")   
 
-        # If not provided, assemble filename of monthly sums, including info of all experiments
+        # Tag of the output sums files. If not provided, use main exptag 
         if outid is None:
-            self.outid =  '_'.join([item for item in self.exptag_list])
-            # append "obs_from" info if obs data are from supplemental experiment 
-            if self.obs_from > 0:
-                self.outid = self.outid + '_Obs_from_' + self.exptag_list[self.obs_from]
-    
+            self.outid =  self.exptag_list[0]
+
+        # Verify the configuration every time when current class is initialized
+        # to avoid saving sums with different configs in the same directory
+
+        # Same configurations should have identical values for these fields
+        config_verify = ['expdir','expid','exptag','domain','use_obs','species_list']
+
+        # Construct config for each experiment
+        config_list = []
+        for exp in exp_list:
+            config_list.append({var:exp[var] for var in config_verify if var in exp})
+
+        # File of configuration for verification
+        f_config = self.sum_path + '/' + self.outid + '_config.yaml'
+
+        # Save a new file or compare current configuration with previously saved 
+        if not os.path.exists(f_config):
+            with open(f_config, 'w') as f:
+                yaml.dump(config_list, f, default_flow_style=False)
+            print(f'Configuration saved to {f_config}')
+        else:
+            with open(f_config,'r') as f:
+                saved_exp_list = yaml.safe_load(f)
+            print(f'Found saved configuration')
+
+            if config_list != saved_exp_list:
+                print('user configuration is different from previously saved '+f_config)
+                sys.exit()  
     # ----------------------------------------------------------------------------------------------------------
     #
     # Function to compute monthly sums from x-hourly ObsFcstAna data for a single month.
