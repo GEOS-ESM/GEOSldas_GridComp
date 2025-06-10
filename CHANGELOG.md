@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Revisions for handling of Nens and special nml and mwtrm path/files in coupled land-atm DAS.
+
 ### Fixed
 
 - Fixed error from MAPL's ApplicationSupport.F90 to init UDUNITS
