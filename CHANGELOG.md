@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added items to LDAS.rc when it is a stretched grid
+- Added functionality to run on tile space of stretched cube-sphere grids.
 
 ### Changed
 
