@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Specify ntasks_model only for slurm resource request
+- Specify only ntasks_model for SLURM resource request.
 - Revisions for handling of Nens and special nml and mwtrm path/files in coupled land-atm DAS.
 
 ### Fixed
