@@ -1454,7 +1454,7 @@ class LDASsetup:
                 # add items for stretched grid
                 if '-SG' in self.rqdExeInp['BCS_RESOLUTION']:
                    pos_ = self.rqdExeInp['BCS_RESOLUTION'].find('-SG')
-                   SG   = self.rqdExeInp['BCS_RESOLUTION'][pos_+1:pos_+6] # get SG001 or SG002
+                   SG   = self.rqdExeInp['BCS_RESOLUTION'][pos_+1:pos_+6]    # get ID of stretched grid (e.g., SG002)
                    ldasrcInp['STRETCH_FACTOR'] = STRETCH_GRID[SG][0]
                    ldasrcInp['TARGET_LAT']     = STRETCH_GRID[SG][1]
                    ldasrcInp['TARGET_LON']     = STRETCH_GRID[SG][2]
