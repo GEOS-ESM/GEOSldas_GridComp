@@ -20,11 +20,11 @@ from helper.write_nc4            import write_sums_nc4, write_stats_nc4
 
 class postproc_ObsFcstAna:
     
-    def __init__(self, exp_list, start_time, end_time, sum_path='./', outid=None):
+    def __init__(self, exp_list, start_time, end_time, sum_path='./'):
         self.exp_list      = exp_list
         self.expdir_list   = [item['expdir'] for item in exp_list]
         self.expid_list    = [item['expid']  for item in exp_list]
-        self.exptag_list   = [item['exptag'] for item in exp_list]
+        self.exptag        = exp_list[0]['exptag']
         self.domain        = exp_list[0]['domain']
         self.start_time    = start_time 
         self.end_time      = end_time
@@ -45,11 +45,7 @@ class postproc_ObsFcstAna:
                 else:
                     self.obs_from = exp_idx
         if self.obs_from < 0: self.obs_from = 0       # by default, obs data are from exp_list[0]
-        print(f"obs data are from {self.exptag_list[self.obs_from]}")   
-
-        # Tag of the output sums files. If not provided, use main exptag 
-        if outid is None:
-            self.outid =  self.exptag_list[0]
+        print(f"obs data are from {exp_list[self.obs_from]['expid']}")   
 
         # Verify the configuration every time when current class is initialized
         # to avoid saving sums with different configs in the same directory
@@ -63,7 +59,7 @@ class postproc_ObsFcstAna:
             config_list.append({var:exp[var] for var in config_verify if var in exp})
 
         # File of configuration for verification
-        f_config = self.sum_path + '/' + self.outid + '_config.yaml'
+        f_config = self.sum_path + '/' + self.exptag + '_config.yaml'
 
         # Save a new file or compare current configuration with previously saved 
         if not os.path.exists(f_config):
@@ -194,7 +190,6 @@ class postproc_ObsFcstAna:
     def save_monthly_sums(self):
         expdir_list    = self.expdir_list
         expid_list     = self.expid_list
-        exptag_list    = self.exptag_list
         domain         = self.domain
         var_list       = self.var_list
         tc             = self.tilecoord
@@ -208,7 +203,7 @@ class postproc_ObsFcstAna:
             mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
             os.makedirs(mo_path, exist_ok=True)
     
-            fout = self.outid + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
+            fout = self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
 
             fout = mo_path + fout
             
@@ -270,7 +265,7 @@ class postproc_ObsFcstAna:
                 
                 fpath = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
                     
-                fout  = self.outid + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
+                fout  = self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
 
                 fout  = fpath + fout
                                 
@@ -355,7 +350,7 @@ class postproc_ObsFcstAna:
         var_list = ['obs_obs', 'obs_fcst','obs_ana']
         
         mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'            
-        fnc4_sums = mo_path + self.outid + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
+        fnc4_sums = mo_path + self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
         
         mdata_sum = {}
         mdata2_sum = {}
@@ -405,7 +400,7 @@ class postproc_ObsFcstAna:
             # var(x) = E[x2] - (E[x])^2
             data_var[var] = data2_mean[var] - data_mean[var]**2
 
-        # Computer metrics of O-F, O-A, etc. based on above stats
+        # Compute metrics of O-F, O-A, etc. based on above stats
         O_mean = data_mean['obs_obs']
         F_mean = data_mean['obs_fcst']
         A_mean = data_mean['obs_ana']

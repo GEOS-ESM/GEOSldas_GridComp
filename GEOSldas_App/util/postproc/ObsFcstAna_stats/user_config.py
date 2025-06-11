@@ -26,13 +26,15 @@ def get_config():
 
     exp_main = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
-        'expid'         : 'DAv8_SMOSSMAP',
-        'exptag'        : 'DAMulti_SMAP', 
-        'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
-        'da_t0'         : 3,                              # (fractional) UTC hour of first land analysis 
-        'da_dt'         : 10800,                          # ObsFcstAna file interval in seconds
-        'species_list'  : [5,6,7,8],                      # indices of species to be processed 
-        'obsparam_time' : "20150401_0000"                 # time stamp of obsparam file (YYYYMMDD_HHMM)
+        'expid'         : 'DAv8_SMOSSMAP',             # GEOSldas exp ID of simulation
+        'exptag'        : 'DAMulti_SMAP',              # string used in output file names for sums & stats,
+                                                       #   can be same as expid or different -- e.g., reflect info
+                                                       #   about subset of included species or about cross-masking
+        'domain'        : 'SMAP_EASEv2_M36_GLOBAL',  
+        'da_t0'         : 3,                           # (fractional) UTC hour of first land analysis 
+        'da_dt'         : 10800,                       # ObsFcstAna file interval in seconds
+        'species_list'  : [5,6,7,8],                   # indices of species to be processed 
+        'obsparam_time' : "20150401_0000"              # time stamp of obsparam file (YYYYMMDD_HHMM)
     }
 
     # Optional experiment(s) can be added for cross-masking or extracting obs from a different experiment.
@@ -40,7 +42,7 @@ def get_config():
     # All optional experiments and the main experiment must have identical tilecoords.
     # If the default "species" number/order do not match, set "species_list" accordingly to force a match.
     # Output will be cross-masked between all specified experiments.    
-
+    #
     # Forecasts and analyses are always from the main experiment.
     # Observations are from the experiment with 'use_obs' set to True (default is exp_main).  The most
     #   likely use case for reading obs from a supplemental experiment is when computing OmF etc diagnostics
@@ -50,21 +52,25 @@ def get_config():
     exp_sup1 = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
         'expid'         : 'DAv8_M36',
-        'exptag'        : 'DASMAP_SMAP', 
         'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
-        'use_obs'       : True,                           # if True, use obs data from this exp
-        'species_list'  : [1,2,3,4],                      # indices of species to be processed 
-        'obsparam_time' : "20150401_0000"                 # time stamp of obsparam file (YYYYMMDD_HHMM)
+        'use_obs'       : True,                        # if True, use obs data from this exp
+        'species_list'  : [1,2,3,4],                   # indices of species to be processed,
+                                                       #   must identify same species as selected in main exp
+        'obsparam_time' : "20150401_0000"              # time stamp of obsparam file (YYYYMMDD_HHMM)
     }
 
-    # Convert experiments input to a list; first entry must be exp_main 
+    # Convert experiments input to a list; first entry must be exp_main: 
 
-    exp_list = [exp_main, exp_sup1]
+    #exp_list = [exp_main]               # no cross-masking
+    exp_list = [exp_main, exp_sup1]      # cross-mask exp_main with exp_sup1
     
-    # Top level directory to store monthly sum files; can use the experiment directory or a different path;
-    # /Yyyyy/Mmm/ is added automatically for individual months
+    # Top level directory for all output from this package:
 
-    out_path = '/discover/nobackup/qliu/SMAP_test/'
+    out_path = '/discover/nobackup/[USERNAME]/SMAP_test/'
+
+    # Directory for monthly sum files:
+    # - Can use the experiment directory or a different path.
+    # - Automatically appends /Yyyyy/Mmm/ for individual months.
     
     sum_path = out_path+'/'+exp_main['expid']+'/output/'+exp_main['domain']+'/ana/ens_avg/'
 

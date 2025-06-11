@@ -2,6 +2,7 @@
 
 """
 Sample script for plotting maps of long-term data assimilation diagnostics.
+Computes Nobs-weighted avg of each metric across all species.
 Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
 Stats of *normalized* OmFs are approximated!
 """
@@ -29,7 +30,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
      
     Nmin = 20
 
-    # Then computer metrics of O-F, O-A, etc. based on above computed
+    # Then compute metrics of O-F, O-A, etc. based on above computed
     N_data = stats['N_data']
     O_mean = stats['obs_mean']
     # mean(x-y) = E[x] - E[y]   
@@ -66,7 +67,10 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmA_stdv[     N_data < Nmin] = np.nan
     N_data[       N_data < Nmin] = 0
 
-    # Combine metrics of individual species using weighted averaging
+    # Compute Nobs-weighted avg of each metric across all species.
+    # Typically used for SMAP Tb_h/h from asc and desc overpasses,
+    # or ASCAT soil moisture from Metop-A/B/C.
+    # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
     Nobs_data     = np.nansum(              N_data, axis=1)
     OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/Nobs_data
     OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/Nobs_data
@@ -76,7 +80,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmA_stdv      = np.nansum(OmA_stdv     *N_data, axis=1)/Nobs_data
 
     # Plotting
-    expid = postproc_obj.outid
+    exptag = postproc_obj.exptag
 
     fig, axes = plt.subplots(2,2, figsize=(18,10))
     plt.rcParams.update({'font.size':14})
@@ -89,23 +93,23 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 # crange is [cmin, cmax]
                 crange =[0, np.ceil((end_time-start_time).days/150)*300]
                 colormap = plt.get_cmap('jet',20)
-                title_txt = expid + ' Tb Nobs '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
+                title_txt = exptag + ' Tb Nobs '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
                 units = '[-]'
             if i == 0 and j ==1:
                 tile_data = OmF_mean
                 crange =[-3, 3]
                 colormap = plt.get_cmap('bwr', 15) 
-                title_txt = expid + ' Tb O-F mean '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
+                title_txt = exptag + ' Tb O-F mean '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
             if i == 1 and j == 0:
                 tile_data = OmF_stdv
                 crange =[0, 15]
                 colormap = plt.get_cmap ('jet',15)
-                title_txt = expid + ' Tb O-F stdv '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
+                title_txt = exptag + ' Tb O-F stdv '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
             if i == 1 and j == 1:
                 tile_data = OmF_norm_stdv
                 crange =[0, 15]
                 colormap = plt.get_cmap ('jet',15)
-                title_txt = expid + ' Tb normalized O-F stdv (approx!) '+ start_time.strftime('%Y%m%d')+'_'+end_time.strftime('%Y%m%d')
+                title_txt = exptag + ' Tb normalized O-F stdv (approx!) '+ start_time.strftime('%Y%m%d')+'_'+end_time.strftime('%Y%m%d')
 
             colormap.set_bad(color='0.9') # light grey, 0-black, 1-white
 
@@ -159,7 +163,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
 
     plt.tight_layout()
     # Save figure to file
-    fig.savefig(fig_path+'Map_OmF_'+ expid +'_'+start_time.strftime('%Y%m')+'_'+\
+    fig.savefig(fig_path+'Map_OmF_'+ exptag +'_'+start_time.strftime('%Y%m')+'_'+\
                         (end_time+timedelta(days=-1)).strftime('%Y%m')+'.png')
     #plt.show()
     plt.close(fig)

@@ -2,6 +2,7 @@
 
 """
 Sample script for plotting monthly time series of spatially averaged data assimilation diagnostics.
+Computes Nobs-weighted avg of each metric across all species.
 Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
 """
 
@@ -17,11 +18,11 @@ from dateutil.relativedelta import relativedelta
     
 def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     import pickle
-    expid = postproc_obj.outid
+    exptag      = postproc_obj.exptag
     start_month = postproc_obj.start_time
-    end_month = postproc_obj.end_time
+    end_month   = postproc_obj.end_time
 
-    stats_file = fig_path + 'spatial_stats_'+expid+'_'+start_month.strftime('%Y%m')+ \
+    stats_file = fig_path + 'spatial_stats_'+exptag+'_'+start_month.strftime('%Y%m')+ \
             '_'+(end_month+timedelta(days=-1)).strftime('%Y%m')+'.pkl'
     
     if os.path.isfile(stats_file):
@@ -47,7 +48,10 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
 
             OmFm,OmFs,OmAm,OmAs,Nobsm = postproc_obj.calc_spatial_stats_from_sums(current_month)
 
-            # Average individual species into a single value
+            # Compute Nobs-weighted avg of each metric across all species.
+            # Typically used for SMAP Tb_h/h from asc and desc overpasses,
+            # or ASCAT soil moisture from Metop-A/B/C.
+            # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
             Nobsm = np.nansum(     Nobsm)
             OmFm  = np.nansum(OmFm*Nobsm)/Nobsm
             OmFs  = np.nansum(OmFs*Nobsm)/Nobsm
@@ -81,13 +85,13 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     plt.grid(True, linestyle='--', alpha=0.5)
 
     plt.xticks(ticks=date_vec[::2], labels=date_vec[::2])
-    plt.title(expid+ 'monthly '+plot_var)
+    plt.title(exptag+ 'monthly '+plot_var)
     plt.xlim(-1, len(date_vec)+1)
     plt.ylim(-.1, 2.)
 
     plt.tight_layout()
     #plt.show()
-    plt.savefig(fig_path+'Bars_'+plot_var+expid+date_vec[0]+'_'+\
+    plt.savefig(fig_path+'Bars_'+plot_var+exptag+date_vec[0]+'_'+\
                     date_vec[-1]+'.png')
     plt.close()
 
