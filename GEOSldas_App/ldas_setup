@@ -1451,6 +1451,14 @@ class LDASsetup:
                         valn = 'landpert'+tmpl_+'_internal_checkpoint'
                         ldasrcInp[keyn]= valn
 
+                # add items for sretched grid
+                if 'SG0' in self.rqdExeInp['BCS_RESOLUTION']:
+                   pos_ = self.rqdExeInp['BCS_RESOLUTION'].find('SG0')
+                   SG   = self.rqdExeInp['BCS_RESOLUTION'][pos_:pos_+5] # get SG001 or SG002
+                   ldasrcInp['STRETCH_FACTOR'] = STRETCH_GRID[SG][0]
+                   ldasrcInp['TARGET_LAT']     = STRETCH_GRID[SG][1]
+                   ldasrcInp['TARGET_LON']     = STRETCH_GRID[SG][2]
+
                 # write LDAS.rc
                 fout =open(self.rundir+'/'+shortfile,'w')
                 # ldasrcInp['NUM_LDAS_ENSEMBLE']=ldasrcInp.pop('NUM_ENSEMBLE')
