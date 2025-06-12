@@ -82,7 +82,6 @@ class postproc_ObsFcstAna:
         
         expdir_list   = self.expdir_list
         expid_list    = self.expid_list
-        domain        = self.domain
         tc            = self.tilecoord
         obsparam_list = self.obsparam_list
         var_list      = self.var_list
@@ -112,7 +111,7 @@ class postproc_ObsFcstAna:
             # read the list of experiments at each time step (OFA="ObsFcstAna")
             OFA_list = []
             for i in range(len(expdir_list)):
-                fname = expdir_list[i]+expid_list[i]+'/output/'+domain+'/ana/ens_avg/Y'+ \
+                fname = expdir_list[i]+expid_list[i]+'/output/'+self.domain+'/ana/ens_avg/Y'+ \
                                   date_time.strftime('%Y') + '/M' + \
                                   date_time.strftime('%m') + '/'  + \
                                   expid_list[i]+'.ens_avg.ldas_ObsFcstAna.' + \
@@ -190,7 +189,6 @@ class postproc_ObsFcstAna:
     def save_monthly_sums(self):
         expdir_list    = self.expdir_list
         expid_list     = self.expid_list
-        domain         = self.domain
         var_list       = self.var_list
         tc             = self.tilecoord
         obsparam_list  = self.obsparam_list

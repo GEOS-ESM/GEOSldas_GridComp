@@ -141,7 +141,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 grid_data, uy, ux = remap_1d_to_2d(tile_data, lat_1d = tc['com_lat'], lon_1d = tc['com_lon'])
                 lon_2d,lat_2d = np.meshgrid(ux, uy)
 
-                # Aear weighted mean and mean(abs)
+                # Area weighted mean and mean(abs)
                 wmean    =     np.nansum(       tile_data     * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
                 wabsmean =     np.nansum(np.abs(tile_data)    * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
                 if 'normalized' in title_txt:

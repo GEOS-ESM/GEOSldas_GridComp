@@ -39,7 +39,8 @@ def get_config():
 
     # Optional experiment(s) can be added for cross-masking or extracting obs from a different experiment.
     #
-    # All optional experiments and the main experiment must have identical tilecoords.
+    # All optional experiments and the main experiment must have identical tile space (BCs resolution) and domain.
+    #
     # If the default "species" number/order do not match, set "species_list" accordingly to force a match.
     # Output will be cross-masked between all specified experiments.    
     #
@@ -52,7 +53,6 @@ def get_config():
     exp_sup1 = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
         'expid'         : 'DAv8_M36',
-        'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
         'use_obs'       : True,                        # if True, use obs data from this exp
         'species_list'  : [1,2,3,4],                   # indices of species to be processed,
                                                        #   must identify same species as selected in main exp
@@ -90,11 +90,12 @@ def get_config():
     end_time   = datetime( end_year,   end_month,   1)
 
     # Get tilecoord and obsparam information for each experiment
+
+    domain = exp_list[0]['domain']
     
     for exp in exp_list:
         expdir        = exp['expdir']
         expid         = exp['expid']
-        domain        = exp['domain']
 
         YYYY          = exp['obsparam_time'][0:4]
         MM            = exp['obsparam_time'][4:6]
