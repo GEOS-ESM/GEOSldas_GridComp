@@ -50,7 +50,7 @@ module LDAS_TileCoordType
      integer :: tile_id      ! unique tile ID
      integer :: f_num        ! full domain ID
      integer :: typ          ! (0=MAPL_Ocean, 100=MAPL_Land, 19=MAPL_Lake, 20=MAPL_LandIce) 
-     integer :: pfaf         ! Pfafstetter number (for land tiles, NOT unique)
+     integer :: pfaf_index   ! index of Pfafstetter catchment (for land tiles, NOT unique)
      real    :: com_lon      ! center-of-mass longitude
      real    :: com_lat      ! center-of-mass latitude
      real    :: min_lon      ! minimum longitude (bounding box for tile)
@@ -398,21 +398,21 @@ contains
        
        write (unitnum) N_tile
        
-       write (unitnum) (tile_coord(n)%tile_id,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%typ,       n=1,N_tile)
-       write (unitnum) (tile_coord(n)%pfaf,      n=1,N_tile)
-       write (unitnum) (tile_coord(n)%com_lon,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%com_lat,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%min_lon,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%max_lon,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%min_lat,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%max_lat,   n=1,N_tile)
-       write (unitnum) (tile_coord(n)%i_indg,    n=1,N_tile)
-       write (unitnum) (tile_coord(n)%j_indg,    n=1,N_tile)
-       write (unitnum) (tile_coord(n)%frac_cell, n=1,N_tile)
-       write (unitnum) (tile_coord(n)%frac_pfaf, n=1,N_tile)
-       write (unitnum) (tile_coord(n)%area,      n=1,N_tile)
-       write (unitnum) (tile_coord(n)%elev,      n=1,N_tile)  
+       write (unitnum) (tile_coord(n)%tile_id,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%typ,          n=1,N_tile)
+       write (unitnum) (tile_coord(n)%pfaf_index,   n=1,N_tile)
+       write (unitnum) (tile_coord(n)%com_lon,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%com_lat,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%min_lon,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%max_lon,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%min_lat,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%max_lat,      n=1,N_tile)
+       write (unitnum) (tile_coord(n)%i_indg,       n=1,N_tile)
+       write (unitnum) (tile_coord(n)%j_indg,       n=1,N_tile)
+       write (unitnum) (tile_coord(n)%frac_cell,    n=1,N_tile)
+       write (unitnum) (tile_coord(n)%frac_pfaf,    n=1,N_tile)
+       write (unitnum) (tile_coord(n)%area,         n=1,N_tile)
+       write (unitnum) (tile_coord(n)%elev,         n=1,N_tile)  
        
     case ('r','R')
        
@@ -437,7 +437,7 @@ contains
        read (unitnum, iostat=istat) tmp_int; if (istat>0) call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        tile_coord(:)%typ = tmp_int(:)
        read (unitnum, iostat=istat) tmp_int; if (istat>0) call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       tile_coord(:)%pfaf = tmp_int(:)
+       tile_coord(:)%pfaf_index = tmp_int(:)
 
        read (unitnum, iostat=istat) tmp_real; if (istat>0) call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        tile_coord(:)%com_lon = tmp_real(:)
