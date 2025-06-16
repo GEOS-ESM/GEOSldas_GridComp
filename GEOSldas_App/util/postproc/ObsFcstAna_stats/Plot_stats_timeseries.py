@@ -28,8 +28,8 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     if os.path.isfile(stats_file):
         
         with open(stats_file,'rb') as file:
-            stats_dict = pickle.load(file)
-        date_vec = stats_dict['date_vec']
+            stats = pickle.load(file)
+        date_vec = stats['date_vec']
         
     else:
         
@@ -47,17 +47,7 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
             print('compute monthly spatial mean stats for '+ current_month.strftime('%Y%m'))
 
             OmFm,OmFs,OmAm,OmAs,Nobsm = postproc_obj.calc_spatial_stats_from_sums(current_month)
-
-            # Compute Nobs-weighted avg of each metric across all species.
-            # Typically used for SMAP Tb_h/h from asc and desc overpasses,
-            # or ASCAT soil moisture from Metop-A/B/C.
-            # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
-            Nobsm = np.nansum(     Nobsm)
-            OmFm  = np.nansum(OmFm*Nobsm)/Nobsm
-            OmFs  = np.nansum(OmFs*Nobsm)/Nobsm
-            OmAm  = np.nansum(OmAm*Nobsm)/Nobsm
-            OmAs  = np.nansum(OmAs*Nobsm)/Nobsm
-      
+                  
             Ndata.append(Nobsm)
 
             OmF_mean.append(OmFm)
@@ -69,18 +59,30 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
             current_month = current_month + relativedelta(months=1)
 
         # Store stats in a dictionary for easier saving and referencing  
-        stats_dict = {"OmF_mean":OmF_mean, "OmF_stdv":OmF_stdv,
-                      "OmA_mean":OmA_mean, "OmA_stdv":OmA_stdv,
-                      "Ndata": Ndata, "date_vec":date_vec}
+        stats = {"OmF_mean":np.array(OmF_mean), "OmF_stdv":np.array(OmF_stdv),
+                      "OmA_mean":np.array(OmA_mean), "OmA_stdv":np.array(OmA_stdv),
+                      "Ndata": np.array(Ndata), "date_vec":date_vec}
         
         if stats_file is not None:
             with open(stats_file,'wb') as file:
-                pickle.dump(stats_dict,file)
+                pickle.dump(stats,file)
+
+    # Compute Nobs-weighted avg of each metric across all species.
+    # Typically used for SMAP Tb_h/h from asc and desc overpasses,
+    # or ASCAT soil moisture from Metop-A/B/C.
+    # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
+    stats_plot = {}
+    Ndata = np.nansum(stats['Ndata'], axis=1)
+    stats_plot['Ndata'] = Ndata
+    stats_plot['OmF_mean']  = np.nansum(stats['OmF_mean']*stats['Ndata'], axis=1)/Ndata
+    stats_plot['OmF_stdv']    = np.nansum(stats['OmF_stdv']*stats['Ndata'], axis=1)/Ndata
+    stats_plot['OmA_mean']  = np.nansum(stats['OmA_mean']*stats['Ndata'], axis=1)/Ndata
+    stats_plot['OmA_stdv']   = np.nansum(stats['OmA_stdv']*stats['Ndata'], axis=1)/Ndata
     
     plot_var = 'OmF_mean'
 
     fig, ax = plt.subplots(figsize=(10,4))
-    bars = ax.bar(date_vec, stats_dict[plot_var])
+    bars = ax.bar(date_vec, stats_plot[plot_var])
 
     plt.grid(True, linestyle='--', alpha=0.5)
 
