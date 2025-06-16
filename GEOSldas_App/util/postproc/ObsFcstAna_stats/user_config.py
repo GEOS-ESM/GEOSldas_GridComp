@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 from datetime               import datetime, timedelta
-from read_GEOSldas          import read_tilecoord, read_obs_param
+from read_GEOSldas          import read_tilecoord, read_tilegrids, read_obs_param
 from postproc_ObsFcstAna    import postproc_ObsFcstAna
 
 def get_config():
@@ -20,7 +20,7 @@ def get_config():
     start_year  = 2015
     start_month =    4
     last_year   = 2016
-    last_month  =    4
+    last_month  =    3
 
     # Sums or stats will be processed for exp_main:
 
@@ -66,7 +66,7 @@ def get_config():
     
     # Top level directory for all output from this package:
 
-    out_path = '/discover/nobackup/[USERNAME]/SMAP_test/'
+    out_path = '/discover/nobackup/qliu/SMAP_test/'
 
     # Directory for monthly sum files:
     # - Can use the experiment directory or a different path.
@@ -115,8 +115,11 @@ def get_config():
         ftc = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilecoord.bin'
         tc  = read_tilecoord(ftc)
 
+        ftg = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilegrids.bin'
+        tg_global, tg_domain  = read_tilegrids(ftg)
+
         # add tilecoord and obsparam into to exp        
-        exp.update({'tilecoord':tc, 'obsparam':obsparam})
+        exp.update({'tilecoord':tc, 'obsparam':obsparam, 'tilegrid_global':tg_global,'tilegrid_domain': tg_domain})
 
     # verify that obs species match across experiments
     for exp_idx, exp in enumerate(exp_list) :
