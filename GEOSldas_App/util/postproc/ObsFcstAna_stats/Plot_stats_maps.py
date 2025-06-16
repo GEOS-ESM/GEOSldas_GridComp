@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from datetime               import timedelta
 
-from remap_1d_to_2d         import tile2grid
+from tile2grid              import tile2grid
 from plot                   import plotMap
 from EASEv2                 import EASEv2_ind2latlon
 
