@@ -32,6 +32,8 @@ class postproc_ObsFcstAna:
         self.da_dt         = exp_list[0]['da_dt']
         self.var_list      = ['obs_obs','obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
         self.tilecoord     = exp_list[0]['tilecoord']
+        self.tilegrid_global     = exp_list[0]['tilegrid_global']
+        self.tilegrid_domain    = exp_list[0]['tilegrid_domain']
         self.obsparam_list = [item['obsparam'] for item in exp_list]
         self.sum_path      = sum_path
 
