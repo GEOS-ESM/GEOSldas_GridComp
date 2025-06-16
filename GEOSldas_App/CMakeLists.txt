@@ -39,7 +39,7 @@ configure_file(${file} ${file} @ONLY)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${file} DESTINATION bin)
 
 file(GLOB rc_files  GEOSldas_*rc)
-file(GLOB nml_files LDASsa_DEFAULT*nml)
+file(GLOB nml_files LDASsa_DEFAULT*nml LandAtmDAS_nml/LDASsa_SPECIAL*nml	)
 
 install(
    FILES ${rc_files} ${nml_files}
