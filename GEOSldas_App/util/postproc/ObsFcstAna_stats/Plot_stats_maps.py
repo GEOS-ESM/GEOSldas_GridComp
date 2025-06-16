@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from datetime               import timedelta
 
-from remap_1d_to_2d         import remap_1d_to_2d
+from remap_1d_to_2d         import tile2grid
 from plot                   import plotMap
 from EASEv2                 import EASEv2_ind2latlon
 
@@ -25,6 +25,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     end_time   = postproc_obj.end_time
     domain     = postproc_obj.domain
     tc         = postproc_obj.tilecoord
+    tg        = postproc_obj.tilegrid_global
     
     # Sample of final compuation of selected diagnostic metrics 
      
@@ -138,9 +139,8 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 lat_M36, lon_M36 = EASEv2_ind2latlon(np.arange(406), np.arange(964),'M36')
                 lon_2d,lat_2d = np.meshgrid(lon_M36,lat_M36)
             else:
-                grid_data, uy, ux = remap_1d_to_2d(tile_data, lat_1d = tc['com_lat'], lon_1d = tc['com_lon'])
-                lon_2d,lat_2d = np.meshgrid(ux, uy)
-
+                grid_data, lat_2d, lon_2d = tile2grid(tile_data, tc, tg)
+                
                 # Area weighted mean and mean(abs)
                 wmean    =     np.nansum(       tile_data     * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
                 wabsmean =     np.nansum(np.abs(tile_data)    * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
@@ -157,10 +157,10 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
             if 'normalized' in title_txt:
                 grid_data = np.log10(grid_data)
                 crange = [-0.6, 0.45]
-                
+            
             mm, cs = plotMap(grid_data, ax =axes[i,j], lat=lat_2d, lon=lon_2d, cRange=crange, \
                         title=title_txt, cmap=colormap, bounding=[-60, 80, -180,180])            
-
+            
     plt.tight_layout()
     # Save figure to file
     fig.savefig(fig_path+'Map_OmF_'+ exptag +'_'+start_time.strftime('%Y%m')+'_'+\
