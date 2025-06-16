@@ -99,6 +99,64 @@ def read_tilecoord(fname):
     print("done reading file")
     return tile_coord
 
+import struct
+import numpy as np
+
+# ----------------------------------------------------------------------------
+#
+# reader for GEOSldas tilecoord file (binary)
+
+def read_tilegrids(fname):
+    """
+    Read tile grid information from file and return global and domain grid structures.
+    
+    Parameters:
+    ----------
+    fname : str
+        Path to the input file (either .txt or .bin)
+        
+    Returns:
+    -------
+    tile_grid_g : dict
+        Global tile grid information
+    tile_grid_d : dict
+        Domain tile grid information
+    """
+    
+    # Set endian format
+    endian = '<'            # '>' for big-endian, '<' for little-endian
+    
+    # Read binary file
+    print(f'reading from {fname}')
+    
+    with open(fname, 'rb') as ifp:
+        # Read first record: "global" grid (tile_grid_g)
+        for grid in ['global','domain']:
+            tile_grid = {}
+            fortran_tag = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['gridtype'] = ifp.read(40).decode('ascii').strip('\x00')
+            tile_grid['ind_base'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['i_dir'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['j_dir'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['N_lon'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['N_lat'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['i_offg'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['j_offg'] = struct.unpack(f'{endian}i', ifp.read(4))[0]
+            tile_grid['ll_lon'] = struct.unpack(f'{endian}f', ifp.read(4))[0]
+            tile_grid['ll_lat'] = struct.unpack(f'{endian}f', ifp.read(4))[0]
+            tile_grid['ur_lon'] = struct.unpack(f'{endian}f', ifp.read(4))[0]
+            tile_grid['ur_lat'] = struct.unpack(f'{endian}f', ifp.read(4))[0]
+            tile_grid['dlon'] = struct.unpack(f'{endian}f', ifp.read(4))[0]
+            tile_grid['dlat'] = struct.unpack(f'{endian}f', ifp.read(4))[0]
+            fortran_tag = struct.unpack(f'{endian}i', ifp.read(4))[0]
+
+            if 'global' in grid:
+                tile_grid_g = tile_grid
+            else:
+                tile_grid_d = tile_grid
+            
+    return tile_grid_g, tile_grid_d
+
 # ----------------------------------------------------------------------------
 #
 # reader for GEOSldas ObsFcstAna file (binary)
