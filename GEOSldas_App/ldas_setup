@@ -1860,7 +1860,7 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5, for future use ),')
     print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
     print ('#      Jobs will hang when oserver_nodes = writers-per-node = 1.')
-    print ('# - constraint       = mil ; submit the job to a particular machine, defaule is "[mil|cas]")
+    print ('# - constraint       = mil ; submit the job to a particular machine, default is "[mil|cas]")
     print ('#')
     for key in optRmInpKeys:
         print ('#'+key + ':')
