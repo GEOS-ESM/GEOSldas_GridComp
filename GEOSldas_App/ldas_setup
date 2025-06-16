@@ -1573,7 +1573,8 @@ class LDASsetup:
         constraint = '"[mil|cas]"'
         if self.GEOS_SITE == "NAS":
           constraint = 'cas_ait'
-        elif 'constraint' in self.optRmInp:
+
+        if 'constraint' in self.optRmInp:
           constraint = self.optRmInp['constraint']
 
         SBATCHQSUB = 'sbatch'
