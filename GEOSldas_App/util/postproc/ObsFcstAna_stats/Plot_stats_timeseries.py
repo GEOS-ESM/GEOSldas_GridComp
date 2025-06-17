@@ -18,12 +18,12 @@ from dateutil.relativedelta import relativedelta
     
 def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     import pickle
-    exptag      = postproc_obj.exptag
-    start_month = postproc_obj.start_time
-    end_month   = postproc_obj.end_time
+    exptag     = postproc_obj.exptag
+    start_time = postproc_obj.start_time
+    end_time   = postproc_obj.end_time
 
-    stats_file = fig_path + 'spatial_stats_'+exptag+'_'+start_month.strftime('%Y%m')+ \
-            '_'+(end_month+timedelta(days=-1)).strftime('%Y%m')+'.pkl'
+    stats_file = fig_path + 'spatial_stats_'+exptag+'_'+start_time.strftime('%Y%m')+ \
+        '_'+(end_time+timedelta(days=-1)).strftime('%Y%m')+'.pkl'
     
     if os.path.isfile(stats_file):
         
@@ -42,11 +42,11 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
         date_vec =[]
 
         # Time loop 
-        current_month = start_month
-        while current_month < end_month:
-            print('compute monthly spatial mean stats for '+ current_month.strftime('%Y%m'))
+        current_time = start_time
+        while current_time < end_time:
+            print('compute monthly spatial mean stats for '+ current_time.strftime('%Y%m'))
 
-            OmFm,OmFs,OmAm,OmAs,Nobsm = postproc_obj.calc_spatial_stats_from_sums(current_month)
+            OmFm,OmFs,OmAm,OmAs,Nobsm = postproc_obj.calc_spatial_stats_from_sums(current_time)
                   
             Ndata.append(Nobsm)
 
@@ -55,13 +55,13 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
             OmA_mean.append(OmAm)
             OmA_stdv.append(OmAs)
 
-            date_vec.append(current_month.strftime('%Y%m'))
-            current_month = current_month + relativedelta(months=1)
+            date_vec.append(current_time.strftime('%Y%m'))
+            current_time = current_time + relativedelta(months=1)
 
         # Store stats in a dictionary for easier saving and referencing  
         stats = {"OmF_mean":np.array(OmF_mean), "OmF_stdv":np.array(OmF_stdv),
-                      "OmA_mean":np.array(OmA_mean), "OmA_stdv":np.array(OmA_stdv),
-                      "Ndata": np.array(Ndata), "date_vec":date_vec}
+                 "OmA_mean":np.array(OmA_mean), "OmA_stdv":np.array(OmA_stdv),
+                 "Ndata":np.array(Ndata), "date_vec":date_vec}
         
         if stats_file is not None:
             with open(stats_file,'wb') as file:
@@ -73,11 +73,11 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
     stats_plot = {}
     Ndata = np.nansum(stats['Ndata'], axis=1)
-    stats_plot['Ndata'] = Ndata
+    stats_plot['Ndata']     = Ndata
     stats_plot['OmF_mean']  = np.nansum(stats['OmF_mean']*stats['Ndata'], axis=1)/Ndata
-    stats_plot['OmF_stdv']    = np.nansum(stats['OmF_stdv']*stats['Ndata'], axis=1)/Ndata
+    stats_plot['OmF_stdv']  = np.nansum(stats['OmF_stdv']*stats['Ndata'], axis=1)/Ndata
     stats_plot['OmA_mean']  = np.nansum(stats['OmA_mean']*stats['Ndata'], axis=1)/Ndata
-    stats_plot['OmA_stdv']   = np.nansum(stats['OmA_stdv']*stats['Ndata'], axis=1)/Ndata
+    stats_plot['OmA_stdv']  = np.nansum(stats['OmA_stdv']*stats['Ndata'], axis=1)/Ndata
     
     plot_var = 'OmF_mean'
 

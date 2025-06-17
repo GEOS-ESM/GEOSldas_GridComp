@@ -25,7 +25,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     end_time   = postproc_obj.end_time
     domain     = postproc_obj.domain
     tc         = postproc_obj.tilecoord
-    tg        = postproc_obj.tilegrid_global
+    tg         = postproc_obj.tilegrid_global
     
     # Sample of final compuation of selected diagnostic metrics 
      
