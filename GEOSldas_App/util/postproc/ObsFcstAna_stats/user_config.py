@@ -66,7 +66,7 @@ def get_config():
     
     # Top level directory for all output from this package:
 
-    out_path = '/discover/nobackup/qliu/SMAP_test/'
+    out_path = '/discover/nobackup/[USERNAME]/'
 
     # Directory for monthly sum files:
     # - Can use the experiment directory or a different path.
@@ -119,7 +119,7 @@ def get_config():
         tg_global, tg_domain  = read_tilegrids(ftg)
 
         # add tilecoord and obsparam into to exp        
-        exp.update({'tilecoord':tc, 'obsparam':obsparam, 'tilegrid_global':tg_global,'tilegrid_domain': tg_domain})
+        exp.update({'tilecoord':tc, 'obsparam':obsparam, 'tilegrid_global':tg_global, 'tilegrid_domain':tg_domain})
 
     # verify that obs species match across experiments
     for exp_idx, exp in enumerate(exp_list) :
