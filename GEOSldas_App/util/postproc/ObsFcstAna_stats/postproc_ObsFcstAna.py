@@ -227,162 +227,158 @@ class postproc_ObsFcstAna:
     #
     # Assumes that monthly sums files have been saved [see save_monthly_sums()].
 
-    def calc_temporal_stats_from_sums(self, write_to_nc=True, fout_stats='./stats.nc4', Nmin=20):
+    def calc_temporal_stats_from_sums(self, write_to_nc=True, fout_stats='./stats.nc4'):
 
-        if os.path.isfile(fout_stats):
+        # Variable list for computing sum and sum-of-squares
+        var_list = self.var_list 
 
-            print('reading stats nc4 file '+ fout_stats)
-            stats = {}
-            with Dataset(fout_stats,'r') as nc:
-                for key, value in nc.variables.items():
-                    stats[key] = value[:].filled(np.nan)
+        # Read tilecoord and obsparam for tile and obs species information
+        n_tile = self.tilecoord['N_tile']
+        n_spec = len(self.obsparam_list[0])
 
-        else:
-            # Variable list for computing sum and sum-of-squares
-            var_list = self.var_list 
+        # ---------------------------------------------------------------
+        #
+        # compute accumulated sums for period (start_time, end_time)
+        
+        # Initialize statistical metrics 
+        data_sum  = {}
+        data2_sum = {}
+        N_data    = np.zeros((n_tile, n_spec))
+        oxf_sum   = np.zeros((n_tile, n_spec))
+        oxa_sum   = np.zeros((n_tile, n_spec))
+        fxa_sum   = np.zeros((n_tile, n_spec))
 
-            # Read tilecoord and obsparam for tile and obs species information
-            n_tile = self.tilecoord['N_tile']
-            n_spec = len(self.obsparam_list[0])
+        for var in var_list:
+            data_sum[ var] = np.zeros((n_tile, n_spec))
+            data2_sum[var] = np.zeros((n_tile, n_spec))
 
-            # Initialize statistical metrics 
-            data_sum  = {}
-            data2_sum = {}
-            N_data  = np.zeros((n_tile, n_spec))
-            oxf_sum = np.zeros((n_tile, n_spec))
-            oxa_sum = np.zeros((n_tile, n_spec))
-            fxa_sum = np.zeros((n_tile, n_spec))
+        # Time loop: processing data at monthly time step
+        
+        date_time = self.start_time
 
-            for var in var_list:
-                data_sum[ var] = np.zeros((n_tile, n_spec))
-                data2_sum[var] = np.zeros((n_tile, n_spec))
-
-            # Time loop: processing data at monthly time step
+        while date_time < self.end_time:      # loop through months
             
-            date_time = self.start_time
-
-            while date_time < self.end_time:      # loop through months
+            fpath = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
                 
-                fpath = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'
-                    
-                fout  = self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
+            fout  = self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
 
-                fout  = fpath + fout
-                                
-                # Read monthly data 
-                if os.path.isfile(fout):
-                    print('read sums from monthly file: '+fout)
-                    mdata_sum  = {}
-                    mdata2_sum = {}
-                    with Dataset(fout,'r') as nc:
-                        mN_data  = nc.variables['N_data'      ][:]
-                        moxf_sum = nc.variables['obsxfcst_sum'][:]
-                        moxa_sum = nc.variables['obsxana_sum' ][:]
-                        mfxa_sum = nc.variables['fcstxana_sum'][:]
-                        for var in var_list:
-                            mdata_sum[ var] = nc.variables[var+'_sum' ][:]
-                            mdata2_sum[var] = nc.variables[var+'2_sum'][:]
-                           
-                    # Aggregate monthly data
-                    N_data  += mN_data
-                    oxf_sum += moxf_sum
-                    oxa_sum += moxa_sum
-                    fxa_sum += mfxa_sum
-                   
+            fout  = fpath + fout
+                            
+            # Read and accumulate monthly sums data 
+            if os.path.isfile(fout):
+                print('read sums from monthly file: '+fout)
+                mdata_sum  = {}
+                mdata2_sum = {}
+                with Dataset(fout,'r') as nc:
+                    mN_data             = nc.variables['N_data'      ][:]
+                    moxf_sum            = nc.variables['obsxfcst_sum'][:]
+                    moxa_sum            = nc.variables['obsxana_sum' ][:]
+                    mfxa_sum            = nc.variables['fcstxana_sum'][:]
                     for var in var_list:
-                        data_sum[ var] += mdata_sum[ var] 
-                        data2_sum[var] += mdata2_sum[var]  
-                else:
-                    raise FileNotFoundError(f"File {fout} does not exist, run save_monthly_sums() first")
-                     
-                date_time = date_time + relativedelta(months=1)
+                        mdata_sum[ var] = nc.variables[var+'_sum'    ][:]
+                        mdata2_sum[var] = nc.variables[var+'2_sum'   ][:]
+                       
+                # Aggregate monthly data
+                N_data  += mN_data
+                oxf_sum += moxf_sum
+                oxa_sum += moxa_sum
+                fxa_sum += mfxa_sum
+               
+                for var in var_list:
+                    data_sum[ var] += mdata_sum[ var] 
+                    data2_sum[var] += mdata2_sum[var]  
+            else:
+                raise FileNotFoundError(f"File {fout} does not exist, run save_monthly_sums() first")
+                 
+            date_time = date_time + relativedelta(months=1)
 
-            # Compute stats (DA diagnostics) from accumulated sums data.
-            data_mean  = {}
-            data2_mean = {}
-            data_var   = {}
+        # --------------------------------------------------------------------
+        #
+        # Compute stats (DA diagnostics) from accumulated sums data.
+        
+        data_mean  = {}
+        data2_mean = {}
+        data_var   = {}
 
-            # calculation  
-            for var in var_list:
-                data_sum[var][ N_data == 0] = np.nan
-                data2_sum[var][N_data == 0] = np.nan
-                
-                data_mean[ var] = data_sum[ var] / N_data
-                data2_mean[var] = data2_sum[var] / N_data
-                # var(x) = E[x2] - (E[x])^2
-                data_var[var]   = data2_mean[var] - data_mean[var]**2
-                
-            oxf_sum[N_data == 0] = np.nan
-            oxa_sum[N_data == 0] = np.nan
-            fxa_sum[N_data == 0] = np.nan
-            # E[xy]
-            oxf_mean = oxf_sum / N_data
-            oxa_mean = oxa_sum / N_data
-            fxa_mean = fxa_sum / N_data
-
-            # Then compute metrics of O-F, O-A, etc. based on above computed
+        # calculation  
+        for var in var_list:
+            data_sum[var][ N_data == 0] = np.nan
+            data2_sum[var][N_data == 0] = np.nan
             
-            O_mean = data_mean['obs_obs']
-            F_mean = data_mean['obs_fcst']
-            A_mean = data_mean['obs_ana']
-
-            O_stdv = np.sqrt(data_var['obs_obs'])
-            F_stdv = np.sqrt(data_var['obs_fcst'])
-            A_stdv = np.sqrt(data_var['obs_ana'])
+            data_mean[ var] = data_sum[ var] / N_data
+            data2_mean[var] = data2_sum[var] / N_data
+            # var(x) = E[x2] - (E[x])^2
+            data_var[var]   = data2_mean[var] - data_mean[var]**2
             
-            # mean(x-y) = E[x] - E[y]   
-            OmF_mean = O_mean - F_mean
-            OmA_mean = O_mean - A_mean
-            
-            # var(x-y) = var(x) + var(y) - 2cov(x,y)
-            # cov(x,y) = E[xy] - E[x]E[y]
-            OmF_stdv  = np.sqrt(O_stdv**2 + F_stdv**2 - 2 * (oxf_mean - O_mean*F_mean))
-            OmA_stdv  = np.sqrt(O_stdv**2 + A_stdv**2 - 2 * (oxa_mean - O_mean*A_mean))
+        oxf_sum[N_data == 0] = np.nan
+        oxa_sum[N_data == 0] = np.nan
+        fxa_sum[N_data == 0] = np.nan
+        # E[xy]
+        oxf_mean = oxf_sum / N_data
+        oxa_mean = oxa_sum / N_data
+        fxa_mean = fxa_sum / N_data
 
-            # *****************************************************************************************
-            # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATED!
-            # *****************************************************************************************
-            # Here, we first compute the stats of the OmF time series and then normalize using 
-            # the time-avg "obsvar" and "fcstvar" values.
-            # Since "fcstvar" changes with time, the OmF values should be normalized at each time 
-            # step (as in the older matlab scripts), and then the time series stats can be computed. 
-            # To compute the exact stats with this python package, the sum and sum-of-squares of 
-            # the normalized OmF values would need to be added into the sums files. 
-            #
-            OmF_norm_mean = OmF_mean / np.sqrt(data_mean['obs_obsvar'] + data_mean['obs_fcstvar'])      # APPROXIMATED stat!
-            OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (data_mean['obs_obsvar'] + data_mean['obs_fcstvar'])) # APPROXIMATED stat!
-              
-            # Mask out data points with insufficent observations using the Nmin threshold
-            # Do NOT apply to N_data
-            O_mean[       N_data < Nmin] = np.nan
-            O_stdv[       N_data < Nmin] = np.nan
-            F_mean[       N_data < Nmin] = np.nan
-            F_stdv[       N_data < Nmin] = np.nan
-            A_mean[       N_data < Nmin] = np.nan
-            A_stdv[       N_data < Nmin] = np.nan
-            
-            OmF_mean[     N_data < Nmin] = np.nan
-            OmF_stdv[     N_data < Nmin] = np.nan
-            OmF_norm_mean[N_data < Nmin] = np.nan
-            OmF_norm_stdv[N_data < Nmin] = np.nan
-            OmA_mean[     N_data < Nmin] = np.nan
-            OmA_stdv[     N_data < Nmin] = np.nan
-            N_data[       N_data < Nmin] = 0
+        # Then compute metrics of O-F, O-A, etc. based on above computed
+        
+        O_mean = data_mean['obs_obs']
+        F_mean = data_mean['obs_fcst']
+        A_mean = data_mean['obs_ana']
 
-            stats = {
-                'O_mean'  : O_mean,   'O_stdv'  : O_stdv,
-                'F_mean'  : F_mean,   'F_stdv'  : F_stdv,
-                'A_mean'  : A_mean,   'A_stdv'  : A_stdv,
-                'OmF_mean': OmF_mean, 'OmF_stdv': OmF_stdv,
-                'OmA_mean': OmA_mean, 'OmA_stdv': OmA_stdv,
-                'OmF_norm_mean': OmF_norm_mean,
-                'OmF_norm_stdv': OmF_norm_stdv,
-                'N_data': N_data,
-                }
+        O_stdv = np.sqrt(data_var['obs_obs'])
+        F_stdv = np.sqrt(data_var['obs_fcst'])
+        A_stdv = np.sqrt(data_var['obs_ana'])
+        
+        # mean(x-y) = E[x] - E[y]   
+        OmF_mean = O_mean - F_mean
+        OmA_mean = O_mean - A_mean
+        
+        # var(x-y) = var(x) + var(y) - 2cov(x,y)
+        # cov(x,y) = E[xy] - E[x]E[y]
+        OmF_stdv  = np.sqrt(O_stdv**2 + F_stdv**2 - 2 * (oxf_mean - O_mean*F_mean))
+        OmA_stdv  = np.sqrt(O_stdv**2 + A_stdv**2 - 2 * (oxa_mean - O_mean*A_mean))
 
-            if write_to_nc:
-                print('writing stats nc4 file: '+fout_stats)
-                write_stats_nc4(fout_stats, stats)
+        # *****************************************************************************************
+        # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATED!
+        # *****************************************************************************************
+        # Here, we first compute the stats of the OmF time series and then normalize using 
+        # the time-avg "obsvar" and "fcstvar" values.
+        # Since "fcstvar" changes with time, the OmF values should be normalized at each time 
+        # step (as in the older matlab scripts), and then the time series stats can be computed. 
+        # To compute the exact stats with this python package, the sum and sum-of-squares of 
+        # the normalized OmF values would need to be added into the sums files. 
+        #
+        OmF_norm_mean = OmF_mean / np.sqrt(data_mean['obs_obsvar'] + data_mean['obs_fcstvar'])      # APPROXIMATED stat!
+        OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (data_mean['obs_obsvar'] + data_mean['obs_fcstvar'])) # APPROXIMATED stat!
+          
+        # Mask out data points without any obs (NOTE: apply Nmin threshold when plotting or computing map avg)
+        # Do NOT apply to N_data
+        O_mean[       N_data < 1] = np.nan
+        O_stdv[       N_data < 1] = np.nan
+        F_mean[       N_data < 1] = np.nan
+        F_stdv[       N_data < 1] = np.nan
+        A_mean[       N_data < 1] = np.nan
+        A_stdv[       N_data < 1] = np.nan
+        
+        OmF_mean[     N_data < 1] = np.nan
+        OmF_stdv[     N_data < 1] = np.nan
+        OmF_norm_mean[N_data < 1] = np.nan
+        OmF_norm_stdv[N_data < 1] = np.nan
+        OmA_mean[     N_data < 1] = np.nan
+        OmA_stdv[     N_data < 1] = np.nan
+
+        stats = {
+            'O_mean'       : O_mean,        'O_stdv'       : O_stdv,
+            'F_mean'       : F_mean,        'F_stdv'       : F_stdv,
+            'A_mean'       : A_mean,        'A_stdv'       : A_stdv,
+            'OmF_mean'     : OmF_mean,      'OmF_stdv'     : OmF_stdv,
+            'OmA_mean'     : OmA_mean,      'OmA_stdv'     : OmA_stdv,
+            'OmF_norm_mean': OmF_norm_mean, 'OmF_norm_stdv': OmF_norm_stdv,
+            'N_data'       : N_data,
+            }
+
+        if write_to_nc:
+            print('writing stats nc4 file: '+fout_stats)
+            write_stats_nc4(fout_stats, stats)
             
         return stats
 

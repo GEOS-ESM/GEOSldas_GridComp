@@ -2,7 +2,7 @@
 
 """
 Sample script for plotting maps of long-term data assimilation diagnostics.
-Computes Nobs-weighted avg of each metric across all species.
+Plots Nobs-weighted avg of each metric across all species.
 Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
 Stats of *normalized* OmFs are approximated!
 """
@@ -21,17 +21,17 @@ from EASEv2                 import EASEv2_ind2latlon
 
 def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     
-    start_time = postproc_obj.start_time
-    end_time   = postproc_obj.end_time
-    domain     = postproc_obj.domain
-    tc         = postproc_obj.tilecoord
-    tg         = postproc_obj.tilegrid_global
+    start_time    = postproc_obj.start_time
+    end_time      = postproc_obj.end_time
+    domain        = postproc_obj.domain
+    tc            = postproc_obj.tilecoord
+    tg            = postproc_obj.tilegrid_global
     
-    N_data = stats['N_data']
-    OmF_mean = stats['OmF_mean']
-    OmF_stdv = stats['OmF_stdv']
-    OmA_mean = stats['OmA_mean']
-    OmA_stdv = stats['OmA_stdv']
+    N_data        = stats['N_data']
+    OmF_mean      = stats['OmF_mean']
+    OmF_stdv      = stats['OmF_stdv']
+    OmA_mean      = stats['OmA_mean']
+    OmA_stdv      = stats['OmA_stdv']
     OmF_norm_mean = stats['OmF_norm_mean']
     OmF_norm_stdv = stats['OmF_norm_stdv']
 
@@ -61,7 +61,7 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 # crange is [cmin, cmax]
                 crange =[0, np.ceil((end_time-start_time).days/150)*300]
                 colormap = plt.get_cmap('jet',20)
-                title_txt = exptag + ' Tb Nobs '+ start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
+                title_txt = exptag + ' Tb Nobs '    + start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
                 units = '[-]'
             if i == 0 and j ==1:
                 tile_data = OmF_mean
@@ -138,6 +138,8 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
 # -----------------------------------------------------------------------------------------------
     
 if __name__ == '__main__':
+
+    # Plot maps of long-term temporal stats
     
     from postproc_ObsFcstAna    import postproc_ObsFcstAna
     from user_config            import get_config
@@ -151,18 +153,29 @@ if __name__ == '__main__':
     out_path   = config['out_path']
      
     # ------------------------------------------------------------------------------------
+
     # Initialize the postprocessing object
     postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
 
-    # Compute long-term temporal stats and plot maps
+    # File name for long-term temporal stats
     stats_file  = out_path + 'temporal_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
         (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
 
-    # temporal_stats is a dictionary that contains all mean/variances fields for computing long-term O-F/O-A stats
-    # each field has the dimension [N_tile, N_species]
 
-    temporal_stats = postproc.calc_temporal_stats_from_sums(write_to_nc=True, fout_stats=stats_file)
+    # Read or compute long-term temporal stats.  Each field has the dimension [N_tile, N_species].
+    if os.path.isfile(stats_file):
 
+        print('reading stats nc4 file '+ stats_file)
+        temporal_stats = {}
+        with Dataset(stats_file,'r') as nc:
+            for key, value in nc.variables.items():
+                temporal_stats[key] = value[:].filled(np.nan)
+
+    else:
+        temporal_stats = postproc.calc_temporal_stats_from_sums(write_to_nc=True, fout_stats=stats_file)
+
+    # Plot stats
+        
     plot_OmF_maps(postproc, temporal_stats, fig_path=out_path )
 
 # ====================== EOF =========================================================
