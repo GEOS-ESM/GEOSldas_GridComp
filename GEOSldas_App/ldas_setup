@@ -63,7 +63,7 @@ class LDASsetup:
         # ------
         # Optional resource manager input fields
         # ------
-        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node']
+        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'constraint']
 
         
         # ===============================================================================================
@@ -1573,15 +1573,17 @@ class LDASsetup:
                         '.'.join([expid, 'ldas_err', myDateTime, 'txt']),
                         ]),
                 self.rundir)
-        constraint='cas'
-        if self.GEOS_SITE == "NAS":
-          constraint = 'cas_ait'
-        elif self.GEOS_SITE == "NCCS":
-          constraint = '"[mil|cas]"'
+
+        constraint = '"[mil|cas]"'
+        if self.GEOS_SITE == "NAS" :
+            constraint = 'cas_ait'
+
+        if 'constraint' in self.optRmInp:
+            constraint = self.optRmInp['constraint']
 
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
-          SBATCHQSUB = 'qsub'
+            SBATCHQSUB = 'qsub'
 
         DETECTED_MPI_STACK = "@MPI_STACK@"
 
@@ -1863,6 +1865,7 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5, for future use ),')
     print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
     print ('#      Jobs will hang when oserver_nodes = writers-per-node = 1.')
+    print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait").')
     print ('#')
     for key in optRmInpKeys:
         print ('#'+key + ':')
