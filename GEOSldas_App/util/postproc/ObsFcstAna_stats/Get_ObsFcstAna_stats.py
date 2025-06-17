@@ -69,7 +69,7 @@ def main():
     # The plotting scripts can also run standalone using the individual Plot_stats_*.py scripts,
     #   as long as the monthly sum files are available.
     
-    plot_maps       = False
+    plot_maps       = False 
     plot_timeseries = False
 
     if plot_maps:            # Compute long-term temporal stats and plot maps
