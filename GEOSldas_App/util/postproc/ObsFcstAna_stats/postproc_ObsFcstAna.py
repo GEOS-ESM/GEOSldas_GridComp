@@ -21,21 +21,21 @@ from helper.write_nc4            import write_sums_nc4, write_stats_nc4
 class postproc_ObsFcstAna:
     
     def __init__(self, exp_list, start_time, end_time, sum_path='./'):
-        self.exp_list      = exp_list
-        self.expdir_list   = [item['expdir'] for item in exp_list]
-        self.expid_list    = [item['expid']  for item in exp_list]
-        self.exptag        = exp_list[0]['exptag']
-        self.domain        = exp_list[0]['domain']
-        self.start_time    = start_time 
-        self.end_time      = end_time
-        self.da_t0         = exp_list[0]['da_t0']
-        self.da_dt         = exp_list[0]['da_dt']
-        self.var_list      = ['obs_obs','obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
-        self.tilecoord     = exp_list[0]['tilecoord']
-        self.tilegrid_global     = exp_list[0]['tilegrid_global']
-        self.tilegrid_domain    = exp_list[0]['tilegrid_domain']
-        self.obsparam_list = [item['obsparam'] for item in exp_list]
-        self.sum_path      = sum_path
+        self.exp_list        = exp_list
+        self.expdir_list     = [item['expdir'] for item in exp_list]
+        self.expid_list      = [item['expid']  for item in exp_list]
+        self.exptag          = exp_list[0]['exptag']
+        self.domain          = exp_list[0]['domain']
+        self.start_time      = start_time 
+        self.end_time        = end_time
+        self.da_t0           = exp_list[0]['da_t0']
+        self.da_dt           = exp_list[0]['da_dt']
+        self.var_list        = ['obs_obs','obs_obsvar','obs_fcst','obs_fcstvar','obs_ana','obs_anavar']
+        self.tilecoord       = exp_list[0]['tilecoord']
+        self.tilegrid_global = exp_list[0]['tilegrid_global']
+        self.tilegrid_domain = exp_list[0]['tilegrid_domain']
+        self.obsparam_list   = [item['obsparam'] for item in exp_list]
+        self.sum_path        = sum_path
 
         # Determine experiment that supplies obs data
         self.obs_from = -1
