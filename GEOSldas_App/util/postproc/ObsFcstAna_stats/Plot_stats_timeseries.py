@@ -48,10 +48,10 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
 
             stats_mo = postproc_obj.calc_spatial_stats_from_sums(current_time)
 
-            OmFm = stats_mo['OmF_mean']
-            OmFs = stats_mo['OmF_stdv']
-            OmAm = stats_mo['OmA_mean']
-            OmAs = stats_mo['OmA_stdv']
+            OmFm  = stats_mo['OmF_mean']
+            OmFs  = stats_mo['OmF_stdv']
+            OmAm  = stats_mo['OmA_mean']
+            OmAs  = stats_mo['OmA_stdv']
             Nobsm = stats_mo['N_data']
                   
             Ndata.append(Nobsm)
