@@ -46,7 +46,13 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
         while current_time < end_time:
             print('compute monthly spatial mean stats for '+ current_time.strftime('%Y%m'))
 
-            OmFm,OmFs,OmAm,OmAs,Nobsm = postproc_obj.calc_spatial_stats_from_sums(current_time)
+            stats_mo = postproc_obj.calc_spatial_stats_from_sums(current_time)
+
+            OmFm = stats_mo['OmF_mean']
+            OmFs = stats_mo['OmF_stdv']
+            OmAm = stats_mo['OmA_mean']
+            OmAs = stats_mo['OmA_stdv']
+            Nobsm = stats_mo['N_data']
                   
             Ndata.append(Nobsm)
 
@@ -87,7 +93,7 @@ def Plot_monthly_OmF_bars(postproc_obj, fig_path='./'):
     plt.grid(True, linestyle='--', alpha=0.5)
 
     plt.xticks(ticks=date_vec[::2], labels=date_vec[::2])
-    plt.title(exptag+ 'monthly '+plot_var)
+    plt.title(exptag+ ' monthly '+plot_var)
     plt.xlim(-1, len(date_vec)+1)
     plt.ylim(-.1, 2.)
 

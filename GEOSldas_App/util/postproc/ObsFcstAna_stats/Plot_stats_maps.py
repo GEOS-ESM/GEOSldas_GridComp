@@ -27,46 +27,13 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     tc         = postproc_obj.tilecoord
     tg         = postproc_obj.tilegrid_global
     
-    # Sample of final compuation of selected diagnostic metrics 
-     
-    Nmin = 20
-
-    # Then compute metrics of O-F, O-A, etc. based on above computed
     N_data = stats['N_data']
-    O_mean = stats['obs_mean']
-    # mean(x-y) = E[x] - E[y]   
-    OmF_mean = stats['obs_mean'] - stats['fcst_mean']
-    OmA_mean = stats['obs_mean'] - stats['ana_mean']
-    # var(x-y) = var(x) + var(y) - 2cov(x,y)
-    # cov(x,y) = E[xy] - E[x]E[y]
-    OmF_stdv  = np.sqrt(stats['obs_variance'] + stats['fcst_variance'] - \
-                        2 * (stats['oxf_mean'] - stats['obs_mean']*stats['fcst_mean']))
-                        
-    OmA_stdv  = np.sqrt(stats['obs_variance'] + stats['ana_variance'] - \
-                        2 * (stats['oxa_mean'] - stats['obs_mean']*stats['ana_mean']))
-
-    # *****************************************************************************************
-    # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATED!
-    # *****************************************************************************************
-    # Here, we first compute the stats of the OmF time series and then normalize using 
-    # the time-avg "obsvar" and "fcstvar" values.
-    # Since "fcstvar" changes with time, the OmF values should be normalized at each time 
-    # step (as in the older matlab scripts), and then the time series stats can be computed. 
-    # To compute the exact stats with this python package, the sum and sum-of-squares of 
-    # the normalized OmF values would need to be added into the sums files. 
-    #
-    OmF_norm_mean = OmF_mean / np.sqrt(stats['obsvar_mean'] + stats['fcstvar_mean'])         # APPROXIMATED stat!
-    OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (stats['obsvar_mean'] + stats['fcstvar_mean']) )   # APPROXIMATED stat!
-      
-    # Mask out data points with insufficent observations using the Nmin threshold
-    # Do NOT apply to N_data
-    OmF_mean[     N_data < Nmin] = np.nan
-    OmF_stdv[     N_data < Nmin] = np.nan
-    OmF_norm_mean[N_data < Nmin] = np.nan
-    OmF_norm_stdv[N_data < Nmin] = np.nan
-    OmA_mean[     N_data < Nmin] = np.nan
-    OmA_stdv[     N_data < Nmin] = np.nan
-    N_data[       N_data < Nmin] = 0
+    OmF_mean = stats['OmF_mean']
+    OmF_stdv = stats['OmF_stdv']
+    OmA_mean = stats['OmA_mean']
+    OmA_stdv = stats['OmA_stdv']
+    OmF_norm_mean = stats['OmF_norm_mean']
+    OmF_norm_stdv = stats['OmF_norm_stdv']
 
     # Compute Nobs-weighted avg of each metric across all species.
     # Typically used for SMAP Tb_h/h from asc and desc overpasses,

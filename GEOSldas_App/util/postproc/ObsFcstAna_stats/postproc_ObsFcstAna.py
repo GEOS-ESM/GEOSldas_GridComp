@@ -227,7 +227,7 @@ class postproc_ObsFcstAna:
     #
     # Assumes that monthly sums files have been saved [see save_monthly_sums()].
 
-    def calc_temporal_stats_from_sums(self, write_to_nc=True, fout_stats='./stats.nc4'):
+    def calc_temporal_stats_from_sums(self, write_to_nc=True, fout_stats='./stats.nc4', Nmin=20):
 
         if os.path.isfile(fout_stats):
 
@@ -320,14 +320,65 @@ class postproc_ObsFcstAna:
             oxa_mean = oxa_sum / N_data
             fxa_mean = fxa_sum / N_data
 
-            stats = {}
-            for var in var_list:
-                stats[var[4:]+'_mean']     = data_mean[var]
-                stats[var[4:]+'_variance'] = data_var[ var]
-            stats['oxf_mean'] = oxf_mean
-            stats['oxa_mean'] = oxa_mean
-            stats['fxa_mean'] = fxa_mean
-            stats['N_data']   = N_data
+            # Then compute metrics of O-F, O-A, etc. based on above computed
+            
+            O_mean = data_mean['obs_obs']
+            F_mean = data_mean['obs_fcst']
+            A_mean = data_mean['obs_ana']
+
+            O_stdv = np.sqrt(data_var['obs_obs'])
+            F_stdv = np.sqrt(data_var['obs_fcst'])
+            A_stdv = np.sqrt(data_var['obs_ana'])
+            
+            # mean(x-y) = E[x] - E[y]   
+            OmF_mean = O_mean - F_mean
+            OmA_mean = O_mean - A_mean
+            
+            # var(x-y) = var(x) + var(y) - 2cov(x,y)
+            # cov(x,y) = E[xy] - E[x]E[y]
+            OmF_stdv  = np.sqrt(O_stdv**2 + F_stdv**2 - 2 * (oxf_mean - O_mean*F_mean))
+            OmA_stdv  = np.sqrt(O_stdv**2 + A_stdv**2 - 2 * (oxa_mean - O_mean*A_mean))
+
+            # *****************************************************************************************
+            # The time series mean and std-dev of the *normalized* OmF computed here are APPROXIMATED!
+            # *****************************************************************************************
+            # Here, we first compute the stats of the OmF time series and then normalize using 
+            # the time-avg "obsvar" and "fcstvar" values.
+            # Since "fcstvar" changes with time, the OmF values should be normalized at each time 
+            # step (as in the older matlab scripts), and then the time series stats can be computed. 
+            # To compute the exact stats with this python package, the sum and sum-of-squares of 
+            # the normalized OmF values would need to be added into the sums files. 
+            #
+            OmF_norm_mean = OmF_mean / np.sqrt(data_mean['obs_obsvar'] + data_mean['obs_fcstvar'])      # APPROXIMATED stat!
+            OmF_norm_stdv = np.sqrt(OmF_stdv**2 / (data_mean['obs_obsvar'] + data_mean['obs_fcstvar'])) # APPROXIMATED stat!
+              
+            # Mask out data points with insufficent observations using the Nmin threshold
+            # Do NOT apply to N_data
+            O_mean[       N_data < Nmin] = np.nan
+            O_stdv[       N_data < Nmin] = np.nan
+            F_mean[       N_data < Nmin] = np.nan
+            F_stdv[       N_data < Nmin] = np.nan
+            A_mean[       N_data < Nmin] = np.nan
+            A_stdv[       N_data < Nmin] = np.nan
+            
+            OmF_mean[     N_data < Nmin] = np.nan
+            OmF_stdv[     N_data < Nmin] = np.nan
+            OmF_norm_mean[N_data < Nmin] = np.nan
+            OmF_norm_stdv[N_data < Nmin] = np.nan
+            OmA_mean[     N_data < Nmin] = np.nan
+            OmA_stdv[     N_data < Nmin] = np.nan
+            N_data[       N_data < Nmin] = 0
+
+            stats = {
+                'O_mean'  : O_mean,   'O_stdv'  : O_stdv,
+                'F_mean'  : F_mean,   'F_stdv'  : F_stdv,
+                'A_mean'  : A_mean,   'A_stdv'  : A_stdv,
+                'OmF_mean': OmF_mean, 'OmF_stdv': OmF_stdv,
+                'OmA_mean': OmA_mean, 'OmA_stdv': OmA_stdv,
+                'OmF_norm_mean': OmF_norm_mean,
+                'OmF_norm_stdv': OmF_norm_stdv,
+                'N_data': N_data,
+                }
 
             if write_to_nc:
                 print('writing stats nc4 file: '+fout_stats)
@@ -418,6 +469,15 @@ class postproc_ObsFcstAna:
         OmF_stdv  = np.sqrt(O_var + F_var - 2 * (OxF_mean - O_mean*F_mean))
         OmA_stdv  = np.sqrt(O_var + A_var - 2 * (OxA_mean - O_mean*A_mean))
 
-        return OmF_mean, OmF_stdv, OmA_mean, OmA_stdv, N_data
+        stats = {
+            'O_mean'  : O_mean,   'O_stdv'  : np.sqrt(O_var),
+            'F_mean'  : F_mean,   'F_stdv'  : np.sqrt(F_var),
+            'A_mean'  : A_mean,   'A_stdv'  : np.sqrt(A_var),
+            'OmF_mean': OmF_mean, 'OmF_stdv': OmF_stdv,
+            'OmA_mean': OmA_mean, 'OmA_stdv': OmA_stdv,
+            'N_data': N_data,
+            }
+
+        return stats
     
 # ============== EOF ====================================================================
