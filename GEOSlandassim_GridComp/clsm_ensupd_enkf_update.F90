@@ -74,8 +74,8 @@ module clsm_ensupd_enkf_update
   use nr_ran2_gasdev,                   ONLY:     &
        NRANDSEED
 
-  use ease_conv,                        ONLY:     &
-       ease_convert
+  use MAPL,                             ONLY:     &
+       MAPL_ease_convert
 
   use my_matrix_functions,              ONLY:     &
        row_std
@@ -2235,7 +2235,7 @@ contains
                   )
                
                 if (index(tile_grid_g%gridtype, 'M09') /=0) then 
-                   call  ease_convert(trim(tile_grid_g%gridtype), this_lat, this_lon, col_ind, row_ind)                
+                   call  MAPL_ease_convert(trim(tile_grid_g%gridtype), this_lat, this_lon, col_ind, row_ind)                
                 endif
 
                 ! col_ind and row_ind are zero-based, need one-based index here
@@ -2254,7 +2254,7 @@ contains
                   )
 
                 if (index(tile_grid_g%gridtype, 'M09') /=0) then
-                   call  ease_convert(trim(tile_grid_g%gridtype), this_lat, this_lon, col_ind, row_ind)             
+                   call  MAPL_ease_convert(trim(tile_grid_g%gridtype), this_lat, this_lon, col_ind, row_ind)             
                 endif                
                 
                 ! col_ind and row_ind are zero-based, need one-based index here
@@ -2278,7 +2278,7 @@ contains
                 if (index(tile_grid_g%gridtype, 'M09') /=0) then
                    ! subindex (1:7) to get the string EASEvx_
                    gridname_tmp = tile_grid_g%gridtype(1:7)//'M36'
-                   call  ease_convert(gridname_tmp, this_lat, this_lon, col_ind, row_ind)                
+                   call  MAPL_ease_convert(gridname_tmp, this_lat, this_lon, col_ind, row_ind)                
                 endif
 
                 ! col_ind and row_ind are zero-based, need one-based index here
