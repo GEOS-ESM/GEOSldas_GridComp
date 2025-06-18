@@ -18,15 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- linked EASE_conv from MAPL
-- Regridding from EASE to other grid types
+- Switch to using EASE grid tools in MAPL.
 - Specify only ntasks_model for SLURM resource request.
 - Revisions for handling of Nens and special nml and mwtrm path/files in coupled land-atm DAS.
 - Updated some defaults in LDASsa_DEFAULT_inputs_*.nml files.
 
 ### Fixed
 
-- Fixed error from MAPL's ApplicationSupport.F90 to init UDUNITS
+- Fixed error from MAPL's ApplicationSupport.F90 to init UDUNITS.
 
 ### Removed
 
