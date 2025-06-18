@@ -27,9 +27,8 @@ module LDAS_TileCoordRoutines
        MAPL_RADIUS                                    ! Earth radius
   
   use MAPL,                             ONLY:     &
-       ease_convert,                              &
-       ease_inverse,                              &
-       ease_extent
+       MAPL_ease_convert,                         &
+       MAPL_ease_extent
 
   use LDAS_ExceptionsMod,               ONLY:     &
        ldas_abort,                                &
@@ -380,7 +379,7 @@ contains
        tile_grid%i_dir  = +1
        tile_grid%j_dir  = -1
        
-       call ease_extent (                   &
+       call MAPL_ease_extent (              &
             gridname, cols, rows,           &
             cell_area = ease_cell_area,     &             ! [m^2]
             ll_lon    = tile_grid%ll_lon,   &
@@ -1002,7 +1001,7 @@ contains
 
        ! EASE grid lat/lon to index provides *global*, *0-based* index!
 
-       call ease_convert(tile_grid%gridtype, lat, lon, r, s)
+       call MAPL_ease_convert(tile_grid%gridtype, lat, lon, r, s)
        
        i_indg = nint(r)    ! i_ind or lon_ind
        j_indg = nint(s)    ! j_ind or lat_ind
