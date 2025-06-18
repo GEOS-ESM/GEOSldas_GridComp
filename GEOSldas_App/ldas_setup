@@ -59,11 +59,11 @@ class LDASsetup:
         # ------
         # Required resource manager input fields
         # ------
-        rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model', 'ntasks-per-node']
+        rqdRmInpKeys    = ['account', 'walltime', 'ntasks_model']
         # ------
         # Optional resource manager input fields
         # ------
-        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node']
+        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'constraint']
 
         
         # ===============================================================================================
@@ -111,9 +111,8 @@ class LDASsetup:
         self.agcm_res           = cmdLineArgs['agcm_res']
         self.bcs_version        = cmdLineArgs['bcs_version']
         self.rstloc             = cmdLineArgs['rstloc']
-        self.varwindow          = cmdLineArgs['varwindow']
-        self.LDAS_nml_path      = cmdLineArgs['LDAS_nml_path']
-        self.mwrtm_path         = cmdLineArgs['mwrtm_path']
+        self.varwindow          = cmdLineArgs['varwindow'] 
+        self.nens               = cmdLineArgs['nens']
 
         # obsolete command line args
         self.runmodel           = cmdLineArgs['runmodel']
@@ -190,81 +189,79 @@ class LDASsetup:
         ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
         if self.ladas_cpl > 0 :
 
-           # make sure all necessary command line arguments were supplied
-           assert self.nymdb         is not None, "Error. Must have command line arg nymdb         for coupled land-atm DAS.\n"
-           assert self.nhmsb         is not None, "Error. Must have command line arg nhmsb         for coupled land-atm DAS.\n"
-           assert self.agcm_res      is not None, "Error. Must have command line arg agcm_res      for coupled land-atm DAS.\n"
-           assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version   for coupled land-atm DAS.\n"
-           assert self.rstloc        is not None, "Error. Must have command line arg rstloc        for coupled land-atm DAS.\n"
-           assert self.varwindow     is not None, "Error. Must have command line arg varwindow     for coupled land-atm DAS.\n"
-           assert self.LDAS_nml_path is not None, "Error. Must have command line arg LDAS_nml_path for coupled land-atm DAS.\n"
-           assert self.mwrtm_path    is not None, "Error. Must have command line arg mwrtm_path    for coupled land-atm DAS.\n"
+            # make sure all necessary command line arguments were supplied
+            assert self.nymdb         is not None, "Error. Must have command line arg nymdb       for coupled land-atm DAS.\n"
+            assert self.nhmsb         is not None, "Error. Must have command line arg nhmsb       for coupled land-atm DAS.\n"
+            assert self.agcm_res      is not None, "Error. Must have command line arg agcm_res    for coupled land-atm DAS.\n"
+            assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version for coupled land-atm DAS.\n"
+            assert self.rstloc        is not None, "Error. Must have command line arg rstloc      for coupled land-atm DAS.\n"
+            assert self.varwindow     is not None, "Error. Must have command line arg varwindow   for coupled land-atm DAS.\n"
+            assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atmensDAS.\n"
            
-           self.rqdExeInp['BEG_DATE']       = f"{self.nymdb} {self.nhmsb}"
-           rstloc_ = self.rstloc.rstrip('/')                # remove trailing '/'
-           assert os.path.isdir(rstloc_)                    # make sure rstloc_ is a valid directory
-           self.rstloc = os.path.abspath(rstloc_)
-           self.rqdExeInp['RESTART_PATH']   = os.path.dirname( self.rstloc) 
-           self.rqdExeInp['RESTART_ID']     = os.path.basename(self.rstloc)
-
-           self.adas_expdir                           = os.path.dirname( self.exphome)
-           self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
-           self.adas_expid                            = os.path.basename(self.adas_expdir)
-           self.rqdExeInp['MET_TAG']                  = self.adas_expid + '__bkg'
-           if   self.ladas_cpl == 1 :
-               # ldas coupled with determistic component of adas
-               self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
-               self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
-               self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO'
-               self.nens                              = 24           # for now, hardwire nens for atm det  
-           elif self.ladas_cpl == 2 :
-               # ldas coupled with ensemble component of adas
-               self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
-               self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
-               self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
-               self.nens                              = 32           # for now, hardwire nens for atm ens
-           else :
-               exit("Error. Unknown value of self.ladas_cpl.\n")
-           self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens
-           self.first_ens_id                          = 1
-           self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id 
-           self.rqdExeInp['EXP_DOMAIN']               = 'CF'+ self.agcm_res +'x6C_GLOBAL' 
+            self.rqdExeInp['BEG_DATE']                 = f"{self.nymdb} {self.nhmsb}"
+            rstloc_                                    = self.rstloc.rstrip('/')                  # remove trailing '/'
+            assert os.path.isdir(rstloc_)                                                         # make sure rstloc_ is a valid directory
+            self.rstloc                                = os.path.abspath(rstloc_)
+            self.rqdExeInp['RESTART_PATH']             = os.path.dirname( self.rstloc) 
+            self.rqdExeInp['RESTART_ID']               = os.path.basename(self.rstloc)
+            self.adas_expdir                           = os.path.dirname( self.exphome)
+            self.rqdExeInp['ADAS_EXPDIR']              = self.adas_expdir
+            self.adas_expid                            = os.path.basename(self.adas_expdir)
+            self.rqdExeInp['MET_TAG']                  = self.adas_expid + '__bkg'
+            
+            if   self.ladas_cpl == 1 :
+                # ldas coupled with determistic component of ADAS
+                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS'
+                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
+                self.rqdExeInp['ENSEMBLE_FORCING']     = 'NO' 
+            elif self.ladas_cpl == 2 :
+                # ldas coupled with ensemble component of ADAS
+                self.rqdExeInp['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
+                self.rqdExeInp['MET_PATH']             = self.adas_expdir + '/atmens/mem'
+                self.rqdExeInp['ENSEMBLE_FORCING']     = 'YES' 
+            else :
+                exit("Error. Unknown value of self.ladas_cpl.\n")
            
-           # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info  
-           # hard-wired BCS_PATH for now 
-           self.rqdExeInp['BCS_PATH'] = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
-           self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'].rstrip('/') + '/' + self.bcs_version 
-           if self.bcs_version == "Icarus-NLv3" :
-               self.rqdExeInp['BCS_PATH']             = self.rqdExeInp['BCS_PATH'] + '_new_layout'  
-           self.rqdExeInp['BCS_RESOLUTION']           = 'CF'+ self.agcm_res +'x6C_CF'     + self.agcm_res +'x6C'
-           self.rqdExeInp['RESTART_DOMAIN']           = 'CF'+ self.agcm_res +'x6C_GLOBAL'
-          
-           # the following are not in default rqdExeInp list; hardwire for now
-           self.rqdExeInp['LAND_ASSIM']               = "YES"
-           self.rqdExeInp['MET_HINTERP']              = 0
-           self.landassim_dt                          = 10800                                    # seconds
-           # make sure ADAS analysis window [minutes] is multiple of LANDASSIM_DT [seconds]
-           if int(self.varwindow) % (self.landassim_dt/60) == 0 : 
-               self.rqdExeInp['LANDASSIM_DT']         = self.landassim_dt
-           else :
-               exit("Error. LANDASSIM_DT is inconsistent with ADAS analysis window.\n")
-           self.rqdExeInp['LANDASSIM_T0']             = "013000"                                 # HHMMSS
-           jsgmt1                                     = "00000000"
-           jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)       # convert minutes to HHMMSS
-           self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
-           self.rqdExeInp['NUM_SGMT']                 = 1 
-           self.rqdExeInp['FORCE_DTSTEP']             = 3600
+            self.rqdExeInp['NUM_LDAS_ENSEMBLE']        = self.nens                                # fvsetup finds Nens by counting restart files
+            self.first_ens_id                          = 1                                        # match ADAS convention
+            self.rqdExeInp['FIRST_ENS_ID']             = self.first_ens_id
 
-           # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
-           _beg_date = datetime.strptime( self.rqdExeInp['BEG_DATE'], "%Y%m%d %H%M%S")
-           _hours    = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
-           _end_date = _beg_date + timedelta(hours=int(self.varwindow)/60) 
-
-           self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
-           self.rqdExeInp['NML_INPUT_PATH']           = self.LDAS_nml_path
-           self.rqdExeInp['MWRTM_PATH']               = self.mwrtm_path   
+            self.agcm_res                              = 'CF' + self.agcm_res                     # change format to "CFnnnn"
+            self.rqdExeInp['EXP_DOMAIN']               = self.agcm_res +'x6C_GLOBAL'
            
-           # end if self.ladas_cpl > 0 
+            # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info  
+            # hard-wired BCS_PATH for now 
+            self.rqdExeInp['BCS_PATH']                 = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
+            self.rqdExeInp['BCS_PATH']                 = self.rqdExeInp['BCS_PATH'].rstrip('/') + '/' + self.bcs_version 
+            if self.bcs_version == "Icarus-NLv3" :
+                self.rqdExeInp['BCS_PATH']             = self.rqdExeInp['BCS_PATH']  + '_new_layout'  
+            self.rqdExeInp['BCS_RESOLUTION']           = self.agcm_res +'x6C_'       + self.agcm_res +'x6C'
+            self.rqdExeInp['RESTART_DOMAIN']           = self.agcm_res +'x6C_GLOBAL'
+
+            # the following are not in default rqdExeInp list; hardwire for now
+            self.rqdExeInp['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/'
+            self.rqdExeInp['LAND_ASSIM']               = "YES"
+            self.rqdExeInp['MET_HINTERP']              = 0
+            self.landassim_dt                          = 10800                                    # seconds
+            # make sure ADAS analysis window [minutes] is multiple of LANDASSIM_DT [seconds]
+            if int(self.varwindow) % (self.landassim_dt/60) == 0 : 
+                self.rqdExeInp['LANDASSIM_DT']         = self.landassim_dt
+            else :
+                exit("Error. LANDASSIM_DT is inconsistent with ADAS analysis window.\n")
+            self.rqdExeInp['LANDASSIM_T0']             = "013000"                                 # HHMMSS
+            jsgmt1                                     = "00000000"
+            jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)  # convert minutes to HHMMSS
+            self.rqdExeInp['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
+            self.rqdExeInp['NUM_SGMT']                 = 1 
+            self.rqdExeInp['FORCE_DTSTEP']             = 3600
+
+            # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
+            _beg_date                                  = datetime.strptime( self.rqdExeInp['BEG_DATE'], "%Y%m%d %H%M%S")
+            _hours                                     = int(self.rqdExeInp['JOB_SGMT'][ 9:11])
+            _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60) 
+            self.rqdExeInp['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S") 
+           
+            # end if self.ladas_cpl > 0 -----------------------------------------------------------------------------------------
 
         for key in rqdExeInpKeys :
            assert key in self.rqdExeInp,' "%s" is required in the input file %s' % (key,self.exeinpfile)
@@ -614,8 +611,6 @@ class LDASsetup:
             self.rqdRmInp['account']         = cmdLineArgs['account']
             self.rqdRmInp['walltime']        = "01:00:00" 
             self.rqdRmInp['ntasks_model']    = 120
-            self.rqdRmInp['ntasks-per-node'] =  46                   # 46 works on Cascade Lake and Milan 
-
 
 
         # print rm inputs
@@ -633,35 +628,26 @@ class LDASsetup:
         #     exefyl
         # ------
 
-        self.bindir  = os.path.dirname(os.path.realpath(__file__))
-        self.blddir = self.bindir.rsplit('/',1)[0]
-        exefyl = '/bin/GEOSldas.x'
-        tmp_execfyl= self.blddir+exefyl
+        self.bindir     = os.path.dirname(os.path.realpath(__file__))
+        self.blddir     = self.bindir.rsplit('/',1)[0]
+        exefyl          = '/bin/GEOSldas.x'
+        tmp_execfyl     = self.blddir   + exefyl
         assert os.path.isfile(tmp_execfyl),\
             'Executable [%s] does not exist!' % tmp_execfyl
-        self.expdir = self.exphome + '/' + self.rqdExeInp['EXP_ID']
-        self.rundir = self.expdir + '/run'
-        self.inpdir = self.expdir + '/input'
-        self.outdir = self.expdir + '/output'
-        self.scratchdir = self.expdir + '/scratch'
-        self.blddirLn = self.expdir + '/build'
-        self.out_path = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']
-        self.bcsdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
-        self.rstdir = self.outdir+'/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
-        self.exefyl = self.blddirLn+exefyl
-
-        my_ntasks_per_node = int(self.rqdRmInp['ntasks-per-node'])
-
-        # default number of nodes
-        my_nodes = self.rqdRmInp['ntasks_model'] // my_ntasks_per_node
-        if self.rqdRmInp['ntasks_model'] % my_ntasks_per_node > 0 :
-           my_nodes = my_nodes + 1
+        self.expdir     = self.exphome  + '/' + self.rqdExeInp['EXP_ID']
+        self.rundir     = self.expdir   + '/run'
+        self.inpdir     = self.expdir   + '/input'
+        self.outdir     = self.expdir   + '/output'
+        self.scratchdir = self.expdir   + '/scratch'
+        self.blddirLn   = self.expdir   + '/build'
+        self.out_path   = self.outdir   + '/'+self.rqdExeInp['EXP_DOMAIN']
+        self.bcsdir     = self.outdir   + '/'+self.rqdExeInp['EXP_DOMAIN']+'/rc_out/'
+        self.rstdir     = self.outdir   + '/'+self.rqdExeInp['EXP_DOMAIN']+'/rs/'
+        self.exefyl     = self.blddirLn + exefyl
 
         # default is set to 0 ( no output server)
         if 'oserver_nodes' not in self.optRmInp :
            self.optRmInp['oserver_nodes'] = 0
-
-        self.optRmInp['nodes'] = my_nodes + int(self.optRmInp['oserver_nodes'])
 
         if (int(self.optRmInp['oserver_nodes']) >=1) :
            self.rqdExeInp['WRITE_RESTART_BY_OSERVER'] = "YES"
@@ -1239,17 +1225,22 @@ class LDASsetup:
         for nmlfile in default_nml:
             shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
             shutil.copy2(nmlfile, shortfile)
-         # special nml
+        # special nml
         special_nml=[]
-        if 'NML_INPUT_PATH' in self.rqdExeInp :
-            special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/LDASsa_SPECIAL_inputs_*.nml')
-            if self.ladas_cpl > 0: 
-               special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/'+ self.rqdExeInp['EXP_DOMAIN'] + '/LDASsa_SPECIAL_inputs_*.nml') 
-  
-        for nmlfile in special_nml:
-            shortfile=nmlfile.split('/')[-1]
-            shutil.copy2(nmlfile, self.rundir+'/'+shortfile)
+        if self.ladas_cpl > 0:
+            special_nml= glob.glob(etcdir+'/LDASsa_SPECIAL_inputs_*.nml')
+        else : 
+            if 'NML_INPUT_PATH' in self.rqdExeInp : 
+                special_nml = glob.glob(self.rqdExeInp['NML_INPUT_PATH']+'/LDASsa_SPECIAL_inputs_*.nml')
 
+        for nmlfile in special_nml:
+            shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
+            shutil.copy2(nmlfile, shortfile)   
+
+        if self.ladas_cpl > 0:
+            # edit resolution info in ensupd nml file
+            sp.run(['sed', '-i', 's/<CFnnnn>/'+self.agcm_res+'/g', self.rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
+ 
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
         print  ("Optimizing... decomposition of processes.... \n")
@@ -1450,6 +1441,14 @@ class LDASsetup:
                         valn = 'landpert'+tmpl_+'_internal_checkpoint'
                         ldasrcInp[keyn]= valn
 
+                # add items for stretched grid
+                if '-SG' in self.rqdExeInp['BCS_RESOLUTION']:
+                   pos_ = self.rqdExeInp['BCS_RESOLUTION'].find('-SG')
+                   SG   = self.rqdExeInp['BCS_RESOLUTION'][pos_+1:pos_+6]    # get ID of stretched grid (e.g., SG002)
+                   ldasrcInp['STRETCH_FACTOR'] = STRETCH_GRID[SG][0]
+                   ldasrcInp['TARGET_LAT']     = STRETCH_GRID[SG][1]
+                   ldasrcInp['TARGET_LON']     = STRETCH_GRID[SG][2]
+
                 # write LDAS.rc
                 fout =open(self.rundir+'/'+shortfile,'w')
                 # ldasrcInp['NUM_LDAS_ENSEMBLE']=ldasrcInp.pop('NUM_ENSEMBLE')
@@ -1572,15 +1571,17 @@ class LDASsetup:
                         '.'.join([expid, 'ldas_err', myDateTime, 'txt']),
                         ]),
                 self.rundir)
-        constraint='cas'
-        if self.GEOS_SITE == "NAS":
-          constraint = 'cas_ait'
-        elif self.GEOS_SITE == "NCCS":
-          constraint = '"[mil|cas]"'
+
+        constraint = '"[mil|cas]"'
+        if self.GEOS_SITE == "NAS" :
+            constraint = 'cas_ait'
+
+        if 'constraint' in self.optRmInp:
+            constraint = self.optRmInp['constraint']
 
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
-          SBATCHQSUB = 'qsub'
+            SBATCHQSUB = 'qsub'
 
         DETECTED_MPI_STACK = "@MPI_STACK@"
 
@@ -1589,8 +1590,7 @@ class LDASsetup:
                   SBATCHQSUB         = SBATCHQSUB,
                   MY_ACCOUNT         = self.rqdRmInp['account'],
                   MY_WALLTIME        = self.rqdRmInp['walltime'],
-                  MY_NODES           = str(self.optRmInp['nodes']),
-                  MY_NTASKS_PER_NODE = str(self.rqdRmInp['ntasks-per-node']),
+                  MY_NTASKS_MODEL    = str(self.rqdRmInp['ntasks_model']),
                   MY_CONSTRAINT      = constraint,
                   MY_OSERVER_NODES   = str(self.optRmInp['oserver_nodes']),
                   MY_WRITERS_NPES    = str(self.optRmInp['writers-per-node']),
@@ -1849,9 +1849,6 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('#                      [At NCCS: Use command "getsponsor" to see available account number(s).]' )
     print ('# - walltime         = walltime requested; format is HH:MM:SS (hours/minutes/seconds)')
     print ('# - ntasks_model     = number of processors requested for the model (typically 126; output server is not included)')
-    print ('# - ntasks-per-node  = number of tasks per node (typically 46 for Cascade Lake and 126 for Milan)')
-    print ('#                      [If >46, Milan nodes will be allocated, else Cascade Lake or Milan.]')
-    print ('#                      [NCCS recommends <=46 for Cascade Lake and <=126 for Milan.]')
     print ('#')
     for key in rqdRmInpKeys:
         print (key + ':')
@@ -1862,10 +1859,11 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('# NOTE:')
     print ('# - job_name         = name of experiment; default is "exp_id"')
     print ('# - qos              = quality-of-service; do not specify by default; specify "debug" for faster but limited service.')
-    print ('# - oserver_nodes    = number of nodes for oserver ( default is 0 )')
-    print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5 ),')
+    print ('# - oserver_nodes    = number of nodes for oserver ( default is 0, for future use )')
+    print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5, for future use ),')
     print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
     print ('#      Jobs will hang when oserver_nodes = writers-per-node = 1.')
+    print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait").')
     print ('#')
     for key in optRmInpKeys:
         print ('#'+key + ':')
@@ -1961,7 +1959,7 @@ def parseCmdLine():
         ) 
     p_setup.add_argument(
         '--agcm_res',
-        help='AGCM resolution associated with boundary conditions: xxxx (4 digits). Required when exeinp is dummy',
+        help='AGCM resolution associated with boundary conditions: nnnn (4 digits). Required when exeinp is dummy',
         type=str
         )
     p_setup.add_argument(
@@ -1980,16 +1978,10 @@ def parseCmdLine():
         type=str
         )
     p_setup.add_argument(
-        '--LDAS_nml_path',
-        help='path to LDAS (special) nml input files. Required when exeinp is dummy',
+        '--nens',
+        help='number of ensemble members. Required when exeinp is dummy',          
         type=str
-        )
-    p_setup.add_argument(
-        '--mwrtm_path',
-        help='path to LDAS L-band microwave radiative transfer model (mwrtm) parameters. Required when exeinp is dummy',
-        type=str
-        )
-
+        )  
 
     # obsolete command line args
     p_setup.add_argument(
