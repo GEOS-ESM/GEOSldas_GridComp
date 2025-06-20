@@ -7,7 +7,7 @@ module GEOS_LdasGridCompMod
   ! !USES
 
   use ESMF
-  use MAPL_Mod
+  use MAPL
 
   use GEOS_MetforceGridCompMod,  only: MetforceSetServices  => SetServices
   use GEOS_LandGridCompMod,      only: LandSetServices      => SetServices
@@ -16,7 +16,6 @@ module GEOS_LdasGridCompMod
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
 
-  use EASE_conv,              only: ease_inverse
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
   use LDAS_TileCoordRoutines, only: get_minExtent_grid, get_ij_ind_from_latlon, io_domain_files
@@ -537,12 +536,12 @@ contains
        call ESMF_GRID_INTERIOR(agrid,I1,IN,J1,JN)
 
        do I = 1,size(centerX,1)
-          call ease_inverse(gridname,1.0*(I+I1-2),0.0,lat,lon)
+          call MAPL_ease_inverse(gridname,1.0*(I+I1-2),0.0,lat,lon)
           centerX(I,:) = lon * MAPL_DEGREES_TO_RADIANS
        enddo
 
        do J = 1,size(centerY,2)
-          call ease_inverse(gridname,0.0,1.0*(J+J1-2),lat,lon)
+          call MAPL_ease_inverse(gridname,0.0,1.0*(J+J1-2),lat,lon)
           centerY(:,J) = lat * MAPL_DEGREES_TO_RADIANS
        enddo
 
