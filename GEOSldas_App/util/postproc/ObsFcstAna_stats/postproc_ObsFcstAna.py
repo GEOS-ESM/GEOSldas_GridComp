@@ -93,7 +93,7 @@ class postproc_ObsFcstAna:
         n_tile = tc['N_tile']
         n_spec = len(obsparam_list[0])
 
-        date_time = date_time.replace(hour=self.da_t0)
+        date_time = date_time.replace(hour=int(self.da_t0), minute=int(np.mod(self.da_t0,1)*60))
         end_time  = date_time + relativedelta(months=1) 
         
         data_sum  = {}
@@ -392,86 +392,122 @@ class postproc_ObsFcstAna:
     #   the straight spatial avg across a map of a given DA diagnostic.  The latter approach gives 
     #   the same weight to each location, regardless of how many obs are available at the location.
 
-    def calc_spatial_stats_from_sums(self, date_time):
+    def calc_spatial_stats_from_sums(self):
 
+        start_time = self.start_time
+        end_time   = self.end_time
+        
         var_list = ['obs_obs', 'obs_fcst','obs_ana']
+
+        O_mean    = []
+        O_stdv    = []
+        F_mean    = []
+        F_stdv    = []
+        A_mean    = []
+        A_stdv    = []
+        OmF_mean  = []
+        OmF_stdv  = []
+        OmA_mean  = []
+        OmA_stdv  = []
+        N_data    = []
+        date_vec  = []
         
-        mo_path = self.sum_path + '/Y'+ date_time.strftime('%Y') + '/M' + date_time.strftime('%m') + '/'            
-        fnc4_sums = mo_path + self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + date_time.strftime('%Y%m') +'.nc4'
+        # Time loop 
+        current_time = start_time
+        while current_time < end_time:
         
-        mdata_sum = {}
-        mdata2_sum = {}
+            mo_path = self.sum_path + '/Y'+ current_time.strftime('%Y') + '/M' + current_time.strftime('%m') + '/'            
+            fnc4_sums = mo_path + self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + current_time.strftime('%Y%m') +'.nc4'
+            
+            mdata_sum = {}
+            mdata2_sum = {}
 
-        try:
-            with Dataset(fnc4_sums,'r') as nc:
-                mN_data                = nc.variables['N_data'      ][:]
-                moxf_sum               = nc.variables['obsxfcst_sum'][:]
-                moxa_sum               = nc.variables['obsxana_sum' ][:]
-                moxf_sum[mN_data == 0] = np.nan
-                moxa_sum[mN_data == 0] = np.nan
-                for var in var_list:
-                    mdata_sum[ var]               = nc.variables[var+'_sum' ][:]
-                    mdata2_sum[var]               = nc.variables[var+'2_sum'][:]
-                    mdata_sum[ var][mN_data == 0] = np.nan
-                    mdata2_sum[var][mN_data == 0] = np.nan
-        except FileNotFoundError:
-            print(f"Error: File '{filename}' not found.")
-            sys.exit(1)
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
-            sys.exit(1)
+            try:
+                with Dataset(fnc4_sums,'r') as nc:
+                    mN_data                = nc.variables['N_data'      ][:]
+                    moxf_sum               = nc.variables['obsxfcst_sum'][:]
+                    moxa_sum               = nc.variables['obsxana_sum' ][:]
+                    moxf_sum[mN_data == 0] = np.nan
+                    moxa_sum[mN_data == 0] = np.nan
+                    for var in var_list:
+                        mdata_sum[ var]               = nc.variables[var+'_sum' ][:]
+                        mdata2_sum[var]               = nc.variables[var+'2_sum'][:]
+                        mdata_sum[ var][mN_data == 0] = np.nan
+                        mdata2_sum[var][mN_data == 0] = np.nan
+            except FileNotFoundError:
+                print(f"Error: File '{fnc4_sums}' not found. Run Get_ObsFcstAna_sums first.")
+                sys.exit(1)
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+                sys.exit(1)
 
-        # Make sure only aggregate tiles with valid values for all variables
-        for var in var_list:
-            mN_data                           = mN_data.astype(float)
-            mN_data[np.isnan(mdata_sum[var])] = np.nan
-            mN_data[mN_data == 0]             = np.nan
+            # Make sure only aggregate tiles with valid values for all variables
+            for var in var_list:
+                mN_data                           = mN_data.astype(float)
+                mN_data[np.isnan(mdata_sum[var])] = np.nan
+                mN_data[mN_data == 0]             = np.nan
 
-        # cross mask before aggregating tile values   
-        for var in var_list:
-            mdata_sum[ var][np.isnan(mN_data)] = np.nan
-            mdata2_sum[var][np.isnan(mN_data)] = np.nan
-            moxf_sum[np.isnan(mN_data)]        = np.nan
-            moxa_sum[np.isnan(mN_data)]        = np.nan
+            # cross mask before aggregating tile values   
+            for var in var_list:
+                mdata_sum[ var][np.isnan(mN_data)] = np.nan
+                mdata2_sum[var][np.isnan(mN_data)] = np.nan
+                moxf_sum[np.isnan(mN_data)]        = np.nan
+                moxa_sum[np.isnan(mN_data)]        = np.nan
 
-        # Aggregate data of all tiles
-        N_data     = np.nansum(mN_data, axis=0)
-        OxF_mean   = np.nansum(moxf_sum,axis=0)/N_data
-        OxA_mean   = np.nansum(moxa_sum,axis=0)/N_data
-        data_mean  = {}
-        data2_mean = {}
-        data_var   = {}
-        for var in var_list:
-            data_mean[ var] = np.nansum(mdata_sum[var ],axis=0)/N_data
-            data2_mean[var] = np.nansum(mdata2_sum[var],axis=0)/N_data
-            # var(x) = E[x2] - (E[x])^2
-            data_var[var] = data2_mean[var] - data_mean[var]**2
+            # Aggregate data of all tiles
+            N_data_mo  = np.nansum(mN_data, axis=0)
+            OxF_mean   = np.nansum(moxf_sum,axis=0)/N_data_mo
+            OxA_mean   = np.nansum(moxa_sum,axis=0)/N_data_mo
+            data_mean  = {}
+            data2_mean = {}
+            data_var   = {}
+            for var in var_list:
+                data_mean[ var] = np.nansum(mdata_sum[var ],axis=0)/N_data_mo
+                data2_mean[var] = np.nansum(mdata2_sum[var],axis=0)/N_data_mo
+                # var(x) = E[x2] - (E[x])^2
+                data_var[var] = data2_mean[var] - data_mean[var]**2
 
-        # Compute metrics of O-F, O-A, etc. based on above stats
-        O_mean = data_mean['obs_obs']
-        F_mean = data_mean['obs_fcst']
-        A_mean = data_mean['obs_ana']
+            # Compute monthly metrics of O-F, O-A, etc. based on above stats
+            O_mean_mo = data_mean['obs_obs']
+            F_mean_mo = data_mean['obs_fcst']
+            A_mean_mo = data_mean['obs_ana']
 
-        O_var  = data_var[ 'obs_obs']
-        F_var  = data_var[ 'obs_fcst']
-        A_var  = data_var[ 'obs_ana']
+            O_var     = data_var['obs_obs']
+            F_var     = data_var['obs_fcst']
+            A_var     = data_var['obs_ana']
 
-        # mean(x-y) = E[x] - E[y]   
-        OmF_mean = O_mean - F_mean
-        OmA_mean = O_mean - A_mean
+            # mean(x-y) = E[x] - E[y]   
+            OmF_mean_mo = O_mean_mo - F_mean_mo
+            OmA_mean_mo = O_mean_mo - A_mean_mo
 
-        # var(x-y) = var(x) + var(y) - 2cov(x,y)
-        # cov(x,y) = E[xy] - E[x]E[y]
-        OmF_stdv  = np.sqrt(O_var + F_var - 2 * (OxF_mean - O_mean*F_mean))
-        OmA_stdv  = np.sqrt(O_var + A_var - 2 * (OxA_mean - O_mean*A_mean))
+            # var(x-y) = var(x) + var(y) - 2cov(x,y)
+            # cov(x,y) = E[xy] - E[x]E[y]
+            OmF_stdv_mo  = np.sqrt(O_var + F_var - 2 * (OxF_mean - O_mean_mo*F_mean_mo))
+            OmA_stdv_mo  = np.sqrt(O_var + A_var - 2 * (OxA_mean - O_mean_mo*A_mean_mo))
+
+            # Extend timeseries
+            N_data.append(N_data_mo)
+            O_mean.append(O_mean_mo)
+            O_stdv.append(np.sqrt(O_var))
+            F_mean.append(F_mean_mo)
+            F_stdv.append(np.sqrt(F_var))
+            A_mean.append(A_mean_mo)
+            A_stdv.append(np.sqrt(A_var))
+            OmF_mean.append(OmF_mean_mo)
+            OmF_stdv.append(OmF_stdv_mo)
+            OmA_mean.append(OmA_mean_mo)
+            OmA_stdv.append(OmA_stdv_mo)            
+
+            date_vec.append(current_time.strftime('%Y%m'))
+            current_time = current_time + relativedelta(months=1)
 
         stats = {
-            'O_mean'  : O_mean,   'O_stdv'  : np.sqrt(O_var),
-            'F_mean'  : F_mean,   'F_stdv'  : np.sqrt(F_var),
-            'A_mean'  : A_mean,   'A_stdv'  : np.sqrt(A_var),
-            'OmF_mean': OmF_mean, 'OmF_stdv': OmF_stdv,
-            'OmA_mean': OmA_mean, 'OmA_stdv': OmA_stdv,
-            'N_data': N_data,
+            'O_mean'  : np.array(O_mean),   'O_stdv'  : np.array(O_stdv),
+            'F_mean'  : np.array(F_mean),   'F_stdv'  : np.array(F_stdv),
+            'A_mean'  : np.array(A_mean),   'A_stdv'  : np.array(A_stdv),
+            'OmF_mean': np.array(OmF_mean), 'OmF_stdv': np.array(OmF_stdv),
+            'OmA_mean': np.array(OmA_mean), 'OmA_stdv': np.array(OmA_stdv),
+            'N_data': np.array(N_data),     'date_vec': date_vec
             }
 
         return stats
