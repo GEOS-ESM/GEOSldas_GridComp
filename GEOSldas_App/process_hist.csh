@@ -7,7 +7,7 @@
 setenv    LSM_CHOICE $1
 setenv    AEROSOL_DEPOSITION $2
 setenv    GRID $3
-setenv    GRIDNAME $4
+setenv    GRIDNAME "'$4'"
 setenv    HISTRC $5
 setenv    RUN_IRRIG $6
 setenv    ASSIM  $7
@@ -26,11 +26,11 @@ endif
 if($GRID == CUBE) then
    sed -i '/^\#EASE/d' $HISTRC
    sed -i 's|\#CUBE|''|g' $HISTRC
-   sed -i 's|GRIDNAME|'"$GRIDNAME"'|g' $HISTRC
+   sed -i -e  s/\'GRIDNAME\'/$GRIDNAME/g $HISTRC
 else
    sed -i '/^\#CUBE/d' $HISTRC
    sed -i 's|\#EASE|''|g' $HISTRC
-   sed -i 's|GRIDNAME|'"$GRIDNAME"'|g' $HISTRC
+   sed -i -e  s/\'GRIDNAME\'/$GRIDNAME/g $HISTRC
 endif
 
 if($LSM_CHOICE == 1) then
