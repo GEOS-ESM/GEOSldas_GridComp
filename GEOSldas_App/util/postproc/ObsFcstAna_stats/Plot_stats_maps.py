@@ -3,29 +3,63 @@
 """
 Sample script for plotting maps of long-term data assimilation diagnostics.
 Plots Nobs-weighted avg of each metric across all species.
-Requires saved files with monthly sums (see Get_ObsFcstAna_stat.py).
+Requires saved files with monthly sums (see Get_ObsFcstAna_sums.py).
 Stats of *normalized* OmFs are approximated!
 """
 
 import sys;       sys.path.append('../../shared/python/')
 import warnings;  warnings.filterwarnings("ignore")
+import os
 
 import numpy             as np
 import matplotlib.pyplot as plt
 
 from datetime               import timedelta
 
-from tile2grid              import tile2grid
+from netCDF4                import Dataset
+
+from tile_to_latlon         import tile_to_latlon, get_grid_resolution
 from plot                   import plotMap
 from EASEv2                 import EASEv2_ind2latlon
 
-def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
+from postproc_ObsFcstAna    import postproc_ObsFcstAna
+from user_config            import get_config
+
+def Main_OmF_maps():
     
-    start_time    = postproc_obj.start_time
-    end_time      = postproc_obj.end_time
-    domain        = postproc_obj.domain
-    tc            = postproc_obj.tilecoord
-    tg            = postproc_obj.tilegrid_global
+    # Plot maps of long-term temporal stats
+    
+    config     = get_config()                 # edit user-defined inputs in user_config.py
+    
+    exp_list   = config['exp_list']
+    start_time = config['start_time']
+    end_time   = config['end_time']
+    sum_path   = config['sum_path']
+    out_path   = config['out_path']
+
+    # Provide Nmin to screen out tiles with inadequate data for temporal stats 
+    Nmin = 20
+    
+    # ------------------------------------------------------------------------------------
+    # Get metrics in [N_tile, N_species] for plotting
+    # ------------------------------------------------------------------------------------
+    # File name for long-term temporal stats
+    stats_file  = out_path + 'temporal_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
+        (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
+
+    # Read or compute long-term temporal stats.  Each field has the dimension [N_tile, N_species].
+    if os.path.isfile(stats_file):
+
+        print('reading stats nc4 file '+ stats_file)
+        stats = {}
+        with Dataset(stats_file,'r') as nc:
+            for key, value in nc.variables.items():
+                stats[key] = value[:].filled(np.nan)
+
+    else:
+        # Initialize the postprocessing object and get information
+        postproc_obj = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
+        stats = postproc_obj.calc_temporal_stats_from_sums(write_to_nc=True, fout_stats=stats_file)
     
     N_data        = stats['N_data']
     OmF_mean      = stats['OmF_mean']
@@ -35,11 +69,22 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmF_norm_mean = stats['OmF_norm_mean']
     OmF_norm_stdv = stats['OmF_norm_stdv']
 
+    # Screen all fields with Nmin  except for N_data
+    OmF_mean[N_data < Nmin]      = np.nan
+    OmF_stdv[N_data < Nmin]        = np.nan
+    OmA_mean[N_data < Nmin]      = np.nan
+    OmA_stdv[N_data < Nmin]       = np.nan   
+    OmF_norm_mean[N_data < Nmin] = np.nan
+    OmF_norm_stdv[N_data < Nmin]   = np.nan
+    
+    # Select/combine fields for plotting. The following provides an example to
+    # combine statistical fields of all species to averages.
+    
     # Compute Nobs-weighted avg of each metric across all species.
     # Typically used for SMAP Tb_h/h from asc and desc overpasses,
     # or ASCAT soil moisture from Metop-A/B/C.
     # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
-    Nobs_data     = np.nansum(              N_data, axis=1)
+    Nobs_data     = np.nansum(  N_data, axis=1)
     OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/Nobs_data
     OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/Nobs_data
     OmF_norm_mean = np.nansum(OmF_norm_mean*N_data, axis=1)/Nobs_data
@@ -47,18 +92,47 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
     OmA_mean      = np.nansum(OmA_mean     *N_data, axis=1)/Nobs_data
     OmA_stdv      = np.nansum(OmA_stdv     *N_data, axis=1)/Nobs_data
 
+    # Nobs_data need to be at least 1, otherwise unwanted zeros 
+    # might get into the computation of global mean etc.
+    Nobs_data[Nobs_data == 0] = np.nan  
+
+    # --------------------------------------------------------------------------------
+    # Get map grid information and provide map resolution (in degree).
+    # Observation FOV-based resolution estimate is provided. The resolution can also be
+    # manually set for optimal map performance
+    # ---------------------------------------------------------------------------------
+    tc = exp_list[0]['tilecoord']
+    tg = exp_list[0]['tilegrid_global']
+    obs_fov = exp_list[0]['obsparam'][0]['FOV']
+    obs_fov_units = exp_list[0]['obsparam'][0]['FOV_units']
+
+    # Get map grid resolution for mapping tile data on lat/lon grid
+    # Convert FOV to degree, assuming 100km is about 1 deg.
+    if 'km' in obs_fov_units:
+        obs_fov = obs_fov /100.
+
+    # Set obs_fov at model resolution if obs_fov = 0
+    if obs_fov == 0:
+        obs_fov = 360./tile_grid['N_lon']/2.
+
+    # Get map plot grid resolution based on obs FOV    
+    map_grid_resolution = get_grid_resolution(obs_fov)
+    print(f'map grid resolution: {map_grid_resolution}' degree)
+
+    # ----------------------------------------------------------------------------------
     # Plotting
-    exptag = postproc_obj.exptag
+    # ----------------------------------------------------------------------------------
+    exptag = exp_list[0]['exptag']
 
     fig, axes = plt.subplots(2,2, figsize=(18,10))
     plt.rcParams.update({'font.size':14})
-
+    
     for i in np.arange(2):
         for j in np.arange(2):
             units = '[k]'
             if i == 0 and j == 0:
                 tile_data = Nobs_data
-                # crange is [cmin, cmax]
+                #crange is [cmin, cmax]
                 crange =[0, np.ceil((end_time-start_time).days/150)*300]
                 colormap = plt.get_cmap('jet',20)
                 title_txt = exptag + ' Tb Nobs '    + start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
@@ -80,102 +154,41 @@ def plot_OmF_maps(postproc_obj, stats, fig_path='./'):
                 title_txt = exptag + ' Tb normalized O-F stdv (approx!) '+ start_time.strftime('%Y%m%d')+'_'+end_time.strftime('%Y%m%d')
 
             colormap.set_bad(color='0.9') # light grey, 0-black, 1-white
+           
+            # map tile_data on 2-d regular lat/lon grid for map plotting
+            grid_data, lat_2d, lon_2d = tile_to_latlon(tile_data, tc, tg, map_grid_resolution)
 
-            # Regrid 1d tile_data to 2d grid_data for map plots
-            if '_M09_' in domain: # special case  
-                grid_data_M09 = np.zeros((1624, 3856)) + np.nan  
-                grid_data_M09[tc['j_indg'],tc['i_indg']] = tile_data
-                
-                # Reshape the data into 4x4 blocks
-                reshaped = grid_data_M09.reshape(1624//4, 4, 3856//4, 4)
-
-                # Combine each 4x4 M09 block into a M36 grid
-                #if i==0 and j==0:
-                #   grid_data = np.sum(reshaped,axis=(1, 3)) 
-                #else:
-                #   grid_data = np.nanmean(reshaped,axis=(1, 3))
-
-                grid_data = grid_data_M09[1::4, 2::4]
-
-                # NOT area weighted 
-                wmean = np.nanmean(grid_data)
-                wabsmean = np.nanmean(np.abs(grid_data))
-                if 'normalized' in title_txt:
-                    wabsmean = np.nanmean(np.abs(grid_data-1.))
-                    
-                lat_M36, lon_M36 = EASEv2_ind2latlon(np.arange(406), np.arange(964),'M36')
-                lon_2d,lat_2d = np.meshgrid(lon_M36,lat_M36)
-            else:
-                grid_data, lat_2d, lon_2d = tile2grid(tile_data, tc, tg)
-                
-                # Area weighted mean and mean(abs)
-                wmean    =     np.nansum(       tile_data     * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
-                wabsmean =     np.nansum(np.abs(tile_data)    * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
-                if 'normalized' in title_txt:
-                    wabsmean = np.nansum(np.abs(tile_data-1.) * tc['area'])/np.nansum(~np.isnan(tile_data)*tc['area'])
-                    
+            mean       = np.nanmean(grid_data)
+            absmean =np.nanmean(np.abs(grid_data))
+            
             if 'normalized' in title_txt:
-                title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (wmean, wabsmean)+' '+units
+                absmean = np.nanmean(np.abs(grid_data-1.) )
+
+            if 'normalized' in title_txt and 'stdv' in title_txt:
+                title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (mean, absmean)+' '+units
             elif 'mean' in title_txt:
-                title_txt = title_txt + '\n' + "avg=%.3f, avg(abs)=%.3f" % (wmean, wabsmean)+' '+units
+                title_txt = title_txt + '\n' + "avg=%.3f, avg(abs)=%.3f" % (mean, absmean)+' '+units
             else:
-                title_txt = title_txt + '\n' + "avg=%.2f" % (wmean) +' '+units                
-         
+                title_txt = title_txt + '\n' + "avg=%.2f" % (mean) +' '+units                
+   
             if 'normalized' in title_txt:
                 grid_data = np.log10(grid_data)
                 crange = [-0.6, 0.45]
             
             mm, cs = plotMap(grid_data, ax =axes[i,j], lat=lat_2d, lon=lon_2d, cRange=crange, \
-                        title=title_txt, cmap=colormap, bounding=[-60, 80, -180,180])            
-            
+                        title=title_txt, cmap=colormap, bounding=[-60, 80, -180,180])
+
     plt.tight_layout()
     # Save figure to file
-    fig.savefig(fig_path+'Map_OmF_'+ exptag +'_'+start_time.strftime('%Y%m')+'_'+\
+    fig.savefig(out_path+'Map_OmF_'+ exptag +'_'+start_time.strftime('%Y%m')+'_'+\
                         (end_time+timedelta(days=-1)).strftime('%Y%m')+'.png')
-    #plt.show()
+    plt.show()
     plt.close(fig)
 
 # -----------------------------------------------------------------------------------------------
     
 if __name__ == '__main__':
-
-    # Plot maps of long-term temporal stats
-    
-    from postproc_ObsFcstAna    import postproc_ObsFcstAna
-    from user_config            import get_config
-    
-    config     = get_config()                 # edit user-defined inputs in user_config.py
-    
-    exp_list   = config['exp_list']
-    start_time = config['start_time']
-    end_time   = config['end_time']
-    sum_path   = config['sum_path']
-    out_path   = config['out_path']
-     
-    # ------------------------------------------------------------------------------------
-
-    # Initialize the postprocessing object
-    postproc = postproc_ObsFcstAna(exp_list, start_time, end_time, sum_path=sum_path)
-
-    # File name for long-term temporal stats
-    stats_file  = out_path + 'temporal_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
-        (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
-
-
-    # Read or compute long-term temporal stats.  Each field has the dimension [N_tile, N_species].
-    if os.path.isfile(stats_file):
-
-        print('reading stats nc4 file '+ stats_file)
-        temporal_stats = {}
-        with Dataset(stats_file,'r') as nc:
-            for key, value in nc.variables.items():
-                temporal_stats[key] = value[:].filled(np.nan)
-
-    else:
-        temporal_stats = postproc.calc_temporal_stats_from_sums(write_to_nc=True, fout_stats=stats_file)
-
-    # Plot stats
         
-    plot_OmF_maps(postproc, temporal_stats, fig_path=out_path )
+    Main_OmF_maps()
 
 # ====================== EOF =========================================================
