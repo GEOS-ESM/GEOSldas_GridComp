@@ -117,7 +117,7 @@ def Main_OmF_maps():
 
     # Get map plot grid resolution based on obs FOV    
     map_grid_resolution = get_grid_resolution(obs_fov)
-    print(f'map grid resolution: {map_grid_resolution}' degree)
+    print(f'map grid resolution: {map_grid_resolution} degree')
 
     # ----------------------------------------------------------------------------------
     # Plotting
