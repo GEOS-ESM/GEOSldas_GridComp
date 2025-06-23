@@ -182,7 +182,7 @@ def Main_OmF_maps():
     # Save figure to file
     fig.savefig(out_path+'Map_OmF_'+ exptag +'_'+start_time.strftime('%Y%m')+'_'+\
                         (end_time+timedelta(days=-1)).strftime('%Y%m')+'.png')
-    plt.show()
+    #plt.show()
     plt.close(fig)
 
 # -----------------------------------------------------------------------------------------------
