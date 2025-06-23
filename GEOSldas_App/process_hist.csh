@@ -26,12 +26,11 @@ endif
 if($GRID == CUBE) then
    sed -i '/^\#EASE/d' $HISTRC
    sed -i 's|\#CUBE|''|g' $HISTRC
-   sed -i -e  s/\'GRIDNAME\'/$GRIDNAME/g $HISTRC
 else
    sed -i '/^\#CUBE/d' $HISTRC
    sed -i 's|\#EASE|''|g' $HISTRC
-   sed -i -e  s/\'GRIDNAME\'/$GRIDNAME/g $HISTRC
 endif
+sed -i -e  s/\'GRIDNAME\'/$GRIDNAME/g $HISTRC
 
 if($LSM_CHOICE == 1) then
    set GridComp = CATCH
