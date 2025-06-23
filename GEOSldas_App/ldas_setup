@@ -936,6 +936,10 @@ class LDASsetup:
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
 
+           os.symlink(self.bcs_dir_landshared + 'river_input', \
+                       self.inpdir+'/river_input')
+
+
         # create and link restart
         print ("Creating and linking restart...")
         _start = self.begDates[0]
@@ -1369,6 +1373,8 @@ class LDASsetup:
                       ldasrcInp.pop('CO2',None)
                       ldasrcInp.pop('CO2_YEAR',None)
                       ldasrcInp.pop('PRESCRIBE_DVG',None)
+                      
+                   ldasrcInp['River_Routing_FILE']= '../input/river_input/'   
 
                 # create restart item in RC
                    catch_ = self.catch.upper()
