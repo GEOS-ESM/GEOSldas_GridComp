@@ -12,10 +12,10 @@ def tile_to_latlongrid( tile_data, tile_coord, resolution, nodata=1.e15, nodata_
     
     Parameters:
     ----------
-    tile_data  : Array in tile space, shape (N_tile, N_fields)
-    tile_coord : Dictionary containing tile coordinate information
-    resolution : target grid resolution
-    nodata     : Value for missing data
+    tile_data       : Array in tile space, shape (N_tile, N_fields)
+    tile_coord      : Dictionary containing tile coordinate information
+    resolution      : Target grid resolution
+    nodata          : Value for missing data
     nodata_tol_frac : Tolerance fraction for comparing values to nodata
         
     Returns:

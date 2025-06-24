@@ -87,22 +87,29 @@ def Main_OmF_maps():
     
     # Select/combine fields for plotting. The following provides an example to
     # computes average stats across all species.
-    
+    #
     # Compute Nobs-weighted avg of each metric across all species.
     # Typically used for SMAP Tb_h/h from asc and desc overpasses,
     # or ASCAT soil moisture from Metop-A/B/C.
     # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
+    
     Ndata_sum     = np.nansum(              N_data, axis=1)
+    
     OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/Ndata_sum
     OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/Ndata_sum
     OmF_norm_mean = np.nansum(OmF_norm_mean*N_data, axis=1)/Ndata_sum
     OmF_norm_stdv = np.nansum(OmF_norm_stdv*N_data, axis=1)/Ndata_sum
     OmA_mean      = np.nansum(OmA_mean     *N_data, axis=1)/Ndata_sum
     OmA_stdv      = np.nansum(OmA_stdv     *N_data, axis=1)/Ndata_sum
-    N_data = Ndata_sum
+    
+    N_data        = Ndata_sum
 
-    # N_data need to be at least 1, otherwise unwanted zeros 
-    # might get into the computation of global mean etc.
+    # The obs are assigned to tiles only for book-keeping purposes, and the resolution of
+    # the obs is often coarser than that of the model tile space.  Therefore, typically many
+    # tiles are never assigned any obs and end up with N_data=0.
+    # Here, we remove these unwanted zeros from N_data to keep them out of the computation of 
+    # spatial averages (global avg; mapping from tile space to lat/lon plotting grid)
+
     N_data[N_data == 0] = np.nan  
 
     # --------------------------------------------------------------------------------
