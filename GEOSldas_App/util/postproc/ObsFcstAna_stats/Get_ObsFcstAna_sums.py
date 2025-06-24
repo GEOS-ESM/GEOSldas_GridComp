@@ -2,12 +2,9 @@
 
 """
 Sample script for post-processing GEOSldas ObsFcstAna output into data assimilation diagnostics.
-First, compute and store monthly sums and sums of squares and cross-products of raw ObsFcstAna output.  
+Computes and stores monthly sums and sums of squares and cross-products of raw ObsFcstAna output.  
 Data assimilation diagnostics ("stats") such as the mean and std-dev of the observation-minus-forecast 
-residuals can then be diagnosed quickly from these intermediate "sums" files. 
-Sample script optionally computes and plots:
-- Maps of long-term data assimilation diagnostics (see also Plot_stats_maps.py).
-- Monthly time series of spatially averaged data assimilation diagnostics (see also Plot_stats_timeseries.py).
+residuals can then be diagnosed quickly from these intermediate "sums" files.  See Plot_stats_*.py.
 
 Usage:
     1. Edit "user_config.py" with experiments information.
@@ -19,7 +16,7 @@ Usage:
     $ nohup ./Get_ObsFcstAna_sums.py > out.log &
 
 Authors: Q. Liu, R. Reichle, A. Fox
-Last Modified: May 2025
+Last Modified: June 2025
 """
 
 import sys;       sys.path.append('../../shared/python/')
