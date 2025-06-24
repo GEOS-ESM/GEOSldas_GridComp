@@ -16,7 +16,7 @@ def tile_to_latlongrid( tile_data, tile_coord, resolution, nodata=1.e15, nodata_
     tile_coord : Dictionary containing tile coordinate information
     resolution : target grid resolution
     nodata     : Value for missing data
-    nodata_tol : Tolerance for comparing values to nodata
+    nodata_tol_frac : Tolerance fraction for comparing values to nodata
         
     Returns:
     -------
