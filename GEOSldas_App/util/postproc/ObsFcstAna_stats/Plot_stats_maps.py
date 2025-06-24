@@ -24,7 +24,7 @@ from datetime               import timedelta
 
 from netCDF4                import Dataset
 
-from tile_to_latlon         import tile_to_latlon, get_grid_resolution
+from tile_to_latlongrid     import tile_to_latlongrid
 from plot                   import plotMap
 from EASEv2                 import EASEv2_ind2latlon
 
@@ -92,17 +92,18 @@ def Main_OmF_maps():
     # Typically used for SMAP Tb_h/h from asc and desc overpasses,
     # or ASCAT soil moisture from Metop-A/B/C.
     # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
-    Nobs_data     = np.nansum(              N_data, axis=1)
-    OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/Nobs_data
-    OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/Nobs_data
-    OmF_norm_mean = np.nansum(OmF_norm_mean*N_data, axis=1)/Nobs_data
-    OmF_norm_stdv = np.nansum(OmF_norm_stdv*N_data, axis=1)/Nobs_data
-    OmA_mean      = np.nansum(OmA_mean     *N_data, axis=1)/Nobs_data
-    OmA_stdv      = np.nansum(OmA_stdv     *N_data, axis=1)/Nobs_data
+    Ndata_sum     = np.nansum(              N_data, axis=1)
+    OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/Ndata_sum
+    OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/Ndata_sum
+    OmF_norm_mean = np.nansum(OmF_norm_mean*N_data, axis=1)/Ndata_sum
+    OmF_norm_stdv = np.nansum(OmF_norm_stdv*N_data, axis=1)/Ndata_sum
+    OmA_mean      = np.nansum(OmA_mean     *N_data, axis=1)/Ndata_sum
+    OmA_stdv      = np.nansum(OmA_stdv     *N_data, axis=1)/Ndata_sum
+    N_data = Ndata_sum
 
-    # Nobs_data need to be at least 1, otherwise unwanted zeros 
+    # N_data need to be at least 1, otherwise unwanted zeros 
     # might get into the computation of global mean etc.
-    Nobs_data[Nobs_data == 0] = np.nan  
+    N_data[N_data == 0] = np.nan  
 
     # --------------------------------------------------------------------------------
     # Plot stats on regular lat/lon grid, with grid spacing guided by the footprint 
@@ -151,11 +152,11 @@ def Main_OmF_maps():
         for j in np.arange(2):
             units = '[k]'
             if i == 0 and j == 0:
-                tile_data = Nobs_data
+                tile_data = N_data
                 # crange is [cmin, cmax]
                 crange =[0, np.ceil((end_time-start_time).days/150)*300]
                 colormap = plt.get_cmap('jet',20)
-                title_txt = exptag + ' Tb Nobs '    + start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
+                title_txt = exptag + ' Tb Nobs (excl. 0s)'    + start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
                 units = '[-]'
             if i == 0 and j ==1:
                 tile_data = OmF_mean
