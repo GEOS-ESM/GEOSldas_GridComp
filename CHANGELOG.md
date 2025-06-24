@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added EASE to Latlon and Cubed-Sphere to EASE history outputs
 - Added optional SLURM "constraint".
 - Added functionality to run on tile space of stretched cube-sphere grids.
 - Added python package for post-processing ObsFcstAna output.
@@ -19,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Revised processing of HISTORY template (GEOSldas_HIST.rc).
 - Switch to using EASE grid tools in MAPL.
 - Specify only ntasks_model for SLURM resource request.
 - Revisions for handling of Nens and special nml and mwtrm path/files in coupled land-atm DAS.
