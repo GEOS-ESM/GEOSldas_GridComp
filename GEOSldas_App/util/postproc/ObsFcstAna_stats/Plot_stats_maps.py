@@ -5,6 +5,12 @@ Sample script for plotting maps of long-term data assimilation diagnostics.
 Plots Nobs-weighted avg of each metric across all species.
 Requires saved files with monthly sums (see Get_ObsFcstAna_sums.py).
 Stats of *normalized* OmFs are approximated!
+
+Usage:
+    1. Edit "user_config.py" with experiments information.
+    2. Run this script as follows (on Discover):
+    $ module load python/GEOSpyD
+    $ ./Plot_stats_maps.py
 """
 
 import sys;       sys.path.append('../../shared/python/')
@@ -37,12 +43,14 @@ def Main_OmF_maps():
     sum_path   = config['sum_path']
     out_path   = config['out_path']
 
-    # Provide Nmin to screen out tiles with inadequate data for temporal stats 
+    # min number of individual O-Fs required for stats at a location (across all months in period)
+    
     Nmin = 20
     
     # ------------------------------------------------------------------------------------
-    # Get metrics in [N_tile, N_species] for plotting
+    # Read or compute stats.  Each field has dimension [N_tile, N_species] 
     # ------------------------------------------------------------------------------------
+
     # File name for long-term temporal stats
     stats_file  = out_path + 'temporal_stats_'+exp_list[0]['exptag']+'_'+ start_time.strftime('%Y%m%d')+'_'+ \
         (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
@@ -69,22 +77,22 @@ def Main_OmF_maps():
     OmF_norm_mean = stats['OmF_norm_mean']
     OmF_norm_stdv = stats['OmF_norm_stdv']
 
-    # Screen all fields with Nmin  except for N_data
-    OmF_mean[N_data < Nmin]      = np.nan
-    OmF_stdv[N_data < Nmin]        = np.nan
-    OmA_mean[N_data < Nmin]      = np.nan
-    OmA_stdv[N_data < Nmin]       = np.nan   
+    # Screen stats with Nmin (except for N_data)
+    OmF_mean[     N_data < Nmin] = np.nan
+    OmF_stdv[     N_data < Nmin] = np.nan
+    OmA_mean[     N_data < Nmin] = np.nan
+    OmA_stdv[     N_data < Nmin] = np.nan   
     OmF_norm_mean[N_data < Nmin] = np.nan
-    OmF_norm_stdv[N_data < Nmin]   = np.nan
+    OmF_norm_stdv[N_data < Nmin] = np.nan
     
     # Select/combine fields for plotting. The following provides an example to
-    # combine statistical fields of all species to averages.
+    # computes average stats across all species.
     
     # Compute Nobs-weighted avg of each metric across all species.
     # Typically used for SMAP Tb_h/h from asc and desc overpasses,
     # or ASCAT soil moisture from Metop-A/B/C.
     # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
-    Nobs_data     = np.nansum(  N_data, axis=1)
+    Nobs_data     = np.nansum(              N_data, axis=1)
     OmF_mean      = np.nansum(OmF_mean     *N_data, axis=1)/Nobs_data
     OmF_stdv      = np.nansum(OmF_stdv     *N_data, axis=1)/Nobs_data
     OmF_norm_mean = np.nansum(OmF_norm_mean*N_data, axis=1)/Nobs_data
@@ -97,31 +105,43 @@ def Main_OmF_maps():
     Nobs_data[Nobs_data == 0] = np.nan  
 
     # --------------------------------------------------------------------------------
-    # Get map grid information and provide map resolution (in degree).
-    # Observation FOV-based resolution estimate is provided. The resolution can also be
-    # manually set for optimal map performance
+    # Plot stats on regular lat/lon grid, with grid spacing guided by the footprint 
+    # scale (field-of-view; FOV) of the  observations.  
     # ---------------------------------------------------------------------------------
-    tc = exp_list[0]['tilecoord']
-    tg = exp_list[0]['tilegrid_global']
-    obs_fov = exp_list[0]['obsparam'][0]['FOV']
+    
+    # Get geographic info about model grid, model tile space, and obs FOV
+    # (assumes that all species have same FOV and FOV_units)
+
+    tc            = exp_list[0]['tilecoord']
+    tg            = exp_list[0]['tilegrid_global']
+    obs_fov       = exp_list[0]['obsparam'][0]['FOV']
     obs_fov_units = exp_list[0]['obsparam'][0]['FOV_units']
 
-    # Get map grid resolution for mapping tile data on lat/lon grid
-    # Convert FOV to degree, assuming 100km is about 1 deg.
+    # Determine spacing of lat/lon grid for plotting (degree) based on obs FOV.
+    # Can also set manually if desired.
+
+    my_res = obs_fov*2.      # Note: FOV is a radius, hence the factor of 2.
+    
+    # If applicable, convert to degree, assuming 100 km is about 1 deg.
     if 'km' in obs_fov_units:
-        obs_fov = obs_fov /100.
+        my_res = my_res/100.
 
-    # Set obs_fov at model resolution if obs_fov = 0
+    # If obs_fov=0, reset to match model resolution.
     if obs_fov == 0:
-        obs_fov = 360./tile_grid['N_lon']/2.
+        my_res = np.sqrt( tile_grid['dlat']*tile_grid['dlon'] )
 
-    # Get map plot grid resolution based on obs FOV    
-    map_grid_resolution = get_grid_resolution(obs_fov)
-    print(f'map grid resolution: {map_grid_resolution} degree')
+    # pick a resolution from a sample vector of resolutions
+
+    sample_res = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]
+
+    my_res = min(sample_res, key=lambda x: abs(x - my_res))
+    
+    print(f'resolution of lat/lon grid for plotting: {my_res} degree')
 
     # ----------------------------------------------------------------------------------
-    # Plotting
+    # Plot
     # ----------------------------------------------------------------------------------
+
     exptag = exp_list[0]['exptag']
 
     fig, axes = plt.subplots(2,2, figsize=(18,10))
@@ -155,11 +175,11 @@ def Main_OmF_maps():
 
             colormap.set_bad(color='0.9') # light grey, 0-black, 1-white
            
-            # map tile_data on 2-d regular lat/lon grid for map plotting
-            grid_data, lat_2d, lon_2d = tile_to_latlon(tile_data, tc, tg, map_grid_resolution)
+            # map tile_data on 2-d regular lat/lon grid for plotting
+            grid_data, lat_2d, lon_2d = tile_to_latlongrid(tile_data, tc, my_res)
 
-            mean       = np.nanmean(grid_data)
-            absmean =np.nanmean(np.abs(grid_data))
+            mean    = np.nanmean(       grid_data )
+            absmean = np.nanmean(np.abs(grid_data))
             
             if 'normalized' in title_txt:
                 absmean = np.nanmean(np.abs(grid_data-1.) )
@@ -167,9 +187,9 @@ def Main_OmF_maps():
             if 'normalized' in title_txt and 'stdv' in title_txt:
                 title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (mean, absmean)+' '+units
             elif 'mean' in title_txt:
-                title_txt = title_txt + '\n' + "avg=%.3f, avg(abs)=%.3f" % (mean, absmean)+' '+units
+                title_txt = title_txt + '\n' + "avg=%.3f, avg(abs)=%.3f"          % (mean, absmean)+' '+units
             else:
-                title_txt = title_txt + '\n' + "avg=%.2f" % (mean) +' '+units                
+                title_txt = title_txt + '\n' + "avg=%.2f"                         % (mean         )+' '+units                
    
             if 'normalized' in title_txt:
                 grid_data = np.log10(grid_data)
