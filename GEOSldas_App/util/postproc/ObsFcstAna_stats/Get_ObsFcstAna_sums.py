@@ -34,7 +34,7 @@ from user_config            import get_config              # user-defined config
 # If the script is run in the background, uncomment the following lines to see the redirected
 #   standard output in the out.log file immediately.  When the lines are commented out, the redirected
 #   standard output will not appear in the out.log file until the job has completed.
-# If the script is run in the foreground, the lines can be commented out to monitor the output log.
+# If the script is run in the foreground, the lines must be commented out.
 #
 #import io
 #sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0), write_through=True)
