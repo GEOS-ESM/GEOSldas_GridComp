@@ -1832,15 +1832,15 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
           line = line.strip()
           if not line:
              continue
-          if line.startswith('#')
+          if line.startswith('#'):
              continue
           # strip out inline comment (if present)
           position = line.find('#')
           if position>0:
              line = line[:position]
                     # extract key/value pair and add to dictionary
-         key, val = line.split(":",1)
-         out_dict[key.strip()] = val.strip()
+          key, val = line.split(":",1)
+          out_dict[key.strip()] = val.strip()
 
 # -----------------------------------------------------------------------------------
     
