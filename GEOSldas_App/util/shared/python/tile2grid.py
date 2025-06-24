@@ -18,6 +18,15 @@ def tile2grid(tile_data, tile_coord, tile_grid):
     -------
     grid_data : Array in grid space, shape (N_lat, N_lon, N_fields)
     """
+
+    # Verify input datasize
+    if tile_data.shape[0] != tile_coord['N_tile']:
+        print(f'Error: size of tile2grid input data does not match that of N_tile')
+        sys.exit()
+        
+    # if tile_data is 1-D [N_tile], expand into 2-D [N_tile,1]
+    if tile_data.ndim == 1:
+        tile_data = np.expand_dims(tile_data, axis=1)
     
     N_fields = tile_data.shape[-1]
     # Initialize grid data array
@@ -37,7 +46,7 @@ def tile2grid(tile_data, tile_coord, tile_grid):
             w = tile_coord['frac_cell'][n]
 
             # Check if current tile data is valid (not no-data)
-            if  ~np.isnan(tile_data[k, n]):
+            if  ~np.isnan(tile_data[n, k]):
                 # Accumulate weighted data
                 grid_data[j, i, k] += w * tile_data[n,k]
                 wgrid[    j, i]    += w
@@ -51,5 +60,7 @@ def tile2grid(tile_data, tile_coord, tile_grid):
                 else:
                     # Set no-data value
                     grid_data[j, i, k] = np.nan
+
+    return grid_data.squeeze()
 
 # ============ EOF ===============================================
