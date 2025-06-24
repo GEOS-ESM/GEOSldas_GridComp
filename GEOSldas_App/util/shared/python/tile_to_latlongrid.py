@@ -7,6 +7,8 @@ def tile_to_latlongrid( tile_data, tile_coord, resolution, nodata=1.e15, nodata_
     
     """
     Map (1d) tile-space data onto (2d) regular lat/lon grid of arbitrary "resolution".
+
+    Use "tile2grid.py" to map tile data onto the grid that is associated with the tile space.
     
     Parameters:
     ----------

@@ -43,7 +43,7 @@ def Main_OmF_maps():
     sum_path   = config['sum_path']
     out_path   = config['out_path']
 
-    # min number of individual O-Fs required for stats at a location (across all months in period)
+    # min total number of individual O-Fs required for stats at a location (across all months in period)
     
     Nmin = 20
     
@@ -178,11 +178,13 @@ def Main_OmF_maps():
             # map tile_data on 2-d regular lat/lon grid for plotting
             grid_data, lat_2d, lon_2d = tile_to_latlongrid(tile_data, tc, my_res)
 
-            mean    = np.nanmean(       grid_data )
-            absmean = np.nanmean(np.abs(grid_data))
+
+            # compute spatial avg of metric (directly from tile_data)
+            mean    = np.nanmean(       tile_data )
+            absmean = np.nanmean(np.abs(tile_data))
             
             if 'normalized' in title_txt:
-                absmean = np.nanmean(np.abs(grid_data-1.) )
+                absmean = np.nanmean(np.abs(tile_data-1.) )
 
             if 'normalized' in title_txt and 'stdv' in title_txt:
                 title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (mean, absmean)+' '+units
