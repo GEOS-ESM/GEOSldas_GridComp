@@ -1823,18 +1823,24 @@ def _produceExeInput(out_dict=None,ladas_cpl=0):
                 # process lines that contain string "use_rc_defaults"
                 if use_rc_defaults in line:                            
                     line0 = line.split(use_rc_defaults)[1]
-                    # strip out inline comment (if present)
-                    position = line0.find('#')
-                    if position>0:  
-                        line0 = line0[:position]
+                    lines.append(line0)
+    print ()
+    print ()
+
+    if ladas_cpl > 0:
+       for line in lines:
+          line = line.strip()
+          if not line:
+             continue
+          if line.startswith('#')
+             continue
+          # strip out inline comment (if present)
+          position = line.find('#')
+          if position>0:
+             line = line[:position]
                     # extract key/value pair and add to dictionary
-                    key, val = line0.split(":",1)
-                    out_dict[key.strip()] = val.strip()
-
-
-    print ()
-    print ()
-
+         key, val = line.split(":",1)
+         out_dict[key.strip()] = val.strip()
 
 # -----------------------------------------------------------------------------------
     

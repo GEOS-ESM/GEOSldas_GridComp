@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the out_dict for values from GEOSldas_LDAS.rc
 - Fixed error from MAPL's ApplicationSupport.F90 to init UDUNITS.
 
 ### Removed
