@@ -41,6 +41,8 @@ def Main_OmF_timeseries():
 
     stats_file = out_path + 'spatial_stats_'+exptag+'_'+start_time.strftime('%Y%m')+ \
         '_'+(end_time+timedelta(days=-1)).strftime('%Y%m')+'.pkl'
+
+    # Read or compute monthly stats across space
     
     if os.path.isfile(stats_file):
         
@@ -64,8 +66,8 @@ def Main_OmF_timeseries():
     # or ASCAT soil moisture from Metop-A/B/C.
     # DOES NOT MAKE SENSE IF, SAY, SPECIES HAVE DIFFERENT UNITS!
     stats_plot = {}
-    N_data = np.nansum(stats['N_data'], axis=1)
-    stats_plot['N_data']     = N_data
+    N_data                  = np.nansum(stats['N_data'  ],                 axis=1)
+    stats_plot['N_data'  ]  = N_data
     stats_plot['OmF_mean']  = np.nansum(stats['OmF_mean']*stats['N_data'], axis=1)/N_data
     stats_plot['OmF_stdv']  = np.nansum(stats['OmF_stdv']*stats['N_data'], axis=1)/N_data
     stats_plot['OmA_mean']  = np.nansum(stats['OmA_mean']*stats['N_data'], axis=1)/N_data
@@ -74,12 +76,12 @@ def Main_OmF_timeseries():
     plot_var = 'OmF_mean'
 
     fig, ax = plt.subplots(figsize=(10,4))
-    bars = ax.bar(date_vec, stats_plot[plot_var])
+    bars    = ax.bar(date_vec, stats_plot[plot_var])
 
     plt.grid(True, linestyle='--', alpha=0.5)
 
     plt.xticks(ticks=date_vec[::2], labels=date_vec[::2])
-    plt.title(exptag+ 'monthly '+plot_var)
+    plt.title(exptag+' monthly '+plot_var)
     plt.xlim(-1, len(date_vec)+1)
     plt.ylim(-.1, 2.)
 

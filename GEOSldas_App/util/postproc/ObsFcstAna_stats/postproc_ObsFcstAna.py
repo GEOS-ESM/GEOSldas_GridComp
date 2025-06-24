@@ -94,7 +94,7 @@ class postproc_ObsFcstAna:
         n_spec = len(obsparam_list[0])
 
         date_time = date_time.replace(hour=int(self.da_t0), minute=int(np.mod(self.da_t0,1)*60))
-        end_time  = date_time + relativedelta(months=1) 
+        stop_time = date_time + relativedelta(months=1) 
         
         data_sum  = {}
         data2_sum = {}
@@ -108,7 +108,7 @@ class postproc_ObsFcstAna:
             data_sum[ var] = np.zeros((n_tile, n_spec))
             data2_sum[var] = np.zeros((n_tile, n_spec))
 
-        while date_time < end_time:
+        while date_time < stop_time:
             
             # read the list of experiments at each time step (OFA="ObsFcstAna")
             OFA_list = []
@@ -195,7 +195,7 @@ class postproc_ObsFcstAna:
         tc             = self.tilecoord
         obsparam_list  = self.obsparam_list
 
-        date_time   = self.start_time
+        date_time      = self.start_time
 
         while date_time < self.end_time:           # loop through months
             
@@ -416,10 +416,10 @@ class postproc_ObsFcstAna:
         current_time = start_time
         while current_time < end_time:
         
-            mo_path = self.sum_path + '/Y'+ current_time.strftime('%Y') + '/M' + current_time.strftime('%m') + '/'            
+            mo_path   = self.sum_path + '/Y'+ current_time.strftime('%Y') + '/M' + current_time.strftime('%m') + '/'            
             fnc4_sums = mo_path + self.exptag + '.ens_avg.ldas_ObsFcstAna_sums.' + current_time.strftime('%Y%m') +'.nc4'
             
-            mdata_sum = {}
+            mdata_sum  = {}
             mdata2_sum = {}
 
             try:
@@ -435,7 +435,7 @@ class postproc_ObsFcstAna:
                         mdata_sum[ var][mN_data == 0] = np.nan
                         mdata2_sum[var][mN_data == 0] = np.nan
             except FileNotFoundError:
-                print(f"Error: File '{fnc4_sums}' not found. Run Get_ObsFcstAna_sums first.")
+                print(f"Error: File '{fnc4_sums}' not found. Run Get_ObsFcstAna_sums.py first.")
                 sys.exit(1)
             except Exception as e:
                 print(f"An unexpected error occurred: {e}")
@@ -451,8 +451,8 @@ class postproc_ObsFcstAna:
             for var in var_list:
                 mdata_sum[ var][np.isnan(mN_data)] = np.nan
                 mdata2_sum[var][np.isnan(mN_data)] = np.nan
-                moxf_sum[np.isnan(mN_data)]        = np.nan
-                moxa_sum[np.isnan(mN_data)]        = np.nan
+                moxf_sum[       np.isnan(mN_data)] = np.nan
+                moxa_sum[       np.isnan(mN_data)] = np.nan
 
             # Aggregate data of all tiles
             N_data_mo  = np.nansum(mN_data, axis=0)
@@ -486,17 +486,17 @@ class postproc_ObsFcstAna:
             OmA_stdv_mo  = np.sqrt(O_var + A_var - 2 * (OxA_mean - O_mean_mo*A_mean_mo))
 
             # Extend timeseries
-            N_data.append(N_data_mo)
-            O_mean.append(O_mean_mo)
-            O_stdv.append(np.sqrt(O_var))
-            F_mean.append(F_mean_mo)
-            F_stdv.append(np.sqrt(F_var))
-            A_mean.append(A_mean_mo)
-            A_stdv.append(np.sqrt(A_var))
-            OmF_mean.append(OmF_mean_mo)
-            OmF_stdv.append(OmF_stdv_mo)
-            OmA_mean.append(OmA_mean_mo)
-            OmA_stdv.append(OmA_stdv_mo)            
+            N_data.append(  N_data_mo     )
+            O_mean.append(  O_mean_mo     )
+            O_stdv.append(  np.sqrt(O_var))
+            F_mean.append(  F_mean_mo     )
+            F_stdv.append(  np.sqrt(F_var))
+            A_mean.append(  A_mean_mo     )
+            A_stdv.append(  np.sqrt(A_var))
+            OmF_mean.append(OmF_mean_mo   )
+            OmF_stdv.append(OmF_stdv_mo   )
+            OmA_mean.append(OmA_mean_mo   )
+            OmA_stdv.append(OmA_stdv_mo   )            
 
             date_vec.append(current_time.strftime('%Y%m'))
             current_time = current_time + relativedelta(months=1)
@@ -507,7 +507,7 @@ class postproc_ObsFcstAna:
             'A_mean'  : np.array(A_mean),   'A_stdv'  : np.array(A_stdv),
             'OmF_mean': np.array(OmF_mean), 'OmF_stdv': np.array(OmF_stdv),
             'OmA_mean': np.array(OmA_mean), 'OmA_stdv': np.array(OmA_stdv),
-            'N_data': np.array(N_data),     'date_vec': date_vec
+            'N_data'  : np.array(N_data),   'date_vec': date_vec
             }
 
         return stats

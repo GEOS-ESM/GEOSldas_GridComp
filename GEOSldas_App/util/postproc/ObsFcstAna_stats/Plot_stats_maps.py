@@ -152,7 +152,7 @@ def Main_OmF_maps():
             units = '[k]'
             if i == 0 and j == 0:
                 tile_data = Nobs_data
-                #crange is [cmin, cmax]
+                # crange is [cmin, cmax]
                 crange =[0, np.ceil((end_time-start_time).days/150)*300]
                 colormap = plt.get_cmap('jet',20)
                 title_txt = exptag + ' Tb Nobs '    + start_time.strftime('%Y%m')+'_'+end_time.strftime('%Y%m')
@@ -179,7 +179,7 @@ def Main_OmF_maps():
             grid_data, lat_2d, lon_2d = tile_to_latlongrid(tile_data, tc, my_res)
 
 
-            # compute spatial avg of metric (directly from tile_data)
+            # compute spatial avg of metric (directly from tile_data; no weighting)
             mean    = np.nanmean(       tile_data )
             absmean = np.nanmean(np.abs(tile_data))
             
