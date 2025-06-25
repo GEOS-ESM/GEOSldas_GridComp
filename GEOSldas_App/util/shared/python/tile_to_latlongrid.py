@@ -47,9 +47,10 @@ def tile_to_latlongrid( tile_data, tile_coord, resolution, nodata=1.e15, nodata_
     grid_data = np.zeros((len(lat_grid), len(lon_grid), nf))
     N_tilecnt = np.zeros((len(lat_grid), len(lon_grid), nf))
 
-    for v in range(nf):        
-        for k in range(tile_coord['N_tile']):
-            if ~np.isnan(tile_data[k,:]):
+          
+    for k in range(tile_coord['N_tile']):
+        for v in range(nf):
+            if ~np.isnan(tile_data[k,v]):
                 j = np.searchsorted(lat_grid + resolution/2., tile_coord['com_lat'][k])
                 i = np.searchsorted(lon_grid + resolution/2., tile_coord['com_lon'][k])
                 # grid value takes the mean of all tiles within
