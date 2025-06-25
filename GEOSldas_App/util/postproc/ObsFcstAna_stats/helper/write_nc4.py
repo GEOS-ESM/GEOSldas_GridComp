@@ -9,7 +9,7 @@ import numpy as np
 
 def write_sums_nc4(file_path, N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa_sum, obs_param):
     
-    nc = Dataset(file_path,'w',formate='NETCDF4')
+    nc = Dataset(file_path,'w',format='NETCDF4')
     
     tile    = nc.createDimension('tile',    N_data.shape[0])
     species = nc.createDimension('species', N_data.shape[1])
@@ -46,7 +46,7 @@ def write_sums_nc4(file_path, N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa
 
 def write_stats_nc4(file_path, stats):
 
-    nc = Dataset(file_path,'w',formate='NETCDF4')
+    nc = Dataset(file_path,'w',format='NETCDF4')
     
     tile    = nc.createDimension('tile',    stats['N_data'].shape[0])
     species = nc.createDimension('species', stats['N_data'].shape[1])

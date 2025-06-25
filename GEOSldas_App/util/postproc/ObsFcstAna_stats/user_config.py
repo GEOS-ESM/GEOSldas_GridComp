@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 from datetime               import datetime, timedelta
-from read_GEOSldas          import read_tilecoord, read_obs_param
+from read_GEOSldas          import read_tilecoord, read_tilegrids, read_obs_param
 from postproc_ObsFcstAna    import postproc_ObsFcstAna
 
 def get_config():
@@ -20,7 +20,7 @@ def get_config():
     start_year  = 2015
     start_month =    4
     last_year   = 2016
-    last_month  =    4
+    last_month  =    3
 
     # Sums or stats will be processed for exp_main:
 
@@ -39,7 +39,8 @@ def get_config():
 
     # Optional experiment(s) can be added for cross-masking or extracting obs from a different experiment.
     #
-    # All optional experiments and the main experiment must have identical tilecoords.
+    # All optional experiments and the main experiment must have identical tile space (BCs resolution) and domain.
+    #
     # If the default "species" number/order do not match, set "species_list" accordingly to force a match.
     # Output will be cross-masked between all specified experiments.    
     #
@@ -52,7 +53,6 @@ def get_config():
     exp_sup1 = {
         'expdir'        : '/discover/nobackup/projects/gmao/merra/iau/merra_land/SMAP_runs/SMAP_Nature_v11/',
         'expid'         : 'DAv8_M36',
-        'domain'        : 'SMAP_EASEv2_M36_GLOBAL',
         'use_obs'       : True,                        # if True, use obs data from this exp
         'species_list'  : [1,2,3,4],                   # indices of species to be processed,
                                                        #   must identify same species as selected in main exp
@@ -66,7 +66,7 @@ def get_config():
     
     # Top level directory for all output from this package:
 
-    out_path = '/discover/nobackup/[USERNAME]/SMAP_test/'
+    out_path = '/discover/nobackup/[USERNAME]/'
 
     # Directory for monthly sum files:
     # - Can use the experiment directory or a different path.
@@ -90,11 +90,12 @@ def get_config():
     end_time   = datetime( end_year,   end_month,   1)
 
     # Get tilecoord and obsparam information for each experiment
+
+    domain = exp_list[0]['domain']
     
     for exp in exp_list:
         expdir        = exp['expdir']
         expid         = exp['expid']
-        domain        = exp['domain']
 
         YYYY          = exp['obsparam_time'][0:4]
         MM            = exp['obsparam_time'][4:6]
@@ -114,8 +115,11 @@ def get_config():
         ftc = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilecoord.bin'
         tc  = read_tilecoord(ftc)
 
+        ftg = expdir+expid+'/output/'+ domain+'/rc_out/'+ expid+'.ldas_tilegrids.bin'
+        tg_global, tg_domain  = read_tilegrids(ftg)
+
         # add tilecoord and obsparam into to exp        
-        exp.update({'tilecoord':tc, 'obsparam':obsparam})
+        exp.update({'tilecoord':tc, 'obsparam':obsparam, 'tilegrid_global':tg_global, 'tilegrid_domain':tg_domain})
 
     # verify that obs species match across experiments
     for exp_idx, exp in enumerate(exp_list) :
