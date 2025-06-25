@@ -152,31 +152,32 @@ class postproc_ObsFcstAna:
 
                 data_all.append(data_tile)
 
-            # cross-mask over all experiments 
-            is_cross_valid = ~np.isnan(data_all[0]['obs_obs'])
-            for data in data_all[1:]:
-                mask = ~np.isnan(data['obs_obs'])
-                is_cross_valid = np.logical_and(is_cross_valid,mask)
+            if len(data_all) > 0:
+                # cross-mask over all experiments 
+                is_cross_valid = ~np.isnan(data_all[0]['obs_obs'])
+                for data in data_all[1:]:
+                    mask = ~np.isnan(data['obs_obs'])
+                    is_cross_valid = np.logical_and(is_cross_valid,mask)
 
-            # reconstruct the output variable dictionary based on input options;
-            # obs_obs and obs_obsvar are from exp_list[obs_from], the rest are from exp_list[0]
-            data_tile = {}    
-            for var in var_list:
-                if 'obs_obs' in var:
-                    data_tile[var] = data_all[obs_from][var]
-                else:
-                    data_tile[var] = data_all[0][var]
+                # reconstruct the output variable dictionary based on input options;
+                # obs_obs and obs_obsvar are from exp_list[obs_from], the rest are from exp_list[0]
+                data_tile = {}    
+                for var in var_list:
+                    if 'obs_obs' in var:
+                        data_tile[var] = data_all[obs_from][var]
+                    else:
+                        data_tile[var] = data_all[0][var]
 
-            is_valid = is_cross_valid
-            
-            N_data[ is_valid] += 1
-            oxf_sum[is_valid] += data_tile['obs_obs' ][is_valid] * data_tile['obs_fcst'][is_valid]
-            oxa_sum[is_valid] += data_tile['obs_obs' ][is_valid] * data_tile['obs_ana' ][is_valid]
-            fxa_sum[is_valid] += data_tile['obs_fcst'][is_valid] * data_tile['obs_ana' ][is_valid]
+                is_valid = is_cross_valid
+                
+                N_data[ is_valid] += 1
+                oxf_sum[is_valid] += data_tile['obs_obs' ][is_valid] * data_tile['obs_fcst'][is_valid]
+                oxa_sum[is_valid] += data_tile['obs_obs' ][is_valid] * data_tile['obs_ana' ][is_valid]
+                fxa_sum[is_valid] += data_tile['obs_fcst'][is_valid] * data_tile['obs_ana' ][is_valid]
 
-            for var in var_list:
-                data_sum[ var][is_valid] += data_tile[var][is_valid]
-                data2_sum[var][is_valid] += data_tile[var][is_valid] **2
+                for var in var_list:
+                    data_sum[ var][is_valid] += data_tile[var][is_valid]
+                    data2_sum[var][is_valid] += data_tile[var][is_valid] **2
             
             date_time = date_time + timedelta(seconds=da_dt)
 
