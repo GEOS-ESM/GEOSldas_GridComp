@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+<<<<<<< feature/rreichle/CHANGELOG_for_v3.1.0
+=======
+- Fixed ncra path for monthly compression
+- Fixed error from MAPL's ApplicationSupport.F90 to init UDUNITS.
+
+>>>>>>> develop
 ### Removed
 
 ### Deprecated
