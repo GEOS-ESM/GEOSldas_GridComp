@@ -457,14 +457,16 @@ class postproc_ObsFcstAna:
 
             # Aggregate data of all tiles
             N_data_mo  = np.nansum(mN_data, axis=0)
-            OxF_mean   = np.nansum(moxf_sum,axis=0)/N_data_mo
-            OxA_mean   = np.nansum(moxa_sum,axis=0)/N_data_mo
+            with np.errstate(divide='ignore', invalid='ignore'):
+                OxF_mean   = np.nansum(moxf_sum, axis=0) / np.where(N_data_mo > 0, N_data_mo, np.nan)
+                OxA_mean   = np.nansum(moxa_sum, axis=0) / np.where(N_data_mo > 0, N_data_mo, np.nan)
             data_mean  = {}
             data2_mean = {}
             data_var   = {}
             for var in var_list:
-                data_mean[ var] = np.nansum(mdata_sum[var ],axis=0)/N_data_mo
-                data2_mean[var] = np.nansum(mdata2_sum[var],axis=0)/N_data_mo
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    data_mean[ var]  = np.nansum(mdata_sum[var ], axis=0) / np.where(N_data_mo > 0, N_data_mo, np.nan)
+                    data2_mean[var]  = np.nansum(mdata2_sum[var], axis=0) / np.where(N_data_mo > 0, N_data_mo, np.nan)
                 # var(x) = E[x2] - (E[x])^2
                 data_var[var] = data2_mean[var] - data_mean[var]**2
 
