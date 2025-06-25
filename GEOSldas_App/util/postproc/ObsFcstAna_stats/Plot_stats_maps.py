@@ -136,7 +136,7 @@ def Main_OmF_maps():
 
     # If obs_fov=0, reset to match model resolution.
     if obs_fov == 0:
-        my_res = np.sqrt( tile_grid['dlat']*tile_grid['dlon'] )
+        my_res = np.sqrt( tg['dlat']*tg['dlon'] )
 
     # pick a resolution from a sample vector of resolutions
 

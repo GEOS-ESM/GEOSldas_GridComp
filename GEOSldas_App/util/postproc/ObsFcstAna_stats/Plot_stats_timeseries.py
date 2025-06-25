@@ -56,7 +56,7 @@ def Main_OmF_timeseries():
         
         if stats_file is not None:
             with open(stats_file,'wb') as file:
-                print(f'saveing stats to {stats_file}')
+                print(f'saving stats to {stats_file}')
                 pickle.dump(stats,file)
 
     date_vec = stats['date_vec']
