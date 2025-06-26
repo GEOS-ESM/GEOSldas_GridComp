@@ -249,7 +249,7 @@ class LDASsetup:
         else :
             self.ensdirs_avg = self.ensdirs + ['ens_avg']
 
-        self.calculateJobSegments()
+        self._calculateJobSegments()
 
         # assemble bcs sub-directories 
         self.bcs_dir_land       = self.ExeInputs['BCS_PATH']+ '/land/'       + self.ExeInputs['BCS_RESOLUTION']+'/'
@@ -595,7 +595,7 @@ class LDASsetup:
     # ---------------------
     # calculate JobSegments
     # ---------------------
-    def calculateJobSegments(self):
+    def _calculateJobSegments(self):
         ## convert date-time strings to datetime object
         ## start/end_time are converted to lists
         ## ensure end>start
