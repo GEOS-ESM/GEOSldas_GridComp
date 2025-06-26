@@ -647,7 +647,7 @@ EOF
           if($NAVAIL != $NDAYS) continue
 
           # create monthly-mean nc4 file
-          ncra -h $EXPID.$ThisCol.${{YYYY}}${{MM}}*.nc4 ${{EXPID}}.${{ThisCol}}.monthly.$YYYY$MM.nc4
+          $BASEBIN/ncra -h $EXPID.$ThisCol.${{YYYY}}${{MM}}*.nc4 ${{EXPID}}.${{ThisCol}}.monthly.$YYYY$MM.nc4
 
           if($POSTPROC_HIST == 2) then
              # rudimentary check for desired nc4 file;  if ok, delete daily files

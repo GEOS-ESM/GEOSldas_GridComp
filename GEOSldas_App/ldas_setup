@@ -1144,12 +1144,18 @@ class LDASsetup:
                     shutil.copy2(histrc_file,tmprcfile)
                 else :
                     shutil.copy2(histrc_file,tmprcfile)
-                    GRID='EASE ' + self.ExeInputs['GRIDNAME'] + ' ' +tmprcfile
-                    if '-CF' in self.ExeInputs['GRIDNAME'] :
-                        GRID ='CUBE ' + self.ExeInputs['GRIDNAME'] + ' ' +tmprcfile
-                    _assim = '1' if self.assim else '0'
-                    cmd =self.bindir +'/process_hist.csh '+ str(self.ExeInputs['LSM_CHOICE']) + ' ' + str(self.ExeInputs['AEROSOL_DEPOSITION']) + \
-                          ' ' + GRID + ' ' + str(self.ExeInputs['RUN_IRRIG']) + ' ' + _assim + ' '+ str(self.nens)
+                    if 'EASE' in self.rqdExeInp['GRIDNAME'] :
+                        TMPSTR='OUT1d'
+                    else :
+                        TMPSTR='OUT2d'
+                    cmd = self.bindir +'/process_hist.csh'          + ' ' \
+                        + tmprcfile                                 + ' ' \
+                        + TMPSTR                                    + ' ' \
+                        + self.rqdExeInp['GRIDNAME']                + ' ' \
+                        + str(self.rqdExeInp['LSM_CHOICE'])         + ' ' \
+                        + str(self.rqdExeInp['AEROSOL_DEPOSITION']) + ' ' \
+                        + str(self.rqdExeInp['RUN_IRRIG'])          + ' ' \
+                        + str(self.nens)
                     print(cmd)
                     #os.system(cmd)
                     sp.call(shlex.split(cmd))

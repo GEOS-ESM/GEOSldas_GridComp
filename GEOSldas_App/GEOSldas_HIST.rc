@@ -1,24 +1,23 @@
 # Sample HISTORY.rc file for GEOSldas
 #
 # This HISTORY template is edited by "ldas_setup" via "process_hist.csh".  
-# The strings '#ASSIM', '#EASE', and '#CUBE' are *not* linked to MAPL HISTORY 
-# functionality.  For example, the line 
-#    "#CUBE            'tavg24_2d_lnd_Nx'"
-#  does *not* mean that the 'lnd' output will be on a cube-sphere grid. 
 
-#CUBE VERSION: 1
+VERSION: 1
 
-# Must edit 'EXPID' manually if HISTORY file is re-used without going  
-#  through "ldas_setup".
-#
+# Must edit 'EXPID' manually if HISTORY file is re-used without going through "ldas_setup".
+
 EXPID:  GEOSldas_expid
 
+# ------------------------------------------------------------------------------------------------
+
+# pre-defined Collections
+
 COLLECTIONS:
-#EASE            'tavg24_1d_lfs_Nt'
-#CUBE            'tavg24_2d_lfs_Nx'	
-#EASE            'tavg24_1d_lnd_Nt'	
-#CUBE            'tavg24_2d_lnd_Nx'
-#ASSIM           'SMAP_L4_SM_gph'
+#OUT1d           'tavg24_1d_lfs_Nt'
+#OUT2d           'tavg24_2d_lfs_Nx'
+#OUT1d           'tavg24_1d_lnd_Nt'
+#OUT2d           'tavg24_2d_lnd_Nx'
+#                'SMAP_L4_SM_gph'
 #                'inst1_1d_lnr_Nt'
 #                'catch_progn_incr'
 #                'inst3_1d_lndfcstana_Nt'
@@ -29,24 +28,34 @@ COLLECTIONS:
 #                'tavg24_1d_glc_Nt'
            ::
 
-#CUBE GRID_LABELS: PC720x361-DC
-#CUBE              PC1440x721-DC
+# --------------------------------------------------------------------------------------------------
 
-#CUBE      ::
+# 2d output can be on the following grids (see [COLLECTION_NAME].grid_label])
 
-#CUBE PC720x361-DC.GRID_TYPE: LatLon
-#CUBE PC720x361-DC.IM_WORLD: 720
-#CUBE PC720x361-DC.JM_WORLD: 361
-#CUBE PC720x361-DC.POLE: PC
-#CUBE PC720x361-DC.DATELINE: DC
-#CUBE PC720x361-DC.LM: 1
+GRID_LABELS: PC720x361-DC
+             PC1440x721-DC
+             EASEv2_M36
+      ::
 
-#CUBE PC1440x721-DC.GRID_TYPE: LatLon
-#CUBE PC1440x721-DC.IM_WORLD: 1440
-#CUBE PC1440x721-DC.JM_WORLD: 721
-#CUBE PC1440x721-DC.POLE: PC
-#CUBE PC1440x721-DC.DATELINE: DC
-#CUBE PC1440x721-DC.LM: 1
+PC720x361-DC.GRID_TYPE:  LatLon
+PC720x361-DC.IM_WORLD:   720
+PC720x361-DC.JM_WORLD:   361
+PC720x361-DC.POLE:       PC
+PC720x361-DC.DATELINE:   DC
+PC720x361-DC.LM:         1
+
+PC1440x721-DC.GRID_TYPE: LatLon
+PC1440x721-DC.IM_WORLD:  1440
+PC1440x721-DC.JM_WORLD:   721
+PC1440x721-DC.POLE:      PC
+PC1440x721-DC.DATELINE:  DC
+PC1440x721-DC.LM:        1
+
+EASEv2_M36.GRID_TYPE:    EASE
+EASEv2_M36.GRIDNAME:     EASEv2_M36
+EASEv2_M36.LM:           1
+
+# --------------------------------------------------------------------------------------------------
 
 # Detailed definition of the collections listed above 
 #
@@ -219,15 +228,16 @@ COLLECTIONS:
 
   tavg24_2d_lnd_Nx.format:        'CFIO',
   tavg24_2d_lnd_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
-  tavg24_2d_lnd_Nx.nbits:        12,
+  tavg24_2d_lnd_Nx.nbits:         12,
   tavg24_2d_lnd_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4',
   tavg24_2d_lnd_Nx.mode:          'time-averaged',
   tavg24_2d_lnd_Nx.frequency:     240000,
   tavg24_2d_lnd_Nx.ref_time:      000000,
-  tavg24_2d_lnd_Nx.regrid_exch:   '../input/tile.data'
-  tavg24_2d_lnd_Nx.regrid_name:   'GRIDNAME'
+  tavg24_2d_lnd_Nx.regrid_exch:   '../input/tile.data',
+  tavg24_2d_lnd_Nx.regrid_name:   'GRIDNAME',
 #  tavg24_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,                           
-  tavg24_2d_lnd_Nx.grid_label:    PC720x361-DC
+  tavg24_2d_lnd_Nx.grid_label:    PC720x361-DC,
+#  tavg24_2d_lnd_Nx.grid_label:   EASEv2_M36,
   tavg24_2d_lnd_Nx.deflate:       2,
   tavg24_2d_lnd_Nx.fields:     'GRN'        , 'VEGDYN'  ,
                                'LAI'        , 'VEGDYN'  ,
