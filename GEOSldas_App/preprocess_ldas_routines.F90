@@ -1773,10 +1773,24 @@ contains
              call var_iter%next()
              cycle
           endif
+
+          if (trim(vname) =='CROPCLASSNAME') then
+             call var_iter%next()
+             cycle
+          endif
           
           if (ndims == 1) then
+             
              call MAPL_VarRead (InFmt,vname,tmp1)
+
+             ! set irrigation variables to zero (i.e., no remapping)  [????? reichle, 13 Jun 2025]
+             if (trim(vname) == 'SPRINKLERRATE') tmp1 = 0.
+             if (trim(vname) == 'DRIPRATE'     ) tmp1 = 0.
+             if (trim(vname) == 'FURROWRATE'   ) tmp1 = 0.
+             if (trim(vname) == 'FLOODRATE'    ) tmp1 = 0.
+                
              call MAPL_VarWrite(OutFmt,vname,tmp1(f2r_))
+
           else if (ndims == 2) then
              
              dname => var%get_ith_dimension(2)

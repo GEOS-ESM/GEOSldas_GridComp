@@ -155,6 +155,7 @@ EASEv2_M36.LM:           1
                                'TP6'        , 'GridComp'  , 'TSOIL6'       ,         # ...                                   
                                'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     # assume "corrected" precip
                                'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     # assume "corrected" precip
+>>>HIST_IRRIG<<<               'IRRLAND'    , 'GridComp'  ,
                                'TSLAND'     , 'GridComp'  , 'SNOMASLAND'   ,
                                'SNOWDP'     , 'GridComp'  , 'SNODPLAND'    ,
                                'EVPSOI'     , 'GridComp'  , 'LHLANDSOIL'   ,
@@ -223,7 +224,10 @@ EASEv2_M36.LM:           1
 >>>HIST_CATCHCN<<<        'WAT10CM'  , 'GridComp'  ,
 >>>HIST_CATCHCN<<<        'WATSOI'   , 'GridComp'  ,
 >>>HIST_CATCHCN<<<        'ICESOI'   , 'GridComp'  ,
->>>HIST_IRRIG<<<        'IRRIGRATE'  , 'GridComp'  ,
+>>>HIST_IRRIG<<<          'SPRINKLERRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'FURROWRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'FLOODRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'DRIPRATE'  , 'IRRIGATION'  ,
                                ::
 
   tavg24_2d_lnd_Nx.format:        'CFIO',
@@ -261,6 +265,7 @@ EASEv2_M36.LM:           1
                                'TP6'        , 'GridComp'  , 'TSOIL6'       ,         # ...                                   
                                'PRLAND'     , 'GridComp'  , 'PRECTOTCORRLAND'  ,     # assume "corrected" precip
                                'SNOLAND'    , 'GridComp'  , 'PRECSNOCORRLAND'  ,     # assume "corrected" precip
+>>>HIST_IRRIG<<<    	       'IRRLAND'    , 'GridComp'  ,                           
                                'TSLAND'     , 'GridComp'  , 'SNOMASLAND'   ,
                                'SNOWDP'     , 'GridComp'  , 'SNODPLAND'    ,
                                'EVPSOI'     , 'GridComp'  , 'LHLANDSOIL'   ,
@@ -329,7 +334,10 @@ EASEv2_M36.LM:           1
 >>>HIST_CATCHCN<<<        'WAT10CM'  , 'GridComp'  ,
 >>>HIST_CATCHCN<<<        'WATSOI'   , 'GridComp'  ,
 >>>HIST_CATCHCN<<<        'ICESOI'   , 'GridComp'  ,
->>>HIST_IRRIG<<<        'IRRIGRATE'  , 'GridComp'  ,
+>>>HIST_IRRIG<<<          'SPRINKLERRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'FURROWRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'FLOODRATE'  , 'IRRIGATION'  ,
+>>>HIST_IRRIG<<<          'DRIPRATE'  , 'IRRIGATION'  ,
                                ::
 
 

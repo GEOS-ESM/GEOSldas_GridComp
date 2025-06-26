@@ -390,7 +390,12 @@ contains
     case ('RMELTBC002');                       LONG_NAME = 'flushed_out_black_carbon_mass_flux_from_the_bottom_layer_bin_2';   UNITS = 'kg m-2 s-1'
     case ('RMELTOC001');                       LONG_NAME = 'flushed_out_organic_carbon_mass_flux_from_the_bottom_layer_bin_1'; UNITS = 'kg m-2 s-1'
     case ('RMELTOC002');                       LONG_NAME = 'flushed_out_organic_carbon_mass_flux_from_the_bottom_layer_bin_2'; UNITS = 'kg m-2 s-1'
- 
+    case ('SPRINKLERRATE');                    LONG_NAME = 'sprinkler_irrigation_rate';                                        UNITS = 'kg m-2 s-1'
+    case ('DRIPRATE');                         LONG_NAME = 'drip_irrigation_rate';                                             UNITS = 'kg m-2 s-1'
+    case ('FURROWRATE');                       LONG_NAME = 'furrow_irrigation_rate';                                           UNITS = 'kg m-2 s-1'
+    case ('FLOODRATE');                        LONG_NAME = 'flood_irrigation_rate';                                            UNITS = 'kg m-2 s-1'
+    case ('IRRLAND');                          LONG_NAME = 'Total_irrigation_land';                                            UNITS = 'kg m-2 s-1'
+
     ! land constants
 
     case ('CDCR2');                            LONG_NAME = 'maximum soil water content above wilting point';                   UNITS = 'kg m-2'
@@ -462,10 +467,10 @@ contains
     case ('PRMC_ANA_ENSSTD');                  LONG_NAME = 'soil_moisture_profile_analysis_ensstd';                            UNITS = 'm3 m-3'
     case ('TSURF_ANA_ENSSTD');                 LONG_NAME = 'surface_temperature_of_land_incl_snow_ensstd';                     UNITS = 'K'
     case ('TSOIL1_ANA_ENSSTD');                LONG_NAME = 'soil_temperature_layer_1_analysis_ensstd';                         UNITS = 'K'
-                                                                                                                               
+            
     ! other land assimilation fields                                                                                           
                                                                                                                                
-    case ('MWRTM_VEGOPACITY');                 LONG_NAME = 'Lband_microwave_vegopacity_normalized_with_cos_inc_angle';         UNITS = '1'       
+    case ('MWRTM_VEGOPACITY');                 LONG_NAME = 'Lband_microwave_vegopacity_normalized_with_cos_inc_angle';         UNITS = '1'      
        
     ! land ice fields 
 

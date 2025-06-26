@@ -41,6 +41,8 @@ program main
   character(len=512) :: new_BC
   character(len=512) :: orig_Veg
   character(len=512) :: new_veg
+  character(len=512) :: orig_irr
+  character(len=512) :: new_irr
   character(len=512) :: orig_ease
   character(len=512) :: new_ease
   character(len=512) :: f2g_file
@@ -100,7 +102,15 @@ program main
      new_veg  = arg2
      f2g_file = arg3
 
-     call  createZoominVegRestart(f2g_file, orig_veg, new_veg)      
+     call createZoominVegRestart(f2g_file, orig_veg, new_veg)      
+
+  else if (trim(option) == "zoomin_irrrst") then
+
+     orig_irr = arg1
+     new_irr  = arg2
+     f2g_file = arg3
+
+     call createZoominRestart(f2g_file, orig_irr, new_irr, 100)      
 
   else if (trim(option) == "zoomin_mwrtmrst") then
 
@@ -108,7 +118,7 @@ program main
      new_rtm  = arg2
      f2g_file = arg3
 
-     call  createZoominRestart(f2g_file, orig_rtm, new_rtm, 100)      
+     call createZoominRestart(f2g_file, orig_rtm, new_rtm, 100)      
 
   else if (trim(option) == "zoomin_catchrst") then
 
