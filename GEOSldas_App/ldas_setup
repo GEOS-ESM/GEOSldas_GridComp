@@ -218,7 +218,11 @@ class LDASsetup:
         # print rqd exe inputs 
         if self.verbose:       
             print ('\nInputs from exeinp file:\n')
-            _printdict(self.ExeInputs)
+            printDictionary(self.ExeInputs)
+
+        _mydir = self.exphome + '/' + self.ExeInputs['EXP_ID']
+        assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
+        _mydir = None
 
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
@@ -229,9 +233,6 @@ class LDASsetup:
         # nens is an integer and =1 for model run
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
         assert self.nens>0, 'NUM_LDAS_ENSEMBLE [%d] <= 0' % self.nens
-        _mydir = self.exphome + '/' + self.ExeInputs['EXP_ID']
-        assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
-        _mydir = None
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
         
         self.perturb = int(self.ExeInputs.get('PERTURBATIONS',0))
@@ -249,6 +250,7 @@ class LDASsetup:
             self.ensdirs_avg = self.ensdirs + ['ens_avg']
 
         self.calculateJobSegments()
+
         # assemble bcs sub-directories 
         self.bcs_dir_land       = self.ExeInputs['BCS_PATH']+ '/land/'       + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_geom       = self.ExeInputs['BCS_PATH']+ '/geometry/'   + self.ExeInputs['BCS_RESOLUTION']+'/'
@@ -481,9 +483,9 @@ class LDASsetup:
         # print rm inputs
         if self.verbose:
             print ('\n\nRequired inputs for resource manager:')
-            _printdict(self.RmInputs)
+            printDictionary(self.RmInputs)
             print ('\n\nOptional inputs for resource manager:')
-            _printdict(self.RmInputs)
+            printDictionary(self.RmInputs)
             print ('\n\n')
             
         # ------
@@ -1491,222 +1493,6 @@ class LDASsetup:
         status = True
         return status
 
-# -----------------------------------------------------------------------------------
-           
-def _printdict(d):
-    """
-    Private method: print a 'flat' dictionary
-    """
-
-    for key, val in d.items():
-        print (key.ljust(23), ':', val)
-
-# -----------------------------------------------------------------------------------
-    
-def _produceExeInput(out_dict=None,ladas_cpl=0):
-    """
-    Private method: (1) Print sample exeinp file to stdout for offline GEOSldas setup:
-                        _produceExeInput().
-                    *or* 
-                    (2) Create dictionary w/ default parameters from GEOSldas_LDAS.rc and 
-                        GEOS_SurfaceGridComp.rc for coupled land-atm DAS setup:
-                        _produceExeInput(out_dict, ladas_cpl=[1,2]).
-    """
-    
-    if ladas_cpl > 0:
-      assert out_dict is not None , " Need out_dict to hold the default parameters"
-
-    # stand-alone (offline) LDAS:
-    #   sample exeinp file includes placeholders for inputs that the user needs to provide
-    if ladas_cpl == 0:
-       print ('####################################################################################')
-       print ('#                                                                                  #')
-       print ('#                             REQUIRED INPUTS                                      #')
-       print ('#                                                                                  #')
-       print ('#             These inputs are needed to set up output dir structure.              #')
-       print ('#                                                                                  #')
-       print ('####################################################################################')
-       print ()        
-       print ('############################################################')
-       print ('#                                                          #')
-       print ('#                 EXPERIMENT INFO                          #')
-       print ('#                                                          #')
-       print ('# Format for start/end times is yyyymmdd hhmmss.           #')
-       print ('#                                                          #')
-       print ('############################################################')
-       print ()
-       print ('EXP_ID:')
-       print ('EXP_DOMAIN:')
-       print ('NUM_LDAS_ENSEMBLE:')
-       print ('BEG_DATE:')
-       print ('END_DATE:')
-       print ()
-       print ('############################################################')
-       print ('#                                                          #')
-       print ('#                 RESTART INFO                             #')
-       print ('#                                                          #')
-       print ('# (i) Select "RESTART" option:                             #')
-       print ('#                                                          #')
-       print ('# Use one of the following options if you *have* a         #')
-       print ('#   GEOSldas restart file:                                 #')
-       print ('#                                                          #')
-       print ('# RESTART: 1                                               #')
-       print ('#   YES, have restart file from GEOSldas                   #')
-       print ('#        in SAME tile space (grid) with SAME boundary      #')
-       print ('#        conditions and SAME snow model parameter (WEMIN). #')
-       print ('#        The restart domain can be for the same or         #')
-       print ('#        a larger one.                                     #')
-       print ('#                                                          #')
-       print ('# RESTART: 2                                               #')
-       print ('#   YES, have restart file from GEOSldas but               #')
-       print ('#        in a DIFFERENT tile space (grid) or with          #')
-       print ('#        DIFFERENT boundary conditions or DIFFERENT snow   #')
-       print ('#        model parameter (WEMIN).                          #')
-       print ('#        Restart *must* be for the GLOBAL domain.          #')
-       print ('#                                                          #')
-       print ('# Use one of the following options if you DO NOT have a    #')
-       print ('#   GEOSldas restart file                                  #')
-       print ('#   (works for global domain ONLY!):                       #')
-       print ('#                                                          #')
-       print ('# RESTART: 0                                               #')
-       print ('#   Cold start from some old restart for Jan 1, 0z.        #')
-       print ('#                                                          #')
-       print ('# RESTART: M                                               #')
-       print ('#   Re-tile from archived MERRA-2 restart file.            #')
-       print ('#                                                          #')
-       print ('# -------------------------------------------------------- #')
-       print ('# IMPORTANT:                                               #')
-       print ('#   Except for RESTART=1, SPIN-UP is REQUIRED in almost    #')
-       print ('#   all cases.                                             #')
-       print ('# -------------------------------------------------------- #')
-       print ('#                                                          #')
-       print ('#                                                          #')
-       print ('# (ii) Specify experiment ID/location of restart file:     #')
-       print ('#                                                          #')
-       print ('# For RESTART=1 or RESTART=2:                              #')
-       print ('#   Specify RESTART_ID, RESTART_PATH, RESTART_DOMAIN with  #')
-       print ('#   restarts stored as follows:                            #')
-       print ('#     RESTART_PATH/RESTART_ID/output/RESTART_DOMAIN/rs/    #')
-       print ('#                                                          #')
-       print ('# For RESTART=0 or RESTART=M:                              #')
-       print ('#   There is no need to specify RESTART_ID, RESTART_PATH,  #')
-       print ('#   and RESTART_DOMAIN.                                    #')
-       print ('#                                                          #')
-       print ('############################################################')
-       print ()
-       print ('RESTART:')
-       print ('#RESTART_ID:')
-       print ('#RESTART_PATH:')
-       print ('#RESTART_DOMAIN:')
-       print ()
-       print ('############################################################')
-       print ('#                                                          #')
-       print ('#         SURFACE METEOROLOGICAL FORCING                   #')
-       print ('#                                                          #')
-       print ('#  Surface meteorological forcing time step is in seconds. #')
-       print ('#                                                          #')
-       print ('#  NOTE:                                                   #')
-       print ('#    When forcing is on cube-sphere (CS) grid, must use:   #')
-       print ('#    - Model tile space (BCS) derived from same CS grid.   #')
-       print ('#    - Nearest-neighbor interpolation (MET_HINTERP: 0).    #')    
-       print ('#                                                          #')
-       print ('#  For more information, see:                              #')
-       print ('#    GEOSldas/doc/README.MetForcing_and_BCS.md             #')
-       print ('#                                                          #')
-       print ('############################################################')
-       print ()
-       print ('MET_TAG:')
-       print ('MET_PATH:')
-       print ('FORCE_DTSTEP:')
-       print ()
-       print ('############################################################')
-       print ('#                                                          #')
-       print ('#          LAND BOUNDARY CONDITIONS (BCS)                  #')
-       print ('#                                                          #')
-       print ('#  Path to and (atmospheric) resolution of BCS.            #')
-       print ('#    Path includes BCS_VERSION.                            #')    
-       print ('#                                                          #')
-       print ('#  For more information, see:                              #')
-       print ('#    GEOSldas/doc/README.MetForcing_and_BCS.md             #')
-       print ('#    [..]/GEOSsurface_GridComp/Utils/Raster/make_bcs       #')
-       print ('#                                                          #')
-       print ('############################################################')
-       print ()
-       print ('BCS_PATH:')
-       print ('BCS_RESOLUTION:')
-       print ()
-       print ('############################################################')
-
-       # end if ladas_cpl==0
-       
-    # add defaults from rc template files
-       
-    current_directory = os.path.dirname(__file__)    # path where ldas_setup is
-
-    # rc template files are in [current_directory]/../etc/
-
-    # add defaults from GEOSldas_LDAS.rc
-    
-    _fn = current_directory+'/../etc/GEOSldas_LDAS.rc'      
-    lines = []
-    with open(_fn) as _f:
-       i_ = 1
-       for line in _f:
-          if ( i_ < 5 or i_ >10):            # ignore lines 5-10 - may need to change if GEOSldas_LDAS.rc is edited
-             if ladas_cpl == 0:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-             else:
-                lines.append(line)
-          i_ += 1
-    print ()
-    print ()
-
-    # add land model parameter defaults from GEOS_SurfaceGridComp.rc
-
-    _fn = current_directory+'/../etc/GEOS_SurfaceGridComp.rc'  
-
-    if ladas_cpl == 0 :
-        use_rc_defaults = 'GEOSldas=>'       # use defaults for LDAS
-    else :
-        use_rc_defaults = 'GEOSagcm=>'       # use defaults for AGCM
-        
-    with open(_fn) as _f :
-        i_ = 1
-        for line in _f:
-            i_ +=1
-            # skip over lines 5-21 (content does not apply after this processing) - may need to change if GEOS_SurfaceGridComp.rc is edited
-            if ( 5<=i_ and i_<=21 ) :        
-                continue
-            if ladas_cpl == 0:
-                # process lines that contain string "use_rc_defaults"
-                if use_rc_defaults in line:                            
-                    line0 = line.split(use_rc_defaults)[1]
-                    sys.stdout.write(line0)
-                    sys.stdout.flush()
-                # echo blank lines and comment lines (except if they contain 'GEOSldas=>' or 'GEOSagcm=>')
-                if (not 'GEOSldas=>' in line) and (not 'GEOSagcm=>' in line) :  
-                    if (not line.strip()) or line.strip().startswith('#') :   
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-            else:
-                # process lines that contain string "use_rc_defaults"
-                if use_rc_defaults in line:                            
-                    line0 = line.split(use_rc_defaults)[1]
-                    # strip out inline comment (if present)
-                    position = line0.find('#')
-                    if position>0:  
-                        line0 = line0[:position]
-                    # extract key/value pair and add to dictionary
-                    key, val = line0.split(":",1)
-                    out_dict[key.strip()] = val.strip()
-
-
-    print ()
-    print ()
-
-# -----------------------------------------------------------------------------------
-                   
 def parseCmdLine():
     """
     parse command line arguments and return a dict of options
@@ -1874,7 +1660,6 @@ if __name__=='__main__':
     ld = LDASsetup(args)
 
     # step 1
-    ld.calculateJobSegments()
     # step 2
     # step 3
 

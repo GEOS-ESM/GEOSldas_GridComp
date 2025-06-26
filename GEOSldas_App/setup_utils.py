@@ -308,6 +308,14 @@ def printInputSampleFile(cmdLineArgs):
    else:
       raise Exception('unrecognized sample option')
 
+def printDictionary(d):
+    """     
+    Private method: print a 'flat' dictionary
+    """     
+            
+    for key, val in d.items():
+        print (key.ljust(24), ':', val)
+
 if __name__=='__main__':
     inpfile = '/gpfsm/dnb34/wjiang/develop_ldas/GEOSldas_nc4/install-SLES15/etc/GEOS_SurfaceGridComp.rc'
     inpdict = parseInputFile(inpfile)
