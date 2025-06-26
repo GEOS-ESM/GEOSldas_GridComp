@@ -20,6 +20,7 @@ ecbuild_add_executable (
    LIBS GEOSlandassim_GridComp)
    
 set (scripts
+   setup_utils.py
    process_hist.csh 
    ens_forcing/average_ensemble_forcing.py 
    ens_forcing/ensemble_forc.py 
