@@ -291,6 +291,23 @@ def printResourceInputSampleFile():
    for key in optionalKeys:
        print ('#'+key + ':')
 
+def printInputSampleFile(cmdLineArgs):
+   '''
+     ./ldas_setup sample ...
+    
+     "sample" sub-command:
+       '--exeinp' and '--batinp' are mutually exclusive command line arguments.
+       Specifying one will set it to True and set the other one to False.
+       That is, we can have either: {'exeinp': False, 'batinp': True }
+                                or: {'exeinp': True,  'batinp': False} 
+   '''
+   if cmdLineArgs['exeinp']:
+      printExeInputSampleFile()
+   elif cmdLineArgs['batinp']:
+      printResourceInputSampleFile()
+   else:
+      raise Exception('unrecognized sample option')
+
 if __name__=='__main__':
     inpfile = '/gpfsm/dnb34/wjiang/develop_ldas/GEOSldas_nc4/install-SLES15/etc/GEOS_SurfaceGridComp.rc'
     inpdict = parseInputFile(inpfile)

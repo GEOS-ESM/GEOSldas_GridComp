@@ -1857,23 +1857,6 @@ def hours_to_hhmmss(hours):
     # Format as HHMMSS
     return f"{hours:02d}{minutes:02d}{seconds:02d}"
 
-def printInputfileSample(cmdLineArgs):
-   '''
-     ./ldas_setup sample ...
-    
-     "sample" sub-command:
-       '--exeinp' and '--batinp' are mutually exclusive command line arguments.
-       Specifying one will set it to True and set the other one to False.
-       That is, we can have either: {'exeinp': False, 'batinp': True }
-                                or: {'exeinp': True,  'batinp': False} 
-   '''
-   if cmdLineArgs['exeinp']:
-      printExeInputSampleFile() 
-   elif cmdLineArgs['batinp']:
-      printResourceInputSampleFile()
-   else:
-      raise Exception('unrecognized sample option')
-
 if __name__=='__main__':
 
     resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
@@ -1883,7 +1866,7 @@ if __name__=='__main__':
     #./ldas_setup sample sub-command
     # print input sample file then exit 
     if 'exeinp' in args:
-      printInputfileSample(args)
+      printInputSampleFile(args)
       sys.exit(0)
 
     # start ./ldas_setup setup sub-command
