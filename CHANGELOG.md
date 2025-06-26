@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added ntasks-per-node 
+
 ### Changed
+
+- Cleaned up ldas_setup, moved some functions to setup_utils.py
 
 ### Fixed
 
