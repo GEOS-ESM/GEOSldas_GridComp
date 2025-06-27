@@ -1,55 +1,73 @@
 #!/bin/csh -f
 
-## I am changed the CUBE/EASE logic
-## if CUBE we produce 2D
-## anything else, SMAP and other offline grids we produce tile space
+# process GEOSldas_HIST.rc (=$HISTRC) template
+#
+# - turn on/off HIST collections depending on tile space
+#   - EASE:      turn on tile-space (1d) output
+#   - otherwise: turn on gridded    (2d) output
+# - turn on/off output variables depending on LSM_CHOICE, AEROSOL_DEPOSITION, and RUN_IRRIG
+# - fill in source 'GridComp' info for variables depending on NENS
 
-setenv    LSM_CHOICE $1
-setenv    AEROSOL_DEPOSITION $2
-setenv    GRID $3
-setenv    GRIDNAME $4
-setenv    HISTRC $5
-setenv    RUN_IRRIG $6
-setenv    ASSIM  $7
-setenv    NENS $8
+# process command line args
+
+setenv HISTRC             $1         # file name of HIST rc template (GEOSldas_HIST.rc)
+setenv OUTxd              $2         # "OUT1d" or "OUT2d" (to turn on/off collections)
+setenv GRIDNAME         "'$3'"       # full name of grid associated with tile space
+setenv LSM_CHOICE         $4
+setenv AEROSOL_DEPOSITION $5
+setenv RUN_IRRIG          $6
+setenv NENS               $7
+
+# -------------------------------------------------
 
 echo $GRIDNAME
 
-if($ASSIM == 1) then
-   sed -i 's|\#ASSIM|''|g' $HISTRC
-   sed -i '/^\#EASE/d' $HISTRC
-   sed -i '/^\#CUBE/d' $HISTRC
+# uncomment 2d or 1d collections, depending on "OUT1d" (EASE tile space) or "OUT2d" (non-EASE tile space)
+
+if($OUTxd == OUT1d) then
+   sed -i 's|\#OUT1d|''|g' $HISTRC
 else
-   sed -i '/^\#ASSIM/d' $HISTRC
+   sed -i 's|\#OUT2d|''|g' $HISTRC
 endif
 
-if($GRID == CUBE) then
-   sed -i '/^\#EASE/d' $HISTRC
-   sed -i 's|\#CUBE|''|g' $HISTRC
-   sed -i 's|GRIDNAME|'"$GRIDNAME"'|g' $HISTRC
-else
-   sed -i '/^\#CUBE/d' $HISTRC
-   sed -i 's|\#EASE|''|g' $HISTRC
-   sed -i 's|GRIDNAME|'"$GRIDNAME"'|g' $HISTRC
-endif
+# fill in name of grid associated with tile space
+
+sed -i -e  s/\'GRIDNAME\'/$GRIDNAME/g $HISTRC
+
+# set 'GridComp' based on LSM_CHOICE;
+# turn on/off variables associated with CATCHCN, AEROSOL_DEPOSITION, RUN_IRRIG
 
 if($LSM_CHOICE == 1) then
    set GridComp = CATCH
-   sed -i '/^>>>HIST_CATCHCN<<</d' $HISTRC
-   sed -i '/^>>>HIST_CATCHCNCLM45<<</d' $HISTRC
+   sed -i '/^>>>HIST_CATCHCN<<</d'         $HISTRC
+   sed -i '/^>>>HIST_CATCHCNCLM45<<</d'    $HISTRC
 endif
 
 if($LSM_CHOICE == 2) then
    set GridComp = CATCHCN
-   sed -i '/^>>>HIST_CATCHCNCLM45<<</d' $HISTRC
-   sed -i 's/>>>HIST_CATCHCN<<</''/g' $HISTRC
+   sed -i '/^>>>HIST_CATCHCNCLM45<<</d'    $HISTRC
+   sed -i 's/>>>HIST_CATCHCN<<</''/g'      $HISTRC
 endif
 
 if($LSM_CHOICE >= 3) then
    set GridComp = CATCHCN
-   sed -i 's/>>>HIST_CATCHCN<<</''/g' $HISTRC
+   sed -i 's/>>>HIST_CATCHCN<<</''/g'      $HISTRC
    sed -i 's/>>>HIST_CATCHCNCLM45<<</''/g' $HISTRC
 endif
+
+if($AEROSOL_DEPOSITION == 0) then
+   sed -i '/^>>>HIST_AEROSOL<<</d'         $HISTRC
+else
+   sed -i 's/>>>HIST_AEROSOL<<</''/g'      $HISTRC
+endif
+
+if($RUN_IRRIG == 0) then
+   sed -i '/^>>>HIST_IRRIG<<</d'           $HISTRC
+else
+   sed -i 's/>>>HIST_IRRIG<<</''/g'        $HISTRC
+endif
+
+# for ensemble simulations, set 'GridComp' to ENSAVG 
 
 if($NENS > 1) then
    set GridComp = ENSAVG
@@ -63,16 +81,6 @@ if($NENS > 1) then
 #   sed -i 's|DATAATM|'DATAATM0000'|g' $HISTRC
 endif
 
+# fill in source 'GridComp' information for output variables
+
 sed -i 's|GridComp|'$GridComp'|g' $HISTRC
-
-if($AEROSOL_DEPOSITION == 0) then
-   sed -i '/^>>>HIST_AEROSOL<<</d' $HISTRC
-else
-   sed -i 's/>>>HIST_AEROSOL<<</''/g' $HISTRC
-endif
-
-if($RUN_IRRIG == 0) then
-   sed -i '/^>>>HIST_IRRIG<<</d' $HISTRC
-else
-   sed -i 's/>>>HIST_IRRIG<<</''/g' $HISTRC
-endif

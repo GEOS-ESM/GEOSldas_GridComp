@@ -2,24 +2,21 @@
 
 """
 Sample script for post-processing GEOSldas ObsFcstAna output into data assimilation diagnostics.
-First, compute and store monthly sums and sums of squares and cross-products of raw ObsFcstAna output.  
+Computes and stores monthly sums and sums of squares and cross-products of raw ObsFcstAna output.  
 Data assimilation diagnostics ("stats") such as the mean and std-dev of the observation-minus-forecast 
-residuals can then be diagnosed quickly from these intermediate "sums" files. 
-Sample script optionally computes and plots:
-- Maps of long-term data assimilation diagnostics (see also Plot_stats_maps.py).
-- Monthly time series of spatially averaged data assimilation diagnostics (see also Plot_stats_timeseries.py).
+residuals can then be diagnosed quickly from these intermediate "sums" files.  See Plot_stats_*.py.
 
 Usage:
     1. Edit "user_config.py" with experiments information.
     2. Run this script as follows (on Discover):
     $ module load python/GEOSpyD
-    $ ./Get_ObsFcstAna_stats.py
+    $ ./Get_ObsFcstAna_sums.py
     
     # Background execution:
-    $ nohup ./Get_ObsFcstAna_stats.py > out.log &
+    $ nohup ./Get_ObsFcstAna_sums.py > out.log &
 
 Authors: Q. Liu, R. Reichle, A. Fox
-Last Modified: May 2025
+Last Modified: June 2025
 """
 
 import sys;       sys.path.append('../../shared/python/')
@@ -63,33 +60,6 @@ def main():
 
     # Compute and save monthly sums
     postproc.save_monthly_sums()
-
-    # --------------------------------------------------------------------------------------
-    # Optionally compute long-term temporal/spatial statistics and create plots.
-    # The plotting scripts can also run standalone using the individual Plot_stats_*.py scripts,
-    #   as long as the monthly sum files are available.
-    
-    plot_maps       = False
-    plot_timeseries = False
-
-    if plot_maps:            # Compute long-term temporal stats and plot maps
-
-        stats_file  = out_path + 'temporal_stats_'+exp_list[0]['exptag']+ '_'+start_time.strftime('%Y%m%d')+'_'+ \
-            (end_time+timedelta(days=-1)).strftime('%Y%m%d')+'.nc4'
-
-        # temporal_stats is a dictionary that contains all mean/variances fields for computing long-term O-F/O-A stats
-        # each field has the dimension [N_tile, N_species]
-
-        temporal_stats = postproc.calc_temporal_stats_from_sums(write_to_nc=True, fout_stats=stats_file)
-
-        # Example to plot some O-F maps
-        from Plot_stats_maps import plot_OmF_maps
-        plot_OmF_maps(postproc, temporal_stats, fig_path=out_path )
-
-    if plot_timeseries:      # Compute spatially averaged stats and plot monthly time series of stats
-
-        from Plot_stats_timeseries import Plot_monthly_OmF_bars
-        Plot_monthly_OmF_bars(postproc, fig_path=out_path)
 
 if __name__ == '__main__':
     main()
