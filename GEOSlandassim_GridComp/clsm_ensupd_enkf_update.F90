@@ -1418,7 +1418,18 @@ contains
        do n=1,N_catd          ! for each tile
           
           do n_e=1,N_ens      ! for each ensemble member 
-             
+            
+             ! In the case of adding snow to bare ground we also increment surface temp and ground layer 1 heat content
+             cat_progn(n,n_e)%tc1 = &
+                   cat_progn(n,n_e)%tc1    + cat_progn_incr(n,n_e)%tc1
+             cat_progn(n,n_e)%tc2 = &
+                   cat_progn(n,n_e)%tc2    + cat_progn_incr(n,n_e)%tc2
+             cat_progn(n,n_e)%tc4 = &
+                   cat_progn(n,n_e)%tc4    + cat_progn_incr(n,n_e)%tc4            
+
+             cat_progn(n,n_e)%ght(1) = &
+                   cat_progn(n,n_e)%ght(1) + cat_progn_incr(n,n_e)%ght(1)
+ 
              do ii=1,N_snow   ! for each snow layer
                 
                 cat_progn(n,n_e)%wesn(ii) =                                         &

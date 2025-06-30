@@ -4590,7 +4590,7 @@ contains
        ! loop through tiles and compute increments
        
        do kk=1,N_catd
-          
+ 
           ! find observations for tile kk
           
           select_tilenum(1) = l2f(kk)
@@ -4653,7 +4653,7 @@ contains
                 
                 do isnow=1,N_snow
                    
-                   if     (asnow_ana == 0.0) then  
+                   if     (asnow_ana == 0.0 .or. swe_ana < StieglitzSnow_MINSWE) then  
                       
                       ! no snow in analysis, remove all snow
                       
@@ -4670,12 +4670,15 @@ contains
                       ! assign heat content for snow at 0 deg C and without liquid water content (100% frozen) 
                       ! (based on StieglitzSnow: htsn = (CPW*tsnow - fice*MAPL_ALHF)*swe )
 
-                      tmp_htsn(kk,n_e,isnow) = (0.0 - MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
+                      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                      ! hack to test impact of new snow temperature/heat content. amf 06/11/2025
+
+                      tmp_htsn(kk,n_e,isnow) = ((StieglitzSnow_CPW * -10.0) - MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
 
                       ! assign snow depth consistent with density of freshly fallen snow (must have SCF_ANA_MAXINCRSWE<=WEMIN)
 
                       tmp_sndz(kk,n_e,isnow) = (WEMIN / RHOFS) / N_snow                   
-                      
+                     
                    else
                       
                       ! snow in forecast and analysis, derive properties of analysis snow from properties of forecast snow
@@ -4690,7 +4693,7 @@ contains
                            snow_temp, fice_snow, log_dum, log_dum2, .false. )
                       
                       tmp_htsn(kk,n_e,isnow) = (StieglitzSnow_CPW*snow_temp - fice_snow*MAPL_ALHF)*tmp_wesn(kk,n_e,isnow)
-                      
+ 
                       ! update snow depth: 
 
                       if (asnow_ana < 1. .and. asnow_fcst < 1.) then
@@ -4746,7 +4749,35 @@ contains
                 cat_progn_incr(kk,n_e)%wesn(1:N_snow) = tmp_wesn(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%wesn(1:N_snow)
                 cat_progn_incr(kk,n_e)%htsn(1:N_snow) = tmp_htsn(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%htsn(1:N_snow)
                 cat_progn_incr(kk,n_e)%sndz(1:N_snow) = tmp_sndz(kk,n_e,1:N_snow) - cat_progn(kk,n_e)%sndz(1:N_snow)
+
+                if (swe_fcst < StieglitzSnow_MINSWE .and. swe_ana > 100000000000000000000000.0 ) then!StieglitzSnow_MINSWE) then ! Adding snow to bare ground. Increment surface temperature.
+               
+                  if (logit) write(logunit, *) 'Debug: tilenumber = ', l2f(kk)
+
+                 ! surface temperature increments
+                  deltaT = -10.0
+                  cat_progn_incr(kk,n_e)%tc1 = deltaT
+                  cat_progn_incr(kk,n_e)%tc2 = deltaT
+                  cat_progn_incr(kk,n_e)%tc4 = deltaT
+                  
+                  ! soil temperature increment
+                  ght1_minus = cat_progn(kk,n_e)%ght(1) ! model forecast 
+                  fice_minus = fice(1,kk,n_e)           ! model forecast
+                  tp1_minus  = tp(1,kk,n_e)             ! model forecast [CELSIUS]       
+                  fice_plus  = fice_minus               ! ice fraction does not change
+                  tp1_plus   = tp1_minus + deltaT       ! tentative tp1 analysis [CELSIUS]
+                  
+                  ! avoid phase change of soil temp
+                  if ((tp1_minus*tp1_plus) < 0.)  tp1_plus = 0.
+                  
+                  ! compute ght1_plus from tp1_plus and fice_plus
+                  call catch_calc_ght( cat_param(kk)%dzgt(1),                    &
+                        cat_param(kk)%poros, tp1_plus, fice_plus, ght1_plus )
+                  
+                  cat_progn_incr(kk,n_e)%ght(1) = ght1_plus - ght1_minus
                 
+                endif
+
              end do   ! n_e=1,N_ens
              
           end if      ! if (N_selected_obs > 0)

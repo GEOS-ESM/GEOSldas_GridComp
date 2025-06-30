@@ -9971,8 +9971,8 @@ contains
           
           ! Find indices for current tile lat and lon on scaling parameter grid
 
-          i_ind = ceiling((this_lon - ll_lon)/dlon) 
-          j_ind = ceiling((this_lat - ll_lat)/dlat) 
+          i_ind = floor((this_lon - ll_lon)/dlon) + 1 
+          j_ind = floor((this_lat - ll_lat)/dlat) + 1
           
           ! Check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
