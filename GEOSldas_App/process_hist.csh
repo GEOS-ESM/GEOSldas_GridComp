@@ -41,18 +41,28 @@ if($LSM_CHOICE == 1) then
    set GridComp = CATCH
    sed -i '/^>>>HIST_CATCHCN<<</d'         $HISTRC
    sed -i '/^>>>HIST_CATCHCNCLM45<<</d'    $HISTRC
+   sed -i '/^>>>HIST_CATCHCNCLM51<<</d'    $HISTRC
 endif
 
 if($LSM_CHOICE == 2) then
    set GridComp = CATCHCN
    sed -i '/^>>>HIST_CATCHCNCLM45<<</d'    $HISTRC
+   sed -i '/^>>>HIST_CATCHCNCLM51<<</d'    $HISTRC
    sed -i 's/>>>HIST_CATCHCN<<</''/g'      $HISTRC
 endif
 
-if($LSM_CHOICE >= 3) then
+if($LSM_CHOICE == 3) then
+   set GridComp = CATCHCN
+   sed -i '/^>>>HIST_CATCHCNCLM51<<</d'    $HISTRC
+   sed -i 's/>>>HIST_CATCHCN<<</''/g'      $HISTRC
+   sed -i 's/>>>HIST_CATCHCNCLM45<<</''/g' $HISTRC
+endif
+
+if($LSM_CHOICE == 4) then
    set GridComp = CATCHCN
    sed -i 's/>>>HIST_CATCHCN<<</''/g'      $HISTRC
    sed -i 's/>>>HIST_CATCHCNCLM45<<</''/g' $HISTRC
+   sed -i 's/>>>HIST_CATCHCNCLM51<<</''/g' $HISTRC
 endif
 
 if($AEROSOL_DEPOSITION == 0) then

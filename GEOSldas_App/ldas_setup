@@ -483,7 +483,9 @@ class LDASsetup:
         if  int(self.rqdExeInp['LSM_CHOICE']) == 4 :
             self.catch = 'catchcnclm51'
 
-        assert int(self.rqdExeInp['LSM_CHOICE']) <= 2 or int(self.rqdExeInp['LSM_CHOICE']) == 4, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment), 2 (Catchment-CN4.0), or 4 (Catchment-CN5.1)"
+        if self.with_land:
+            assert int(self.rqdExeInp['LSM_CHOICE']) <= 2 or int(self.rqdExeInp['LSM_CHOICE']) == 4,   \
+                "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment), 2 (Catchment-CN4.0), or 4 (Catchment-CN5.1)."
 
         if 'POSTPROC_HIST' not in self.rqdExeInp:
             self.rqdExeInp['POSTPROC_HIST'] = 0
