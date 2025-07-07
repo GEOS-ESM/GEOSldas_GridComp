@@ -188,7 +188,7 @@ class LDASsetup:
             self.ExeInputs['BCS_RESOLUTION']           = self.agcm_res +'x6C_'       + self.agcm_res +'x6C'
             self.ExeInputs['RESTART_DOMAIN']           = self.agcm_res +'x6C_GLOBAL'
 
-            # the following are not in default rqdExeInp list; hardwire for now
+            # the following are not in default ExeInputs list; hardwire for now
             self.ExeInputs['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/'
             self.ExeInputs['LAND_ASSIM']               = "YES"
             self.ExeInputs['MET_HINTERP']              = 0
@@ -1144,17 +1144,17 @@ class LDASsetup:
                     shutil.copy2(histrc_file,tmprcfile)
                 else :
                     shutil.copy2(histrc_file,tmprcfile)
-                    if 'EASE' in self.rqdExeInp['GRIDNAME'] :
+                    if 'EASE' in self.ExeInputs['GRIDNAME'] :
                         TMPSTR='OUT1d'
                     else :
                         TMPSTR='OUT2d'
                     cmd = self.bindir +'/process_hist.csh'          + ' ' \
                         + tmprcfile                                 + ' ' \
                         + TMPSTR                                    + ' ' \
-                        + self.rqdExeInp['GRIDNAME']                + ' ' \
-                        + str(self.rqdExeInp['LSM_CHOICE'])         + ' ' \
-                        + str(self.rqdExeInp['AEROSOL_DEPOSITION']) + ' ' \
-                        + str(self.rqdExeInp['RUN_IRRIG'])          + ' ' \
+                        + self.ExeInputs['GRIDNAME']                + ' ' \
+                        + str(self.ExeInputs['LSM_CHOICE'])         + ' ' \
+                        + str(self.ExeInputs['AEROSOL_DEPOSITION']) + ' ' \
+                        + str(self.ExeInputs['RUN_IRRIG'])          + ' ' \
                         + str(self.nens)
                     print(cmd)
                     #os.system(cmd)
