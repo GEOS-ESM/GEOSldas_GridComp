@@ -1246,6 +1246,12 @@ class LDASsetup:
             # edit resolution info in ensupd nml file
             sp.run(['sed', '-i', 's/<CFnnnn>/'+self.agcm_res+'/g', self.rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
  
+        #CN_CLM51 nml
+        cnclm51_nml = glob.glob(etcdir+'/CN_CLM51.nml')
+        for nmlfile in cnclm51_nml:
+            shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
+            shutil.copy2(nmlfile, shortfile)
+
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
         print  ("Optimizing... decomposition of processes.... \n")
@@ -1258,7 +1264,6 @@ class LDASsetup:
             if int(optinxny['NY']) != int(self.rqdRmInp['ntasks_model']):
                 self.rqdRmInp['ntasks_model']=optinxny['NY']
                 print ('adjust ntasks_model %d for cubed-sphere grid' % int(self.rqdRmInp['ntasks_model']))
-
 
         #os.remove(optimized_distribution_file.name)
 
