@@ -222,15 +222,6 @@ def getExeKeys(option):
    assert option == '0' or option == '1', '"%s" option is not recognized ' % option
    return rqdExeInpKeys[option]
 
-def verifyExeInpKeys(ExeInputs):
-   option = '1'
-   if (ExeInputs['RESTART'] == 'G' or  ExeInputs['RESTART'] == '0'):
-      option = '0'
- 
-   rqdExeInpKeys = getExeKeys(option)
-   for key in rqdExeInpKeys:
-      assert key in ExeInputs,' "%s" is required in the inputs ( from exeinpfile or command line) ' % (key)   
-
 def getResourceKeys(option):
    # ------
    # Required resource manager input fields
@@ -242,18 +233,6 @@ def getResourceKeys(option):
 
    return RmInpKeys[option]
  
-def verifyResourceInputs(ResourceInputs):
-   #-----
-   # verify resource input keys are correct
-   #-----
-   rqdRmInpKeys    = getResourceKeys('required')
-   optSlurmInpKeys = getResourceKeys('optional')
-   allKeys = rqdRmInpKeys + optSlurmInpKeys
-   for key in rqdRmInpKeys:
-     assert key in ResourceInputs,' "%s" is required in the inputs ( from batinpfile or command line) ' % (key)   
-
-   for key in ResourceInputs:
-     assert key in allKeys, ' "%s" is not recognized ' % key 
    
 def printResourceInputSampleFile():
    """

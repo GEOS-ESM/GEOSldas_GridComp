@@ -213,28 +213,33 @@ class LDASsetup:
            
             # end if self.ladas_cpl > 0 -----------------------------------------------------------------------------------------
 
-        verifyExeInpKeys(self.ExeInputs)
 
         # print rqd exe inputs 
         if self.verbose:       
             print ('\nInputs from exeinp file:\n')
             printDictionary(self.ExeInputs)
 
-        _mydir = self.exphome + '/' + self.ExeInputs['EXP_ID']
-        assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
-        _mydir = None
+        if 'LSM_CHOICE' not in self.ExeInputs:
+            self.ExeInputs['LSM_CHOICE'] = 1
+        _lsm_choice_int = int(self.ExeInputs['LSM_CHOICE'])
+        if  _lsm_choice_int == 1:
+            self.catch = 'catch'
+        elif _lsm_choice_int == 2 :
+            self.catch = 'catchcnclm40'
+        elif _lsm_choice_int == 3 :
+            self.catch = 'catchcnclm45'
+        elif _lsm_choice_int == 4 :
+            self.catch = 'catchcnclm51'
+        _lsm_choice_int = None
 
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
-          self.with_land = True
+          self.with_land    = True
         if  "20" in self.tile_types :
           self.with_landice = True
 
-        # nens is an integer and =1 for model run
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
-        assert self.nens>0, 'NUM_LDAS_ENSEMBLE [%d] <= 0' % self.nens
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
-        
         self.perturb = int(self.ExeInputs.get('PERTURBATIONS',0))
         if self.nens > 1:
            self.perturb = 1
@@ -248,6 +253,8 @@ class LDASsetup:
             self.ensids=['']
         else :
             self.ensdirs_avg = self.ensdirs + ['ens_avg']
+
+        self._verifyExeInputs()
 
         self._calculateJobSegments()
 
@@ -268,24 +275,21 @@ class LDASsetup:
         if (self.with_land) :
            assert os.path.isfile(self.ExeInputs['CATCH_DEF_FILE']),"[%s] file does not exist " % self.ExeInputs['CATCH_DEF_FILE']
 
-        self.ExeInputs['RST_FROM_GLOBAL'] = 1
-        # skip checking. It is users' reponsibility to make it right!
-        #if self.ExeInputs['RESTART'].isdigit() :
-        #    if int(self.ExeInputs['RESTART']) == 1 :
-        #        _numg = int(linecache.getline(self.ExeInputs['CATCH_DEF_FILE'], 1).strip())
-        #        _numd = _numg
-        #        ldas_domain = self.ExeInputs['RESTART_PATH']+ \
-        #                      self.ExeInputs['RESTART_ID'] + \
-        #                      '/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'+self.ExeInputs['RESTART_ID']+'.ldas_domain.txt'
-        #        if os.path.isfile(ldas_domain) :
-        #            _numd = int(linecache.getline(ldas_domain, 1).strip())
-        #
-        #            if _numg != _numd :
-        #                self.ExeInputs['RST_FROM_GLOBAL'] = 0
-
+        # assigning BC files
         self.ExeInputs['LNFM_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
-        if int(self.ExeInputs['RST_FROM_GLOBAL']) == 1 :
+        if self.ExeInputs['RESTART'] == '1' :
+           inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
+           self.ExeInputs['TILING_FILE'] = os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
+           self.ExeInputs['GRN_FILE']    = os.path.realpath(glob.glob(inpdir+'green*data')[0])
+           self.ExeInputs['LAI_FILE']    = os.path.realpath(glob.glob(inpdir+'lai*data'  )[0])
+           tmp_ = glob.glob(inpdir + 'lnfm*data')
+           if (len(tmp_) == 1) :
+              self.ExeInputs['LNFM_FILE']= os.path.realpath(tmp_[0])
+           self.ExeInputs['NDVI_FILE']   = os.path.realpath(glob.glob(inpdir+'ndvi*data' )[0])
+           self.ExeInputs['NIRDF_FILE']  = os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
+           self.ExeInputs['VISDF_FILE']  = os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
+        else:
            txt_tile = glob.glob(self.bcs_dir_geom + '*.til')
            nc4_tile = glob.glob(self.bcs_dir_geom + '*.nc4')
            if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
@@ -299,52 +303,8 @@ class LDASsetup:
            self.ExeInputs['NDVI_FILE']   = glob.glob(self.bcs_dir_land + 'ndvi_clim_*.data' )[0]
            self.ExeInputs['NIRDF_FILE']  = glob.glob(self.bcs_dir_land + 'nirdf_*.dat'      )[0]
            self.ExeInputs['VISDF_FILE']  = glob.glob(self.bcs_dir_land + 'visdf_*.dat'      )[0]
-        else :
-           inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
-           self.ExeInputs['TILING_FILE'] = os.path.realpath(glob.glob(inpdir+'*tile.data')[0])
-           self.ExeInputs['GRN_FILE']    = os.path.realpath(glob.glob(inpdir+'green*data')[0])
-           self.ExeInputs['LAI_FILE']    = os.path.realpath(glob.glob(inpdir+'lai*data'  )[0])
-           tmp_ = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data')
-           if (len(tmp_) == 1) :
-              self.ExeInputs['LNFM_FILE'] = tmp_[0]
-           self.ExeInputs['NDVI_FILE']   = os.path.realpath(glob.glob(inpdir+'ndvi*data' )[0])
-           self.ExeInputs['NIRDF_FILE']  = os.path.realpath(glob.glob(inpdir+'nirdf*data')[0])
-           self.ExeInputs['VISDF_FILE']  = os.path.realpath(glob.glob(inpdir+'visdf*data')[0])
 
-        if self.ExeInputs['RESTART'].isdigit() :
-            if int(self.ExeInputs['RESTART']) == 2 :
-                self.ExeInputs['RST_FROM_GLOBAL'] = 1
-                ldas_domain = self.ExeInputs['RESTART_PATH']+ \
-                              self.ExeInputs['RESTART_ID'] + \
-                              '/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'+self.ExeInputs['RESTART_ID']+'.ldas_domain.txt'
-                inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
-                in_tilefiles_ = glob.glob(inpdir+'*tile.data')
-                if len(in_tilefiles_) == 0 :
-                   inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
-                   in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
-                   if len(in_tilefiles_) == 0 :
-                      in_tilefiles_ = glob.glob(inpdir+'/*.til')
-                   if len(in_tilefiles_) == 0 :
-                      in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
-
-                self.in_tilefile =os.path.realpath(in_tilefiles_[0])
-
-                if os.path.isfile(ldas_domain):
-                    txt_tile = glob.glob(self.bcs_dir_geom + '*.til')
-                    nc4_tile = glob.glob(self.bcs_dir_geom + '*.nc4')
-                    if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] = txt_tile[0]
-                    if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
-
-                    self.ExeInputs['GRN_FILE']   = glob.glob(self.bcs_dir_land + 'green_clim_*.data')[0]
-                    self.ExeInputs['LAI_FILE']   = glob.glob(self.bcs_dir_land + 'lai_clim_*.data'  )[0]
-                    tmp_ = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data')
-                    if (len(tmp_) == 1) :
-                       self.ExeInputs['LNFM_FILE'] = tmp_[0]
-                    self.ExeInputs['LNFM_FILE']  = glob.glob(self.bcs_dir_land + 'lnfm_clim_*.data' )[0]
-                    self.ExeInputs['NDVI_FILE']  = glob.glob(self.bcs_dir_land + 'ndvi_clim_*.data' )[0]
-                    self.ExeInputs['NIRDF_FILE'] = glob.glob(self.bcs_dir_land + 'nirdf_*.dat'      )[0]
-                    self.ExeInputs['VISDF_FILE'] = glob.glob(self.bcs_dir_land + 'visdf_*.dat'      )[0]
-
+        # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
             tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
             extension = os.path.splitext(tmptile)[1]
@@ -359,17 +319,6 @@ class LDASsetup:
             # in case it is an old name: SMAP-EASEvx-Mxx
             gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
             self.ExeInputs['GRIDNAME']  = gridname_
-               
-        if 'LSM_CHOICE' not in self.ExeInputs:
-            self.ExeInputs['LSM_CHOICE'] = 1
-
-        if  int(self.ExeInputs['LSM_CHOICE']) == 1 :
-            self.catch = 'catch'
-        if  int(self.ExeInputs['LSM_CHOICE']) == 2 :
-            self.catch = 'catchcnclm40'
-
-        if self.with_land: 
-           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
 
         if 'POSTPROC_HIST' not in self.ExeInputs:
             self.ExeInputs['POSTPROC_HIST'] = 0
@@ -403,36 +352,50 @@ class LDASsetup:
         self.domain_def.write('/\n')
         self.domain_def.close()
 
-        # make sure bcs files exist
-        if self.ExeInputs['RESTART'].isdigit() and self.with_land :
-            if int(self.ExeInputs['RESTART']) >= 1 :
-                y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
-                y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
+        # find restart files and tile files (if necessary)
+        if self.with_land:
+           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
+           RESTART_str  = str(self.ExeInputs['RESTART'])
+           if RESTART_str in ['1', '2']:
+              y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
+              y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
                                                       self.begDates[0].day,self.begDates[0].hour,self.begDates[0].minute)
-                tmpFile=self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+              tmpFile=self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
+              tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                                                                    self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0],y4m2])
-                catchRstFile=tmpRstDir+'/'+tmpFile
+              catchRstFile=tmpRstDir+'/'+tmpFile
 
-                assert os.path.isfile(catchRstFile), self.catch+'_internal_rst file [%s] does not exist!' %(catchRstFile)
-                self.in_rstfile = catchRstFile
+              assert os.path.isfile(catchRstFile), self.catch+'_internal_rst file [%s] does not exist!' %(catchRstFile)
+              self.in_rstfile = catchRstFile
 
-                if int(self.ExeInputs['RESTART']) == 1 :
-                    tmpFile=self.ExeInputs['RESTART_ID']+'.vegdyn_internal_rst'
-                    tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+           if RESTART_str == '1' :
+              tmpFile=self.ExeInputs['RESTART_ID']+'.vegdyn_internal_rst'
+              tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                                                                        self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0]])
-                    vegdynRstFile=tmpRstDir+'/'+tmpFile
-                    if not os.path.isfile(vegdynRstFile):
-                        assert int(self.ExeInputs['RST_FROM_GLOBAL']) == 1, 'restart from LDASsa should be global'
+              vegdynRstFile=tmpRstDir+'/'+tmpFile
+              # if not os.path.isfile(vegdynRstFile):
+              #     assert int(self.ExeInputs['RST_FROM_GLOBAL']) == 1, 'restart from LDASsa should be global'
 
-                    tmpFile=self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
-                    tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+              tmpFile=self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
+              tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                                                                        self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0],y4m2])
-                    landpertRstFile=tmpRstDir+'/'+tmpFile
-                    if ( os.path.isfile(landpertRstFile)) :
-                        self.has_geos_pert = True
+              landpertRstFile=tmpRstDir+'/'+tmpFile
+              if ( os.path.isfile(landpertRstFile)) :
+                 self.has_geos_pert = True
 
-            elif (int(self.ExeInputs['RESTART']) == 0) :
+           if RESTART_str == '2':
+              inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
+              in_tilefiles_ = glob.glob(inpdir+'*tile.data')
+              if len(in_tilefiles_) == 0 :
+                 inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
+                 in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
+                 if len(in_tilefiles_) == 0 :
+                    in_tilefiles_ = glob.glob(inpdir+'/*.til')
+                 if len(in_tilefiles_) == 0 :
+                    in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
+              self.in_tilefile =os.path.realpath(in_tilefiles_[0])
+
+           if RESTART_str == '0':
               if (self.catch == 'catch'):
                 self.in_rstfile = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
                                   '/Catch/M09/20170101/catch_internal_rst'
@@ -478,7 +441,7 @@ class LDASsetup:
            self.RmInputs['walltime']        = "01:00:00" 
            self.RmInputs['ntasks_model']    = 120
 
-        verifyResourceInputs(self.RmInputs)
+        self._verifyResourceInputs()
 
         # print rm inputs
         if self.verbose:
@@ -524,9 +487,38 @@ class LDASsetup:
         else:
            self.RmInputs['writers-per-node'] = 0
 
-           
-    # -----------------------------------------------------------------------------------
-           
+    def _verifyExeInputs(self):
+       ExeInputs = self.ExeInputs
+       #) verify keys
+       option = '1'
+       if (ExeInputs['RESTART'] == 'G' or  ExeInputs['RESTART'] == '0'):
+          option = '0'
+     
+       rqdExeInpKeys = getExeKeys(option)
+       for key in rqdExeInpKeys:
+          assert key in ExeInputs,' "%s" is required in the inputs ( from exeinpfile or command line) ' % (key)
+    
+       _mydir = self.exphome + '/' + self.ExeInputs['EXP_ID']
+       assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
+       _mydir = None
+    
+       # nens is an integer and =1 for model run
+       assert self.nens>0, 'NUM_LDAS_ENSEMBLE [%d] <= 0' % self.nens 
+        # -----------------------------------------------------------------------------------
+    def _verifyResourceInputs():
+       #-----
+       # verify resource input keys are correct
+       #-----
+       ResourceInputs  = self.RmInputs 
+       rqdRmInpKeys    = getResourceKeys('required')
+       optSlurmInpKeys = getResourceKeys('optional')
+       allKeys = rqdRmInpKeys + optSlurmInpKeys
+       for key in rqdRmInpKeys:
+         assert key in ResourceInputs,' "%s" is required in the inputs ( from batinpfile or command line) ' % (key)
+    
+       for key in ResourceInputs:
+         assert key in allKeys, ' "%s" is not recognized ' % key
+
     def createDirStructure(self):
         """
         Create required dir structure
