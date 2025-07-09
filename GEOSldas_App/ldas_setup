@@ -278,24 +278,29 @@ class LDASsetup:
         # assigning BC files
         self.ExeInputs['LNFM_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
-        domain_ = ''
+        domain_  = ''
+        inpdir_  = ''   
+        inpgeom_ = ''   
         if self.ExeInputs['RESTART'] == '1' :
            inpdir_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
            txt_tile = glob.glob(inpdir_ + '*.domain')
+           inpgeom_ = inpdir_
            if len(txt_tile) > 0:
               domain_ = '.domain'
         if domain_ == '':
-           inpdir_ = self.bcs_dir_geom
+           inpdir_   = self.bcs_dir_land
+           inpigeom_ = self.bcs_dir_geom
         
-        inpdir_ = os.path.realpath(inpdir_)+'/'
+        inpdir_  = os.path.realpath(inpdir_)+'/'
+        inpgeom_ = os.path.realpath(inpgeom_)+'/'
  
-        txt_tile = glob.glob(inpdir_ + '*.til' + domain_)
+        txt_tile = glob.glob(inpgeom_ + '*.til' + domain_)
         for f in txt_tile:
            if 'MAPL_' in os.path.basename(f):
               txt_tile = [f]
               break
-        nc4_tile = glob.glob(inpdir_ + '*.nc4' + domain_)
+        nc4_tile = glob.glob(inpgeom_ + '*.nc4' + domain_)
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
