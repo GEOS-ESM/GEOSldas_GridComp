@@ -285,7 +285,7 @@ class LDASsetup:
            txt_tile = glob.glob(inpdir_ + '*.domain')
            if len(txt_tile) > 0:
               domain_ = '.domain'
-        if domain == '':
+        if domain_ == '':
            inpdir_ = self.bcs_dir_geom
         
         inpdir_ = os.path.realpath(inpdir_)+'/'
@@ -307,7 +307,8 @@ class LDASsetup:
         self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_ )[0]
         self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +domain_ )[0]
         self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
-
+        inpdir_ = None
+        domain_ = None
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
             tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
@@ -357,9 +358,22 @@ class LDASsetup:
         self.domain_def.close()
 
         # find restart files and tile files (if necessary)
+        RESTART_str  = str(self.ExeInputs['RESTART'])
+
+        if RESTART_str == '2':
+           inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
+           in_tilefiles_ = glob.glob(inpdir+'*tile.data')
+           if len(in_tilefiles_) == 0 :
+              inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
+              in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
+              if len(in_tilefiles_) == 0 :
+                 in_tilefiles_ = glob.glob(inpdir+'/*.til')
+              if len(in_tilefiles_) == 0 :
+                 in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
+           self.in_tilefile =os.path.realpath(in_tilefiles_[0])
+
         if self.with_land:
            assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
-           RESTART_str  = str(self.ExeInputs['RESTART'])
            if RESTART_str in ['1', '2']:
               y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
               y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
@@ -386,18 +400,6 @@ class LDASsetup:
               landpertRstFile=tmpRstDir+'/'+tmpFile
               if ( os.path.isfile(landpertRstFile)) :
                  self.has_geos_pert = True
-
-           if RESTART_str == '2':
-              inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
-              in_tilefiles_ = glob.glob(inpdir+'*tile.data')
-              if len(in_tilefiles_) == 0 :
-                 inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
-                 in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
-                 if len(in_tilefiles_) == 0 :
-                    in_tilefiles_ = glob.glob(inpdir+'/*.til')
-                 if len(in_tilefiles_) == 0 :
-                    in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
-              self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
            if RESTART_str == '0':
               if (self.catch == 'catch'):
