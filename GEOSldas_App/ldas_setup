@@ -935,6 +935,9 @@ class LDASsetup:
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
+           if ("catchcn" in self.catch):
+              os.symlink(self.bcs_dir_landshared + 'ctsm51_params.c210923_forCNCLM.nc', \
+                          self.inpdir+'/ctsm51_params.c210923_forCNCLM.nc')
 
         # create and link restart
         print ("Creating and linking restart...")
