@@ -278,30 +278,35 @@ class LDASsetup:
         # assigning BC files
         self.ExeInputs['LNFM_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
+        domain_ = ''
         if self.ExeInputs['RESTART'] == '1' :
            inpdir_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
-        else:
+           txt_tile = glob.glob(inpdir_ + '*.domain')
+           if len(txt_tile) > 0:
+              domain_ = '.domain'
+        if domain == '':
            inpdir_ = self.bcs_dir_geom
-
-        inpdir_ = os.path.realpath(inpdir_)+'/' 
-        txt_tile = glob.glob(inpdir_ + '*.til')
+        
+        inpdir_ = os.path.realpath(inpdir_)+'/'
+ 
+        txt_tile = glob.glob(inpdir_ + '*.til' + domain_)
         for f in txt_tile:
            if 'MAPL_' in os.path.basename(f):
               txt_tile = [f]
               break
-        nc4_tile = glob.glob(inpdir_ + '*.nc4')
+        nc4_tile = glob.glob(inpdir_ + '*.nc4' + domain_)
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
-        self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data')[0]
-        self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  )[0]
-        tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data')
+        self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+domain_)[0]
+        self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +domain_)[0]
+        tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+domain_)
         if (len(tmp_) ==1) :
            self.ExeInputs['LNFM_FILE'] = tmp_[0]
-        self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data' )[0]
-        self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'      )[0]
-        self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'      )[0]
+        self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_ )[0]
+        self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +domain_ )[0]
+        self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
 
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
