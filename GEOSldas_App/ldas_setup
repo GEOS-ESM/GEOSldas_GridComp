@@ -279,18 +279,17 @@ class LDASsetup:
         self.ExeInputs['LNFM_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
         domain_  = ''
-        inpdir_  = ''   
-        inpgeom_ = ''   
+        inpdir_  = self.bcs_dir_land  
+        inpgeom_ = self.bcs_dir_geom
+
         if self.ExeInputs['RESTART'] == '1' :
-           inpdir_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+           inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
-           txt_tile = glob.glob(inpdir_ + '*.domain')
-           inpgeom_ = inpdir_
+           txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
-              domain_ = '.domain'
-        if domain_ == '':
-           inpdir_   = self.bcs_dir_land
-           inpigeom_ = self.bcs_dir_geom
+              domain_  = '.domain'
+              inpdir_  = inp_
+              inpgeom_ = inp_
         
         inpdir_  = os.path.realpath(inpdir_)+'/'
         inpgeom_ = os.path.realpath(inpgeom_)+'/'
@@ -314,6 +313,7 @@ class LDASsetup:
         self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
         inpdir_ = None
         domain_ = None
+        inpgeom_= None
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
             tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
