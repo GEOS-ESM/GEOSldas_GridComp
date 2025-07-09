@@ -6,9 +6,9 @@ from collections    import OrderedDict
 
 def parseInputFile(inpfile, ladas_cpl=0):
    """ 
-     Private method: parse input file and return a dict of options
-     Input: input file
-     Output: dict
+     Parse the input file and return a dict of options
+     Inpfile : input file
+     Output  : dict, if inpfile does not exist, return empty {}
    """ 
    if not os.path.exists(inpfile):
      assert ladas_cpl > 0, " No exeinput file only if ladas_cpl > 0"
@@ -207,7 +207,6 @@ def printExeInputSampleFile():
    echoInputFile(_fn)
 
 
-
 def getExeKeys(option):
    # required keys for exe input file depending on restart options
    rqdExeInpKeys = {'1' : ['EXP_ID',        'EXP_DOMAIN',      'NUM_LDAS_ENSEMBLE',  'BEG_DATE',
@@ -233,7 +232,7 @@ def getResourceKeys(option):
 
    return RmInpKeys[option]
  
-   
+
 def printResourceInputSampleFile():
    """
     print sample resource manager input file
@@ -294,6 +293,19 @@ def printDictionary(d):
             
     for key, val in d.items():
         print (key.ljust(24), ':', val)
+
+def hours_to_hhmmss(hours):
+
+    # Convert hours to timedelta
+    td = timedelta(hours=hours)
+
+    # Extract hours, minutes, seconds
+    total_seconds = int(td.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Format as HHMMSS
+    return f"{hours:02d}{minutes:02d}{seconds:02d}"
 
 if __name__=='__main__':
     inpfile = '/gpfsm/dnb34/wjiang/develop_ldas/GEOSldas_nc4/install-SLES15/etc/GEOS_SurfaceGridComp.rc'

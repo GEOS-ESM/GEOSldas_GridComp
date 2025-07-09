@@ -20,6 +20,7 @@ ecbuild_add_executable (
    LIBS GEOSlandassim_GridComp)
    
 set (scripts
+   ldas_setup
    setup_utils.py
    process_hist.csh 
    ens_forcing/average_ensemble_forcing.py 
@@ -35,7 +36,7 @@ install (
    DESTINATION bin
    )
 
-set(file ldas_setup)
+set(file ldas.py)
 configure_file(${file} ${file} @ONLY)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${file} DESTINATION bin)
 
