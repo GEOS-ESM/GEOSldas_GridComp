@@ -103,7 +103,7 @@ class ldas:
         self.with_landice       = False
         self.adas_expdir        = ''
 
-        # assert necessary optional arguments in command line if exeinp does not exsit
+        # assert necessary optional arguments in command line if exeinp file does not exsit
         if not os.path.exists(cmdLineArgs['exeinpfile']):
            # make sure all necessary command line arguments were supplied
            assert self.ladas_cpl     is not None, "Error. Must have command line arg ladas_cpl   for coupled land-atm DAS.\n"
@@ -115,7 +115,7 @@ class ldas:
            assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version for coupled land-atm DAS.\n"
            assert self.rstloc        is not None, "Error. Must have command line arg rstloc      for coupled land-atm DAS.\n"
            assert self.varwindow     is not None, "Error. Must have command line arg varwindow   for coupled land-atm DAS.\n"
-           assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atmensDAS.\n"
+           assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atm DAS (ens component).\n"
            self.ladas_cpl = int(self.ladas_cpl)
         else:
            self.ladas_cpl = 0
@@ -210,7 +210,7 @@ class ldas:
             # end if self.ladas_cpl > 0 -----------------------------------------------------------------------------------------
 
 
-        # print rqd exe inputs 
+        # print exe inputs 
         if self.verbose:       
             print ('\nInputs from exeinp file:\n')
             printDictionary(self.ExeInputs)
@@ -234,7 +234,7 @@ class ldas:
         if  "20" in self.tile_types :
           self.with_landice = True
 
-        self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE']) # fail if Nens's val is not int
+        self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
         self.perturb = int(self.ExeInputs.get('PERTURBATIONS',0))
         if self.nens > 1:

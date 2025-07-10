@@ -80,11 +80,11 @@ def printExeInputSampleFile():
    print ('#                                                                                  #')
    print ('#                             REQUIRED INPUTS                                      #')
    print ('#                                                                                  #')
-   print ('#   To run ldas_setup, the paremeters can be provided in an exeinput file as       #')
-   print ('#   this sample file. However, if no such file is provided in case GEOSldas is     #')
-   print ('#   coupling with GEOSadas, the inputs should be provided as optional arguments    #')
-   print ('#   in the command line:                                                           #')
-   print ('#   ./ldas_setup setup /run/folder no_exeinp batinp --                             #')
+   print ('#   The inputs to ldas_setup can be provided in an "exeinp" file such as this      #')
+   print ('#     sample file.                                                                 #')
+   print ('#   When ldas_setup is called by fvsetup to set up an experiment with the coupled  #')
+   print ('#     land-atm data assimilation system, the inputs to ldas_setup are provided as  #')
+   print ('#     optional command line arguments.                                             #')
    print ('#                                                                                  #')
    print ('####################################################################################')
    print ()
@@ -208,14 +208,15 @@ def printExeInputSampleFile():
 
 
 def getExeKeys(option):
-   # required keys for exe input file depending on restart options
+   # required keys for exe input file depending on restart option
    rqdExeInpKeys = {'1' : ['EXP_ID',        'EXP_DOMAIN',      'NUM_LDAS_ENSEMBLE',  'BEG_DATE',
-                         'END_DATE',      'RESTART_PATH',    'RESTART_DOMAIN',     'RESTART_ID',
-                         'MET_TAG',       'MET_PATH',        'FORCE_DTSTEP',       'BCS_PATH',
-                         'BCS_RESOLUTION'],
-                    '0' : ['EXP_ID',    'EXP_DOMAIN',       'NUM_LDAS_ENSEMBLE',  'BEG_DATE',
-                         'END_DATE',       'MET_TAG',         'MET_PATH',           'FORCE_DTSTEP',
-                         'BCS_PATH', 'BCS_RESOLUTION']
+                           'END_DATE',      'RESTART_PATH',    'RESTART_DOMAIN',     'RESTART_ID',
+                           'MET_TAG',       'MET_PATH',        'FORCE_DTSTEP',       'BCS_PATH',
+                           'BCS_RESOLUTION'],
+                    '0' : ['EXP_ID',        'EXP_DOMAIN',      'NUM_LDAS_ENSEMBLE',  'BEG_DATE',
+                           'END_DATE',
+                           'MET_TAG',       'MET_PATH',        'FORCE_DTSTEP',       'BCS_PATH',
+                           'BCS_RESOLUTION']
                 }
 
    assert option == '0' or option == '1', '"%s" option is not recognized ' % option
@@ -257,14 +258,14 @@ def printResourceInputSampleFile():
    print ('#')
    print ('# NOTE:')
    print ('# - job_name         = name of experiment; default is "exp_id"')
-   print ('# - qos              = quality-of-service; do not specify by default; specify "debug" for faster but limited service.')
+   print ('# - qos              = quality-of-service; do not specify by default; specify "debug" for faster but limited service')
    print ('# - oserver_nodes    = number of nodes for oserver ( default is 0, for future use )')
-   print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5, for future use ),')
-   print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
-   print ('#      Jobs will hang when oserver_nodes = writers-per-node = 1.')
-   print ('# - ntasks-per-node  , allocate ntasks per nodes. Usually it is less then total cores per nodes to get more memory.')
-   print ('#                      make ntasks_model be a multiple of ntasks-per-node') 
-   print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait").')
+   print ('# - writers-per-node = tasks per oserver_node for writing ( default is 5, for future use );')
+   print ('#                        IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2;')
+   print ('#                        jobs will hang when oserver_nodes = writers-per-node = 1.')
+   print ('# - ntasks-per-node  = requesting fewer ntasks-per-node than total number of cores per node increases allocated memory;')
+   print ('#                        ntasks_model should be a multiple of ntasks-per-node') 
+   print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait")')
    print ('#')
    for key in optionalKeys:
        print ('#'+key + ':')

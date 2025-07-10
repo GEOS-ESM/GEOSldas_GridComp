@@ -6,7 +6,7 @@
 ##                in *.F90 calls to MAPL_GetResource().                            #
 ##                                                                                 #
 ##              Users can further override the values below by                     #
-##                editing the "exeinp" file during ldas setup.                     #
+##                editing the "exeinp" input file for ldas_setup.                  #
 ##                                                                                 #
 ## ##################################################################################
 
