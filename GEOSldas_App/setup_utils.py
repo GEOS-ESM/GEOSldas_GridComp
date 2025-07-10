@@ -6,6 +6,22 @@ import sys
 from collections import OrderedDict
 from datetime    import timedelta
 
+
+def generate_echo(inpfile, ladas_cpl = 0):
+   """
+    Echo generator of inpfile, ignore line starts with "## "
+   """
+   if ladas_cpl == 0 :
+      use_rc_defaults = '# GEOSldas=>'    # use defaults for LDAS
+   else :
+      use_rc_defaults = '# GEOSagcm=>'    # use defaults for AGCM
+
+   with open (inpfile) as fin :
+     for line in fin:
+        if line.startswith(use_rc_defaults):
+           line = line.split(use_rc_defaults)[1]
+        yield line
+
 def parseInputFile(inpfile, ladas_cpl=0):
    """ 
      Parse the input file and return a dict of options
@@ -18,61 +34,46 @@ def parseInputFile(inpfile, ladas_cpl=0):
         
    inpdict = OrderedDict()
    errstr  = "line [%d] of [%s] is not in the form 'key: value'"
-   # determine which default values to pick from GEOS_SurfaceGridComp.rc
-   # must be in the format '# GEOSldas=>' or # GEOSagcm=>
-   if ladas_cpl == 0 :
-      use_rc_defaults = '# GEOSldas=>'    # use defaults for LDAS
-   else :
-      use_rc_defaults = '# GEOSagcm=>'    # use defaults for AGCM
-            
+
+   echoLines = generate_echo(inpfile, ladas_cpl=ladas_cpl)
+         
    linenum = 0
-   with open(inpfile) as fin:
-     for line in fin:
-       line = line.strip()
-       linenum += 1
-       if not line:
-          continue
-       if line.startswith(use_rc_defaults):
-          line = line.split(use_rc_defaults)[1]
-       # handle comments
-       position = line.find('#')
-       if position==0: # comment line
-          continue
-       if position>0:  # strip out comment
-          line = line[:position]
-       # we expect a line to be of the form
-       # key : value
-       assert ':' in line, errstr % (linenum, inpfile)
-                                                               
-       key, val = line.split(':',1)
-       key = key.strip()
-       val = val.strip()
-       if not key or not val:
-         print ("WARNING: " + errstr % (linenum, inpfile))
-         continue
-      #raise Exception(errstr % (linenum, inpfile))
-       if key in inpdict:
-         raise Exception('Duplicate key [%s] in [%s]' % (key, inpfile))
-       inpdict[key] = val.strip()
+   for line in echoLines:
+     line = line.strip()
+     linenum += 1
+     if not line:
+        continue
+     # handle comments
+     position = line.find('#')
+     if position==0: # comment line
+        continue
+     if position>0:  # strip out comment
+        line = line[:position]
+     # we expect a line to be of the form
+     # key : value
+     assert ':' in line, errstr % (linenum, inpfile)
+                                                             
+     key, val = line.split(':',1)
+     key = key.strip()
+     val = val.strip()
+     if not key or not val:
+       print ("WARNING: " + errstr % (linenum, inpfile))
+       continue
+     #raise Exception(errstr % (linenum, inpfile))
+     if key in inpdict:
+       raise Exception('Duplicate key [%s] in [%s]' % (key, inpfile))
+     inpdict[key] = val.strip()
    return inpdict
 
 def echoInputFile(inpfile, ladas_cpl = 0):
    """
     Echo inpfile, ignore line starts with "## "
    """
-   if ladas_cpl == 0 :
-      use_rc_defaults = '# GEOSldas=>'    # use defaults for LDAS
-   else :
-      use_rc_defaults = '# GEOSagcm=>'    # use defaults for AGCM
+   echoLines = generate_echo(inpfile, ladas_cpl=ladas_cpl)
 
-   with open (inpfile) as fin :
-     for line in fin:
-        if line.startswith("## "):
-           continue
-        if line.startswith(use_rc_defaults):
-           line = line.split(use_rc_defaults)[1]
-        sys.stdout.write(line) 
-        sys.stdout.flush() 
+   for line in echoLines:
+      sys.stdout.write(line) 
+      sys.stdout.flush() 
 
 def printExeInputSampleFile():
    """
