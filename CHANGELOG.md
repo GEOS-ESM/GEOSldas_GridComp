@@ -15,9 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Cleaned up ldas_setup, moved some functions to setup_utils.py
+- Cleaned up ldas_setup. Split it to ldas.py and setup_utils.py, 
 
 ### Fixed
+
+- Fixed Restart = 1 when the domain is not global
 
 ### Removed
 
