@@ -306,11 +306,3 @@ def hours_to_hhmmss(hours):
 
     # Format as HHMMSS
     return f"{hours:02d}{minutes:02d}{seconds:02d}"
-
-if __name__=='__main__':
-    inpfile = '/gpfsm/dnb34/wjiang/develop_ldas/GEOSldas_nc4/install-SLES15/etc/GEOS_SurfaceGridComp.rc'
-    inpdict = parseInputFile(inpfile)
-    print(inpdict)
-
-    printExeInputSampleFile()
-     
