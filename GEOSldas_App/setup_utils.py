@@ -2,7 +2,9 @@
 
 import os
 import sys
-from collections    import OrderedDict
+
+from collections import OrderedDict
+from datetime    import timedelta
 
 def parseInputFile(inpfile, ladas_cpl=0):
    """ 
