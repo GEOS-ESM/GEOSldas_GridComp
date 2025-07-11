@@ -16,6 +16,7 @@ job_directive = {"NCCS": '''#!/bin/csh -f
 #SBATCH --job-name={MY_JOB}
 #SBATCH --qos={MY_QOS}
 #SBATCH --constraint={MY_CONSTRAINT}
+{MY_NODES}
 '''
 ,
 "NAS": '''#!/bin/csh -f
