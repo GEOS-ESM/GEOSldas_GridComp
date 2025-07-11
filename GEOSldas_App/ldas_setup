@@ -939,6 +939,10 @@ class LDASsetup:
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
 
+           if ("catchcn" in self.catch):
+              os.symlink(self.bcs_dir_landshared + 'ctsm51_params.c210923_forCNCLM.nc', \
+                          self.inpdir+'/ctsm51_params.c210923_forCNCLM.nc')
+
         # create and link restart
         print ("Creating and linking restart...")
         _start = self.begDates[0]
@@ -1376,6 +1380,7 @@ class LDASsetup:
                       ldasrcInp[keyn]= valn
                    if('catchcn' in self.catch):
                       ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
+                      ldasrcInp['ctsm51_params.c210923_forCNCLM_FILE']= '../input/ctsm51_params.c210923_forCNCLM.nc'
                    else:
                       # remove catchcn-specific entries that do not apply to catch model
                       ldasrcInp.pop('DTCN',None)
