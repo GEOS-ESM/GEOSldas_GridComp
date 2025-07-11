@@ -12,15 +12,15 @@ def generate_echo(inpfile, ladas_cpl = 0):
     Echo generator of inpfile, ignore line starts with "## "
    """
    if ladas_cpl == 0 :
-      use_rc_defaults = '# GEOSldas=>'    # use defaults for LDAS
+      use_rc_defaults = 'GEOSldas=>'    # use defaults for LDAS
    else :
-      use_rc_defaults = '# GEOSagcm=>'    # use defaults for AGCM
+      use_rc_defaults = 'GEOSagcm=>'    # use defaults for AGCM
 
    with open (inpfile) as fin :
-     for line in fin:
-        if line.startswith(use_rc_defaults):
-           line = line.split(use_rc_defaults)[1]
-        yield line
+      for line in fin:
+         if use_rc_defaults in line:  
+            line = line.split(use_rc_defaults)[1]
+         yield line
 
 def parseInputFile(inpfile, ladas_cpl=0):
    """ 
