@@ -1242,7 +1242,7 @@ class ldas:
                    if('catchcn' in self.catch):
                       ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
                       if (self.catch=="catchcnclm51"):
-                          ldasrcInp['ctsm51_params.c210923_forCNCLM_FILE']= '../input/ctsm51_params.c210923_forCNCLM.nc'
+                          ldasrcInp['CNCLM51_PARAM_FILE']= '../input/ctsm51_params.c210923_forCNCLM.nc'
                    else:
                       # remove catchcn-specific entries that do not apply to catch model
                       ldasrcInp.pop('DTCN',None)
