@@ -10,7 +10,7 @@ from datetime    import timedelta
 def generate_echo(inpfile, ladas_cpl = 0):
    """
     Echo generator of inpfile
-    Remove the sepcial string according to defaults then return the line
+    Pick default values from GEOS_SurfaceGridComp.rc via special string "GEOS[xxxx]=>".
    """
    if ladas_cpl == 0 :
       use_rc_defaults = 'GEOSldas=>'    # use defaults for LDAS
