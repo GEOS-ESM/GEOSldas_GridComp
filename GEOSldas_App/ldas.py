@@ -798,6 +798,7 @@ class ldas:
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
+           if (self.catch=="catchcnclm51'"):
               os.symlink(self.bcs_dir_landshared + 'ctsm51_params.c210923_forCNCLM.nc', \
                           self.inpdir+'/ctsm51_params.c210923_forCNCLM.nc')
 
@@ -1109,10 +1110,11 @@ class ldas:
             sp.run(['sed', '-i', 's/<CFnnnn>/'+self.agcm_res+'/g', self.rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
 
         #CN_CLM51 nml
-        cnclm51_nml = glob.glob(etcdir+'/CN_CLM51.nml')
-        for nmlfile in cnclm51_nml:
-            shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
-            shutil.copy2(nmlfile, shortfile)
+        if (self.catch=="catchcnclm51'"):
+            cnclm51_nml = glob.glob(etcdir+'/CN_CLM51.nml')
+            for nmlfile in cnclm51_nml:
+                shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
+                shutil.copy2(nmlfile, shortfile)
  
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
@@ -1239,7 +1241,8 @@ class ldas:
                       ldasrcInp[keyn]= valn
                    if('catchcn' in self.catch):
                       ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
-                      ldasrcInp['ctsm51_params.c210923_forCNCLM_FILE']= '../input/ctsm51_params.c210923_forCNCLM.nc'
+                      if (self.catch=="catchcnclm51'"):
+                          ldasrcInp['ctsm51_params.c210923_forCNCLM_FILE']= '../input/ctsm51_params.c210923_forCNCLM.nc'
                    else:
                       # remove catchcn-specific entries that do not apply to catch model
                       ldasrcInp.pop('DTCN',None)
