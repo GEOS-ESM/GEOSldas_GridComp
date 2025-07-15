@@ -374,7 +374,7 @@ class ldas:
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
         if self.with_land:
-           assert int(self.rqdExeInp['LSM_CHOICE']) <= 2 or int(self.rqdExeInp['LSM_CHOICE']) == 4,   \
+           assert int(self.ExeInputs['LSM_CHOICE']) <= 2 or int(self.ExeInputs['LSM_CHOICE']) == 4,   \
                 "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment), 2 (Catchment-CN4.0), or 4 (Catchment-CN5.1)."
            if RESTART_str in ['1', '2']:
               y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
