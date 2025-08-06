@@ -222,8 +222,6 @@ class ldas:
             self.catch = 'catch'
         elif _lsm_choice_int == 2 :
             self.catch = 'catchcnclm40'
-        #elif _lsm_choice_int == 3 :
-        #    self.catch = 'catchcnclm45'
         elif _lsm_choice_int == 4 :
             self.catch = 'catchcnclm51'
         _lsm_choice_int = None
