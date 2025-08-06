@@ -411,12 +411,10 @@ class ldas:
                 self.in_rstfile  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
                                    '/CatchCN/M36/20150301_0000/catchcnclm40_internal_dummy'
                 self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Heracles-NL/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-              elif (self.catch == 'catchcnclm45'):
-                self.in_rstfile  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                   '/CatchCN/M36/19800101_0000/catchcnclm45_internal_dummy'
-                self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Icarus-NLv3/Icarus-NLv3_EASE/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
+              elif (self.catch == 'catchcnclm51'):
+                sys.exit('Error. RESTART=0 not (yet) available for Catchment-CN5.1.\n')
               else:
-                sys.exit('need to provide at least dummy files')
+                sys.exit('Error. Unknown model version.')
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
