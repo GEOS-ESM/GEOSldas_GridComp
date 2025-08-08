@@ -3164,8 +3164,8 @@ contains
     ! parse met_tag
 
     ! 12345678901234567890123456789
-    ! GEOSs2sv2FCST__ensX__YYYYMMDD
-    ! GEOSs2sv2AODAS
+    ! GEOSs2sv3FCST__ensX__YYYYMMDD
+    ! GEOSs2sv3AODAS
 
     if     (index(met_tag(10:13), 'FCST')/=0) then
 
@@ -3228,8 +3228,7 @@ contains
     ! open input file
 
     if     (FCST)  then
-       fname = trim(met_path) // '/' // init_YYYYMMDD // '/' // ens_num // '/G
-EOSS2S3.' // YYYY // MM // '.nc4'
+       fname = trim(met_path) // '/' // init_YYYYMMDD // '/' // ens_num // '/GEOSS2S3.' // YYYY // MM // '.nc4'
     endif
 
     call GEOS_openfile(FileOpenedHash,fname,fid,tile_coord,met_hinterp,rc,lat_str,lon_str)
@@ -3272,8 +3271,7 @@ EOSS2S3.' // YYYY // MM // '.nc4'
              call MAPL_DeallocNodeArray(ptrShForce,rc=status)
              VERIFY_(status)
           endif
-          call MAPL_AllocateShared(ptrShForce,(/GEOSgcm_grid_N_lon,GEOSgcm_grid_N_lat/),Tr
-ansRoot= .true.,rc=status)
+          call MAPL_AllocateShared(ptrShForce,(/GEOSgcm_grid_N_lon,GEOSgcm_grid_N_lat/),TransRoot= .true.,rc=status)
           VERIFY_(status)
        end if
 
