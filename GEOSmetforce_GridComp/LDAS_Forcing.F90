@@ -320,9 +320,14 @@ contains
        unlimited_Qair                 = .true.
        unlimited_LWdown               = .true.
 
+    elseif (index(met_tag(1:9), 'GEOSs2sv3')/=0) then
+
+       call get_GEOSs2s_v3( date_time_tmp, met_path, met_tag, N_catd, tile_coord, &
+            MET_HINTERP, met_force_obs_tile_new, nodata_forcing)
+
     elseif (index(met_tag(1:7), 'GEOSs2s')/=0) then
 
-       call get_GEOSs2s( date_time_tmp, met_path, met_tag, N_catd, tile_coord, &
+       call get_GEOSs2s_v2( date_time_tmp, met_path, met_tag, N_catd, tile_coord, &
             MET_HINTERP, met_force_obs_tile_new, nodata_forcing, PAR_available)
 
     else ! assume forcing from GEOS5 GCM ("DAS" or "MERRA") output
@@ -2643,7 +2648,7 @@ contains
 
   ! ************************************************************************
   
-  subroutine get_GEOSs2s(date_time, met_path, met_tag, N_catd, tile_coord, &
+  subroutine get_GEOSs2s_v2(date_time, met_path, met_tag, N_catd, tile_coord, &
        met_hinterp, met_force_new, nodata_forcing, PAR_available)
     
     ! read forcing derived from GEOS S2S output and map to tile space
@@ -2758,7 +2763,7 @@ contains
     logical                    :: FCST  = .false.
     logical                    :: AODAS = .false.
     
-    character(len=*), parameter :: Iam = 'get_GEOSs2s'
+    character(len=*), parameter :: Iam = 'get_GEOSs2s_v2'
     character(len=400)          :: err_msg
 
     ! --------------------------------------------------------------------
@@ -3046,7 +3051,315 @@ contains
     deallocate(force_array)
     deallocate(GEOSgcm_name)
     
-  end subroutine get_GEOSs2s
+  end subroutine get_GEOSs2s_v2
+
+  ! ************************************************************************
+  
+  subroutine get_GEOSs2s_v3(date_time, met_path, met_tag, N_catd, tile_coord, &
+       met_hinterp, met_force_new, nodata_forcing)
+    
+    ! read forcing derived from GEOS S2Sv3 output and map to tile space
+    ! (using nearest neighbor or bilinear interpolation)
+    !
+    ! forcing derived through post-processing of daily average output from S2S
+    ! hindcasts/forecasts ("FCST") or the "AODAS" used for initialization
+    ! (see doc/README.MetForcing_and_BCS.md)
+    !
+    ! implementation follows LDASsa subroutines get_Princeton_netcdf() and get_GEOS(),
+    ! fzeng, 24 Jun 2019
+    !
+    ! jkolassa,jmpark,reichle, 10 May - 14 June 2021:
+    !   modified for GEOSldas; added AODAS; met_tag encodes ID of ensemble
+    !   member and initial month/day
+    !   modified to compute precipitation components from total precipitation
+    !   and air temperature (pre-processing of precipitation components was faulty)
+    ! qliu, Aug. 2025
+    !   modified for S2Sv3 fcst data, remove AODAS option, remove PAR_available option
+    
+    use netcdf
+    implicit none
+    include 'mpif.h'
+    
+    type(date_time_type), intent(in) :: date_time
+    
+    character(*),         intent(in) :: met_path
+    character(*),         intent(in) :: met_tag
+    
+    integer,              intent(in) :: N_catd, met_hinterp
+    
+    type(tile_coord_type), dimension(:), pointer       :: tile_coord     ! input
+    
+    type(met_force_type),  dimension(:), intent(inout) :: met_force_new
+    
+    real,                 intent(out) :: nodata_forcing
+
+    ! Hindcast grid and netcdf parameters
+    
+    integer, parameter :: GEOSgcm_grid_N_lon  = 720
+    integer, parameter :: GEOSgcm_grid_N_lat  = 361
+    real,    parameter :: GEOSgcm_grid_dlon   = 0.5
+    real,    parameter :: GEOSgcm_grid_dlat   = 0.5
+    real,    parameter :: GEOSgcm_grid_ll_lon = -180. - GEOSgcm_grid_dlon/2.
+    real,    parameter :: GEOSgcm_grid_ll_lat =  -90. - GEOSgcm_grid_dlat/2.
+    
+    real,    parameter :: nodata_GEOSgcm = -9999.
+    
+    integer, parameter :: dt_GEOSgcm_in_hours_FCST  =  3
+    
+    integer, parameter :: N_GEOSgcm_vars_FCST       =  10 
+    
+    ! variable names in "FCST" forcing files match those in MERRA-2(SWGDN, LWGAB) 
+    ! and S2Sv3 (other variables) file specs
+    
+    character(40), dimension(N_GEOSgcm_vars_FCST) :: GEOSgcm_name_FCST = &
+         (/             &
+         'PLS        ', &  !  1 - flux,  largescale_liquid_precipitation,     kg m-2 s-1
+         'PCU        ', &  !  2 - flux,  convective_liquid_precipitation,     kg m-2 s-1
+         'SNO        ', &  !  3 - flux,  snowfall_precipitation,              kg m-2 s-1
+         'LWGAB      ', &  !  4 - flux,  surface_absorbed_longwave_radiation,  W m-2
+         'SWGDN      ', &  !  5 - flux,  surface_incoming_shortwave_flux,      W m-2
+         'PS         ', &  !  6 - state, surface_pressure,                     Pa
+         'QA         ', &  !  7 - state, surface_specific_humidity,            kg kg-1
+         'TA         ', &  !  8 - state, surface_air_temperature,              K
+         'SPEED      ', &  !  9 - state, surface_wind_speed,                   m s-1
+         'HLML       '  &  ! 10 - state, surface_layer_height,                 m
+         /)
+
+    ! local variables
+    
+    character(40), dimension(:), allocatable  :: GEOSgcm_name
+    
+    integer :: N_GEOSgcm_vars, dt_GEOSgcm_in_hours, N_lon_tmp, N_lat_tmp
+    
+    real    :: fnbr(2,2)
+    
+    integer, pointer :: i1(:), i2(:), j1(:), j2(:)
+    real,    pointer :: x1(:), x2(:), y1(:), y2(:)
+    
+    real,    dimension(:,:), allocatable  :: force_array
+    
+    integer, dimension(3)      :: iicount, iistart
+    integer                    :: k, hours_in_month, GEOSgcm_var, nciv_data
+    integer                    :: fid, rc, nv_id, status
+    
+    real                       :: tol, this_lon, this_lat, Tair_tmp, Totprec_tmp
+    
+    character(  8)             :: init_YYYYMMDD
+    character(  4)             :: YYYY, ens_num
+    character(  2)             :: MM, DD
+    character(300)             :: fname
+    
+    character( 10)             :: lat_str = 'latitude'
+    character( 10)             :: lon_str = 'longitude'
+    
+    logical                    :: FCST  = .false.
+    
+    character(len=*), parameter :: Iam = 'get_GEOSs2s_v3'
+    character(len=400)          :: err_msg
+
+    ! --------------------------------------------------------------------
+    !
+    ! preparations
+
+    ! parse met_tag
+
+    ! 12345678901234567890123456789
+    ! GEOSs2sv2FCST__ensX__YYYYMMDD
+    ! GEOSs2sv2AODAS
+
+    if     (index(met_tag(10:13), 'FCST')/=0) then
+
+       FCST          = .true.
+
+       dt_GEOSgcm_in_hours = dt_GEOSgcm_in_hours_FCST
+       N_GEOSgcm_vars      = N_GEOSgcm_vars_FCST
+
+       allocate(GEOSgcm_name(N_GEOSgcm_vars))
+
+       GEOSgcm_name = GEOSgcm_name_FCST
+
+       ! parse ensemble and initialization month from met_tag
+
+       ens_num    = trim(met_tag(16:19))
+       init_YYYYMMDD = trim(met_tag(22:29))
+
+    else
+
+       err_msg = "unknown met_tag"
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+    end if
+
+    nodata_forcing = nodata_GEOSgcm
+
+    tol = abs(nodata_forcing*nodata_tolfrac_generic)
+
+    ! assemble year and month strings
+
+    write (YYYY, '(i4.4)') date_time%year
+    write (MM,   '(i2.2)') date_time%month
+    write (DD,   '(i2.2)') date_time%day
+
+    ! set lon index
+
+    iistart(1) = 1
+    iicount(1) = GEOSgcm_grid_N_lon
+
+    ! set lat index
+    iistart(2) = 1
+    iicount(2) = GEOSgcm_grid_N_lat
+
+    ! get time index
+
+    if ( (date_time%min/=0) .or. (date_time%sec/=0) .or.              &
+         (mod(date_time%hour, dt_GEOSgcm_in_hours)/=0) ) then
+       
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'timing ERROR!!')
+       
+    endif
+    
+    hours_in_month = (date_time%day-1)*24 + date_time%hour
+    
+    iistart(3) = hours_in_month / dt_GEOSgcm_in_hours + 1
+    iicount(3) = 1
+    
+    ! ----------------------------------------------------------------
+    !
+    ! open input file
+
+    if     (FCST)  then
+       fname = trim(met_path) // '/' // init_YYYYMMDD // '/' // ens_num // '/G
+EOSS2S3.' // YYYY // MM // '.nc4'
+    endif
+
+    call GEOS_openfile(FileOpenedHash,fname,fid,tile_coord,met_hinterp,rc,lat_str,lon_str)
+    if (rc<0) then
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error opening file')
+    endif
+
+    ! assign indices from met forcing interpolation
+
+    i1=>local_info%i1
+    i2=>local_info%i2
+    j1=>local_info%j1
+    j2=>local_info%j2
+    x1=>local_info%x1
+    x2=>local_info%x2
+    y1=>local_info%y1
+    y2=>local_info%y2
+
+    ! allocate force_array
+
+    allocate(force_array(N_catd,N_GEOSgcm_vars))
+    force_array = nodata_forcing
+
+    ! loop over variables
+    
+    do GEOSgcm_var = 1,N_GEOSgcm_vars
+       
+       ! init shared memory
+       N_lon_tmp = -1
+       N_lat_tmp = -1
+       if (associated(ptrShForce)) then
+          N_lon_tmp = size(ptrShForce,1)
+          N_lat_tmp = size(ptrShForce,2)
+       endif
+       if(  (N_lon_tmp /= GEOSgcm_grid_N_lon) .or.          &
+            (N_lat_tmp /= GEOSgcm_grid_N_lat)       ) then
+          call MAPL_SyncSharedMemory(rc=status)
+          VERIFY_(status)
+          if (associated(ptrShForce)) then
+             call MAPL_DeallocNodeArray(ptrShForce,rc=status)
+             VERIFY_(status)
+          endif
+          call MAPL_AllocateShared(ptrShForce,(/GEOSgcm_grid_N_lon,GEOSgcm_grid_N_lat/),Tr
+ansRoot= .true.,rc=status)
+          VERIFY_(status)
+       end if
+
+       call MAPL_SyncSharedMemory(rc=status)
+       VERIFY_(status)
+       
+       ! read variable from netcdf file
+       if (MAPL_AmNodeRoot .or. (.not. MAPL_ShmInitialized)) then
+          rc= NF90_INQ_VARID( fid, trim(GEOSgcm_name(GEOSgcm_var)), nv_id)
+          _ASSERT( rc == nf90_noerr, "nf90 error")
+          rc= NF90_GET_VAR( fid, nv_id, ptrShForce, start=iistart,count=iicount)
+       end if
+       
+       call MAPL_SyncSharedMemory(rc=status)
+       
+       ! map variable array to force array using chosen met interpolation method
+       
+       select case (MET_HINTERP)
+          
+       case(0)  ! nearest neighbor interpolation
+          
+          do k = 1, N_catd
+             force_array(k, GEOSgcm_var) = ptrShForce(i1(k), j1(k))
+          end do
+          
+       case (1)  ! bilinear interpolation
+          
+          do k=1,N_catd
+             this_lon = tile_coord(k)%com_lon
+             this_lat = tile_coord(k)%com_lat
+             
+             fnbr(1,1) = ptrShForce(i1(k),j1(k))
+             fnbr(1,2) = ptrShForce(i1(k),j2(k))
+             fnbr(2,1) = ptrShForce(i2(k),j1(k))
+             fnbr(2,2) = ptrShForce(i2(k),j2(k))
+             
+             !DEC$ FORCEINLINE
+             force_array(k,GEOSgcm_var) = BilinearInterpolation(this_lon, this_lat, &
+                  x1(k), x2(k), y1(k), y2(k), fnbr, nodata_forcing, tol)
+          end do
+          
+       case default
+          
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unsupported MET_HINTERP option')
+          
+       end select
+    end do ! GEOSgcm_var
+    
+    ! ----------------------------------------------------------------
+
+    ! convert variables and units of force_array to match met_force_type,
+    ! put into structure
+
+    ! from GEOSgcm files:
+    !
+    !                     FCST/Hindcast
+    !
+    ! force_array(:, 1) = PLS            kg/m2/s ([gauge-corr]_largescale_rainfall
+    ! force_array(:, 2) = PCU            kg/m2/s ([gauge-corr]_convective_rainfall
+    ! force_array(:, 3) = SNO            kg/m2/s ([gauge-corr]_snowfall
+    ! force_array(:, 2) = LWGAB          W/m2    (surface_absorbed_longwave_radiation)
+    ! force_array(:, 3) = SWGDN          W/m2    (surface_incoming_shortwave_flux)
+    ! force_array(:, 4) = PS             Pa      (surface_pressure)
+    ! force_array(:, 5) = QA             kg/kg   (surface_specific_humidity)
+    ! force_array(:, 6) = TA             K       (surface_air_temperature)
+    ! force_array(:, 7) = SPEED          m/s     (surface_wind_speed)
+    ! force_array(:, 8) = HLML           m       (surface_layer_height)
+
+    if     (FCST) then
+       met_force_new%Rainf     = force_array(:, 1) + force_array(:, 2)
+       met_force_new%Rainf_C   = 0.
+       met_force_new%Snowf     = force_array(:, 3)
+       met_force_new%LWdown    = force_array(:, 4)
+       met_force_new%SWdown    = force_array(:, 5)
+       met_force_new%Psurf     = force_array(:, 6)
+       met_force_new%Qair      = force_array(:, 7)
+       met_force_new%Tair      = force_array(:, 8)
+       met_force_new%Wind      = force_array(:, 9)
+       met_force_new%RefH      = force_array(:,10)
+    end if
+    
+    deallocate(force_array)
+    deallocate(GEOSgcm_name)
+    
+  end subroutine get_GEOSs2s_v3
+
   
   ! *************************************************************************
   
