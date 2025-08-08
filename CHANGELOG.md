@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed zoom value when there is landice. It will be determined by input tilefile
 - Fixed Restart = 1 when the domain is not global
 
 ### Removed
