@@ -3,7 +3,6 @@
 import os
 import sys
 import glob
-import linecache
 import shutil
 import fileinput
 import time
@@ -312,18 +311,7 @@ class ldas:
         inpgeom_= None
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
-            tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
-            extension = os.path.splitext(tmptile)[1]
-            if extension == '.domain':
-              extension = os.path.splitext(tmptile)[0]
-            gridname_ =''
-            if extension == '.til':
-               gridname_ = linecache.getline(tmptile, 3).strip()
-            else:
-               nc_file = netCDF4.Dataset(tmptile,'r')
-               gridname_ = nc_file.getncattr('Grid_Name')
-            # in case it is an old name: SMAP-EASEvx-Mxx
-            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
+            gridname_ = get_gridname(self.ExeInputs['TILING_FILE'])
             self.ExeInputs['GRIDNAME']  = gridname_
 
         if 'POSTPROC_HIST' not in self.ExeInputs:
@@ -867,6 +855,7 @@ class ldas:
            config['output']['surface']['wemin']          = wemin_out
 
            if RESTART_str == "M" : # restart from merra2
+             config['input']['surface']['zoom'] = '2'
              yyyymm = int(YYYYMMDDHH[0:6])
              merra2_expid = "d5124_m2_jan10"
              if yyyymm < 197901 :
@@ -898,7 +887,6 @@ class ldas:
              catch_obj.remap()
            if self.with_landice:
              config['output']['surface']['remap_water'] = True
-             config['input']['surface']['zoom'] = '2'
              landice_obj = lake_landice_saltwater(config_obj = config)
              landice_obj.remap()
 
