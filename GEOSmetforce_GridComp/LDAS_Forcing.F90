@@ -3102,7 +3102,7 @@ contains
     real,    parameter :: GEOSgcm_grid_ll_lon = -180. - GEOSgcm_grid_dlon/2.
     real,    parameter :: GEOSgcm_grid_ll_lat =  -90. - GEOSgcm_grid_dlat/2.
     
-    real,    parameter :: nodata_GEOSgcm = -9999.
+    real,    parameter :: nodata_GEOSgcm = 1.e15
     
     integer, parameter :: dt_GEOSgcm_in_hours_FCST  =  3
     
@@ -3138,10 +3138,12 @@ contains
     
     real,    dimension(:,:), allocatable  :: force_array
     
-    integer, dimension(3)      :: iicount, iistart
+    integer, dimension(3)      :: iicount, iistart, iistart_tmp
     integer                    :: k, hours_in_month, GEOSgcm_var, nciv_data
-    integer                    :: fid, rc, nv_id, status
-    
+    integer                    :: fid, rc, nv_id, status, tdimid
+    integer, parameter         :: odd_months(7) = [1, 3, 5, 7, 8, 10, 12]
+    integer                    :: ttot_in_month, time_len
+ 
     real                       :: tol, this_lon, this_lat, Tair_tmp, Totprec_tmp
     
     character(  8)             :: init_YYYYMMDD
@@ -3149,8 +3151,8 @@ contains
     character(  2)             :: MM, DD
     character(300)             :: fname
     
-    character( 10)             :: lat_str = 'latitude'
-    character( 10)             :: lon_str = 'longitude'
+    character(  3)             :: lat_str = 'lat'
+    character(  3)             :: lon_str = 'lon'
     
     logical                    :: FCST  = .false.
     
@@ -3219,10 +3221,21 @@ contains
     endif
     
     hours_in_month = (date_time%day-1)*24 + date_time%hour
+
+    if (any(date_time%month == odd_months)) then
+       ttot_in_month = 31 * 24 / dt_GEOSgcm_in_hours
+    elseif (date_time%month == 2) then 
+       if (is_leap_year(date_time%year)) then 
+          ttot_in_month = 29 * 24 / dt_GEOSgcm_in_hours
+       else
+          ttot_in_month = 28 * 24 / dt_GEOSgcm_in_hours
+       endif
+    else
+       ttot_in_month = 30 * 24 / dt_GEOSgcm_in_hours
+    endif 
     
     iistart(3) = hours_in_month / dt_GEOSgcm_in_hours + 1
     iicount(3) = 1
-    
     ! ----------------------------------------------------------------
     !
     ! open input file
@@ -3282,7 +3295,15 @@ contains
        if (MAPL_AmNodeRoot .or. (.not. MAPL_ShmInitialized)) then
           rc= NF90_INQ_VARID( fid, trim(GEOSgcm_name(GEOSgcm_var)), nv_id)
           _ASSERT( rc == nf90_noerr, "nf90 error")
-          rc= NF90_GET_VAR( fid, nv_id, ptrShForce, start=iistart,count=iicount)
+          rc= nf90_inq_dimid(fid,"time",tdimid)
+          _ASSERT( rc == nf90_noerr, "nf90 error")
+          rc= nf90_Inquire_Dimension(fid, tdimid,  len=time_len)
+          _ASSERT( rc == nf90_noerr, "nf90 error")
+
+          iistart_tmp = iistart
+          iistart_tmp(3) = iistart(3) - (ttot_in_month-time_len)
+          ! some monthly file contains only partial temporal record 
+          rc= NF90_GET_VAR( fid, nv_id, ptrShForce, start=iistart_tmp,count=iicount)
        end if
        
        call MAPL_SyncSharedMemory(rc=status)
@@ -3319,7 +3340,6 @@ contains
           
        end select
     end do ! GEOSgcm_var
-    
     ! ----------------------------------------------------------------
 
     ! convert variables and units of force_array to match met_force_type,
@@ -3332,13 +3352,13 @@ contains
     ! force_array(:, 1) = PLS            kg/m2/s ([gauge-corr]_largescale_rainfall
     ! force_array(:, 2) = PCU            kg/m2/s ([gauge-corr]_convective_rainfall
     ! force_array(:, 3) = SNO            kg/m2/s ([gauge-corr]_snowfall
-    ! force_array(:, 2) = LWGAB          W/m2    (surface_absorbed_longwave_radiation)
-    ! force_array(:, 3) = SWGDN          W/m2    (surface_incoming_shortwave_flux)
-    ! force_array(:, 4) = PS             Pa      (surface_pressure)
-    ! force_array(:, 5) = QA             kg/kg   (surface_specific_humidity)
-    ! force_array(:, 6) = TA             K       (surface_air_temperature)
-    ! force_array(:, 7) = SPEED          m/s     (surface_wind_speed)
-    ! force_array(:, 8) = HLML           m       (surface_layer_height)
+    ! force_array(:, 4) = LWGAB          W/m2    (surface_absorbed_longwave_radiation)
+    ! force_array(:, 5) = SWGDN          W/m2    (surface_incoming_shortwave_flux)
+    ! force_array(:, 6) = PS             Pa      (surface_pressure)
+    ! force_array(:, 7) = QA             kg/kg   (surface_specific_humidity)
+    ! force_array(:, 8) = TA             K       (surface_air_temperature)
+    ! force_array(:, 9) = SPEED          m/s     (surface_wind_speed)
+    ! force_array(:,10) = HLML           m       (surface_layer_height)
 
     if     (FCST) then
        met_force_new%Rainf     = force_array(:, 1) + force_array(:, 2)
