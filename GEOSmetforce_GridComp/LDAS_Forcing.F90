@@ -38,7 +38,8 @@ module LDAS_ForceMod
        datetime_lt_refdatetime,                   &
        datetime_le_refdatetime,                   &
        is_leap_year,                              &
-       get_dofyr_pentad
+       get_dofyr_pentad,                          &
+       days_in_month
 
   use LDAS_ExceptionsMod,               ONLY:     &
        ldas_abort,                                &
@@ -319,11 +320,6 @@ contains
        
        unlimited_Qair                 = .true.
        unlimited_LWdown               = .true.
-
-    elseif (index(met_tag(1:9), 'GEOSs2sv3')/=0) then
-
-       call get_GEOSs2s_v3( date_time_tmp, met_path, met_tag, N_catd, tile_coord, &
-            MET_HINTERP, met_force_obs_tile_new, nodata_forcing)
 
     elseif (index(met_tag(1:7), 'GEOSs2s')/=0) then
 
@@ -3053,332 +3049,6 @@ contains
     
   end subroutine get_GEOSs2s_v2
 
-  ! ************************************************************************
-  
-  subroutine get_GEOSs2s_v3(date_time, met_path, met_tag, N_catd, tile_coord, &
-       met_hinterp, met_force_new, nodata_forcing)
-    
-    ! read forcing derived from GEOS S2Sv3 output and map to tile space
-    ! (using nearest neighbor or bilinear interpolation)
-    !
-    ! forcing derived through post-processing of daily average output from S2S
-    ! hindcasts/forecasts ("FCST") or the "AODAS" used for initialization
-    ! (see doc/README.MetForcing_and_BCS.md)
-    !
-    ! implementation follows LDASsa subroutines get_Princeton_netcdf() and get_GEOS(),
-    ! fzeng, 24 Jun 2019
-    !
-    ! jkolassa,jmpark,reichle, 10 May - 14 June 2021:
-    !   modified for GEOSldas; added AODAS; met_tag encodes ID of ensemble
-    !   member and initial month/day
-    !   modified to compute precipitation components from total precipitation
-    !   and air temperature (pre-processing of precipitation components was faulty)
-    ! qliu, Aug. 2025
-    !   modified for S2Sv3 fcst data, remove AODAS option, remove PAR_available option
-    
-    use netcdf
-    implicit none
-    include 'mpif.h'
-    
-    type(date_time_type), intent(in) :: date_time
-    
-    character(*),         intent(in) :: met_path
-    character(*),         intent(in) :: met_tag
-    
-    integer,              intent(in) :: N_catd, met_hinterp
-    
-    type(tile_coord_type), dimension(:), pointer       :: tile_coord     ! input
-    
-    type(met_force_type),  dimension(:), intent(inout) :: met_force_new
-    
-    real,                 intent(out) :: nodata_forcing
-
-    ! Hindcast grid and netcdf parameters
-    
-    integer, parameter :: GEOSgcm_grid_N_lon  = 720
-    integer, parameter :: GEOSgcm_grid_N_lat  = 361
-    real,    parameter :: GEOSgcm_grid_dlon   = 0.5
-    real,    parameter :: GEOSgcm_grid_dlat   = 0.5
-    real,    parameter :: GEOSgcm_grid_ll_lon = -180. - GEOSgcm_grid_dlon/2.
-    real,    parameter :: GEOSgcm_grid_ll_lat =  -90. - GEOSgcm_grid_dlat/2.
-    
-    real,    parameter :: nodata_GEOSgcm = 1.e15
-    
-    integer, parameter :: dt_GEOSgcm_in_hours_FCST  =  3
-    
-    integer, parameter :: N_GEOSgcm_vars_FCST       =  10 
-    
-    ! variable names in "FCST" forcing files match those in MERRA-2(SWGDN, LWGAB) 
-    ! and S2Sv3 (other variables) file specs
-    
-    character(40), dimension(N_GEOSgcm_vars_FCST) :: GEOSgcm_name_FCST = &
-         (/             &
-         'PLS        ', &  !  1 - flux,  largescale_liquid_precipitation,     kg m-2 s-1
-         'PCU        ', &  !  2 - flux,  convective_liquid_precipitation,     kg m-2 s-1
-         'SNO        ', &  !  3 - flux,  snowfall_precipitation,              kg m-2 s-1
-         'LWGAB      ', &  !  4 - flux,  surface_absorbed_longwave_radiation,  W m-2
-         'SWGDN      ', &  !  5 - flux,  surface_incoming_shortwave_flux,      W m-2
-         'PS         ', &  !  6 - state, surface_pressure,                     Pa
-         'QA         ', &  !  7 - state, surface_specific_humidity,            kg kg-1
-         'TA         ', &  !  8 - state, surface_air_temperature,              K
-         'SPEED      ', &  !  9 - state, surface_wind_speed,                   m s-1
-         'HLML       '  &  ! 10 - state, surface_layer_height,                 m
-         /)
-
-    ! local variables
-    
-    character(40), dimension(:), allocatable  :: GEOSgcm_name
-    
-    integer :: N_GEOSgcm_vars, dt_GEOSgcm_in_hours, N_lon_tmp, N_lat_tmp
-    
-    real    :: fnbr(2,2)
-    
-    integer, pointer :: i1(:), i2(:), j1(:), j2(:)
-    real,    pointer :: x1(:), x2(:), y1(:), y2(:)
-    
-    real,    dimension(:,:), allocatable  :: force_array
-    
-    integer, dimension(3)      :: iicount, iistart, iistart_tmp
-    integer                    :: k, hours_in_month, GEOSgcm_var, nciv_data
-    integer                    :: fid, rc, nv_id, status, tdimid
-    integer, parameter         :: odd_months(7) = [1, 3, 5, 7, 8, 10, 12]
-    integer                    :: ttot_in_month, time_len
- 
-    real                       :: tol, this_lon, this_lat, Tair_tmp, Totprec_tmp
-    
-    character(  8)             :: init_YYYYMMDD
-    character(  4)             :: YYYY, ens_num
-    character(  2)             :: MM, DD
-    character(300)             :: fname
-    
-    character(  3)             :: lat_str = 'lat'
-    character(  3)             :: lon_str = 'lon'
-    
-    logical                    :: FCST  = .false.
-    
-    character(len=*), parameter :: Iam = 'get_GEOSs2s_v3'
-    character(len=400)          :: err_msg
-
-    ! --------------------------------------------------------------------
-    !
-    ! preparations
-
-    ! parse met_tag
-
-    ! 12345678901234567890123456789
-    ! GEOSs2sv3FCST__ensX__YYYYMMDD
-    ! GEOSs2sv3AODAS
-
-    if     (index(met_tag(10:13), 'FCST')/=0) then
-
-       FCST          = .true.
-
-       dt_GEOSgcm_in_hours = dt_GEOSgcm_in_hours_FCST
-       N_GEOSgcm_vars      = N_GEOSgcm_vars_FCST
-
-       allocate(GEOSgcm_name(N_GEOSgcm_vars))
-
-       GEOSgcm_name = GEOSgcm_name_FCST
-
-       ! parse ensemble and initialization month from met_tag
-
-       ens_num    = trim(met_tag(16:19))
-       init_YYYYMMDD = trim(met_tag(22:29))
-
-    else
-
-       err_msg = "unknown met_tag"
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-
-    end if
-
-    nodata_forcing = nodata_GEOSgcm
-
-    tol = abs(nodata_forcing*nodata_tolfrac_generic)
-
-    ! assemble year and month strings
-
-    write (YYYY, '(i4.4)') date_time%year
-    write (MM,   '(i2.2)') date_time%month
-    write (DD,   '(i2.2)') date_time%day
-
-    ! set lon index
-
-    iistart(1) = 1
-    iicount(1) = GEOSgcm_grid_N_lon
-
-    ! set lat index
-    iistart(2) = 1
-    iicount(2) = GEOSgcm_grid_N_lat
-
-    ! get time index
-
-    if ( (date_time%min/=0) .or. (date_time%sec/=0) .or.              &
-         (mod(date_time%hour, dt_GEOSgcm_in_hours)/=0) ) then
-       
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'timing ERROR!!')
-       
-    endif
-    
-    hours_in_month = (date_time%day-1)*24 + date_time%hour
-
-    if (any(date_time%month == odd_months)) then
-       ttot_in_month = 31 * 24 / dt_GEOSgcm_in_hours
-    elseif (date_time%month == 2) then 
-       if (is_leap_year(date_time%year)) then 
-          ttot_in_month = 29 * 24 / dt_GEOSgcm_in_hours
-       else
-          ttot_in_month = 28 * 24 / dt_GEOSgcm_in_hours
-       endif
-    else
-       ttot_in_month = 30 * 24 / dt_GEOSgcm_in_hours
-    endif 
-    
-    iistart(3) = hours_in_month / dt_GEOSgcm_in_hours + 1
-    iicount(3) = 1
-    ! ----------------------------------------------------------------
-    !
-    ! open input file
-
-    if     (FCST)  then
-       fname = trim(met_path) // '/' // init_YYYYMMDD // '/' // ens_num // '/GEOSS2S3.' // YYYY // MM // '.nc4'
-    endif
-
-    call GEOS_openfile(FileOpenedHash,fname,fid,tile_coord,met_hinterp,rc,lat_str,lon_str)
-    if (rc<0) then
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error opening file')
-    endif
-
-    ! assign indices from met forcing interpolation
-
-    i1=>local_info%i1
-    i2=>local_info%i2
-    j1=>local_info%j1
-    j2=>local_info%j2
-    x1=>local_info%x1
-    x2=>local_info%x2
-    y1=>local_info%y1
-    y2=>local_info%y2
-
-    ! allocate force_array
-
-    allocate(force_array(N_catd,N_GEOSgcm_vars))
-    force_array = nodata_forcing
-
-    ! loop over variables
-    
-    do GEOSgcm_var = 1,N_GEOSgcm_vars
-       
-       ! init shared memory
-       N_lon_tmp = -1
-       N_lat_tmp = -1
-       if (associated(ptrShForce)) then
-          N_lon_tmp = size(ptrShForce,1)
-          N_lat_tmp = size(ptrShForce,2)
-       endif
-       if(  (N_lon_tmp /= GEOSgcm_grid_N_lon) .or.          &
-            (N_lat_tmp /= GEOSgcm_grid_N_lat)       ) then
-          call MAPL_SyncSharedMemory(rc=status)
-          VERIFY_(status)
-          if (associated(ptrShForce)) then
-             call MAPL_DeallocNodeArray(ptrShForce,rc=status)
-             VERIFY_(status)
-          endif
-          call MAPL_AllocateShared(ptrShForce,(/GEOSgcm_grid_N_lon,GEOSgcm_grid_N_lat/),TransRoot= .true.,rc=status)
-          VERIFY_(status)
-       end if
-
-       call MAPL_SyncSharedMemory(rc=status)
-       VERIFY_(status)
-       
-       ! read variable from netcdf file
-       if (MAPL_AmNodeRoot .or. (.not. MAPL_ShmInitialized)) then
-          rc= NF90_INQ_VARID( fid, trim(GEOSgcm_name(GEOSgcm_var)), nv_id)
-          _ASSERT( rc == nf90_noerr, "nf90 error")
-          rc= nf90_inq_dimid(fid,"time",tdimid)
-          _ASSERT( rc == nf90_noerr, "nf90 error")
-          rc= nf90_Inquire_Dimension(fid, tdimid,  len=time_len)
-          _ASSERT( rc == nf90_noerr, "nf90 error")
-
-          iistart_tmp = iistart
-          iistart_tmp(3) = iistart(3) - (ttot_in_month-time_len)
-          ! some monthly file contains only partial temporal record 
-          rc= NF90_GET_VAR( fid, nv_id, ptrShForce, start=iistart_tmp,count=iicount)
-       end if
-       
-       call MAPL_SyncSharedMemory(rc=status)
-       
-       ! map variable array to force array using chosen met interpolation method
-       
-       select case (MET_HINTERP)
-          
-       case(0)  ! nearest neighbor interpolation
-          
-          do k = 1, N_catd
-             force_array(k, GEOSgcm_var) = ptrShForce(i1(k), j1(k))
-          end do
-          
-       case (1)  ! bilinear interpolation
-          
-          do k=1,N_catd
-             this_lon = tile_coord(k)%com_lon
-             this_lat = tile_coord(k)%com_lat
-             
-             fnbr(1,1) = ptrShForce(i1(k),j1(k))
-             fnbr(1,2) = ptrShForce(i1(k),j2(k))
-             fnbr(2,1) = ptrShForce(i2(k),j1(k))
-             fnbr(2,2) = ptrShForce(i2(k),j2(k))
-             
-             !DEC$ FORCEINLINE
-             force_array(k,GEOSgcm_var) = BilinearInterpolation(this_lon, this_lat, &
-                  x1(k), x2(k), y1(k), y2(k), fnbr, nodata_forcing, tol)
-          end do
-          
-       case default
-          
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unsupported MET_HINTERP option')
-          
-       end select
-    end do ! GEOSgcm_var
-    ! ----------------------------------------------------------------
-
-    ! convert variables and units of force_array to match met_force_type,
-    ! put into structure
-
-    ! from GEOSgcm files:
-    !
-    !                     FCST/Hindcast
-    !
-    ! force_array(:, 1) = PLS            kg/m2/s ([gauge-corr]_largescale_rainfall
-    ! force_array(:, 2) = PCU            kg/m2/s ([gauge-corr]_convective_rainfall
-    ! force_array(:, 3) = SNO            kg/m2/s ([gauge-corr]_snowfall
-    ! force_array(:, 4) = LWGAB          W/m2    (surface_absorbed_longwave_radiation)
-    ! force_array(:, 5) = SWGDN          W/m2    (surface_incoming_shortwave_flux)
-    ! force_array(:, 6) = PS             Pa      (surface_pressure)
-    ! force_array(:, 7) = QA             kg/kg   (surface_specific_humidity)
-    ! force_array(:, 8) = TA             K       (surface_air_temperature)
-    ! force_array(:, 9) = SPEED          m/s     (surface_wind_speed)
-    ! force_array(:,10) = HLML           m       (surface_layer_height)
-
-    if     (FCST) then
-       met_force_new%Rainf     = force_array(:, 1) + force_array(:, 2)
-       met_force_new%Rainf_C   = 0.
-       met_force_new%Snowf     = force_array(:, 3)
-       met_force_new%LWdown    = force_array(:, 4)
-       met_force_new%SWdown    = force_array(:, 5)
-       met_force_new%Psurf     = force_array(:, 6)
-       met_force_new%Qair      = force_array(:, 7)
-       met_force_new%Tair      = force_array(:, 8)
-       met_force_new%Wind      = force_array(:, 9)
-       met_force_new%RefH      = force_array(:,10)
-    end if
-    
-    deallocate(force_array)
-    deallocate(GEOSgcm_name)
-    
-  end subroutine get_GEOSs2s_v3
-
-  
   ! *************************************************************************
   
   subroutine get_GEOS( date_time, force_dtstep, met_path, met_tag,             &
@@ -3516,6 +3186,8 @@ contains
     character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CCOR_defs
     character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CCSINT_defs
     character(40), dimension(N_M21C_vars,               N_defs_cols) :: M21CCSCOR_defs
+    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: S2S3FCST_defs
+    character(40), dimension(N_G5DAS_vars,              N_defs_cols) :: S2S3AODAS_defs
 
     character(40), dimension(:,:), allocatable :: GEOSgcm_defs
 
@@ -3548,8 +3220,10 @@ contains
 
     logical :: minimize_shift, use_prec_corr, use_bkg, tmp_init
 
-    logical :: daily_met_files, daily_precipcorr_files
-    
+    logical :: daily_met_files, daily_precipcorr_files 
+   
+    logical :: is_S2S3_fcst
+ 
     integer :: nv_id, ierr, icount(3), istart(3), lonid, latid
 
     character(len=*), parameter :: Iam = 'get_GEOS'
@@ -3586,6 +3260,33 @@ contains
     G5DAS_defs(11,:)=[character(len=40):: 'QLML    ','inst','inst1_2d_lfo_Nx','diag','S']    
     G5DAS_defs(12,:)=[character(len=40):: 'SPEEDLML','inst','inst1_2d_lfo_Nx','diag','S']    
 
+    ! -----------------------------------------------------------------------
+    !
+    ! define GEOS5 S2Sv3 FCST specs 
+    !
+
+    S2S3FCST_defs( 1,:)=[character(len=40):: 'SWGDN   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 2,:)=[character(len=40):: 'LWGAB   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 3,:)=[character(len=40):: 'PARDR   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 4,:)=[character(len=40):: 'PARDF   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 5,:)=[character(len=40):: 'PCU     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 6,:)=[character(len=40):: 'PLS     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 7,:)=[character(len=40):: 'SNO     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 8,:)=[character(len=40):: 'PS      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 9,:)=[character(len=40):: 'HLML    ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs(10,:)=[character(len=40):: 'TA      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs(11,:)=[character(len=40):: 'QA      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs(12,:)=[character(len=40):: 'SPEED   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+
+    ! -----------------------------------------------------------------------
+    !
+    ! define GEOS5 S2Sv3 AODAS specs 
+    !
+
+    S2S3AODAS_defs = S2S3FCST_defs
+    S2S3AODAS_defs( 5,:)=[character(len=40):: 'PCUCORR','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3AODAS_defs( 6,:)=[character(len=40):: 'PLSCORR','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3AODAS_defs( 7,:)=[character(len=40):: 'SNOCORR','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
 
     ! -----------------------------------------------------------------------
     !
@@ -3988,8 +3689,10 @@ contains
     met_file_ext         = 'nc4'       
     
     daily_met_files      = .false.
-    
+
     precip_corr_file_ext = 'nc4'
+
+    is_S2S3_fcst         = .false.
     
     if     (met_tag(4:8)=='merra') then   ! MERRA
        
@@ -4104,7 +3807,39 @@ contains
        call parse_MERRA2_met_tag( met_path, met_tag, date_time_bkwd,         &
             met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr )
 
-       
+
+    elseif (met_tag(1:8)=='GEOSS2S3') then    ! GEOS S2S v3
+
+       N_GEOSgcm_vars = N_G5DAS_vars
+
+       PAR_available = .false.                 ! S2Sv3 doesn't hae PARxx
+
+       single_time_in_file = .false.           ! FCST are in monthly,AODAS in daily 
+
+       if (met_tag(9:12)=='FCST') then
+
+          is_S2S3_fcst = .true.
+
+          GEOSgcm_defs = S2S3FCST_defs
+
+       elseif (met_tag(9:13)=='AODAS') then
+
+          daily_met_files = .true.
+
+          GEOSgcm_defs = S2S3AODAS_defs
+
+       else
+
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown "GEOSS2S3[xxx]" met_tag')
+
+       end if
+
+       met_path_fwd = met_path
+       met_tag_fwd  = met_tag
+
+       met_path_bkwd = met_path
+       met_tag_bkwd  = met_tag
+
     else     ! GEOS ADAS (FP, GEOSIT)
 
        call parse_G5DAS_met_tag( met_path, met_tag, date_time_inst,          &
@@ -4169,6 +3904,7 @@ contains
        ! if (init==.true.) make second attempt (j=2) to allow for possibly 
        ! missing "diag_sfc" or "tavg" file at date_time_bkwd (and try reading 
        ! the file at date_time_fwd).
+       if (PAR_available .or. (GEOSgcm_var<3 .or. GEOSgcm_var>4)) then ! skip PARDR/DF for S2Sv3 
        
        do j=1,2
           
@@ -4221,31 +3957,36 @@ contains
              single_time_in_file = .not. daily_met_files  ! MERRA-2 files are daily files
 
           end if
-          
-          if ( file_exists) then
+
+
+          if (.not.(is_S2S3_fcst .and. tmp_init .and. (j==1)) ) then   ! always skip first timestep bkwd for S2Sv3 fcst
+ 
+             if ( file_exists ) then 
+
+                exit  ! exit j loop after successfully finding file
              
-             exit  ! exit j loop after successfully finding file
+             elseif (                                                               &
+                  (j==1)                                       .and.                &
+                  (tmp_init)                                   .and.                &
+                  (trim(GEOSgcm_defs(GEOSgcm_var,2))=='tavg')  .and.                &
+                  (root_logit)                                       ) then
              
-          elseif (                                                               &
-               (j==1)                                       .and.                &
-               (tmp_init)                                   .and.                &
-               (trim(GEOSgcm_defs(GEOSgcm_var,2))=='tavg')  .and.                &
-               (root_logit)                                       ) then
+                if (.not. MERRA_file_specs)  write (logunit,'(400A)')               &
+                     'NOTE: Initialization. Data from tavg file are not used '  //  &
+                     'with lfo inst/tavg forcing, but dummy values must be '    //  &
+                     'read from some file for backward compatibility with '     //  &
+                     'MERRA forcing.'
              
-             if (.not. MERRA_file_specs)  write (logunit,'(400A)')               &
-                  'NOTE: Initialization. Data from tavg file are not used '  //  &
-                  'with lfo inst/tavg forcing, but dummy values must be '    //  &
-                  'read from some file for backward compatibility with '     //  &
-                  'MERRA forcing.'
+                write (logunit,*) 'try again with different file...'
              
-             write (logunit,*) 'try again with different file...'
+             else
              
-          else
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error finding met forcing file')
              
-             call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error finding met forcing file')
-             
-          end if
-          
+             end if ! if(file_exists)
+
+          end if    ! if(.not.(is_S2S3_fcst xxx)
+
        end do  ! j=1,2
 
        ! open file, extract coord info, prep horizontal interpolation info (if not done already)
@@ -4292,9 +4033,8 @@ contains
        ! ----------------------------------------------    
        !
        ! read global gridded field of given variable
-       
        call LDAS_GetVar( fid, trim(GEOSgcm_defs(GEOSgcm_var,1)),                  &
-               YYYYMMDD, HHMMSS, single_time_in_file, local_info, ptrShForce, rc)
+               YYYYMMDD, HHMMSS, single_time_in_file, is_S2S3_fcst, local_info, ptrShForce, rc)
        if (rc<0) then
            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error reading gfio file')
        endif 
@@ -4382,9 +4122,9 @@ contains
              HHMMSS   = date_time_tmp%hour*10000+date_time_tmp%min*100  +date_time_tmp%sec
              
              ! read global gridded field of given variable
-             
+
              call LDAS_GetVar( fid, trim(GEOSgcm_defs(GEOSgcm_var,1)),         &
-               YYYYMMDD, HHMMSS, .false., local_info, ptrShForce, rc)
+               YYYYMMDD, HHMMSS, .false.,.false., local_info, ptrShForce, rc)
              
              if (rc<0) then
                 err_msg = 'error reading gfio file'
@@ -4443,7 +4183,7 @@ contains
           end if    ! if (fid>0)
           
        end if       ! if (minimize_shift) .and. [...]
-       
+       end if       ! if (PAR_avaialble .or. [...]  
     end do          ! do GEOSgcm_var = 1,N_GEOSgcm_vars
 
     call FileOpenedHash%free( GEOS_closefile,.false. )
@@ -4483,9 +4223,12 @@ contains
     
     met_force_new%SWdown    = force_array(:, 1)
     met_force_new%LWdown    = force_array(:, 2)
-    met_force_new%PARdrct   = force_array(:, 3)
-    met_force_new%PARdffs   = force_array(:, 4)
-    
+
+    if (PAR_available) then
+       met_force_new%PARdrct   = force_array(:, 3)
+       met_force_new%PARdffs   = force_array(:, 4)
+    end if
+
     met_force_new%Psurf     = force_array(:, 8)
     
     met_force_new%RefH      = force_array(:, 9)
@@ -4635,7 +4378,7 @@ contains
   
   ! ******************************************************************
   
-  subroutine LDAS_GetVar(fid, vname, yyyymmdd, hhmmss, single_time_in_file, local_info,  &
+  subroutine LDAS_GetVar(fid, vname, yyyymmdd, hhmmss, single_time_in_file, is_S2S3_fcst, local_info,  &
        ptrShForce, rc)
 
     ! get LDAS forcing variable 
@@ -4649,6 +4392,7 @@ contains
     integer,          intent(in)    ::  yyyymmdd            ! Year-month-day, e.g., 19971003
     integer,          intent(in)    ::  hhmmss              ! Hour-minute-second, e.g., 120000
     logical,          intent(in)    ::  single_time_in_file ! if true, no time index is necessary
+    logical,          intent(in)    ::  is_S2S3_fcst        ! S2S3 fcst data are in monthly file 
     type(local_grid), intent(in)    ::  local_info
     !OUTPUT PARAMETERS:
     real, pointer,    intent(inout) ::  ptrShForce(:,:)     ! Gridded data read for this time
@@ -4662,6 +4406,8 @@ contains
     type(c_ptr)                  :: c_address
     integer                      :: nv_id,imin, jmin, imax, jmax,ierr
     integer                      :: DiffDate
+    integer                      :: dt_hours, day,month,year, hour 
+    integer                      :: tdimid, timeFull, timeLen  
     integer                      :: status
     character(*), parameter      :: Iam="LDAS_getvar" 
     logical                      :: isCubed                             ! forcing on cs grid: true/false
@@ -4682,7 +4428,26 @@ contains
        iicount(3) = 1
     endif
     
-    if (.not. single_time_in_file ) then   ! determine start index
+    if (is_S2S3_fcst) then
+       dt_hours = 3   ! forcing time interval
+       day =  mod (yyyymmdd,100)
+       month =  mod (yyyymmdd - day, 10000)/100
+       year =  (yyyymmdd - month*100 -day) / 10000
+       hour =  hhmmss / 10000
+       if ( MOD(hour-1,dt_hours) .eq. 0) then
+          ! S2S3 monthly forecast files store a limited temporal range of records,
+          ! beginning at the forecast initial date minus 1.5 hours and ending at month's end.
+          ! The following information combined with the time dimension size calculates the 
+          ! record index corresponding to the current timestamp within this file structure.
+          timeIndex = int(((day-1)*24 + hour) /dt_hours) + 1    ! the index of current time in a month 
+          timeFull = days_in_month(year, month) * 24 / 3        ! number of time record for the full month
+       else
+          print *, 'LDAS_GetVar: S2Sv3 forcing require times fall on 1:30,4:30,...'
+          rc = -6
+          return
+       end if 
+      
+    elseif (.not. single_time_in_file ) then   ! determine start index
        call GetBegDateTime ( fid, begDate, begTime, incSecs, rc )
        if (rc .NE. 0) then
           print *, 'LDAS_GetVar: could not determine begin_date/begin_time'
@@ -4727,6 +4492,14 @@ contains
           call c_f_pointer(c_address,tmpShared,shape=icount)
           rc= NF90_GET_VAR( fid, nv_id, tmpShared, start=istart,count=icount) 
        else
+          if (is_S2S3_fcst) then
+             rc= nf90_inq_dimid(fid,"time",tdimid)
+             _ASSERT( rc == nf90_noerr, "nf90 error")
+             rc= nf90_Inquire_Dimension(fid, tdimid,  len=timeLen)
+             _ASSERT( rc == nf90_noerr, "nf90 error")
+             iistart(3) = timeIndex - (timeFull - timeLen)
+          end if
+
           rc= NF90_GET_VAR( fid, nv_id, ptrShForce, start=iistart,count=iicount) 
        endif
        _ASSERT( rc == nf90_noerr, "nf90 error")
@@ -5870,6 +5643,8 @@ contains
     character( 16) :: time_stamp
     character(  4) :: YYYY,  HHMM, day_dir
     character(  2) :: MM,    DD  
+    character(  8) :: init_YYYYMMDD  ! S2Sv3 initial date, e.g. "20160101" 
+    character(  4) :: ens_num        ! S2Sv3 ensemble member, e.g. "ens1" 
 
     integer        :: tmpind, tmpindend
 
@@ -5894,7 +5669,7 @@ contains
     if (daily_file) then
        
        time_stamp(1:8)  = YYYY // MM // DD
-       
+
     elseif (                                                                    & 
          index(met_tag,'GEOSIT') > 0  .or.  index(met_tag,'geosit') > 0  .or.   &
          index(met_tag,'M21C'  ) > 0  .or.  index(met_tag,'m21c'  ) > 0         &
@@ -5929,12 +5704,25 @@ contains
 
        day_dir = 'D' // DD // '/'
 
+    elseif (met_tag(1:12) == 'GEOSS2S3FCST') then  
+       ! parse met_tag
+
+       ! 1234567890123456789012345678
+       ! GEOSS2S3FCST__ensX__YYYYMMDD
+       ! GEOSS2S3AODAS
+ 
+       ens_num       = trim(met_tag(15:18))
+       init_YYYYMMDD = trim(met_tag(21:28))
+
+       fname = init_YYYYMMDD // '/' // ens_num // '/GEOSS2S3.' // YYYY // MM // '.nc4' 
+
     else
        
        ! GEOS FP with experiment-specific file names and MERRA-2, e.g.,
        !
        !    f525_p5_fp.inst1_2d_lfo_Nx.20200507_0000z.nc4
        !    MERRA2_400.inst1_2d_lfo_Nx.20200507.nc4
+       !    
        
        fname = trim(met_tag) // '.' // trim(GEOSgcm_defs(3)) // '.' // &
             trim(time_stamp) // '.' // trim(file_ext)
