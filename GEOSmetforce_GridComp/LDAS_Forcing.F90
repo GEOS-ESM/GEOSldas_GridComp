@@ -324,6 +324,9 @@ contains
 
     elseif (index(met_tag(1:7), 'GEOSs2s')/=0) then
 
+       ! IMPORTANT: met_tag = GEOSs2s*  for S2S v2 (note lower case "s2s")
+       !            met_tag = GEOSS2S3* for S2S v3 (note upper case "S2S") --> handled by get_GEOS() in "else" block
+       
        call get_GEOSs2s_v2( date_time_tmp, met_path, met_tag, N_catd, tile_coord, &
             MET_HINTERP, met_force_obs_tile_new, nodata_forcing, PAR_available)
 
@@ -3644,10 +3647,15 @@ contains
     ! define GEOS S2S3 AODAS specs; same as FCST except for corrected precip
 
     S2S3AODAS_defs = S2S3FCST_defs
-    
-    S2S3AODAS_defs( 5,1)=[character(len=40):: 'PCUCORR']
-    S2S3AODAS_defs( 6,1)=[character(len=40):: 'PLSCORR']
-    S2S3AODAS_defs( 7,1)=[character(len=40):: 'SNOCORR']
+
+    ! character(40):                            
+    !                                                   1         2         3         4
+    !                                          1234567890123456789012345678901234567890     
+                                              
+                                              
+    S2S3AODAS_defs( 5,1)=[                    'PCUCORR                                 ']
+    S2S3AODAS_defs( 6,1)=[                    'PLSCORR                                 ']
+    S2S3AODAS_defs( 7,1)=[                    'SNOCORR                                 ']
 
     
     ! --------------------------------------------------------------------
