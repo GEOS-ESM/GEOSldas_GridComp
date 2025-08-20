@@ -3910,7 +3910,7 @@ contains
 
     do GEOSgcm_var = 1,N_GEOSgcm_vars
 
-       if (GEOSgcm_defs(GEOSgcm_var,1)=="dummy")  cycle   ! skip "dummy" variable (e.g., no PAR for S2S3)
+       if (trim(GEOSgcm_defs(GEOSgcm_var,1))=="dummy")  cycle   ! skip "dummy" variable (e.g., no PAR for S2S3)
        
        ! open GEOS file (G5DAS or MERRA or MERRA-2)
        ! 
