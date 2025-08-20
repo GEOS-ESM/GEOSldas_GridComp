@@ -3939,9 +3939,9 @@ contains
              ! special S2S3 FCST case: must skip j==1 at S2S3 FCST initialization time because (monthly) file
              !                         exists but does not contain data for "date_time_bkwd"
              
-             write (YYYYMMDD(1:4),'(i4.4)') date_time_tmp%year
-             write (YYYYMMDD(5:6),'(i2.2)') date_time_tmp%month
-             write (YYYYMMDD(7:8),'(i2.2)') date_time_tmp%day
+             write (S2S3_init_YYYYMMDD(1:4),'(i4.4)') date_time_tmp%year
+             write (S2S3_init_YYYYMMDD(5:6),'(i2.2)') date_time_tmp%month
+             write (S2S3_init_YYYYMMDD(7:8),'(i2.2)') date_time_tmp%day
              
              date_time_tmp%hour = 0
              date_time_tmp%min  = 0
@@ -3949,7 +3949,7 @@ contains
              
              call augment_date_time( -force_dtstep, date_time_tmp )   ! S2S3 fcst is initialized at S2S3_init_YYYYMMDD minus 3 hours
              
-             if datetime_eq_refdatetime( date_time_tmp, date_time_inst )  cycle   ! skip to j==2, i.e., try "date_time_fwd"
+             if (datetime_eq_refdatetime( date_time_tmp, date_time_inst ))  cycle   ! skip to j==2, i.e., try "date_time_fwd"
              
           end if
           
