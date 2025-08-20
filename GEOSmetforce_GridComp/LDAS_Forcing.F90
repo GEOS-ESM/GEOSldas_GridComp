@@ -3211,6 +3211,8 @@ contains
     character(  3)       :: met_file_ext
     character(  3)       :: precip_corr_file_ext
 
+    character(  8)       :: S2S3_init_YYYYMMDD
+        
     integer :: N_GEOSgcm_vars, N_lon_tmp, N_lat_tmp    
 
     real    :: this_lon, this_lat
@@ -3231,7 +3233,7 @@ contains
     logical :: daily_met_files, daily_precipcorr_files 
    
     logical :: is_S2S3_fcst
- 
+
     integer :: nv_id, ierr, icount(3), istart(3), lonid, latid
 
     character(len=*), parameter :: Iam = 'get_GEOS'
@@ -3710,6 +3712,8 @@ contains
     precip_corr_file_ext = 'nc4'
 
     is_S2S3_fcst         = .false.
+
+    S2S3_init_YYYYMMDD   = 'xxxxxxxx'     ! character(8)
     
     if     (met_tag(4:8)=='merra') then   ! MERRA
        
@@ -3825,27 +3829,29 @@ contains
             met_path_bkwd, prec_path_bkwd, met_tag_bkwd, use_prec_corr )
 
 
-    elseif (met_tag(1:8)=='GEOSS2S3') then    ! GEOS S2S v3
+    elseif (met_tag(1:8)=='GEOSS2S3') then      ! GEOS S2S v3
 
        N_GEOSgcm_vars = N_S2S3_vars
 
-       PAR_available       = .false.          ! S2S3 does not have PAR
+       PAR_available         = .false.          ! S2S3 does not have PAR
 
-       S2S3_file_specs     = .true.
+       S2S3_file_specs       = .true.
 
-       single_time_in_file = .false.          ! FCST: monthly files, AODAS: daily files 
+       single_time_in_file   = .false.          ! FCST: monthly files, AODAS: daily files 
 
        if     (met_tag(9:12)=='FCST' ) then
 
-          is_S2S3_fcst     = .true.
+          is_S2S3_fcst       = .true.
 
-          GEOSgcm_defs     = S2S3FCST_defs
+          GEOSgcm_defs       = S2S3FCST_defs
+
+          S2S3_init_YYYYMMDD = met_tag(21:28)   ! S2S3 FCST init YYYYMMDD; character(8)
 
        elseif (met_tag(9:13)=='AODAS') then
 
-          daily_met_files  = .true.
+          daily_met_files    = .true.
 
-          GEOSgcm_defs = S2S3AODAS_defs
+          GEOSgcm_defs       = S2S3AODAS_defs
 
        else
 
@@ -3912,7 +3918,7 @@ contains
 
        if (trim(GEOSgcm_defs(GEOSgcm_var,1))=="dummy")  cycle   ! skip "dummy" variable (e.g., no PAR for S2S3)
        
-       ! open GEOS file (G5DAS or MERRA or MERRA-2)
+       ! open GEOS file (G5DAS or MERRA or MERRA-2 or ...)
        ! 
        ! Initial "tavg1_2d_*_Nx" files may not be available.  In this case,
        ! use first available file.  For G5DAS file specs, only "PS" is affected 
@@ -3927,6 +3933,25 @@ contains
        ! the file at date_time_fwd).
        
        do j=1,2
+
+          if (is_S2S3_fcst .and. j==1) then
+             
+             ! special S2S3 FCST case: must skip j==1 at S2S3 FCST initialization time because (monthly) file
+             !                         exists but does not contain data for "date_time_bkwd"
+             
+             write (YYYYMMDD(1:4),'(i4.4)') date_time_tmp%year
+             write (YYYYMMDD(5:6),'(i2.2)') date_time_tmp%month
+             write (YYYYMMDD(7:8),'(i2.2)') date_time_tmp%day
+             
+             date_time_tmp%hour = 0
+             date_time_tmp%min  = 0
+             date_time_tmp%sec  = 0
+             
+             call augment_date_time( -force_dtstep, date_time_tmp )   ! S2S3 fcst is initialized at S2S3_init_YYYYMMDD minus 3 hours
+             
+             if datetime_eq_refdatetime( date_time_tmp, date_time_inst )  cycle   ! skip to j==2, i.e., try "date_time_fwd"
+             
+          end if
           
           ! determine time stamp on file and corresponding met_path, prec_path, & met_tag
           
@@ -3950,6 +3975,7 @@ contains
              met_path_tmp      = met_path_inst
              prec_path_tmp     = prec_path_inst
              met_tag_tmp       = met_tag_inst
+
           else
              
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown GEOSgcm_defs(2)')
@@ -3979,7 +4005,7 @@ contains
           end if
 
  
-          if ( file_exists .and. (.not. is_S2S3_fcst) ) then      ! S2S3 FCST has monthly files 
+          if ( file_exists ) then      
              
              exit  ! exit j loop after successfully finding file
              
@@ -3996,7 +4022,7 @@ contains
                   'read from some file for backward compatibility with '     //  &
                   'MERRA forcing.'
              
-             write (logunit,*) 'try again with different file...'
+             write (logunit,*) 'try again with different file (or time)...'
              
           else
              
@@ -5635,8 +5661,8 @@ contains
     character( 16) :: time_stamp
     character(  4) :: YYYY,  HHMM, day_dir
     character(  2) :: MM,    DD  
-    character(  8) :: S2S3_init_YYYYMMDD  ! S2S3 initial date, e.g. "20160101" 
-    character(  4) :: S2S3_ens_num        ! S2S3 ensemble member, e.g. "ens1" 
+    character(  8) :: S2S3_init_YYYYMMDD  ! S2S3 fcst initialization YYYYMMDD (fcst start time is YYYYMMDD minus 3 hours)
+    character(  4) :: S2S3_ens_num        ! S2S3 fcst ensemble member, e.g. "ens1" 
 
     integer        :: tmpind, tmpindend
 
@@ -5705,7 +5731,7 @@ contains
        ! GEOSS2S3AODAS
        
        S2S3_ens_num       = trim(met_tag(15:18))
-       S2S3_init_YYYYMMDD = trim(met_tag(21:28))
+       S2S3_init_YYYYMMDD =      met_tag(21:28)       ! character(8)
        
        fname = S2S3_init_YYYYMMDD // '/' // S2S3_ens_num // '/GEOSS2S3.' // YYYY // MM // '.nc4' 
 
