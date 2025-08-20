@@ -3629,18 +3629,18 @@ contains
     ! use *only* 3-hourly "tavg" files b/c instantaneous output is not available
     ! 
     
-    S2S3FCST_defs(  1,:)=[character(len=40):: 'SWGDN   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
-    S2S3FCST_defs(  2,:)=[character(len=40):: 'LWGAB   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
-    S2S3FCST_defs(  3,:)=[character(len=40):: 'dummy   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']  ! no PARDR for S2S3
-    S2S3FCST_defs(  4,:)=[character(len=40):: 'dummy   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']  ! no PARDF for S2S3
-    S2S3FCST_defs(  5,:)=[character(len=40):: 'PCU     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
-    S2S3FCST_defs(  6,:)=[character(len=40):: 'PLS     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
-    S2S3FCST_defs(  7,:)=[character(len=40):: 'SNO     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
-    S2S3FCST_defs(  8,:)=[character(len=40):: 'PS      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift
-    S2S3FCST_defs(  9,:)=[character(len=40):: 'HLML    ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift 
-    S2S3FCST_defs( 10,:)=[character(len=40):: 'TA      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift
-    S2S3FCST_defs( 11,:)=[character(len=40):: 'QA      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift
-    S2S3FCST_defs( 12,:)=[character(len=40):: 'SPEED   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 1,:)=[character(len=40):: 'SWGDN   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 2,:)=[character(len=40):: 'LWGAB   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 3,:)=[character(len=40):: 'dummy   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']  ! no PARDR for S2S3
+    S2S3FCST_defs( 4,:)=[character(len=40):: 'dummy   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']  ! no PARDF for S2S3
+    S2S3FCST_defs( 5,:)=[character(len=40):: 'PCU     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 6,:)=[character(len=40):: 'PLS     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 7,:)=[character(len=40):: 'SNO     ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
+    S2S3FCST_defs( 8,:)=[character(len=40):: 'PS      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift
+    S2S3FCST_defs( 9,:)=[character(len=40):: 'HLML    ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift 
+    S2S3FCST_defs(10,:)=[character(len=40):: 'TA      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift
+    S2S3FCST_defs(11,:)=[character(len=40):: 'QA      ','tavg','lfo_tavg_3hr_glo_L720x361','diag','S']  ! note "S" --> minimize_shift
+    S2S3FCST_defs(12,:)=[character(len=40):: 'SPEED   ','tavg','lfo_tavg_3hr_glo_L720x361','diag','F']
 
     ! -----------------------------------------------------------------------
     !
@@ -3648,14 +3648,14 @@ contains
 
     S2S3AODAS_defs = S2S3FCST_defs
 
-    ! character(40):                            
-    !                                                   1         2         3         4
-    !                                          1234567890123456789012345678901234567890     
-                                              
-                                              
-    S2S3AODAS_defs( 5,1)=[                    'PCUCORR                                 ']
-    S2S3AODAS_defs( 6,1)=[                    'PLSCORR                                 ']
-    S2S3AODAS_defs( 7,1)=[                    'SNOCORR                                 ']
+    ! character(40):         
+    !                                1         2         3         4
+    !                       1234567890123456789012345678901234567890     
+                           
+                           
+    S2S3AODAS_defs( 5,1) = 'PCUCORR                                 '
+    S2S3AODAS_defs( 6,1) = 'PLSCORR                                 '
+    S2S3AODAS_defs( 7,1) = 'SNOCORR                                 '
 
     
     ! --------------------------------------------------------------------
