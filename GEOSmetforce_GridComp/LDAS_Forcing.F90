@@ -35,6 +35,7 @@ module LDAS_ForceMod
   use LDAS_DateTimeMod,                 ONLY:     &
        date_time_type,                            &
        augment_date_time,                         &
+       datetime_eq_refdatetime,                   &
        datetime_lt_refdatetime,                   &
        datetime_le_refdatetime,                   &
        is_leap_year,                              &
