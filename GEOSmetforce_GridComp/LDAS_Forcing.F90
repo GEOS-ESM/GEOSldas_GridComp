@@ -4001,7 +4001,7 @@ contains
                   daily_met_files, met_path_tmp, met_tag_tmp,                     &
                   GEOSgcm_defs(GEOSgcm_var,:), met_file_ext)
 
-             single_time_in_file = .not. daily_met_files  ! MERRA-2 files are daily files
+             single_time_in_file = .not. (daily_met_files .or. is_S2S3_fcst) ! MERRA-2 files are daily files
 
           end if
 
