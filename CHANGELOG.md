@@ -11,11 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added ntasks-per-node 
+- Added ntasks-per-node
 
 ### Changed
 
-- Cleaned up ldas_setup. Split it to ldas.py and setup_utils.py, 
+- Cleaned up ldas_setup. Split it to ldas.py and setup_utils.py,
+- Update `GEOSlandassim_GridComp/io_hdf5.F90` to allow for use with HDF5 1.14
 
 ### Fixed
 
@@ -33,8 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added python package for post-processing ObsFcstAna output into data assimilation diagnostics ([PR #87](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/87), [PR #111](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/111)). 
-- Support for 2d output from EASE tile space and 2d output on EASE grid: 
+- Added python package for post-processing ObsFcstAna output into data assimilation diagnostics ([PR #87](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/87), [PR #111](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/111)).
+- Support for 2d output from EASE tile space and 2d output on EASE grid:
   - Switched EASE grid handling to new MAPL EASE Grid Factory ([PR #115](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/115)).
   - Revised pre-processing of HISTORY template ([PR #118](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/118)).
 - Support for tile space of stretched cube-sphere grids ([PR #109](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/109)).
