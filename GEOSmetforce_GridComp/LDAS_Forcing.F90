@@ -5703,7 +5703,7 @@ contains
 
     ! abort if something went wrong
     
-    if (len_trim(err_code)>0)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    if (len_trim(err_msg)>0)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     
   end subroutine parse_S2S3FCST_met_tag
   
@@ -5735,7 +5735,7 @@ contains
     character(  4) :: YYYY,  HHMM, day_dir
     character(  2) :: MM,    DD  
     character(  8) :: S2S3_init_YYYYMMDD  ! S2S3 fcst initialization YYYYMMDD (fcst start time is YYYYMMDD minus 3 hours)
-    character(  4) :: S2S3_ens_num        ! S2S3 fcst ensemble member, e.g. "ens1", "ens12" 
+    character(  5) :: S2S3_ens_num        ! S2S3 fcst ensemble member, e.g. "ens1", "ens12" 
 
     integer        :: tmpind, tmpindend
 
