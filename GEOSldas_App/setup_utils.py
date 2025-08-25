@@ -269,7 +269,9 @@ def printResourceInputSampleFile():
    print ('#                        IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2;')
    print ('#                        jobs will hang when oserver_nodes = writers-per-node = 1.')
    print ('# - ntasks-per-node  = requesting fewer ntasks-per-node than total number of cores per node increases allocated memory;')
-   print ('#                        ntasks_model should be a multiple of ntasks-per-node') 
+   print ('#                        defaults to number of cores per node;')
+   print ('#                        ntasks_model should be a multiple of ntasks-per-node;')
+   print ('#                        edit ntasks-per-node when running CatchCNCLM51 on resolution other than EASEv2_M36') 
    print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait")')
    print ('#')
    for key in optionalKeys:
