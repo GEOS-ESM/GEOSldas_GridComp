@@ -3212,6 +3212,7 @@ contains
     character(  3)       :: met_file_ext
     character(  3)       :: precip_corr_file_ext
 
+    character(  5)       :: S2S3_ens_num
     character(  8)       :: S2S3_init_YYYYMMDD
         
     integer :: N_GEOSgcm_vars, N_lon_tmp, N_lat_tmp    
@@ -3846,7 +3847,7 @@ contains
 
           GEOSgcm_defs       = S2S3FCST_defs
 
-          S2S3_init_YYYYMMDD = met_tag(21:28)   ! S2S3 FCST init YYYYMMDD; character(8)
+          call parse_S2S3FCST_met_tag( met_tag, S2S3_ens_num, S2S3_init_YYYYMMDD )
 
        elseif (met_tag(9:13)=='AODAS') then
 
@@ -4001,7 +4002,7 @@ contains
                   daily_met_files, met_path_tmp, met_tag_tmp,                     &
                   GEOSgcm_defs(GEOSgcm_var,:), met_file_ext)
 
-             single_time_in_file = .not. (daily_met_files .or. is_S2S3_fcst) ! MERRA-2 files are daily files
+             single_time_in_file = .not. (daily_met_files .or. is_S2S3_fcst) ! MERRA-2 files are daily files; S2S3FCST are monthly files
 
           end if
 
@@ -5636,6 +5637,77 @@ contains
   end subroutine parse_G5DAS_met_tag
   
   ! ****************************************************************
+
+  subroutine parse_S2S3FCST_met_tag( met_tag, S2S3_ens_num, S2S3_init_YYYYMMDD )
+    
+    ! reichle, 25 Aug 2025
+    
+    ! parse GEOSS2S3FCST "met_tag": extract S2S3 ens number and initialization YYYYMMDD
+    !
+    !   met_tag  = "GEOSS2S3FCST__ens{XX}__[YYYYMMDD]"
+    !
+    ! where 
+    !
+    !   ens{XX}  = S2S3 ensemble member ("ens1", "ens2", ..., "ens9", "ens10", ..., "ens15")
+    !   YYYYMMDD = S2S3 fcst initialization YYYYMMDD (fcst start time is YYYYMMDD minus 3 hours)
+    !
+    ! ---------------------------------------------------------------------------    
+
+    implicit none
+    
+    character(*), intent(in)  :: met_tag
+    
+    character(5), intent(out) :: S2S3_ens_num
+    character(8), intent(out) :: S2S3_init_YYYYMMDD
+    
+    ! local variables
+
+    integer                      :: is
+    
+    character(len=len(met_tag))  :: tmpstring
+    
+    character(len=*),  parameter :: Iam = 'parse_S2S3FCST_met_tag'
+    character(len=400)           :: err_msg
+    
+    ! ----------------------------------------------------------
+    
+    err_msg  = ''     ! initialize error message to blank string
+    
+    if (met_tag(1:14) /= 'GEOSS2S3FCST__')  err_msg = 'met_tag must start with GEOSS2S3FCST__'    
+    
+    ! cut off leading 'GEOSS2S3FCST__'
+    
+    tmpstring = met_tag(15:len_trim(met_tag))
+    
+    ! split met_tag at double underscores
+    
+    is = index(tmpstring, '__')
+    
+    if (is>0) then
+       
+       S2S3_ens_num       = tmpstring(1:is-1)
+       
+       S2S3_init_YYYYMMDD = tmpstring(is+2:len_trim(tmpstring))
+       
+       if (is<5 .or. is>6 .or. (len_trim(tmpstring)-is-1/=8)) then
+          
+          err_msg  = 'ens_num or YYYYMMDD in met_tag does not match expectation'
+          
+       end if
+       
+    else
+       
+       err_msg  = 'cannot find second double-underscore in met_tag'
+       
+    end if
+
+    ! abort if something went wrong
+    
+    if (len_trim(err_code)>0)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    
+  end subroutine parse_S2S3FCST_met_tag
+  
+  ! ****************************************************************
  
   subroutine get_GEOS_forcing_filename(fname_full,file_exists, date_time, daily_file, met_path, met_tag, &
        GEOSgcm_defs, file_ext)
@@ -5663,7 +5735,7 @@ contains
     character(  4) :: YYYY,  HHMM, day_dir
     character(  2) :: MM,    DD  
     character(  8) :: S2S3_init_YYYYMMDD  ! S2S3 fcst initialization YYYYMMDD (fcst start time is YYYYMMDD minus 3 hours)
-    character(  4) :: S2S3_ens_num        ! S2S3 fcst ensemble member, e.g. "ens1" 
+    character(  4) :: S2S3_ens_num        ! S2S3 fcst ensemble member, e.g. "ens1", "ens12" 
 
     integer        :: tmpind, tmpindend
 
@@ -5724,17 +5796,10 @@ contains
        day_dir = 'D' // DD // '/'
 
     elseif (met_tag(1:12) == 'GEOSS2S3FCST') then  
-
-       ! parse met_tag
-
-       ! 1234567890123456789012345678
-       ! GEOSS2S3FCST__ensX__YYYYMMDD
-       ! GEOSS2S3AODAS
        
-       S2S3_ens_num       = trim(met_tag(15:18))
-       S2S3_init_YYYYMMDD =      met_tag(21:28)       ! character(8)
+       call parse_S2S3FCST_met_tag( met_tag, S2S3_ens_num, S2S3_init_YYYYMMDD )
        
-       fname = S2S3_init_YYYYMMDD // '/' // S2S3_ens_num // '/GEOSS2S3.' // YYYY // MM // '.nc4' 
+       fname = S2S3_init_YYYYMMDD // '/' // trim(S2S3_ens_num) // '/GEOSS2S3.' // YYYY // MM // '.nc4' 
 
     else
        
