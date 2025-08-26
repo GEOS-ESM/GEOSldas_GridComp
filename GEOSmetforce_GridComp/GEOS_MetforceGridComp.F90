@@ -608,7 +608,7 @@ module GEOS_MetforceGridCompMod
     integer :: local_nt, k, NUM_ENSEMBLE, i1, i2, j1, j2
     integer :: ForceDtStep
     type(met_force_type) :: mf_nodata
-    logical :: MERRA_file_specs, ensemble_forcing
+    logical :: MERRA_file_specs, S2S3_file_specs, ensemble_forcing
     logical :: backward_looking_fluxes  
     real, pointer :: TileLats(:)
     real, pointer :: TileLons(:)
@@ -768,6 +768,7 @@ module GEOS_MetforceGridCompMod
          internal%mf%hinterp,                                                   &
          AEROSOL_DEPOSITION,                                                    &
          MERRA_file_specs,                                                      &
+         S2S3_file_specs,                                                       &
          backward_looking_fluxes,                                               &
          internal%mf%DataNxt,                                                   &
          .true.                                                                 &      ! init
@@ -776,7 +777,7 @@ module GEOS_MetforceGridCompMod
     
     if (backward_looking_fluxes)                                                &
          call LDAS_move_new_force_to_old(                                       &
-         MERRA_file_specs, AEROSOL_DEPOSITION,                                  &
+         MERRA_file_specs, S2S3_file_specs, AEROSOL_DEPOSITION,                 &
          internal%mf%DataNxt, internal%mf%DataPrv )
 
     ! Turn timer off
@@ -851,7 +852,7 @@ module GEOS_MetforceGridCompMod
     type(met_force_type), pointer, contiguous :: DataTmp(:)=>null()
     type(met_force_type) :: mf_nodata
 
-    logical :: MERRA_file_specs
+    logical :: MERRA_file_specs, S2S3_file_specs
     logical :: backward_looking_fluxes 
     integer :: AEROSOL_DEPOSITION
     ! Export pointers
@@ -995,6 +996,7 @@ module GEOS_MetforceGridCompMod
             internal%mf%hinterp,                                                &
             AEROSOL_DEPOSITION,                                                 &
             MERRA_file_specs,                                                   &
+            S2S3_file_specs,                                                    &
             backward_looking_fluxes,                                            &
             internal%mf%DataNxt,                                                &
             .false.                                                             &      ! init
@@ -1003,7 +1005,7 @@ module GEOS_MetforceGridCompMod
        
        if (backward_looking_fluxes)                                             &
             call LDAS_move_new_force_to_old(                                    &
-            MERRA_file_specs, AEROSOL_DEPOSITION,                               &
+            MERRA_file_specs, S2S3_file_specs, AEROSOL_DEPOSITION,              &
             internal%mf%DataNxt, internal%mf%DataPrv )
 
        ! -compute-average-zenith-angle-over-daylight-part-of-forcing-interval-

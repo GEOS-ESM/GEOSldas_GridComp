@@ -15,12 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Cleaned up ldas_setup. Split it to ldas.py and setup_utils.py,
+- Cleaned up ldas_setup. Split out ldas.py and setup_utils.py.
+- Added reader for surface meteorological forcing from S2S-3.
 - Update `GEOSlandassim_GridComp/io_hdf5.F90` to allow for use with HDF5 1.14
 
 ### Fixed
 
-- Fixed Restart = 1 when the domain is not global
+- Fixed Restart=1 when the domain is not global.
 
 ### Removed
 
