@@ -5,11 +5,13 @@ import sys
 
 from collections import OrderedDict
 from datetime    import timedelta
-
+import netCDF4
+import linecache
 
 def generate_echo(inpfile, ladas_cpl = 0):
    """
-    Echo generator of inpfile, ignore line starts with "## "
+    Echo generator of inpfile
+    Pick default values from GEOS_SurfaceGridComp.rc via special string "GEOS[xxxx]=>".
    """
    if ladas_cpl == 0 :
       use_rc_defaults = 'GEOSldas=>'    # use defaults for LDAS
@@ -267,7 +269,9 @@ def printResourceInputSampleFile():
    print ('#                        IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2;')
    print ('#                        jobs will hang when oserver_nodes = writers-per-node = 1.')
    print ('# - ntasks-per-node  = requesting fewer ntasks-per-node than total number of cores per node increases allocated memory;')
-   print ('#                        ntasks_model should be a multiple of ntasks-per-node') 
+   print ('#                        defaults to number of cores per node;')
+   print ('#                        ntasks_model should be a multiple of ntasks-per-node;')
+   print ('#                        edit ntasks-per-node when running CatchCNCLM51 on resolution other than EASEv2_M36') 
    print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait")')
    print ('#')
    for key in optionalKeys:
@@ -310,3 +314,23 @@ def hours_to_hhmmss(hours):
 
     # Format as HHMMSS
     return f"{hours:02d}{minutes:02d}{seconds:02d}"
+
+def get_gridname(tilefile):
+    """
+    get name of atmospheric grid from header/attributes of tile file (*.til) 
+    """
+    
+    gridname_ =''
+    tmptile   = os.path.realpath(tilefile)
+    extension = os.path.splitext(tmptile)[1]
+    if extension == '.domain':
+        extension = os.path.splitext(tmptile)[0]
+    if extension == '.til':
+        gridname_ = linecache.getline(tmptile, 3).strip()
+    else:
+       nc_file = netCDF4.Dataset(tmptile,'r')
+       gridname_ = nc_file.getncattr('Grid_Name')
+    # in case it is an old name: SMAP-EASEvx-Mxx: change to EASEvx_Mxx
+    gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
+    return gridname_
+

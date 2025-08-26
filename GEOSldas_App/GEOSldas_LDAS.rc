@@ -31,8 +31,9 @@ CATCHMENT_SPINUP: 0
 
 # ---- Choice of land surface model (for LAND tiles)
 #
-#    1 : Catchment model   (default)
+#    1 : Catchment model     (default)
 #    2 : CatchmentCN-CLM4.0
+#    4 : CatchmentCN-CLM5.1  (edit "ntasks-per-node" in batinp file to increase memory unless on EASEv2_M36)
 #
 LSM_CHOICE: 1
 

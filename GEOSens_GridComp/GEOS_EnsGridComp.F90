@@ -1605,6 +1605,24 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_AddExportSpec(GC                         ,&
+    LONG_NAME          = 'CN_total_autotrophic_respiration' ,&
+    UNITS              = 'kg m-2 s-1'                ,&
+    SHORT_NAME         = 'CNAR'                      ,&
+    DIMS               = MAPL_DimsTileOnly           ,&
+    VLOCATION          = MAPL_VLocationNone          ,&
+                                           RC=STATUS  )
+  VERIFY_(STATUS)
+
+  call MAPL_AddExportSpec(GC                         ,&
+    LONG_NAME          = 'CN_total_heterotrophic_respiration' ,&
+    UNITS              = 'kg m-2 s-1'                ,&
+    SHORT_NAME         = 'CNHR'                      ,&
+    DIMS               = MAPL_DimsTileOnly           ,&
+    VLOCATION          = MAPL_VLocationNone          ,&
+                                           RC=STATUS  )
+  VERIFY_(STATUS)
+
+  call MAPL_AddExportSpec(GC                         ,&
     LONG_NAME          = 'CN_net_ecosystem_exchange' ,&
     UNITS              = 'kg m-2 s-1'                ,&
     SHORT_NAME         = 'CNNEE'                     ,&
@@ -2438,28 +2456,30 @@ contains
     real, dimension(:),pointer :: PEATCLSM_WATERLEVEL,PEATCLSM_WATERLEVEL_enavg
     real, dimension(:),pointer :: PEATCLSM_FSWCHANGE, PEATCLSM_FSWCHANGE_enavg
 
-    real, dimension(:), pointer :: CNLAI,    CNLAI_enavg 
-    real, dimension(:), pointer :: CNTLAI,  CNTLAI_enavg
-    real, dimension(:), pointer :: CNSAI,    CNSAI_enavg
-    real, dimension(:), pointer :: CNTOTC,  CNTOTC_enavg 
-    real, dimension(:), pointer :: CNVEGC,  CNVEGC_enavg
-    real, dimension(:), pointer :: CNROOT,  CNROOT_enavg
-    real, dimension(:), pointer :: CNFROOTC,  CNFROOTC_enavg
-    real, dimension(:), pointer :: CNNPP,    CNNPP_enavg
-    real, dimension(:), pointer :: CNGPP,    CNGPP_enavg
-    real, dimension(:), pointer :: CNSR,      CNSR_enavg
-    real, dimension(:), pointer :: CNNEE,    CNNEE_enavg
-    real, dimension(:), pointer :: CNXSMR,  CNXSMR_enavg
-    real, dimension(:), pointer :: CNADD,    CNADD_enavg
-    real, dimension(:), pointer :: PARABS,  PARABS_enavg
-    real, dimension(:), pointer :: PARINC,  PARINC_enavg
-    real, dimension(:), pointer :: SCSAT,    SCSAT_enavg
-    real, dimension(:), pointer :: SCUNS,    SCUNS_enavg
-    real, dimension(:), pointer :: BTRANT,  BTRANT_enavg
-    real, dimension(:), pointer :: SIF,        SIF_enavg
-    real, dimension(:), pointer :: CNLOSS,  CNLOSS_enavg
-    real, dimension(:), pointer :: CNBURN,  CNBURN_enavg
-    real, dimension(:), pointer :: CNFSEL,  CNFSEL_enavg
+    real, dimension(:), pointer :: CNLAI,       CNLAI_enavg 
+    real, dimension(:), pointer :: CNTLAI,     CNTLAI_enavg
+    real, dimension(:), pointer :: CNSAI,       CNSAI_enavg
+    real, dimension(:), pointer :: CNTOTC,     CNTOTC_enavg 
+    real, dimension(:), pointer :: CNVEGC,     CNVEGC_enavg
+    real, dimension(:), pointer :: CNROOT,     CNROOT_enavg
+    real, dimension(:), pointer :: CNFROOTC, CNFROOTC_enavg
+    real, dimension(:), pointer :: CNNPP,       CNNPP_enavg
+    real, dimension(:), pointer :: CNGPP,       CNGPP_enavg
+    real, dimension(:), pointer :: CNSR,         CNSR_enavg
+    real, dimension(:), pointer :: CNAR,         CNAR_enavg
+    real, dimension(:), pointer :: CNHR,         CNHR_enavg
+    real, dimension(:), pointer :: CNNEE,       CNNEE_enavg
+    real, dimension(:), pointer :: CNXSMR,     CNXSMR_enavg
+    real, dimension(:), pointer :: CNADD,       CNADD_enavg
+    real, dimension(:), pointer :: PARABS,     PARABS_enavg
+    real, dimension(:), pointer :: PARINC,     PARINC_enavg
+    real, dimension(:), pointer :: SCSAT,       SCSAT_enavg
+    real, dimension(:), pointer :: SCUNS,       SCUNS_enavg
+    real, dimension(:), pointer :: BTRANT,     BTRANT_enavg
+    real, dimension(:), pointer :: SIF,           SIF_enavg
+    real, dimension(:), pointer :: CNLOSS,     CNLOSS_enavg
+    real, dimension(:), pointer :: CNBURN,     CNBURN_enavg
+    real, dimension(:), pointer :: CNFSEL,     CNFSEL_enavg
 
     real ::  Nm1, NdivNm1    
 
@@ -2811,28 +2831,30 @@ contains
 
     ! CatchCN-specific variables (not available in standard Catch)
     
-    call MAPL_GetPointer(import, CNLAI  ,   'CNLAI' ,   notFoundOK=.true.,  _RC)   
-    call MAPL_GetPointer(import, CNTLAI ,   'CNTLAI',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNSAI  ,   'CNSAI' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNTOTC ,   'CNTOTC',   notFoundOK=.true.,  _RC) 
-    call MAPL_GetPointer(import, CNVEGC ,   'CNVEGC',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNROOT ,   'CNROOT',   notFoundOK=.true.,  _RC)    ! CatchCNCLM45 only
-    call MAPL_GetPointer(import, CNFROOTC , 'CNFROOTC', notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNNPP  ,   'CNNPP' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNGPP  ,   'CNGPP' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNSR   ,   'CNSR'  ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNNEE  ,   'CNNEE' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNXSMR ,   'CNXSMR',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNADD  ,   'CNADD' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, PARABS ,   'PARABS',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, PARINC ,   'PARINC',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, SCSAT  ,   'SCSAT' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, SCUNS  ,   'SCUNS' ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, BTRANT ,   'BTRANT',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, SIF    ,   'SIF'   ,   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNLOSS ,   'CNLOSS',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNBURN ,   'CNBURN',   notFoundOK=.true.,  _RC)
-    call MAPL_GetPointer(import, CNFSEL ,   'CNFSEL',   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNLAI    ,   'CNLAI'   ,   notFoundOK=.true.,  _RC)   
+    call MAPL_GetPointer(import,   CNTLAI   ,   'CNTLAI'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNSAI    ,   'CNSAI'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNTOTC   ,   'CNTOTC'  ,   notFoundOK=.true.,  _RC) 
+    call MAPL_GetPointer(import,   CNVEGC   ,   'CNVEGC'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNROOT   ,   'CNROOT'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNFROOTC ,   'CNFROOTC',   notFoundOK=.true.,  _RC)    ! CatchCNCLM51 only
+    call MAPL_GetPointer(import,   CNNPP    ,   'CNNPP'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNGPP    ,   'CNGPP'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNSR     ,   'CNSR'    ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNAR     ,   'CNAR'    ,   notFoundOK=.true.,  _RC)    ! CatchCNCLM51 only
+    call MAPL_GetPointer(import,   CNHR     ,   'CNHR'    ,   notFoundOK=.true.,  _RC)    ! CatchCNCLM51 only
+    call MAPL_GetPointer(import,   CNNEE    ,   'CNNEE'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNXSMR   ,   'CNXSMR'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNADD    ,   'CNADD'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   PARABS   ,   'PARABS'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   PARINC   ,   'PARINC'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   SCSAT    ,   'SCSAT'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   SCUNS    ,   'SCUNS'   ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   BTRANT   ,   'BTRANT'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   SIF      ,   'SIF'     ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNLOSS   ,   'CNLOSS'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNBURN   ,   'CNBURN'  ,   notFoundOK=.true.,  _RC)
+    call MAPL_GetPointer(import,   CNFSEL   ,   'CNFSEL'  ,   notFoundOK=.true.,  _RC)
 
 
 
@@ -3113,28 +3135,30 @@ contains
     call MAPL_GetPointer(export, out_lai,  'LAI' , alloc=.true., rc=status)
     VERIFY_(status)
 
-    call MAPL_GetPointer(export,   CNLAI_enavg  ,   'CNLAI' , _RC)   
-    call MAPL_GetPointer(export,  CNTLAI_enavg  ,   'CNTLAI', _RC)
-    call MAPL_GetPointer(export,   CNSAI_enavg  ,   'CNSAI' , _RC)
-    call MAPL_GetPointer(export,  CNTOTC_enavg  ,   'CNTOTC', _RC) 
-    call MAPL_GetPointer(export,  CNVEGC_enavg  ,   'CNVEGC', _RC)
-    call MAPL_GetPointer(export,  CNROOT_enavg  ,   'CNROOT', _RC)
-    call MAPL_GetPointer(export,  CNFROOTC_enavg,   'CNFROOTC', _RC)
-    call MAPL_GetPointer(export,   CNNPP_enavg  ,   'CNNPP' , _RC)
-    call MAPL_GetPointer(export,   CNGPP_enavg  ,   'CNGPP' , _RC)
-    call MAPL_GetPointer(export,    CNSR_enavg  ,   'CNSR'  , _RC)
-    call MAPL_GetPointer(export,   CNNEE_enavg  ,   'CNNEE' , _RC)
-    call MAPL_GetPointer(export,   CNXSMR_enavg ,   'CNXSMR', _RC)
-    call MAPL_GetPointer(export,   CNADD_enavg  ,   'CNADD' , _RC)
-    call MAPL_GetPointer(export,  PARABS_enavg  ,   'PARABS', _RC)
-    call MAPL_GetPointer(export,  PARINC_enavg  ,   'PARINC', _RC)
-    call MAPL_GetPointer(export,   SCSAT_enavg  ,   'SCSAT' , _RC)
-    call MAPL_GetPointer(export,   SCUNS_enavg  ,   'SCUNS' , _RC)
-    call MAPL_GetPointer(export,  BTRANT_enavg  ,   'BTRANT', _RC)
-    call MAPL_GetPointer(export,     SIF_enavg  ,   'SIF'   , _RC)
-    call MAPL_GetPointer(export,  CNLOSS_enavg  ,   'CNLOSS', _RC)
-    call MAPL_GetPointer(export,  CNBURN_enavg  ,   'CNBURN', _RC)
-    call MAPL_GetPointer(export,  CNFSEL_enavg  ,   'CNFSEL', _RC)
+    call MAPL_GetPointer(export,    CNLAI_enavg  ,   'CNLAI'   ,   _RC)      
+    call MAPL_GetPointer(export,   CNTLAI_enavg  ,   'CNTLAI'  ,   _RC)
+    call MAPL_GetPointer(export,    CNSAI_enavg  ,   'CNSAI'   ,   _RC)
+    call MAPL_GetPointer(export,   CNTOTC_enavg  ,   'CNTOTC'  ,   _RC) 
+    call MAPL_GetPointer(export,   CNVEGC_enavg  ,   'CNVEGC'  ,   _RC)
+    call MAPL_GetPointer(export,   CNROOT_enavg  ,   'CNROOT'  ,   _RC)
+    call MAPL_GetPointer(export, CNFROOTC_enavg  ,   'CNFROOTC',   _RC)
+    call MAPL_GetPointer(export,    CNNPP_enavg  ,   'CNNPP'   ,   _RC)
+    call MAPL_GetPointer(export,    CNGPP_enavg  ,   'CNGPP'   ,   _RC)
+    call MAPL_GetPointer(export,     CNSR_enavg  ,   'CNSR'    ,   _RC)
+    call MAPL_GetPointer(export,     CNAR_enavg  ,   'CNAR'    ,   _RC)
+    call MAPL_GetPointer(export,     CNHR_enavg  ,   'CNHR'    ,   _RC)
+    call MAPL_GetPointer(export,    CNNEE_enavg  ,   'CNNEE'   ,   _RC)
+    call MAPL_GetPointer(export,   CNXSMR_enavg  ,   'CNXSMR'  ,   _RC)
+    call MAPL_GetPointer(export,    CNADD_enavg  ,   'CNADD'   ,   _RC)
+    call MAPL_GetPointer(export,   PARABS_enavg  ,   'PARABS'  ,   _RC)
+    call MAPL_GetPointer(export,   PARINC_enavg  ,   'PARINC'  ,   _RC)
+    call MAPL_GetPointer(export,    SCSAT_enavg  ,   'SCSAT'   ,   _RC)
+    call MAPL_GetPointer(export,    SCUNS_enavg  ,   'SCUNS'   ,   _RC)
+    call MAPL_GetPointer(export,   BTRANT_enavg  ,   'BTRANT'  ,   _RC)
+    call MAPL_GetPointer(export,      SIF_enavg  ,   'SIF'     ,   _RC)
+    call MAPL_GetPointer(export,   CNLOSS_enavg  ,   'CNLOSS'  ,   _RC)
+    call MAPL_GetPointer(export,   CNBURN_enavg  ,   'CNBURN'  ,   _RC)
+    call MAPL_GetPointer(export,   CNFSEL_enavg  ,   'CNFSEL'  ,   _RC)
 
     out_lai = in_lai
     if (collect_land_counter == 0) then
@@ -3283,12 +3307,14 @@ contains
         if(associated(   CNTOTC_enavg))     CNTOTC_enavg = 0.0
         if(associated(   CNVEGC_enavg))     CNVEGC_enavg = 0.0
         if(associated(   CNROOT_enavg))     CNROOT_enavg = 0.0
-        if(associated(   CNFROOTC_enavg))     CNFROOTC_enavg = 0.0
+        if(associated( CNFROOTC_enavg))   CNFROOTC_enavg = 0.0
         if(associated(    CNNPP_enavg))      CNNPP_enavg = 0.0
         if(associated(    CNGPP_enavg))      CNGPP_enavg = 0.0
         if(associated(     CNSR_enavg))       CNSR_enavg = 0.0
+        if(associated(     CNAR_enavg))       CNAR_enavg = 0.0
+        if(associated(     CNHR_enavg))       CNHR_enavg = 0.0
         if(associated(    CNNEE_enavg))      CNNEE_enavg = 0.0
-        if(associated(    CNXSMR_enavg))    CNXSMR_enavg = 0.0
+        if(associated(   CNXSMR_enavg))     CNXSMR_enavg = 0.0
         if(associated(    CNADD_enavg))      CNADD_enavg = 0.0
         if(associated(   PARABS_enavg))     PARABS_enavg = 0.0
         if(associated(   PARINC_enavg))     PARINC_enavg = 0.0
@@ -3576,28 +3602,30 @@ contains
     if(associated(PEATCLSM_FSWCHANGE_enavg)  .and. associated(PEATCLSM_FSWCHANGE))    & 
         PEATCLSM_FSWCHANGE_enavg  = PEATCLSM_FSWCHANGE_enavg  + PEATCLSM_FSWCHANGE
 
-    if(associated(  CNLAI_enavg) .and. associated( CNLAI))  CNLAI_enavg =  CNLAI_enavg +  CNLAI
-    if(associated( CNTLAI_enavg) .and. associated(CNTLAI)) CNTLAI_enavg = CNTLAI_enavg + CNTLAI
-    if(associated(  CNSAI_enavg) .and. associated( CNSAI))  CNSAI_enavg =  CNSAI_enavg +  CNSAI
-    if(associated( CNTOTC_enavg) .and. associated(CNTOTC)) CNTOTC_enavg = CNTOTC_enavg + CNTOTC
-    if(associated( CNVEGC_enavg) .and. associated(CNVEGC)) CNVEGC_enavg = CNVEGC_enavg + CNVEGC
-    if(associated( CNROOT_enavg) .and. associated(CNROOT)) CNROOT_enavg = CNROOT_enavg + CNROOT
-    if(associated( CNFROOTC_enavg) .and. associated(CNFROOTC)) CNFROOTC_enavg = CNFROOTC_enavg + CNFROOTC
-    if(associated(  CNNPP_enavg) .and. associated( CNNPP))  CNNPP_enavg =  CNNPP_enavg +  CNNPP
-    if(associated(  CNGPP_enavg) .and. associated( CNGPP))  CNGPP_enavg =  CNGPP_enavg +  CNGPP
-    if(associated(   CNSR_enavg) .and. associated(  CNSR))   CNSR_enavg =   CNSR_enavg +   CNSR
-    if(associated(  CNNEE_enavg) .and. associated( CNNEE))  CNNEE_enavg =  CNNEE_enavg +  CNNEE
-    if(associated(  CNXSMR_enavg).and. associated( CNXSMR))CNXSMR_enavg =  CNXSMR_enavg+ CNXSMR
-    if(associated(  CNADD_enavg) .and. associated( CNADD))  CNADD_enavg =  CNADD_enavg +  CNADD
-    if(associated( PARABS_enavg) .and. associated(PARABS)) PARABS_enavg = PARABS_enavg + PARABS
-    if(associated( PARINC_enavg) .and. associated(PARINC)) PARINC_enavg = PARINC_enavg + PARINC
-    if(associated(  SCSAT_enavg) .and. associated( SCSAT))  SCSAT_enavg =  SCSAT_enavg +  SCSAT
-    if(associated(  SCUNS_enavg) .and. associated( SCUNS))  SCUNS_enavg =  SCUNS_enavg +  SCUNS
-    if(associated( BTRANT_enavg) .and. associated(BTRANT)) BTRANT_enavg = BTRANT_enavg + BTRANT
-    if(associated(    SIF_enavg) .and. associated(   SIF))    SIF_enavg =    SIF_enavg +    SIF
-    if(associated( CNLOSS_enavg) .and. associated(CNLOSS)) CNLOSS_enavg = CNLOSS_enavg + CNLOSS
-    if(associated( CNBURN_enavg) .and. associated(CNBURN)) CNBURN_enavg = CNBURN_enavg + CNBURN
-    if(associated( CNFSEL_enavg) .and. associated(CNFSEL)) CNFSEL_enavg = CNFSEL_enavg + CNFSEL
+    if(associated(    CNLAI_enavg) .and. associated(    CNLAI))    CNLAI_enavg =    CNLAI_enavg +    CNLAI
+    if(associated(   CNTLAI_enavg) .and. associated(   CNTLAI))   CNTLAI_enavg =   CNTLAI_enavg +   CNTLAI
+    if(associated(    CNSAI_enavg) .and. associated(    CNSAI))    CNSAI_enavg =    CNSAI_enavg +    CNSAI
+    if(associated(   CNTOTC_enavg) .and. associated(   CNTOTC))   CNTOTC_enavg =   CNTOTC_enavg +   CNTOTC
+    if(associated(   CNVEGC_enavg) .and. associated(   CNVEGC))   CNVEGC_enavg =   CNVEGC_enavg +   CNVEGC
+    if(associated(   CNROOT_enavg) .and. associated(   CNROOT))   CNROOT_enavg =   CNROOT_enavg +   CNROOT
+    if(associated( CNFROOTC_enavg) .and. associated( CNFROOTC)) CNFROOTC_enavg = CNFROOTC_enavg + CNFROOTC
+    if(associated(    CNNPP_enavg) .and. associated(    CNNPP))    CNNPP_enavg =    CNNPP_enavg +    CNNPP
+    if(associated(    CNGPP_enavg) .and. associated(    CNGPP))    CNGPP_enavg =    CNGPP_enavg +    CNGPP
+    if(associated(     CNSR_enavg) .and. associated(     CNSR))     CNSR_enavg =     CNSR_enavg +     CNSR
+    if(associated(     CNAR_enavg) .and. associated(     CNAR))     CNAR_enavg =     CNAR_enavg +     CNAR
+    if(associated(     CNHR_enavg) .and. associated(     CNHR))     CNHR_enavg =     CNHR_enavg +     CNHR
+    if(associated(    CNNEE_enavg) .and. associated(    CNNEE))    CNNEE_enavg =    CNNEE_enavg +    CNNEE
+    if(associated(   CNXSMR_enavg) .and. associated(   CNXSMR))   CNXSMR_enavg =   CNXSMR_enavg +   CNXSMR
+    if(associated(    CNADD_enavg) .and. associated(    CNADD))    CNADD_enavg =    CNADD_enavg +    CNADD
+    if(associated(   PARABS_enavg) .and. associated(   PARABS))   PARABS_enavg =   PARABS_enavg +   PARABS
+    if(associated(   PARINC_enavg) .and. associated(   PARINC))   PARINC_enavg =   PARINC_enavg +   PARINC
+    if(associated(    SCSAT_enavg) .and. associated(    SCSAT))    SCSAT_enavg =    SCSAT_enavg +    SCSAT
+    if(associated(    SCUNS_enavg) .and. associated(    SCUNS))    SCUNS_enavg =    SCUNS_enavg +    SCUNS
+    if(associated(   BTRANT_enavg) .and. associated(   BTRANT))   BTRANT_enavg =   BTRANT_enavg +   BTRANT
+    if(associated(      SIF_enavg) .and. associated(      SIF))      SIF_enavg =      SIF_enavg +      SIF
+    if(associated(   CNLOSS_enavg) .and. associated(   CNLOSS))   CNLOSS_enavg =   CNLOSS_enavg +   CNLOSS
+    if(associated(   CNBURN_enavg) .and. associated(   CNBURN))   CNBURN_enavg =   CNBURN_enavg +   CNBURN
+    if(associated(   CNFSEL_enavg) .and. associated(   CNFSEL))   CNFSEL_enavg =   CNFSEL_enavg +   CNFSEL
 
     ! This counter is relative to ens_id
     collect_land_counter = collect_land_counter + 1
@@ -3813,28 +3841,30 @@ contains
         if(associated(PEATCLSM_WATERLEVEL_enavg)) PEATCLSM_WATERLEVEL_enavg = PEATCLSM_WATERLEVEL_enavg/NUM_ENSEMBLE
         if(associated(PEATCLSM_FSWCHANGE_enavg))  PEATCLSM_FSWCHANGE_enavg  = PEATCLSM_FSWCHANGE_enavg /NUM_ENSEMBLE
 
-        if(associated(   CNLAI_enavg))     CNLAI_enavg =    CNLAI_enavg/NUM_ENSEMBLE 
-        if(associated(  CNTLAI_enavg))    CNTLAI_enavg =   CNTLAI_enavg/NUM_ENSEMBLE
-        if(associated(   CNSAI_enavg))     CNSAI_enavg =    CNSAI_enavg/NUM_ENSEMBLE
-        if(associated(  CNTOTC_enavg))    CNTOTC_enavg =   CNTOTC_enavg/NUM_ENSEMBLE
-        if(associated(  CNVEGC_enavg))    CNVEGC_enavg =   CNVEGC_enavg/NUM_ENSEMBLE
-        if(associated(  CNROOT_enavg))    CNROOT_enavg =   CNROOT_enavg/NUM_ENSEMBLE
-        if(associated(  CNFROOTC_enavg))    CNFROOTC_enavg =   CNFROOTC_enavg/NUM_ENSEMBLE
-        if(associated(   CNNPP_enavg))     CNNPP_enavg =    CNNPP_enavg/NUM_ENSEMBLE
-        if(associated(   CNGPP_enavg))     CNGPP_enavg =    CNGPP_enavg/NUM_ENSEMBLE
-        if(associated(    CNSR_enavg))      CNSR_enavg =     CNSR_enavg/NUM_ENSEMBLE
-        if(associated(   CNNEE_enavg))     CNNEE_enavg =    CNNEE_enavg/NUM_ENSEMBLE
-        if(associated(   CNXSMR_enavg))   CNXSMR_enavg =   CNXSMR_enavg/NUM_ENSEMBLE
-        if(associated(   CNADD_enavg))     CNADD_enavg =    CNADD_enavg/NUM_ENSEMBLE
-        if(associated(  PARABS_enavg))    PARABS_enavg =   PARABS_enavg/NUM_ENSEMBLE
-        if(associated(  PARINC_enavg))    PARINC_enavg =   PARINC_enavg/NUM_ENSEMBLE
-        if(associated(   SCSAT_enavg))     SCSAT_enavg =    SCSAT_enavg/NUM_ENSEMBLE
-        if(associated(   SCUNS_enavg))     SCUNS_enavg =    SCUNS_enavg/NUM_ENSEMBLE
-        if(associated(  BTRANT_enavg))    BTRANT_enavg =   BTRANT_enavg/NUM_ENSEMBLE
-        if(associated(     SIF_enavg))       SIF_enavg =      SIF_enavg/NUM_ENSEMBLE
-        if(associated(  CNLOSS_enavg))    CNLOSS_enavg =   CNLOSS_enavg/NUM_ENSEMBLE
-        if(associated(  CNBURN_enavg))    CNBURN_enavg =   CNBURN_enavg/NUM_ENSEMBLE
-        if(associated(  CNFSEL_enavg))    CNFSEL_enavg =   CNFSEL_enavg/NUM_ENSEMBLE
+        if(associated(    CNLAI_enavg))     CNLAI_enavg =    CNLAI_enavg/NUM_ENSEMBLE 
+        if(associated(   CNTLAI_enavg))    CNTLAI_enavg =   CNTLAI_enavg/NUM_ENSEMBLE
+        if(associated(    CNSAI_enavg))     CNSAI_enavg =    CNSAI_enavg/NUM_ENSEMBLE
+        if(associated(   CNTOTC_enavg))    CNTOTC_enavg =   CNTOTC_enavg/NUM_ENSEMBLE
+        if(associated(   CNVEGC_enavg))    CNVEGC_enavg =   CNVEGC_enavg/NUM_ENSEMBLE
+        if(associated(   CNROOT_enavg))    CNROOT_enavg =   CNROOT_enavg/NUM_ENSEMBLE
+        if(associated( CNFROOTC_enavg))  CNFROOTC_enavg = CNFROOTC_enavg/NUM_ENSEMBLE
+        if(associated(    CNNPP_enavg))     CNNPP_enavg =    CNNPP_enavg/NUM_ENSEMBLE
+        if(associated(    CNGPP_enavg))     CNGPP_enavg =    CNGPP_enavg/NUM_ENSEMBLE
+        if(associated(     CNSR_enavg))      CNSR_enavg =     CNSR_enavg/NUM_ENSEMBLE
+        if(associated(     CNAR_enavg))      CNAR_enavg =     CNAR_enavg/NUM_ENSEMBLE
+        if(associated(     CNHR_enavg))      CNHR_enavg =     CNHR_enavg/NUM_ENSEMBLE
+        if(associated(    CNNEE_enavg))     CNNEE_enavg =    CNNEE_enavg/NUM_ENSEMBLE
+        if(associated(   CNXSMR_enavg))    CNXSMR_enavg =   CNXSMR_enavg/NUM_ENSEMBLE
+        if(associated(    CNADD_enavg))     CNADD_enavg =    CNADD_enavg/NUM_ENSEMBLE
+        if(associated(   PARABS_enavg))    PARABS_enavg =   PARABS_enavg/NUM_ENSEMBLE
+        if(associated(   PARINC_enavg))    PARINC_enavg =   PARINC_enavg/NUM_ENSEMBLE
+        if(associated(    SCSAT_enavg))     SCSAT_enavg =    SCSAT_enavg/NUM_ENSEMBLE
+        if(associated(    SCUNS_enavg))     SCUNS_enavg =    SCUNS_enavg/NUM_ENSEMBLE
+        if(associated(   BTRANT_enavg))    BTRANT_enavg =   BTRANT_enavg/NUM_ENSEMBLE
+        if(associated(      SIF_enavg))       SIF_enavg =      SIF_enavg/NUM_ENSEMBLE
+        if(associated(   CNLOSS_enavg))    CNLOSS_enavg =   CNLOSS_enavg/NUM_ENSEMBLE
+        if(associated(   CNBURN_enavg))    CNBURN_enavg =   CNBURN_enavg/NUM_ENSEMBLE
+        if(associated(   CNFSEL_enavg))    CNFSEL_enavg =   CNFSEL_enavg/NUM_ENSEMBLE
 
         ! Deal with no-data-values
         !

@@ -3,7 +3,6 @@
 import os
 import sys
 import glob
-import linecache
 import shutil
 import fileinput
 import time
@@ -222,8 +221,6 @@ class ldas:
             self.catch = 'catch'
         elif _lsm_choice_int == 2 :
             self.catch = 'catchcnclm40'
-        elif _lsm_choice_int == 3 :
-            self.catch = 'catchcnclm45'
         elif _lsm_choice_int == 4 :
             self.catch = 'catchcnclm51'
         _lsm_choice_int = None
@@ -312,18 +309,7 @@ class ldas:
         inpgeom_= None
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
-            tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
-            extension = os.path.splitext(tmptile)[1]
-            if extension == '.domain':
-              extension = os.path.splitext(tmptile)[0]
-            gridname_ =''
-            if extension == '.til':
-               gridname_ = linecache.getline(tmptile, 3).strip()
-            else:
-               nc_file = netCDF4.Dataset(tmptile,'r')
-               gridname_ = nc_file.getncattr('Grid_Name')
-            # in case it is an old name: SMAP-EASEvx-Mxx
-            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
+            gridname_ = get_gridname(self.ExeInputs['TILING_FILE'])
             self.ExeInputs['GRIDNAME']  = gridname_
 
         if 'POSTPROC_HIST' not in self.ExeInputs:
@@ -374,7 +360,8 @@ class ldas:
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
         if self.with_land:
-           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
+           assert int(self.ExeInputs['LSM_CHOICE']) <= 2 or int(self.ExeInputs['LSM_CHOICE']) == 4,   \
+                "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment), 2 (Catchment-CN4.0), or 4 (Catchment-CN5.1)."
            if RESTART_str in ['1', '2']:
               y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
               y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
@@ -412,12 +399,10 @@ class ldas:
                 self.in_rstfile  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
                                    '/CatchCN/M36/20150301_0000/catchcnclm40_internal_dummy'
                 self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Heracles-NL/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-              elif (self.catch == 'catchcnclm45'):
-                self.in_rstfile  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                   '/CatchCN/M36/19800101_0000/catchcnclm45_internal_dummy'
-                self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Icarus-NLv3/Icarus-NLv3_EASE/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
+              elif (self.catch == 'catchcnclm51'):
+                sys.exit('Error. RESTART=0 not (yet) available for Catchment-CN5.1.\n')
               else:
-                sys.exit('need to provide at least dummy files')
+                sys.exit('Error. Unknown model version.')
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -797,6 +782,9 @@ class ldas:
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
+           if (self.catch=="catchcnclm51"):
+              os.symlink(self.bcs_dir_landshared + 'ctsm51_params.c210923_forCNCLM.nc', \
+                          self.inpdir+'/ctsm51_params.c210923_forCNCLM.nc')
 
         # create and link restart
         print ("Creating and linking restart...")
@@ -867,6 +855,7 @@ class ldas:
            config['output']['surface']['wemin']          = wemin_out
 
            if RESTART_str == "M" : # restart from merra2
+             config['input']['surface']['zoom'] = '2'
              yyyymm = int(YYYYMMDDHH[0:6])
              merra2_expid = "d5124_m2_jan10"
              if yyyymm < 197901 :
@@ -898,7 +887,6 @@ class ldas:
              catch_obj.remap()
            if self.with_landice:
              config['output']['surface']['remap_water'] = True
-             config['input']['surface']['zoom'] = '2'
              landice_obj = lake_landice_saltwater(config_obj = config)
              landice_obj.remap()
 
@@ -1104,6 +1092,13 @@ class ldas:
         if self.ladas_cpl > 0:
             # edit resolution info in ensupd nml file
             sp.run(['sed', '-i', 's/<CFnnnn>/'+self.agcm_res+'/g', self.rundir+'/LDASsa_SPECIAL_inputs_ensupd.nml'])
+
+        #CN_CLM51 nml
+        if (self.catch=="catchcnclm51"):
+            cnclm51_nml = glob.glob(etcdir+'/CN_CLM51.nml')
+            for nmlfile in cnclm51_nml:
+                shortfile=self.rundir+'/'+nmlfile.split('/')[-1]
+                shutil.copy2(nmlfile, shortfile)
  
         # get optimzed NX and IMS
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
@@ -1230,6 +1225,8 @@ class ldas:
                       ldasrcInp[keyn]= valn
                    if('catchcn' in self.catch):
                       ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
+                      if (self.catch=="catchcnclm51"):
+                          ldasrcInp['CNCLM51_PARAM_FILE']= '../input/ctsm51_params.c210923_forCNCLM.nc'
                    else:
                       # remove catchcn-specific entries that do not apply to catch model
                       ldasrcInp.pop('DTCN',None)
