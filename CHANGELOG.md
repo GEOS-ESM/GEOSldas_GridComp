@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added ntasks-per-node
+- Added ntasks-per-node.
+- Added matlab reader for binary mwRTM vegopacity file.
 
 ### Changed
 
