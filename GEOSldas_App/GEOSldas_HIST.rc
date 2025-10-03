@@ -70,9 +70,10 @@ EASEv2_M36.LM:           1
 
   tavg24_1d_lfs_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Forcings and States',
   tavg24_1d_lfs_Nt.nbits:       12,
-  tavg24_1d_lfs_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  tavg24_1d_lfs_Nt.template:    '%y4%m2%d2_%h2%n2z.nc4',
   tavg24_1d_lfs_Nt.archive:     '%c/Y%y4',
   tavg24_1d_lfs_Nt.mode:        'time-averaged',
+  tavg24_1d_lfs_Nt.format:      'CFIO'
   tavg24_1d_lfs_Nt.frequency:   240000,
   tavg24_1d_lfs_Nt.ref_time:    000000,
   tavg24_1d_lfs_Nt.fields:'Tair'       , 'METFORCE'      ,
@@ -129,8 +130,9 @@ EASEv2_M36.LM:           1
 
   tavg24_1d_lnd_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
   tavg24_1d_lnd_Nt.nbits:       12,
-  tavg24_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  tavg24_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.nc4',
   tavg24_1d_lnd_Nt.mode:        'time-averaged',
+  tavg24_1d_lnd_Nt.format:      'CFIO',
   tavg24_1d_lnd_Nt.frequency:   240000,
   tavg24_1d_lnd_Nt.ref_time:    000000,
   tavg24_1d_lnd_Nt.fields:     'GRN'        , 'VEGDYN'  ,
