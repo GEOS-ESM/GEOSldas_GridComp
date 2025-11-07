@@ -973,11 +973,11 @@ class ldas:
 
             landiceRstFile = ''
             if self.with_landice :
-               if self.ExeInputs['RESTART'].isdigit():
-                  if int(self.ExeInputs['RESTART']) == 0 :
-                     print("RESTART=0 not supported for landice tiles. Please use RESTART=M (MERRA-2) or RESTART=2.")
+               if RESTART_str == '0' :
+                  exit("RESTART=0 not supported for landice tiles. Please use RESTART=M, 1, or 2")
+               if RESTART_str == '1' :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-               else:
+               if RESTART_str == '2' or RESTART_str == 'M':
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
 
             if os.path.isfile(landiceRstFile) :
