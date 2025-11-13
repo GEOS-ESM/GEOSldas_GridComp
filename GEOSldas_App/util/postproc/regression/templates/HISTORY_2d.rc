@@ -1,0 +1,208 @@
+# Sample HISTORY.rc file for GEOSldas
+#
+# This HISTORY template is edited by "ldas_setup" via "process_hist.csh".
+
+VERSION: 1
+
+# Must edit 'EXPID' manually if HISTORY file is re-used without going through "ldas_setup".
+
+EXPID:  CURRENT
+
+# ------------------------------------------------------------------------------------------------
+
+# pre-defined Collections
+
+COLLECTIONS:
+                'tavg06_2d_lfs_Nx'
+                'tavg06_2d_lnd_Nx'
+                'tavg06_2d_glc_Nx'
+           ::
+
+# --------------------------------------------------------------------------------------------------
+
+# 2d output can be on the following grids (see [COLLECTION_NAME].grid_label])
+
+GRID_LABELS: PC720x361-DC
+             PC1440x721-DC
+             EASEv2_M36
+      ::
+
+PC720x361-DC.GRID_TYPE:  LatLon
+PC720x361-DC.IM_WORLD:   720
+PC720x361-DC.JM_WORLD:   361
+PC720x361-DC.POLE:       PC
+PC720x361-DC.DATELINE:   DC
+PC720x361-DC.LM:         1
+
+PC1440x721-DC.GRID_TYPE: LatLon
+PC1440x721-DC.IM_WORLD:  1440
+PC1440x721-DC.JM_WORLD:   721
+PC1440x721-DC.POLE:      PC
+PC1440x721-DC.DATELINE:  DC
+PC1440x721-DC.LM:        1
+
+EASEv2_M36.GRID_TYPE:    EASE
+EASEv2_M36.GRIDNAME:     EASEv2_M36
+EASEv2_M36.LM:           1
+
+# --------------------------------------------------------------------------------------------------
+
+# Detailed definition of the collections listed above
+#
+# Bit shaving: Retain only scientifically meaningful precision and modify meaningless
+#              bits to facilitate better compression in post-processing;
+#              *.nbits specifies the number of bits retained;
+#              For example, many MERRA-2 and FP products use nbits=12 and nbits=10, resp.
+#   IMPORTANT: To realize the disk space savings, bit-shaved output must be compressed
+#              after the GEOSldas simulation has finished.  Binary files can be compressed
+#              with "gzip"; nc4 files can be compressed using the "compress_bit-shaved_nc4.sh"
+#              utility script.
+
+
+  tavg06_2d_lfs_Nx.descr:       '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Forcings and States',
+  tavg06_2d_lfs_Nx.nbits:       12,
+  tavg06_2d_lfs_Nx.template:    '%y4%m2%d2_%h2%n2z.nc4',
+  tavg06_2d_lfs_Nx.archive:     '%c/Y%y4',
+  tavg06_2d_lfs_Nx.mode:        'time-averaged',
+  tavg06_2d_lfs_Nx.frequency:   060000,
+  tavg06_2d_lfs_Nx.ref_time:    000000,
+  tavg06_2d_lfs_Nx.format:      'CFIO',
+  tavg06_2d_lfs_Nx.regrid_exch: '../input/tile.data',
+  tavg06_2d_lfs_Nx.regrid_name: 'PE90x540-CF',
+  tavg06_2d_lfs_Nx.grid_label:  PC720x361-DC,
+  tavg06_2d_lfs_Nx.deflate:     2,
+  tavg06_2d_lfs_Nx.fields:'Tair'       , 'METFORCE'      ,
+                          'Qair'       , 'METFORCE'      ,
+                          'LWdown'     , 'METFORCE'      ,
+                          'SWdown'     , 'METFORCE'      ,
+                          'Wind'       , 'METFORCE'      ,
+                          'Psurf'      , 'METFORCE'      ,
+                          'Rainf_C'    , 'METFORCE'      ,
+                          'Rainf'      , 'METFORCE'      ,
+                          'Snowf'      , 'METFORCE'      ,
+                          'RainfSnowf' , 'METFORCE'      ,
+                          'RefH'       , 'METFORCE'      ,
+                          'CATDEF'     , 'CATCH'      ,
+                          'RZEXC'      , 'CATCH'      ,
+                          'SRFEXC'     , 'CATCH'      ,
+                          'WESNN1'     , 'CATCH'      ,
+                          'WESNN2'     , 'CATCH'      ,
+                          'WESNN3'     , 'CATCH'      ,
+                          'HLWUP'      , 'CATCH'       ,
+          ::
+
+  tavg06_2d_lnd_Nx.format:        'CFIO',
+  tavg06_2d_lnd_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
+  tavg06_2d_lnd_Nx.nbits:         12,
+  tavg06_2d_lnd_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4',
+  tavg06_2d_lnd_Nx.mode:          'time-averaged',
+  tavg06_2d_lnd_Nx.frequency:     060000,
+  tavg06_2d_lnd_Nx.ref_time:      000000,
+  tavg06_2d_lnd_Nx.regrid_exch:   '../input/tile.data',
+  tavg06_2d_lnd_Nx.regrid_name:   'PE90x540-CF',
+#  tavg06_2d_lnd_Nx.regrid_method: 'BILINEAR_MONOTONIC' ,
+  tavg06_2d_lnd_Nx.grid_label:    PC720x361-DC,
+#  tavg06_2d_lnd_Nx.grid_label:   EASEv2_M36,
+  tavg06_2d_lnd_Nx.deflate:       2,
+  tavg06_2d_lnd_Nx.fields:     'GRN'        , 'VEGDYN'  ,
+                               'LAI'        , 'VEGDYN'  ,
+                               'WET3'       , 'CATCH'  , 'GWETPROF'     ,
+                               'WET2'       , 'CATCH'  , 'GWETROOT'     ,
+                               'WET1'       , 'CATCH'  , 'GWETTOP'      ,
+                               'WCPR'       , 'CATCH'  , 'PRMC'         ,
+                               'WCRZ'       , 'CATCH'  , 'RZMC'         ,
+                               'WCSF'       , 'CATCH'  , 'SFMC'         ,
+                               'CAPAC'      , 'CATCH'  , 'INTRWATR'     ,
+                               'TPSNOW'     , 'CATCH'  , 'TPSNOWLAND'   ,
+                               'TPUNST'     , 'CATCH'  , 'TUNSTLAND'    ,
+                               'TPSAT'      , 'CATCH'  , 'TSATLAND'     ,
+                               'TPWLT'      , 'CATCH'  , 'TWLTLAND'     ,
+                               'TPSURF'     , 'CATCH'  , 'TSURFLAND'    ,
+                               'TP1'        , 'CATCH'  , 'TSOIL1'       ,         # CATCH GC: TP1,  ENSAVG GC: TSOIL1TILE
+                               'TP2'        , 'CATCH'  , 'TSOIL2'       ,         # ...
+                               'TP3'        , 'CATCH'  , 'TSOIL3'       ,         # ...
+                               'TP4'        , 'CATCH'  , 'TSOIL4'       ,         # ...
+                               'TP5'        , 'CATCH'  , 'TSOIL5'       ,         # ...
+                               'TP6'        , 'CATCH'  , 'TSOIL6'       ,         # ...
+                               'PRLAND'     , 'CATCH'  , 'PRECTOTCORRLAND'  ,     # assume "corrected" precip
+                               'SNOLAND'    , 'CATCH'  , 'PRECSNOCORRLAND'  ,     # assume "corrected" precip
+                               'TSLAND'     , 'CATCH'  , 'SNOMASLAND'   ,
+                               'SNOWDP'     , 'CATCH'  , 'SNODPLAND'    ,
+                               'EVPSOI'     , 'CATCH'  , 'LHLANDSOIL'   ,
+                               'EVPVEG'     , 'CATCH'  , 'LHLANDTRNS'   ,
+                               'EVPINT'     , 'CATCH'  , 'LHLANDINTR'   ,
+                               'EVPICE'     , 'CATCH'  , 'LHLANDSBLN'   ,
+                               'RUNSURF'    , 'CATCH'  , 'RUNSURFLAND'  ,
+                               'BASEFLOW'   , 'CATCH'  , 'BASEFLOWLAND' ,
+                               'SMLAND'     , 'CATCH'  ,
+                               'QINFIL'     , 'CATCH'  , 'QINFILLAND'   ,
+                               'FRUST'      , 'CATCH'  , 'FRLANDUNST'   ,
+                               'FRSAT'      , 'CATCH'  , 'FRLANDSAT'    ,
+                               'ASNOW'      , 'CATCH'  , 'FRLANDSNO'    ,
+                               'FRWLT'      , 'CATCH'  , 'FRLANDWLT'    ,
+                               'DFPARLAND'  , 'CATCH'  , 'PARDFLAND'    ,
+                               'DRPARLAND'  , 'CATCH'  , 'PARDRLAND'    ,
+                               'SHLAND'     , 'CATCH'  ,
+                               'LHLAND'     , 'CATCH'  ,
+                               'EVLAND'     , 'CATCH'  ,
+                               'LWLAND'     , 'CATCH'  ,
+                               'SWLAND'     , 'CATCH'  ,
+                               'GHLAND'     , 'CATCH'  ,
+                               'TWLAND'     , 'CATCH'  ,
+                               'TELAND'     , 'CATCH'  ,
+                               'DWLAND'     , 'CATCH'  , 'WCHANGELAND'  ,
+                               'DHLAND'     , 'CATCH'  , 'ECHANGELAND'  ,
+                               'SPLAND'     , 'CATCH'  , 'SPSHLAND'     ,
+#                               'SPLH'       , 'CATCH'  , 'SPLHLAND'     ,        # works for Catch only, not yet for CatchCN
+                               'SPWATR'     , 'CATCH'  , 'SPEVLAND'     ,
+                               'SPSNOW'     , 'CATCH'  , 'SPSNLAND'     ,
+                               'PEATCLSM_WATERLEVEL', 'CATCH'  ,
+                               'PEATCLSM_FSWCHANGE' , 'CATCH'  ,
+                               ::
+
+
+
+  tavg06_2d_glc_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Land Ice Diagnostics',
+  tavg06_2d_glc_Nx.nbits:         12,
+  tavg06_2d_glc_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
+  tavg06_2d_glc_Nx.mode:          'time-averaged' ,
+  tavg06_2d_glc_Nx.frequency:      060000 ,
+  tavg06_2d_glc_Nx.ref_time:       000000 ,
+  tavg06_2d_glc_Nx.format:        'CFIO' ,
+  tavg06_2d_glc_Nx.regrid_exch:   '../input/tile.data' ,
+  tavg06_2d_glc_Nx.regrid_name:   'PE90x540-CF' ,
+  tavg06_2d_glc_Nx.grid_label:     PC720x361-DC ,  #comment this line out for cube face output
+  tavg06_2d_glc_Nx.deflate:        1,
+  tavg06_2d_glc_Nx.fields:      'ACCUM'       , 'LANDICE' ,
+                                'ALBVR'       , 'LANDICE' ,  'ALBVR_GL'           ,
+                                'ALBVF'       , 'LANDICE' ,  'ALBVF_GL'           ,
+                                'ALBNR'       , 'LANDICE' ,  'ALBNR_GL'           ,
+                                'ALBNF'       , 'LANDICE' ,  'ALBNF_GL'           ,
+                                'ASNOW_GL'    , 'LANDICE' ,
+                                'DELTS'       , 'LANDICE' ,
+                                'DNICFLX'     , 'LANDICE' ,
+                                'EVAPOUT'     , 'LANDICE' ,
+                                'QH'          , 'LANDICE' ,
+                                'GHTSKIN'     , 'LANDICE' ,  'GHTSKIN_GL'           ,
+                                'HLATN'       , 'LANDICE' ,
+                                'HLWUP'       , 'LANDICE' ,  'HLWUP_GL'           ,
+                                'IMELT'       , 'LANDICE' ,
+                                'LWNDSRF'     , 'LANDICE' ,
+                                'MELTWTR'     , 'LANDICE' ,
+                                'MELTWTRCONT' , 'LANDICE' ,
+                                'RUNOFF'      , 'LANDICE' ,  'RUNOFF_GL'           ,
+                                'SHOUT'       , 'LANDICE' ,
+                                'SMELT'       , 'LANDICE' ,
+                                'SNICEALB'    , 'LANDICE' ,
+                                'SNOMAS_GL'   , 'LANDICE' ,
+                                'SNOWALB'     , 'LANDICE' ,
+                                'SNOWDP_GL'   , 'LANDICE' ,
+                                'SWNDSRF'     , 'LANDICE' ,
+                                'TST'         , 'LANDICE' ,
+                                'WESNBOT'     , 'LANDICE' ,
+                                'WESNEXT'     , 'LANDICE' ,
+                                'WESNPERC'    , 'LANDICE' ,
+                                'WESNPREC'    , 'LANDICE' ,
+                                 ::
+
+# ========================== EOF ==============================================================

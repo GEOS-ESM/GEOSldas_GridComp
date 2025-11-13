@@ -3,8 +3,10 @@
 import sys
 import argparse
 import resource
+import os, shutil
 from setup_utils import *
 from ldas        import *
+from pathlib     import Path
 
 def parseCmdLine():
     """
@@ -176,3 +178,27 @@ if __name__=='__main__':
     print ("creating batch Run scripts")
     status = ldasObj.createBatchRun()
     assert (status)
+
+    # --- Install regression driver into this experiment (copy from source tree) ---
+def _copy_regression_from_source(expdir: Path):
+    """
+    Copy util/postproc/regression from the GEOSldas source tree
+    into <EXPDIR>/regress.
+    """
+    src = Path(__file__).resolve().parents[2] / "src" / "Components" / "@GEOSldas_GridComp" / "GEOSldas_App" / "util" / "postproc" / "regression"
+    dst = expdir / "regress"
+    if not src.is_dir():
+        print(f"WARNING: regression source not found: {src}")
+        return
+
+    for root, dirs, files in os.walk(src):
+        rel = Path(root).relative_to(src)
+        (dst / rel).mkdir(parents=True, exist_ok=True)
+        for f in files:
+            srcf = Path(root) / f
+            dstf = dst / rel / f
+            shutil.copy2(srcf, dstf)
+            if dstf.suffix == ".sh":
+                mode = os.stat(dstf).st_mode
+                os.chmod(dstf, mode | 0o111)
+

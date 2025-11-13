@@ -1,0 +1,176 @@
+# Sample HISTORY.rc file for GEOSldas
+#
+# This HISTORY template is edited by "ldas_setup" via "process_hist.csh".
+# The strings '#ASSIM', '', and '#CUBE' are *not* linked to MAPL HISTORY
+# functionality.  For example, the line
+#    "#CUBE            'tavg06_2d_lnd_Nx'"
+#  does *not* mean that the 'lnd' output will be on a cube-sphere grid.
+
+
+# Must edit 'EXPID' manually if HISTORY file is re-used without going
+#  through "ldas_setup".
+#
+EXPID:  CURRENT
+
+COLLECTIONS:
+            'tavg06_1d_lfs_Nt'
+            'tavg06_1d_lnd_Nt'
+	    'tavg06_1d_glc_Nt'
+           ::
+
+
+
+
+# Detailed definition of the collections listed above
+#
+# Bit shaving: Retain only scientifically meaningful precision and modify meaningless
+#              bits to facilitate better compression in post-processing;
+#              *.nbits specifies the number of bits retained;
+#              For example, many MERRA-2 and FP products use nbits=12 and nbits=10, resp.
+#   IMPORTANT: To realize the disk space savings, bit-shaved output must be compressed
+#              after the GEOSldas simulation has finished.  Binary files can be compressed
+#              with "gzip"; nc4 files can be compressed using the "compress_bit-shaved_nc4.sh"
+#              utility script.
+
+  tavg06_1d_lfs_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Forcings and States',
+  tavg06_1d_lfs_Nt.nbits:       12,
+  tavg06_1d_lfs_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  tavg06_1d_lfs_Nt.archive:     '%c/Y%y4',
+  tavg06_1d_lfs_Nt.mode:        'time-averaged',
+  tavg06_1d_lfs_Nt.frequency:   060000,
+  tavg06_1d_lfs_Nt.ref_time:    000000,
+  tavg06_1d_lfs_Nt.fields:'Tair'       , 'METFORCE'      ,
+                          'Qair'       , 'METFORCE'      ,
+                          'LWdown'     , 'METFORCE'      ,
+                          'SWdown'     , 'METFORCE'      ,
+                          'Wind'       , 'METFORCE'      ,
+                          'Psurf'      , 'METFORCE'      ,
+                          'Rainf_C'    , 'METFORCE'      ,
+                          'Rainf'      , 'METFORCE'      ,
+                          'Snowf'      , 'METFORCE'      ,
+                          'RainfSnowf' , 'METFORCE'      ,
+                          'RefH'       , 'METFORCE'      ,
+                          'CATDEF'     , 'CATCH'      ,
+                          'RZEXC'      , 'CATCH'      ,
+                          'SRFEXC'     , 'CATCH'      ,
+                          'WESNN1'     , 'CATCH'      ,
+                          'WESNN2'     , 'CATCH'      ,
+                          'WESNN3'     , 'CATCH'      ,
+                          'HLWUP'      , 'CATCH'      ,
+          ::
+
+  inst6_1d_lfs_Nt.descr:       'Tile-space,Instantaneous,Single-Level,Assimilation,Land Surface Forcings and States',
+  inst6_1d_lfs_Nt.nbits:       12,
+  inst6_1d_lfs_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  inst6_1d_lfs_Nt.archive:     '%c/Y%y4',
+  inst6_1d_lfs_Nt.mode:        'instantaneous',
+  inst6_1d_lfs_Nt.frequency:   060000,
+  inst6_1d_lfs_Nt.ref_time:    000000,
+  inst6_1d_lfs_Nt.fields: 'Tair'       , 'METFORCE'      ,
+                          'Qair'       , 'METFORCE'      ,
+                          'LWdown'     , 'METFORCE'      ,
+                          'SWdown'     , 'METFORCE'      ,
+                          'Wind'       , 'METFORCE'      ,
+                          'Psurf'      , 'METFORCE'      ,
+                          'Rainf_C'    , 'METFORCE'      ,
+                          'Rainf'      , 'METFORCE'      ,
+                          'Snowf'      , 'METFORCE'      ,
+                          'RainfSnowf' , 'METFORCE'      ,
+                          'RefH'       , 'METFORCE'      ,
+                          'CATDEF'     , 'CATCH'      ,
+                          'RZEXC'      , 'CATCH'      ,
+                          'SRFEXC'     , 'CATCH'      ,
+                          'WESNN1'     , 'CATCH'      ,
+                          'WESNN2'     , 'CATCH'      ,
+                          'WESNN3'     , 'CATCH'      ,
+                          'HLWUP'      , 'CATCH'      ,
+          ::
+
+
+  tavg06_1d_lnd_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
+  tavg06_1d_lnd_Nt.nbits:       12,
+  tavg06_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  tavg06_1d_lnd_Nt.mode:        'time-averaged',
+  tavg06_1d_lnd_Nt.frequency:   060000,
+  tavg06_1d_lnd_Nt.ref_time:    000000,
+  tavg06_1d_lnd_Nt.fields:     'WET3'       , 'CATCH'  , 'GWETPROF'     ,
+                               'WET2'       , 'CATCH'  , 'GWETROOT'     ,
+                               'WET1'       , 'CATCH'  , 'GWETTOP'      ,
+                               'WCPR'       , 'CATCH'  , 'PRMC'         ,
+                               'WCRZ'       , 'CATCH'  , 'RZMC'         ,
+                               'WCSF'       , 'CATCH'  , 'SFMC'         ,
+                               'TPSNOW'     , 'CATCH'  ,
+                               'TPUNST'     , 'CATCH'  , 'TUNST'        ,
+                               'TPSAT'      , 'CATCH'  , 'TSAT'         ,
+                               'TPWLT'      , 'CATCH'  , 'TWLT'         ,
+                               'TPSURF'     , 'CATCH'  , 'TSURF'        ,
+                               'GRN'        , 'VEGDYN'  ,
+                               'LAI'        , 'VEGDYN'  ,
+                               'TP1'        , 'CATCH'  ,
+                               'TP2'        , 'CATCH'  ,
+                               'TP3'        , 'CATCH'  ,
+                               'TP4'        , 'CATCH'  ,
+                               'TP5'        , 'CATCH'  ,
+                               'TP6'        , 'CATCH'  ,
+                               'PRLAND'     , 'CATCH'  , 'PRECTOTLAND'  ,
+                               'SNOLAND'    , 'CATCH'  , 'PRECSNOLAND'  ,
+                               'TSLAND'     , 'CATCH'  , 'SNOMAS'       ,
+                               'SNOWDP'     , 'CATCH'  , 'SNODP'        ,
+                               'EVPSOI'     , 'CATCH'  , 'EVPSOIL'      ,
+                               'EVPVEG'     , 'CATCH'  , 'EVPTRNS'      ,
+                               'EVPINT'     , 'CATCH'  , 'EVPINTR'      ,
+                               'EVPICE'     , 'CATCH'  , 'EVPSBLN'      ,
+                               'RUNSURF'    , 'CATCH'  , 'RUNOFF'       ,
+                               'BASEFLOW'   , 'CATCH'  ,
+                               'SMLAND'     , 'CATCH'  ,
+                               'QINFIL'     , 'CATCH'  ,
+                               'FRUST'      , 'CATCH'  , 'FRUNST'       ,
+                               'FRSAT'      , 'CATCH'  ,
+                               'ASNOW'      , 'CATCH'  , 'FRSNO'        ,
+                               'FRWLT'      , 'CATCH'  ,
+                               'DFPARLAND'  , 'CATCH'  , 'PARDFLAND'    ,
+                               'DRPARLAND'  , 'CATCH'  , 'PARDRLAND'    ,
+                               'SHLAND'     , 'CATCH'  ,
+                               'LHLAND'     , 'CATCH'  ,
+                               'EVLAND'     , 'CATCH'  ,
+                               'LWLAND'     , 'CATCH'  ,
+                               'SWLAND'     , 'CATCH'  ,
+                               'GHLAND'     , 'CATCH'  ,
+                               'TWLAND'     , 'CATCH'  ,
+                               'TELAND'     , 'CATCH'  ,
+                               'DWLAND'     , 'CATCH'  , 'WCHANGE'      ,
+                               'DHLAND'     , 'CATCH'  , 'ECHANGE'      ,
+                               'SPLAND'     , 'CATCH'  ,
+                               'SPWATR'     , 'CATCH'  ,
+                               'SPSNOW'     , 'CATCH'  ,
+                               'PEATCLSM_WATERLEVEL', 'CATCH'  ,
+                               'PEATCLSM_FSWCHANGE' , 'CATCH'  ,
+                               ::
+
+
+  tavg06_1d_glc_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Land Ice Diagnostics',
+  tavg06_1d_glc_Nt.nbits:         12,
+  tavg06_1d_glc_Nt.template:      '%y4%m2%d2_%h2%n2z.bin' ,
+  tavg06_1d_glc_Nt.mode:          'time-averaged' ,
+  tavg06_1d_glc_Nt.frequency:      060000 ,
+  tavg06_1d_glc_Nt.ref_time:       000000 ,
+  tavg06_1d_glc_Nt.fields:      'ASNOW_GL'    , 'LANDICE' ,
+                                'DELTS'       , 'LANDICE' ,
+                                'EVAPOUT'     , 'LANDICE' ,
+                                'GHTSKIN'     , 'LANDICE' ,  'GHTSKIN_GL'           ,
+                                'HLATN'       , 'LANDICE' ,
+                                'HLWUP'       , 'LANDICE' ,  'HLWUP_GL'           ,
+                                'LWNDSRF'     , 'LANDICE' ,
+                                'MELTWTR'     , 'LANDICE' ,
+                                'MELTWTRCONT' , 'LANDICE' ,
+                                'RUNOFF'      , 'LANDICE' ,  'RUNOFF_GL'           ,
+                                'SHOUT'       , 'LANDICE' ,
+                                'SNOMAS_GL'   , 'LANDICE' ,
+                                'SNOWDP_GL'   , 'LANDICE' ,
+                                'SWNDSRF'     , 'LANDICE' ,
+                                'TST'         , 'LANDICE' ,
+                                'WESNBOT'     , 'LANDICE' ,
+                                'WESNEXT'     , 'LANDICE' ,
+                                 ::
+
+# ========================== EOF ==============================================================
