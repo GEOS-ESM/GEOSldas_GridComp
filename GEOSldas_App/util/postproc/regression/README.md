@@ -1,4 +1,4 @@
-# GEOSldas Global Regression: Model Start/Stop & Layout (6-hour tavg profile)
+# GEOSldas Global Regression: Model Start/Stop & Layout
 
 ## Overview
 
