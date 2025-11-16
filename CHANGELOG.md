@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed bug in ASCAT EUMET soil moisture obs reader.
 - Fixed Restart=1 when the domain is not global.
 
 ### Removed
