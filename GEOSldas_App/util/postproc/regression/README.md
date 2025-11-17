@@ -96,16 +96,16 @@ in `start_stop_model.sh`. By default, the sandbox is deleted after a PASS.
 Run your experiment once so that restart files and outputs exist.
 The regression uses these restarts as inputs.
 
-Run only start/stop tests in the regression driver:
+Run the standard start/stop tests:
 
     cd /discover/nobackup/.../EXPID
     ./regress/start_stop_model.sh
 
-Run with layout test:
+To include the optional layout-invariance test (T4):
 
-    ./regress/RUN_LAYOUT=1 ALT_1D=120 ./start_stop_model.sh
+    RUN_LAYOUT=1 ALT_1D=120 ./regress/start_stop_model.sh
 
-where `ALT_1D` can be 84, 120, 126, etc., depending on grid resolution.
+See the “Layout-Invariance Test (T4)” section below for details.
 
 
 # What the regression does
@@ -126,6 +126,53 @@ where `ALT_1D` can be 84, 120, 126, etc., depending on grid resolution.
 - Compares:
   - **RESTARTS:** T1 (24 h) vs T3 (12 h + 12 h)
   - **HISTORY:** T1 vs [T2 ∪ T3] at 03/09/15/21Z centers
+    
+# Layout-Invariance Test (T4)
+
+In addition to the core start/stop regression (T1–T3), the script supports an
+optional **layout-invariance test (T4)**.  
+This test verifies that GEOSldas produces identical results when the number of
+MPI tasks along the active axis (NX or NY) is changed.
+
+T4 is disabled by default.  
+
+Enable it by running:
+
+    RUN_LAYOUT=1 ALT_1D=<npes> ./regress/start_stop_model.sh
+
+where `ALT_1D` is the alternate number of MPI tasks (e.g., 84, 120, 126, ...).
+
+### What T4 does
+
+- Uses the T1 run directory as a frozen template.
+- Creates a new sandbox sub-experiment (`run_T4/`) with:
+  - identical model configuration,
+  - different number of MPI tasks (`ALT_1D`),
+  - identical tile distribution file (IMS/JMS.rc) pre-built by `preprocess_ldas.x`.
+
+- Runs a 24-hour GEOSldas simulation under the alternate layout.
+- Compares **T1 (baseline)** vs **T4 (alternate layout)**:
+
+  **HISTORY (tolerant compare):**
+  - Uses `nccmp -dmfMNS -G history -t <ABS_TOL> -T <REL_TOL>`  
+    allowing tiny floating-point differences from MPI reduction ordering.
+
+  **Restarts (strict compare):**
+  - Uses `nccmp -dmfgMNS`  
+    and requires bit-for-bit identical restart fields at the final time.
+
+### When T4 passes
+
+A passing T4 test means:
+
+- Changing layout (task decomposition) does **not** affect model results,
+- HISTORY fields agree within tolerance,
+- Restart fields agree bit-for-bit.
+
+### When T4 is skipped
+
+T4 runs only if `RUN_LAYOUT=1` is provided.  
+Normal users running only T1–T3 do not trigger layout testing.
 
 
 # Environment variables
@@ -143,13 +190,30 @@ where `ALT_1D` can be 84, 120, 126, etc., depending on grid resolution.
 
 # Comparison logic
 
-- Restarts are compared with:
+GEOSldas start/stop regression uses three comparison modes:
 
-      nccmp -dmfgqMNS
+### 1. Restart files (strict compare)
+Restart files are compared with full data + metadata + attributes:
 
-  If strict compare fails, the script performs a tolerant comparison.
+    nccmp -dmfgMNS fileA fileB
 
-- HISTORY compares all 6-hour stamps in the same 24-hour window.
+This must be bit-for-bit identical for the test to pass.
+
+### 2. HISTORY files (data-only strict compare)
+For HISTORY collections, only variables are compared (metadata ignored):
+
+    nccmp -dNM fileA fileB
+
+### 3. Layout-invariance tests (tolerant compare)
+For layout (T4) or tolerant mode, the script uses:
+
+    nccmp -dmfMNS -G history -t <ABS_TOL> -T <REL_TOL>
+
+which is controlled by:
+
+    NCCMP_FLAGS_TOL = -dmfMNS -G history -t 1e-15 -T 1e-12
+
+This tolerates tiny floating-point differences caused by MPI layout changes.
 
 
 # Notes
