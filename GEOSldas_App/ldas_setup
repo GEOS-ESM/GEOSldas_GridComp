@@ -179,7 +179,7 @@ if __name__=='__main__':
     status = ldasObj.createBatchRun()
     assert (status)
 
-    # --- Install regression driver into this experiment (copy from source tree) ---
+# --- Install regression driver into this experiment (copy from source tree) ---
 def _copy_regression_from_source(expdir: Path):
     """
     Copy util/postproc/regression from the GEOSldas source tree
@@ -201,4 +201,11 @@ def _copy_regression_from_source(expdir: Path):
             if dstf.suffix == ".sh":
                 mode = os.stat(dstf).st_mode
                 os.chmod(dstf, mode | 0o111)
+
+try:
+    expdir = Path(ldasObj.exphome) / ldasObj.ExeInputs['EXP_ID']
+    _copy_regression_from_source(expdir)
+    print(f"Installed regression under {expdir}/regress")
+except Exception as e:
+    print(f"WARNING: could not copy regression: {e}")
 
