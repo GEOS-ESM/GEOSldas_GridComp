@@ -177,15 +177,17 @@ Normal users running only T1–T3 do not trigger layout testing.
 
 # Environment variables
 
-| Variable              | Description                               | Default                      |
-|----------------------|-------------------------------------------|------------------------------|
-| EXPDIR               | Experiment root (run/, input/, build/, output/) | auto-detected          |
-| EXPDOMAIN            | Domain under output/                       | auto-detected                |
-| SUBMIT               | Batch command (Slurm only)                 | `sbatch`                     |
-| ALT_1D               | Alternate 1-D task count for layout test   | required if `RUN_LAYOUT=1`   |
-| NCCMP_FLAGS_TOL      | Tolerant compare flags                     | `-dmfgqMNS -t 1e-12 -T 1e-6` |
-| HIST_STEP_SEC        | Step for HISTORY collection                | 21600 (6 h)                  |
-| HIST_STEP_OFFSET_SEC | Center offset (+3 h)                       | 10800                        |
+| Variable              | Description                               | Default                                 |
+|-----------------------|-------------------------------------------|-----------------------------------------|
+| EXPDIR                | Experiment root (run/, input/, build/, output/) | auto-detected                     |
+| EXPDOMAIN             | Domain under output/                       | auto-detected                          |
+| SUBMIT                | Batch command (Slurm only)                 | `sbatch`                               |
+| ALT_1D                | Alternate 1-D task count for layout test   | required if `RUN_LAYOUT=1`             |
+| ABS_TOL               | Absolute tolerance for tolerant nccmp      | `1e-15`                                |
+| REL_TOL               | Relative tolerance for tolerant nccmp      | `1e-12`                                |
+| NCCMP_FLAGS_TOL       | Tolerant compare flags                     | `-dmfMNS -G history -t 1e-15 -T 1e-12` |
+| HIST_STEP_SEC         | Step for HISTORY collection                | 21600 (6 h)                            |
+| HIST_STEP_OFFSET_SEC  | Center offset (+3 h)                       | 10800                                  |
 
 
 # Comparison logic
