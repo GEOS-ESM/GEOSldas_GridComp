@@ -185,6 +185,16 @@ make_sandbox() {
     sed -i -E 's|^\s*(DO_HIST|DO_HISTORY)\s*:.*$|\1:                        .true.|' "$SANDBOX_EXPDIR/run/LDAS.rc"
   fi
 
+  # Detect whether landice restart exists in sandbox
+  if [[ -L "$SANDBOX_EXPDIR/input/restart/landice_internal_rst" || \
+        -f "$SANDBOX_EXPDIR/input/restart/landice_internal_rst" ]]; then
+    HAS_LANDICE=1
+    echo "Sandbox: landice_internal_rst detected (HAS_LANDICE=1)"
+  else
+    HAS_LANDICE=0
+    echo "Sandbox: NO landice_internal_rst (HAS_LANDICE=0)"
+  fi
+
   echo "Sandbox ready."
 }
 
@@ -697,6 +707,15 @@ else
   cp -f "$TEMPLATE_DIR/HISTORY_1d.rc" "$EXPDIR/run/HISTORY.rc"
 fi
 
+# If there is no land-ice restart, drop glc collections from HISTORY.rc
+if [[ "${HAS_LANDICE:-0}" -eq 0 ]]; then
+  echo "Land-only sandbox: removing glc HISTORY collections (no landice_internal_rst)"
+  # EASE 1-D glc collection
+  sed -i "/tavg06_1d_glc_Nt/d" "$EXPDIR/run/HISTORY.rc" || true
+  # CF 2-D glc collection
+  sed -i "/tavg06_2d_glc_Nx/d" "$EXPDIR/run/HISTORY.rc" || true
+fi
+
 # Ensure LDAS uses this HISTORY.rc
 sed -i -E 's|^\s*(HISTORY(_RC)?\s*:\s*).*$|\1HISTORY.rc|' "$EXPDIR/run/LDAS.rc"
 
@@ -1026,17 +1045,28 @@ if [[ "${RUN_LAYOUT:-0}" == "1" ]]; then
   T4_RS_ROOT="$T4_OUT/rs/ens0000"
   T4_RS_DIR="$T4_RS_ROOT/Y$ORIG_Y/M$ORIG_M"
   mkdir -p "$T4_RS_DIR" "$T4_EXPDIR/input/restart"
-  cp -p "$src" "$tgt"
-  ln -rsf "$tgt" "$T4_EXPDIR/input/restart/${comp}_internal_rst"
 
   echo "T4: copying sandbox start restarts from $BASE_RS to $T4_RS_DIR for ${ORIG_NYMD}_${ORIG_NHMS}"
+  
   for comp in catch landice; do
+    # Land-only case: skip landice restart entirely
+    if [[ "$comp" == "landice" && "${HAS_LANDICE:-0}" -eq 0 ]]; then
+      echo "  T4: skipping landice restart (HAS_LANDICE=0)"
+      continue
+    fi
+  
     base="$BASE_RS/Y$ORIG_Y/M$ORIG_M/$EXPID.${comp}_internal_rst"
     src=""
-    [[ -f "${base}.${ORIG_NYMD}_${ORIG_NHMS}"     ]] && src="${base}.${ORIG_NYMD}_${ORIG_NHMS}"
+  
+    [[ -f "${base}.${ORIG_NYMD}_${ORIG_NHMS}"           ]] && src="${base}.${ORIG_NYMD}_${ORIG_NHMS}"
     [[ -z "$src" && -f "${base}.${ORIG_NYMD}_${ORIG_NHMS:0:4}" ]] && src="${base}.${ORIG_NYMD}_${ORIG_NHMS:0:4}"
-    [[ -n "$src" ]] || { echo "❌ T4: missing sandbox $comp restart ${ORIG_NYMD}_${ORIG_NHMS} at $base.*"; exit 2; }
-
+  
+    if [[ -z "$src" ]]; then
+      echo "❌ T4: missing sandbox $comp restart ${ORIG_NYMD}_${ORIG_NHMS} at $base.*"
+      # For catch, this is fatal; landice should never hit here if HAS_LANDICE=0
+      exit 2
+    fi
+  
     tgt="$T4_RS_DIR/$(basename "$src")"
     cp -p "$src" "$tgt"
     ln -rsf "$tgt" "$T4_EXPDIR/input/restart/${comp}_internal_rst"
