@@ -1951,8 +1951,8 @@ contains
           date_time_tmp%sec   = int(tmp_data(kk, 6))
           
           ! skip if record outside of current assim window
-          if ( datetime_lt_refdatetime( date_time_tmp, date_time_low ) .and.           &
-               datetime_le_refdatetime( date_time_up, date_time_tmp )         ) cycle
+          if ( datetime_lt_refdatetime( date_time_tmp, date_time_low ) .or.              &   ! obs is before start of assim window *or*
+               datetime_le_refdatetime( date_time_up,  date_time_tmp )         ) cycle       ! obs is after  end   of assim window
           
           ! skip if record contains invalid soil moisture value
           if ( tmp_data(kk, 7) > 100. .or. tmp_data(kk, 7) < 0. ) cycle
