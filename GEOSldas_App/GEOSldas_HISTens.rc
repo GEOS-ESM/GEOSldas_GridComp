@@ -85,8 +85,9 @@ PC360x181-DC.LM: 1
 
 tavg3_1d_lnd_Nt.descr:       'Tile-space,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
 tavg3_1d_lnd_Nt.nbits:       12,
-tavg3_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+tavg3_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.nc4',
 tavg3_1d_lnd_Nt.mode:        'time-averaged',
+tavg3_1d_lnd_Nt.format:      'CFIO',
 tavg3_1d_lnd_Nt.frequency:   030000,
 tavg3_1d_lnd_Nt.ref_time:    000000,
 tavg3_1d_lnd_Nt.fields:      'WET3'       , 'ENSAVG'  , 'GWETPROF'     ,
