@@ -438,8 +438,9 @@ EASEv2_M36.LM:           1
 # By default, no bit shaving for increments output.
 
   catch_progn_incr.descr:       'Tile-space,3-Hourly,Instantaneous,Single-Level,Assimilation,Ensemble-Average Land Prognostics Increments',
-  catch_progn_incr.template:    '%y4%m2%d2_%h2%n2z.bin',
+  catch_progn_incr.template:    '%y4%m2%d2_%h2%n2z.nc4',
   catch_progn_incr.mode:        'instantaneous',
+  catch_progn_incr.format:      'CFIO',
   catch_progn_incr.frequency:   030000,
   catch_progn_incr.ref_time:    000000,
   catch_progn_incr.fields:     'TCFSAT_INCR'    , 'LANDASSIM'      ,
