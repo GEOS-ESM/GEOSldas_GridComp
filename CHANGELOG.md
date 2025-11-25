@@ -11,26 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added ntasks-per-node.
-- Added matlab reader for binary mwRTM vegopacity file.
-
 ### Changed
 
-- Bumped max_obs limit from 250k to 280k in ASCAT reader.
-- Commented out static QC mask in CYGNSS reader and guarded mask deallocation when disabled.
-- Cleaned up ldas_setup. Split out ldas.py and setup_utils.py.
-- Added reader for surface meteorological forcing from S2S-3.
-- Update `GEOSlandassim_GridComp/io_hdf5.F90` to allow for use with HDF5 1.14.
-- Changed default format of tile-space HISTORY output to nc4.
-
 ### Fixed
-
-- Fixed bug in ASCAT EUMET soil moisture obs reader.
-- Fixed Restart=1 when the domain is not global.
 
 ### Removed
 
 ### Deprecated
+
+-----------------------------
+
+## [v3.2.0] - 2025-11-26
+
+- 0-diff vs. v3.1.0 (except for lat/lon fields in "1d" nc4 output, which have roundoff differences between files directly generated with MAPL [new default] and files generated with tile_bin2nc4 [discontinued]).
+
+### Added
+
+- Added reader for surface meteorological forcing from S2S-3 ([PR #138](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/138)).
+- Added matlab reader for binary mwRTM vegopacity file ([PR #142](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/142)).
+
+### Changed
+
+- Changed default format of tile-space HISTORY output to nc4 ([PR #144](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/144)).
+- Enable remapping of landice restarts from ldas_setup ([PR #146](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/146)).
+- Commented out static QC mask in CYGNSS obs reader ([PR #151](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/151)).
+- Cleaned up ldas_setup; split out ldas.py and setup_utils.py; restored ntasks-per-node option ([PR #107](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/107)).
+- Update `GEOSlandassim_GridComp/io_hdf5.F90` to allow for use with HDF5 1.14 ([PR #139](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/139)).
+
+### Fixed
+
+- Fixed bug in ASCAT EUMET soil moisture obs reader; bumped max_obs limit ([PR #148](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/148), [PR #151](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/151)).
+- Provide default "zoom" value for remap_restarts yaml file ([PR #137](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/137)).
+- Fixed Restart=1 when the domain is not global ([PR #107](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/107)).
 
 -----------------------------
 
