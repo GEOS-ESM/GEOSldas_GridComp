@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bumped max_obs limit from 250k to 280k in ASCAT reader.
+- Commented out static QC mask in CYGNSS reader and guarded mask deallocation when disabled.
 - Cleaned up ldas_setup. Split out ldas.py and setup_utils.py.
 - Added reader for surface meteorological forcing from S2S-3.
 - Update `GEOSlandassim_GridComp/io_hdf5.F90` to allow for use with HDF5 1.14.
@@ -150,5 +152,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inaugural version.  0-diff vs. GEOSldas v18.0.0.
 
 -----------------------------
-
 
