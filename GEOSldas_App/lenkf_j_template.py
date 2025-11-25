@@ -518,11 +518,9 @@ while ( $counter <= ${{NUM_SGMT}} )
       if($file_ext == nc4) then
          /bin/mv $ofile $THISDIR/.
       else
-         set binfile   = `echo $ofile | rev | cut -d'.' -f2- | rev`
-         set decr_file = `echo $ofile | rev | cut -d'.' -f3- | rev`.ctl
-         ($GEOSBIN/tile_bin2nc4.x $binfile $decr_file $TILECOORD ; \\
-         /bin/mv ${{binfile}}.nc4 $THISDIR/. ; \\
-         /bin/rm ${{binfile}}.bin) &
+         set rc = -1
+         echo "ERROR: detected unexpected binary output file(s), exit without post-processing"
+         exit $rc
       endif
    end
    wait
