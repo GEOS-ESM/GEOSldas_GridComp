@@ -92,7 +92,7 @@ class ldas:
         self.nSegments          = 1
         self.perturb            = 0
         self.first_ens_id       = 0
-        self.in_rstfile         = None
+        self.in_rstdir          = None
         self.in_tilefile        = None                 # default string
         self.ens_id_width       = 6                    # _eXXXX
         self.bcs_dir_land       = ''
@@ -231,6 +231,7 @@ class ldas:
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
           self.with_land    = True
+          assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
         if  "20" in self.tile_types :
           self.with_landice = True
 
@@ -268,7 +269,7 @@ class ldas:
         # make sure catchment and vegdyn restart files ( at least one for each) exist
         if 'CATCH_DEF_FILE' not in self.ExeInputs :
            self.ExeInputs['CATCH_DEF_FILE']= self.bcs_dir_land + 'clsm/catchment.def'
-        if (self.with_land) :
+        if self.with_land :
            assert os.path.isfile(self.ExeInputs['CATCH_DEF_FILE']),"[%s] file does not exist " % self.ExeInputs['CATCH_DEF_FILE']
 
         # assigning BC files
@@ -373,51 +374,44 @@ class ldas:
                  in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
-        if self.with_land:
-           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
-           if RESTART_str in ['1', '2']:
-              y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
-              y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
-                                                      self.begDates[0].day,self.begDates[0].hour,self.begDates[0].minute)
-              tmpFile=self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-              tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+        if RESTART_str in ['1', '2']:
+           y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
+           y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
+                                                  self.begDates[0].day,self.begDates[0].hour,self.begDates[0].minute)
+           self.in_rstdir = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                                                                    self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0],y4m2])
-              catchRstFile=tmpRstDir+'/'+tmpFile
-
+           if self.with_land:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
+              catchRstFile=self.in_rstdir+'/'+tmpFile
               assert os.path.isfile(catchRstFile), self.catch+'_internal_rst file [%s] does not exist!' %(catchRstFile)
-              self.in_rstfile = catchRstFile
+              if RESTART_str == '1':
+                 tmpFile=self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
+                 landpertRstFile=self.in_rstdir+'/'+tmpFile
+                 if ( os.path.isfile(landpertRstFile)) :
+                    self.has_geos_pert = True
 
-           if RESTART_str == '1' :
-              tmpFile=self.ExeInputs['RESTART_ID']+'.vegdyn_internal_rst'
-              tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
-                                                                       self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0]])
-              vegdynRstFile=tmpRstDir+'/'+tmpFile
-              # if not os.path.isfile(vegdynRstFile):
-              #     assert int(self.ExeInputs['RST_FROM_GLOBAL']) == 1, 'restart from LDASsa should be global'
+           if self.with_landice:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
+              landiceRstFile=self.in_rstdir+'/'+tmpFile
+              assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
 
-              tmpFile=self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
-              tmpRstDir=self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
-                                                                       self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0],y4m2])
-              landpertRstFile=tmpRstDir+'/'+tmpFile
-              if ( os.path.isfile(landpertRstFile)) :
-                 self.has_geos_pert = True
-
-           if RESTART_str == '0':
-              if (self.catch == 'catch'):
-                self.in_rstfile = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                  '/Catch/M09/20170101/catch_internal_rst'
-                self.in_tilefile = '/discover/nobackup/projects/gmao/ssd/land/l_data/geos5/bcs/CLSM_params' \
-                                   '/mkCatchParam_SMAP_L4SM_v002/SMAP_EASEv2_M09/SMAP_EASEv2_M09_3856x1624.til'
-              elif (self.catch == 'catchcnclm40'):
-                self.in_rstfile  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                   '/CatchCN/M36/20150301_0000/catchcnclm40_internal_dummy'
-                self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Heracles-NL/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-              elif (self.catch == 'catchcnclm45'):
-                self.in_rstfile  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                   '/CatchCN/M36/19800101_0000/catchcnclm45_internal_dummy'
-                self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Icarus-NLv3/Icarus-NLv3_EASE/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-              else:
-                sys.exit('need to provide at least dummy files')
+        if RESTART_str == '0':
+           assert ( self.with_land and not self.with_landice), "RESTART = 0 is only for land"
+           if (self.catch == 'catch'):
+             self.in_rstdir = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
+                               '/Catch/M09/20170101/' #catch_internal_rst
+             self.in_tilefile = '/discover/nobackup/projects/gmao/ssd/land/l_data/geos5/bcs/CLSM_params' \
+                                '/mkCatchParam_SMAP_L4SM_v002/SMAP_EASEv2_M09/SMAP_EASEv2_M09_3856x1624.til'
+           elif (self.catch == 'catchcnclm40'):
+             self.in_rstdir  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
+                                '/CatchCN/M36/20150301_0000/' #catchcnclm40_internal_dummy
+             self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Heracles-NL/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
+           elif (self.catch == 'catchcnclm45'):
+             self.in_rstdir  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
+                                '/CatchCN/M36/19800101_0000/' #catchcnclm45_internal_dummy
+             self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Icarus-NLv3/Icarus-NLv3_EASE/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
+           else:
+             sys.exit('need to provide at least dummy files')
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -851,7 +845,7 @@ class ldas:
            config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
            config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
            if RESTART_str != 'M':
-             config['input']['shared']['rst_dir']        = os.path.dirname(self.in_rstfile)+'/'
+             config['input']['shared']['rst_dir']        = self.in_rstdir
            config['input']['surface']['wemin']           = wemin_in
            config['input']['surface']['catch_model']     = self.catch
 
@@ -919,83 +913,84 @@ class ldas:
             pertRstFile   = ''
             print ("restart: " + self.ExeInputs['RESTART'])
 
-            if self.ExeInputs['RESTART'].isdigit() :
+            if self.with_land :
+               if self.ExeInputs['RESTART'].isdigit() :
 
-                if int(self.ExeInputs['RESTART']) == 0 or int(self.ExeInputs['RESTART']) == 2 :
-                    vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                    catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
-                else : # RESTART == 1
-                    catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                    vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
-                    if not os.path.isfile(vegdynRstFile): # no vegdyn restart from LDASsa
-                       if not os.path.isfile(vegdynRstFile0):
-                         vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-            else :
-                vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                if self.with_land:
-                  catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
+                   if int(self.ExeInputs['RESTART']) == 0 or int(self.ExeInputs['RESTART']) == 2 :
+                       vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
+                       catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
+                   else : # RESTART == 1
+                       catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
+                       vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
+                       if not os.path.isfile(vegdynRstFile): # no vegdyn restart from LDASsa
+                          if not os.path.isfile(vegdynRstFile0):
+                            vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
+               else :
+                   vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
+                   if self.with_land:
+                     catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
 
-            # catchment restart file
-            if os.path.isfile(catchRstFile) and self.with_land :
-                catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                if self.isZoomIn :
-                    print( "Creating local catchment restart file... \n")
-                    cmd=self.bindir +'/preprocess_ldas.x zoomin_catchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
-                    print ("cmd:  "+cmd)
-                    sp.call(shlex.split(cmd))
-                else :
-                    shutil.copy(catchRstFile,catchLocal)
+               # catchment restart file
+               if os.path.isfile(catchRstFile) :
+                   catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
+                   if self.isZoomIn :
+                       print( "Creating local catchment restart file... \n")
+                       cmd=self.bindir +'/preprocess_ldas.x zoomin_catchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
+                       print ("cmd:  "+cmd)
+                       sp.call(shlex.split(cmd))
+                   else :
+                       shutil.copy(catchRstFile,catchLocal)
 
-                catchRstFile = catchLocal
+                   catchRstFile = catchLocal
 
-                if '0000' in ensdir :
-                    catchRstFile0 = catchRstFile
-            else : # re-use 0000 catch file
-                catchRstFile = catchRstFile0
+                   if '0000' in ensdir :
+                       catchRstFile0 = catchRstFile
+               else : # re-use 0000 catch file
+                   catchRstFile = catchRstFile0
 
-            # vegdyn restart file
-            if os.path.isfile(vegdynRstFile) and self.with_land :
-                vegdynLocal = self.rstdir+ensdir +'/'+self.ExeInputs['EXP_ID']+'.vegdyn_internal_rst'
-                if self.isZoomIn :
-                    print ("Creating the local veg restart file... \n")
-                    cmd=self.bindir + '/preprocess_ldas.x zoomin_vegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
-                    print ("cmd:   " + cmd)
-                    sp.call(shlex.split(cmd))
-                else :
-                    shutil.copy(vegdynRstFile,vegdynLocal)
+               # vegdyn restart file
+               if os.path.isfile(vegdynRstFile) :
+                   vegdynLocal = self.rstdir+ensdir +'/'+self.ExeInputs['EXP_ID']+'.vegdyn_internal_rst'
+                   if self.isZoomIn :
+                       print ("Creating the local veg restart file... \n")
+                       cmd=self.bindir + '/preprocess_ldas.x zoomin_vegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
+                       print ("cmd:   " + cmd)
+                       sp.call(shlex.split(cmd))
+                   else :
+                       shutil.copy(vegdynRstFile,vegdynLocal)
 
-                vegdynRstFile = vegdynLocal
+                   vegdynRstFile = vegdynLocal
 
-                if '0000' in ensdir :
-                    vegdynRstFile0 = vegdynRstFile
-            else :
-                vegdynRstFile = vegdynRstFile0
+                   if '0000' in ensdir :
+                       vegdynRstFile0 = vegdynRstFile
+               else :
+                   vegdynRstFile = vegdynRstFile0
 
             landiceRstFile = ''
             if self.with_landice :
-               if self.ExeInputs['RESTART'].isdigit():
-                  if int(self.ExeInputs['RESTART']) == 0 or int(self.ExeInputs['RESTART']) == 2 :
-                     print("RESTART=0 and RESTART=2 not supported for landice tiles. Please use RESTART=M (MERRA-2).")
+               if RESTART_str == '0' :
+                  exit("RESTART=0 not supported for landice tiles. Please use RESTART=M, 1, or 2")
+               if RESTART_str == '1' :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-               else:
+               if RESTART_str == '2' or RESTART_str == 'M':
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
 
-            if os.path.isfile(landiceRstFile) :
-               landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-               if self.isZoomIn :
-                  print ("Creating zoom-in of landice restart file... \n")
-                  cmd=self.bindir + '/preprocess_ldas.x zoomin_landicerst '+ landiceRstFile +' ' + landiceLocal + ' '+ tmp_f2g_file.name
-                  print ("cmd:   " + cmd)
-                  sp.call(shlex.split(cmd))
+               if os.path.isfile(landiceRstFile) :
+                  landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
+                  if self.isZoomIn :
+                     print ("Creating zoom-in of landice restart file... \n")
+                     cmd=self.bindir + '/preprocess_ldas.x zoomin_landicerst '+ landiceRstFile +' ' + landiceLocal + ' '+ tmp_f2g_file.name
+                     print ("cmd:   " + cmd)
+                     sp.call(shlex.split(cmd))
+                  else :
+                     shutil.copy(landiceRstFile,landiceLocal)
+
+                  landiceRstFile = landiceLocal
+
+                  if '0000' in ensdir :
+                     landiceRstFile0 = landiceRstFile
                else :
-                  shutil.copy(landiceRstFile,landiceLocal)
-
-               landiceRstFile = landiceLocal
-
-               if '0000' in ensdir :
-                  landiceRstFile0 = landiceRstFile
-            else :
-                landiceRstFile = landiceRstFile0
+                   landiceRstFile = landiceRstFile0
             
             if (self.has_geos_pert and self.perturb == 1) :
                 pertRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
