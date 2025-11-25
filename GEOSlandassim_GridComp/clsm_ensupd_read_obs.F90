@@ -1643,7 +1643,7 @@ contains
 
     integer, parameter :: lnbufr  =     50       ! BUFR file unit number
     integer, parameter :: max_rec =  50000       ! max number of obs after QC (expecting < 6 hr assim window)
-    integer, parameter :: max_obs = 250000       ! max number of obs read by subroutine (expecting < 6 hr assim window)
+    integer, parameter :: max_obs = 280000       ! max number of obs read by subroutine (expecting < 6 hr assim window)
 
     integer :: idate, iret, ireadmg, ireadsb
 
