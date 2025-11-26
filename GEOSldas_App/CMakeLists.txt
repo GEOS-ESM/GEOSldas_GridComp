@@ -10,16 +10,13 @@ ecbuild_add_executable (
    LIBS GEOSldas_GridComp MAPL)
 
 ecbuild_add_executable (
-   TARGET tile_bin2nc4.x 
-   SOURCES tile_bin2nc4.F90
-   LIBS MAPL)
- 
-ecbuild_add_executable (
    TARGET mwrtm_bin2nc4.x
    SOURCES util/inputs/mwRTM_params/mwrtm_bin2nc4.F90
    LIBS GEOSlandassim_GridComp)
    
 set (scripts
+   ldas_setup
+   setup_utils.py
    process_hist.csh 
    ens_forcing/average_ensemble_forcing.py 
    ens_forcing/ensemble_forc.py 
@@ -34,7 +31,7 @@ install (
    DESTINATION bin
    )
 
-set(file ldas_setup)
+set(file ldas.py)
 configure_file(${file} ${file} @ONLY)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${file} DESTINATION bin)
 

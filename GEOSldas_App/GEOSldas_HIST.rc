@@ -13,7 +13,6 @@ EXPID:  GEOSldas_expid
 # pre-defined Collections
 
 COLLECTIONS:
-#OUT1d           'tavg24_1d_lfs_Nt'
 #OUT2d           'tavg24_2d_lfs_Nx'
 #OUT1d           'tavg24_1d_lnd_Nt'
 #OUT2d           'tavg24_2d_lnd_Nx'
@@ -68,32 +67,14 @@ EASEv2_M36.LM:           1
 #              with "gzip"; nc4 files can be compressed using the "compress_bit-shaved_nc4.sh"
 #              utility script. 
 
-  tavg24_1d_lfs_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Forcings and States',
-  tavg24_1d_lfs_Nt.nbits:       12,
-  tavg24_1d_lfs_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
-  tavg24_1d_lfs_Nt.archive:     '%c/Y%y4',
-  tavg24_1d_lfs_Nt.mode:        'time-averaged',
-  tavg24_1d_lfs_Nt.frequency:   240000,
-  tavg24_1d_lfs_Nt.ref_time:    000000,
-  tavg24_1d_lfs_Nt.fields:'Tair'       , 'METFORCE'      ,
-                          'Qair'       , 'METFORCE'      ,
-                          'LWdown'     , 'METFORCE'      ,
-                          'SWdown'     , 'METFORCE'      ,
-                          'Wind'       , 'METFORCE'      ,
-                          'Psurf'      , 'METFORCE'      ,
-                          'Rainf_C'    , 'METFORCE'      ,
-                          'Rainf'      , 'METFORCE'      ,                    
-                          'Snowf'      , 'METFORCE'      ,                    
-                          'RainfSnowf' , 'METFORCE'      ,                    
-                          'RefH'       , 'METFORCE'      ,  
-                          'CATDEF'     , 'GridComp'      ,
-                          'RZEXC'      , 'GridComp'      ,  
-                          'SRFEXC'     , 'GridComp'      ,  
-                          'WESNN1'     , 'GridComp'      ,  
-                          'WESNN2'     , 'GridComp'      ,  
-                          'WESNN3'     , 'GridComp'      ,  
-                          'HLWUP'      , 'GridComp'      ,	
-          ::
+# NOTE (Nov 2025):
+#   Changes for *1d* output with recent introduction of land+landice simulations:
+#     - Direct *1d* output to nc4 via MAPL.
+#     - Removed tile_bin2nc4.F90; no longer works for land-only collections in land+landice
+#         simulations because it uses tilecoord.bin, which contains info for all tiles.
+#     - Removed *1d* lfs collection; no longer works in land+landice simulations because of
+#         different tile spaces for CATCH and METFORCE.
+# 
 
   tavg24_2d_lfs_Nx.descr:       '2d,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Forcings and States',
   tavg24_2d_lfs_Nx.nbits:       12,
@@ -129,8 +110,9 @@ EASEv2_M36.LM:           1
 
   tavg24_1d_lnd_Nt.descr:       'Tile-space,Daily,Time-Averaged,Single-Level,Assimilation,Land Surface Diagnostics',
   tavg24_1d_lnd_Nt.nbits:       12,
-  tavg24_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  tavg24_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.nc4',
   tavg24_1d_lnd_Nt.mode:        'time-averaged',
+  tavg24_1d_lnd_Nt.format:      'CFIO',
   tavg24_1d_lnd_Nt.frequency:   240000,
   tavg24_1d_lnd_Nt.ref_time:    000000,
   tavg24_1d_lnd_Nt.fields:     'GRN'        , 'VEGDYN'  ,
@@ -334,8 +316,9 @@ EASEv2_M36.LM:           1
 
 
   const_1d_lnd_Nt.descr:       'Tile-space,Constant,Time-invariant,Single-Level,Assimilation,Land Surface Model Parameters',
-  const_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  const_1d_lnd_Nt.template:    '%y4%m2%d2_%h2%n2z.nc4',
   const_1d_lnd_Nt.mode:        'instantaneous',
+  const_1d_lnd_Nt.format:      'CFIO',
   const_1d_lnd_Nt.frequency:   240000,
   const_1d_lnd_Nt.ref_time:    000000,
   const_1d_lnd_Nt.fields:      'DZGT1'      , 'GridComp'  ,
@@ -386,8 +369,9 @@ EASEv2_M36.LM:           1
 
   SMAP_L4_SM_gph.descr:         'Tile-space,3-Hourly,Time-Averaged,Single-Level,Assimilation,SMAP L4_SM Land Geophysical Diagnostics',
   SMAP_L4_SM_gph.nbits:         12,
-  SMAP_L4_SM_gph.template:      '%y4%m2%d2_%h2%n2z.bin',
+  SMAP_L4_SM_gph.template:      '%y4%m2%d2_%h2%n2z.nc4',
   SMAP_L4_SM_gph.mode:          'time-averaged',
+  SMAP_L4_SM_gph.format:        'CFIO',
   SMAP_L4_SM_gph.frequency:     030000,
   SMAP_L4_SM_gph.ref_time:      000000,
   SMAP_L4_SM_gph.fields:       'WCSF'             , 'ENSAVG'      , 'sm_surface'                                                ,
@@ -437,8 +421,9 @@ EASEv2_M36.LM:           1
 
   inst1_1d_lnr_Nt.descr:        'Tile-space,1-Hourly,Instantaneous,Single-Level,Assimilation,Land Nature Run Diagnostics',
   inst1_1d_lnr_Nt.nbits:       12,
-  inst1_1d_lnr_Nt.template:     '%y4%m2%d2_%h2%n2z.bin' ,
+  inst1_1d_lnr_Nt.template:     '%y4%m2%d2_%h2%n2z.nc4' ,
   inst1_1d_lnr_Nt.mode:         'instantaneous' ,
+  inst1_1d_lnr_Nt.format:       'CFIO',
   inst1_1d_lnr_Nt.frequency:    010000 ,
   inst1_1d_lnr_Nt.ref_time:     000000,
   inst1_1d_lnr_Nt.fields:      'TPSURF'                     , 'ENSAVG'      , 'surface_temp'                      ,
@@ -453,8 +438,9 @@ EASEv2_M36.LM:           1
 # By default, no bit shaving for increments output.
 
   catch_progn_incr.descr:       'Tile-space,3-Hourly,Instantaneous,Single-Level,Assimilation,Ensemble-Average Land Prognostics Increments',
-  catch_progn_incr.template:    '%y4%m2%d2_%h2%n2z.bin',
+  catch_progn_incr.template:    '%y4%m2%d2_%h2%n2z.nc4',
   catch_progn_incr.mode:        'instantaneous',
+  catch_progn_incr.format:      'CFIO',
   catch_progn_incr.frequency:   030000,
   catch_progn_incr.ref_time:    000000,
   catch_progn_incr.fields:     'TCFSAT_INCR'    , 'LANDASSIM'      ,
@@ -491,8 +477,9 @@ EASEv2_M36.LM:           1
 
   inst3_1d_lndfcstana_Nt.descr:       'Tile-space,3-Hourly,Instantaneous,Single-Level,Assimilation,Ensemble Land Forecast and Analysis Diagnostics',
   inst3_1d_lndfcstana_Nt.nbits:       12,
-  inst3_1d_lndfcstana_Nt.template:    '%y4%m2%d2_%h2%n2z.bin',
+  inst3_1d_lndfcstana_Nt.template:    '%y4%m2%d2_%h2%n2z.nc4',
   inst3_1d_lndfcstana_Nt.mode:        'instantaneous',
+  inst3_1d_lndfcstana_Nt.format:      'CFIO',
   inst3_1d_lndfcstana_Nt.frequency:   030000,
   inst3_1d_lndfcstana_Nt.ref_time:    000000,
   inst3_1d_lndfcstana_Nt.fields:     'WCSF'              , 'ENSAVG'    , 'SFMC_FCST'           ,
@@ -601,8 +588,9 @@ EASEv2_M36.LM:           1
 
   tavg24_1d_glc_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Land Ice Diagnostics',
   tavg24_1d_glc_Nt.nbits:         12,
-  tavg24_1d_glc_Nt.template:      '%y4%m2%d2_%h2%n2z.bin' ,
+  tavg24_1d_glc_Nt.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
   tavg24_1d_glc_Nt.mode:          'time-averaged' ,
+  tavg24_1d_glc_Nt.format:        'CFIO',
   tavg24_1d_glc_Nt.frequency:      240000 ,
   tavg24_1d_glc_Nt.ref_time:       000000 ,
   tavg24_1d_glc_Nt.fields:      'ASNOW_GL'    , 'LANDICE' ,
