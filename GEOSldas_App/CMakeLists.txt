@@ -10,11 +10,6 @@ ecbuild_add_executable (
    LIBS GEOSldas_GridComp MAPL)
 
 ecbuild_add_executable (
-   TARGET tile_bin2nc4.x 
-   SOURCES tile_bin2nc4.F90
-   LIBS MAPL)
- 
-ecbuild_add_executable (
    TARGET mwrtm_bin2nc4.x
    SOURCES util/inputs/mwRTM_params/mwrtm_bin2nc4.F90
    LIBS GEOSlandassim_GridComp)

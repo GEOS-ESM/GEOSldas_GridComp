@@ -1643,7 +1643,7 @@ contains
 
     integer, parameter :: lnbufr  =     50       ! BUFR file unit number
     integer, parameter :: max_rec =  50000       ! max number of obs after QC (expecting < 6 hr assim window)
-    integer, parameter :: max_obs = 250000       ! max number of obs read by subroutine (expecting < 6 hr assim window)
+    integer, parameter :: max_obs = 280000       ! max number of obs read by subroutine (expecting < 6 hr assim window)
 
     integer :: idate, iret, ireadmg, ireadsb
 
@@ -1951,8 +1951,8 @@ contains
           date_time_tmp%sec   = int(tmp_data(kk, 6))
           
           ! skip if record outside of current assim window
-          if ( datetime_lt_refdatetime( date_time_tmp, date_time_low ) .and.           &
-               datetime_le_refdatetime( date_time_up, date_time_tmp )         ) cycle
+          if ( datetime_lt_refdatetime( date_time_tmp, date_time_low ) .or.              &   ! obs is before start of assim window *or*
+               datetime_le_refdatetime( date_time_up,  date_time_tmp )         ) cycle       ! obs is after  end   of assim window
           
           ! skip if record contains invalid soil moisture value
           if ( tmp_data(kk, 7) > 100. .or. tmp_data(kk, 7) < 0. ) cycle
@@ -2427,78 +2427,87 @@ contains
     ! close the obs file
     ierr = nf90_close(ncid)
 
-   ! get name for CYGNSS mask file
+   ! ----------------------------------------------------------------
+   ! AMF, November 2025
+   ! Original CYGNSS mask reading section commented out - masks not currently used
+   ! Mask originally developed for version 1.0 of CYGNSS soil moisture product and
+   ! not believed to be appropriate for version 3.2 product being used here. 
+   ! ----------------------------------------------------------------
 
-    tmpmaskname = trim(this_obs_param%maskpath) // '/' // trim(this_obs_param%maskname) // '.nc'
+   !  ! get name for CYGNSS mask file
 
-    inquire(file=tmpfname, exist=file_exists)
+   !  tmpmaskname = trim(this_obs_param%maskpath) // '/' // trim(this_obs_param%maskname) // '.nc'
 
-    if (.not. file_exists) then
-       err_msg = 'CYGNSS mask file not found!'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
+   !  inquire(file=tmpfname, exist=file_exists)
 
-    ! open the CYGNSS mask file
+   !  if (.not. file_exists) then
+   !     err_msg = 'CYGNSS mask file not found!'
+   !     call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+   !  end if
 
-    ierr = nf90_open(trim(tmpmaskname), nf90_nowrite, ncid)
+   !  ! open the CYGNSS mask file
 
-    ! get variable dimension IDs
-    ierr = nf90_inq_dimid(ncid, 'lon', lon_dimid)
-    ierr = nf90_inq_dimid(ncid, 'lat', lat_dimid)
+   !  ierr = nf90_open(trim(tmpmaskname), nf90_nowrite, ncid)
 
-    ! dimensions sizes
-    ierr = nf90_inquire_dimension(ncid, lon_dimid, len=N_lon_m)
-    ierr = nf90_inquire_dimension(ncid, lat_dimid, len=N_lat_m)
+   !  ! get variable dimension IDs
+   !  ierr = nf90_inq_dimid(ncid, 'lon', lon_dimid)
+   !  ierr = nf90_inq_dimid(ncid, 'lat', lat_dimid)
 
-    ! get variable IDs
-    ierr = nf90_inq_varid(ncid, 'longitude',           longitudes_m_varid)
-    ierr = nf90_inq_varid(ncid, 'latitude',            latitudes_m_varid)
-    ierr = nf90_inq_varid(ncid, 'flag_small_SM_range', small_SM_range_varid)
-    ierr = nf90_inq_varid(ncid, 'flag_poor_SMAP',      poor_SMAP_varid)
-    ierr = nf90_inq_varid(ncid, 'flag_high_ubrmsd',    high_ubrmsd_varid)
-    ierr = nf90_inq_varid(ncid, 'flag_few_obs',        few_obs_varid)
-    ierr = nf90_inq_varid(ncid, 'flag_low_signal',     low_signal_varid)
+   !  ! dimensions sizes
+   !  ierr = nf90_inquire_dimension(ncid, lon_dimid, len=N_lon_m)
+   !  ierr = nf90_inquire_dimension(ncid, lat_dimid, len=N_lat_m)
 
-    ! allocate memory for the variables
-    allocate(latitudes_m(        N_lon_m, N_lat_m))
-    allocate(longitudes_m(       N_lon_m, N_lat_m))
-    allocate(small_SM_range_flag(N_lon_m, N_lat_m))
-    allocate(poor_SMAP_flag(     N_lon_m, N_lat_m))
-    allocate(high_ubrmsd_flag(   N_lon_m, N_lat_m))
-    allocate(few_obs_flag(       N_lon_m, N_lat_m))
-    allocate(low_signal_flag(    N_lon_m, N_lat_m))
+   !  ! get variable IDs
+   !  ierr = nf90_inq_varid(ncid, 'longitude',           longitudes_m_varid)
+   !  ierr = nf90_inq_varid(ncid, 'latitude',            latitudes_m_varid)
+   !  ierr = nf90_inq_varid(ncid, 'flag_small_SM_range', small_SM_range_varid)
+   !  ierr = nf90_inq_varid(ncid, 'flag_poor_SMAP',      poor_SMAP_varid)
+   !  ierr = nf90_inq_varid(ncid, 'flag_high_ubrmsd',    high_ubrmsd_varid)
+   !  ierr = nf90_inq_varid(ncid, 'flag_few_obs',        few_obs_varid)
+   !  ierr = nf90_inq_varid(ncid, 'flag_low_signal',     low_signal_varid)
 
-    ! read the variables
-    ierr = nf90_get_var(ncid, latitudes_m_varid,    latitudes_m)
-    ierr = nf90_get_var(ncid, longitudes_m_varid,   longitudes_m)
-    ierr = nf90_get_var(ncid, small_SM_range_varid, small_SM_range_flag)
-    ierr = nf90_get_var(ncid, poor_SMAP_varid,      poor_SMAP_flag)
-    ierr = nf90_get_var(ncid, high_ubrmsd_varid,    high_ubrmsd_flag)
-    ierr = nf90_get_var(ncid, few_obs_varid,        few_obs_flag)
-    ierr = nf90_get_var(ncid, low_signal_varid,     low_signal_flag)
+   !  ! allocate memory for the variables
+   !  allocate(latitudes_m(        N_lon_m, N_lat_m))
+   !  allocate(longitudes_m(       N_lon_m, N_lat_m))
+   !  allocate(small_SM_range_flag(N_lon_m, N_lat_m))
+   !  allocate(poor_SMAP_flag(     N_lon_m, N_lat_m))
+   !  allocate(high_ubrmsd_flag(   N_lon_m, N_lat_m))
+   !  allocate(few_obs_flag(       N_lon_m, N_lat_m))
+   !  allocate(low_signal_flag(    N_lon_m, N_lat_m))
 
-    ! close the mask file
-    ierr = nf90_close(ncid)  
+   !  ! read the variables
+   !  ierr = nf90_get_var(ncid, latitudes_m_varid,    latitudes_m)
+   !  ierr = nf90_get_var(ncid, longitudes_m_varid,   longitudes_m)
+   !  ierr = nf90_get_var(ncid, small_SM_range_varid, small_SM_range_flag)
+   !  ierr = nf90_get_var(ncid, poor_SMAP_varid,      poor_SMAP_flag)
+   !  ierr = nf90_get_var(ncid, high_ubrmsd_varid,    high_ubrmsd_flag)
+   !  ierr = nf90_get_var(ncid, few_obs_varid,        few_obs_flag)
+   !  ierr = nf90_get_var(ncid, low_signal_varid,     low_signal_flag)
 
-    ! check the obs data and mask data are the same resolution
-    if (N_lon /= N_lon_m .or. N_lat /= N_lat_m) then
-       err_msg = 'The mask file ' // trim(this_obs_param%maskname) // ' does not match the obs resolution'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
+   !  ! close the mask file
+   !  ierr = nf90_close(ncid)  
 
-    good_flag_value = 255  ! should really be 0 but is 255 because of unsigned v. signed byte issues
+   !  ! check the obs data and mask data are the same resolution
+   !  if (N_lon /= N_lon_m .or. N_lat /= N_lat_m) then
+   !     err_msg = 'The mask file ' // trim(this_obs_param%maskname) // ' does not match the obs resolution'
+   !     call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+   !  end if
+
+   !  good_flag_value = 255  ! should really be 0 but is 255 because of unsigned v. signed byte issues
 
     ! fill tmp arrays
     N_obs = 0
 
     do i = 1, N_lon
         do j = 1, N_lat
-            if (tmp_sm(i,j) .ne. this_obs_param%nodata      .and.         &
-                small_SM_range_flag(i,j) == good_flag_value .and.         &
-                poor_SMAP_flag(i,j)      == good_flag_value .and.         &
-                high_ubrmsd_flag(i,j)    == good_flag_value .and.         &
-                few_obs_flag(i,j)        == good_flag_value .and.         &
-                low_signal_flag(i,j)     == good_flag_value ) then
+            ! if (tmp_sm(i,j) .ne. this_obs_param%nodata      .and.         &
+            !     small_SM_range_flag(i,j) == good_flag_value .and.         &
+            !     poor_SMAP_flag(i,j)      == good_flag_value .and.         &
+            !     high_ubrmsd_flag(i,j)    == good_flag_value .and.         &
+            !     few_obs_flag(i,j)        == good_flag_value .and.         &
+            !     low_signal_flag(i,j)     == good_flag_value ) then
+
+            if (tmp_sm(i,j) .ne. this_obs_param%nodata) then
                 
                 ! valid observation
                 N_obs = N_obs + 1
@@ -2631,18 +2640,18 @@ contains
    
    ! clean up
 
-   deallocate(timeintervals)
-   deallocate(latitudes)
-   deallocate(longitudes)
-   deallocate(tmp_sm)
-   deallocate(tmp_sigma)
-   deallocate(latitudes_m)
-   deallocate(longitudes_m)
-   deallocate(small_SM_range_flag)
-   deallocate(poor_SMAP_flag)
-   deallocate(high_ubrmsd_flag)
-   deallocate(few_obs_flag)
-   deallocate(low_signal_flag)
+   if (allocated(timeintervals))        deallocate(timeintervals)
+   if (allocated(latitudes))            deallocate(latitudes)
+   if (allocated(longitudes))           deallocate(longitudes)
+   if (allocated(tmp_sm))               deallocate(tmp_sm)
+   if (allocated(tmp_sigma))            deallocate(tmp_sigma)
+   if (allocated(latitudes_m))          deallocate(latitudes_m)
+   if (allocated(longitudes_m))         deallocate(longitudes_m)
+   if (allocated(small_SM_range_flag))  deallocate(small_SM_range_flag)
+   if (allocated(poor_SMAP_flag))       deallocate(poor_SMAP_flag)
+   if (allocated(high_ubrmsd_flag))     deallocate(high_ubrmsd_flag)
+   if (allocated(few_obs_flag))         deallocate(few_obs_flag)
+   if (allocated(low_signal_flag))      deallocate(low_signal_flag)
    
    if (associated(tmp_obs))      deallocate(tmp_obs)
    if (associated(tmp_lon))      deallocate(tmp_lon)
@@ -11069,4 +11078,3 @@ end program test
 #endif
 
 ! *******  EOF *************************************************************
-
