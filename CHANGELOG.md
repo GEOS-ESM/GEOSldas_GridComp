@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed 2d lfs collection from HISTORY.rc template.
+
 ### Deprecated
 
 -----------------------------
