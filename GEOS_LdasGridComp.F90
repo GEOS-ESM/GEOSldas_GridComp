@@ -64,7 +64,7 @@ module GEOS_LdasGridCompMod
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
   logical :: with_landice       ! true if landice tiles requested by config
   logical :: with_land          ! true if land    tiles requested by config
-  integer :: RUN_ROUTE          ! 1 if run river-routine grid comp
+  integer :: RUN_ROUTE          ! 1/2 if run river-routine grid comp without/with reservoirs, 
   
 contains
 
@@ -210,7 +210,7 @@ contains
 
     if (with_land)    allocate(LAND(   NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
     if (with_landice) allocate(LANDICE(NUM_ENSEMBLE))
-    if (RUN_ROUTE == 1) then
+    if (RUN_ROUTE >= 1) then
        _ASSERT( with_land, "RUNOFF must be from the export of land_gridcomp for now.")
        allocate(ROUTE(NUM_ENSEMBLE))
     endif
@@ -262,7 +262,7 @@ contains
           VERIFY_(status)
        endif
 
-      if (RUN_ROUTE == 1) then
+      if (RUN_ROUTE >= 1) then
           childname='ROUTE'//trim(ensid_string)
           ROUTE(i) = MAPL_AddChild(gc, name=childname, ss=RouteSetServices, rc=status)
           VERIFY_(status)
@@ -317,7 +317,7 @@ contains
                )
           VERIFY_(status)
 
-          IF(RUN_ROUTE == 1) THEN
+          IF(RUN_ROUTE >= 1) THEN
              call MAPL_AddConnectivity (                              &
                   GC                                                 ,&
                   SHORT_NAME  = (/'RUNOFF  '/)                       ,&   ! RUNOFF = total runoff = surface runoff + baseflow
@@ -814,7 +814,7 @@ contains
           VERIFY_(status)
        endif
 
-       if (RUN_ROUTE == 1) then
+       if (RUN_ROUTE >= 1) then
           call MAPL_GetObjectFromGC(gcs(ROUTE(i)), CHILD_MAPL, rc=status)
           VERIFY_(status) ! CHILD = ens_avg
           call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
@@ -1048,7 +1048,7 @@ contains
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land_ice
 
-       if ( RUN_ROUTE == 1 ) then
+       if ( RUN_ROUTE >= 1 ) then
           igc = ROUTE(i)
           call MAPL_TimerOn(MAPL, gcnames(igc))
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
