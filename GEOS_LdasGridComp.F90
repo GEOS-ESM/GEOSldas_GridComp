@@ -179,6 +179,10 @@ contains
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
 !   if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
 
+    if (NUM_ENSEMBLE>1 .and. (with_landice .or. RUN_ROUTE>0))then
+       stop "The landice and route modules are not supported in ensemble mode"
+    endif
+
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
     LAND_ASSIM_STR =  ESMF_UtilStringUpperCase(LAND_ASSIM_STR, rc=STATUS)
