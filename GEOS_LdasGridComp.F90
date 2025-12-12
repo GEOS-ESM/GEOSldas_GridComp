@@ -146,15 +146,15 @@ contains
     !create ensemble children
     call MAPL_GetObjectFromGC(gc, MAPL, rc=status)
     VERIFY_(status)
-    call MAPL_GetResource ( MAPL, NUM_ENSEMBLE, Label="NUM_LDAS_ENSEMBLE:", DEFAULT=1,       RC=STATUS)
+    call MAPL_GetResource ( MAPL, NUM_ENSEMBLE,    Label="NUM_LDAS_ENSEMBLE:", DEFAULT=1,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, ens_id_width, Label="ENS_ID_WIDTH:",      DEFAULT=0,       RC=STATUS)
+    call MAPL_GetResource ( MAPL, ens_id_width,    Label="ENS_ID_WIDTH:",      DEFAULT=0,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, RUN_ROUTE, Label="RUN_ROUTE:",      DEFAULT=0,       RC=STATUS)
+    call MAPL_GetResource ( MAPL, RUN_ROUTE,       Label="RUN_ROUTE:",         DEFAULT=0,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, FIRST_ENS_ID, Label="FIRST_ENS_ID:", DEFAULT=0, RC=STATUS)
+    call MAPL_GetResource ( MAPL, FIRST_ENS_ID,    Label="FIRST_ENS_ID:",      DEFAULT=0,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:", DEFAULT="NO", RC=STATUS)
+    call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:",  DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
     ENS_FORCING_STR =  ESMF_UtilStringUpperCase(ENS_FORCING_STR, rc=STATUS)
     VERIFY_(STATUS)
@@ -179,8 +179,8 @@ contains
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
 !   if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
 
-    if (NUM_ENSEMBLE>1 .and. (with_landice .or. RUN_ROUTE>0))then
-       stop "The landice and route modules are not supported in ensemble mode"
+    if (NUM_ENSEMBLE>1) then
+       _ASSERT( .not. (with_landice .or. RUN_ROUTE>0), "Landice and route not supported in ensemble mode.")
     endif
 
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
