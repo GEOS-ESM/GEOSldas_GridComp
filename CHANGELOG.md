@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+Switch from "floor + 1" to "ceil" when defining grid indicies in get_model_and_obs_clim_stats_latlon_grid.m to match reader (Required with CYGNSS observations)
+
 ### Removed
 
 - Removed 2d lfs collection from HISTORY.rc template.
