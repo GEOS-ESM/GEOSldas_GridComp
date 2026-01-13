@@ -101,6 +101,7 @@ class ldas:
         self.tile_types         = ''
         self.with_land          = False
         self.with_landice       = False
+        self.run_route          = 0
         self.adas_expdir        = ''
 
         # assert necessary optional arguments in command line if exeinp file does not exsit
@@ -234,6 +235,8 @@ class ldas:
           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
         if  "20" in self.tile_types :
           self.with_landice = True
+
+        self.run_route = int(self.ExeInputs.get('RUN_ROUTE',0))
 
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
@@ -395,6 +398,11 @@ class ldas:
               landiceRstFile=self.in_rstdir+'/'+tmpFile
               assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
 
+           if self.run_route > 0:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
+              routeRstFile=self.in_rstdir+'/'+tmpFile
+              assert os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile)
+            
         if RESTART_str == '0':
            assert ( self.with_land and not self.with_landice), "RESTART = 0 is only for land"
            if (self.catch == 'catch'):
@@ -903,10 +911,11 @@ class ldas:
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
-            myCatchRst = myRstDir+'/'+self.catch +ensid +'_internal_rst'
+            myCatchRst   = myRstDir+'/'+self.catch +ensid +'_internal_rst'
             myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
-            myVegRst   = myRstDir+'/'+'vegdyn'+ensid +'_internal_rst'
-            myPertRst  = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
+            myVegRst     = myRstDir+'/'+ 'vegdyn'+ensid +'_internal_rst'
+            myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
+            myRouteRst   = myRstDir+'/'+ 'route' +ensid +'_internal_rst'
 
             catchRstFile  = ''
             vegdynRstFile = ''
@@ -991,6 +1000,26 @@ class ldas:
                      landiceRstFile0 = landiceRstFile
                else :
                    landiceRstFile = landiceRstFile0
+
+            routeRstFile = ''
+            if self.run_route > 0 :
+               if RESTART_str == '0' :
+                  exit("RESTART=0 copy from BC")
+               if RESTART_str in ['1', '2'] :
+                  routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
+               if RESTART_str  == 'M':
+                  exit(" RUN_ROUTE does not support MERRA 2 option")
+
+               if os.path.isfile(routeRstFile) :
+                  routeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.route_internal_rst.'+y4m2d2_h2m2
+                  shutil.copy(routeRstFile,routeLocal)
+
+                  routeRstFile = routeLocal
+
+                  if '0000' in ensdir :
+                     routeRstFile0 = routeRstFile
+               else :
+                   routeRstFile = routeRstFile0
             
             if (self.has_geos_pert and self.perturb == 1) :
                 pertRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
@@ -1003,9 +1032,15 @@ class ldas:
                print ('vegdynRstFile: ' +  vegdynRstFile)
                os.symlink(catchRstFile,   myCatchRst)
                os.symlink(vegdynRstFile,  myVegRst)
+
             if self.with_landice :
                print("link landice restart: " + myLandiceRst)
                os.symlink(landiceRstFile, myLandiceRst)
+
+            if self.run_route > 0 :
+               print("link route restart: " + myRouteRst)
+               os.symlink(routeRstFile, myRouteRst)
+
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,    myPertRst)
 
@@ -1255,6 +1290,10 @@ class ldas:
                   rstkey.append('LANDICE')
                   rstval.append('landice')
 
+                if self.run_route > 0:
+                  rstkey.append('ROUTE')
+                  rstval.append('route')
+
                 if self.has_mwrtm :
                    keyn='LANDASSIM_INTERNAL_RESTART_FILE'
                    valn='../input/restart/mwrtm_param_rst'
@@ -1282,18 +1321,12 @@ class ldas:
                 for key,val in zip(rstkey,rstval) :
                     keyn = key+ '_INTERNAL_RESTART_FILE'
                     valn = '../input/restart/'+val+tmpl_+'_internal_rst'
-                    ldasrcInp[keyn]= valn
+                    ldasrcInp[keyn] = valn
+                    if 'VEGDYN' not in key: # not checkpoi for vegdyn
+                       keyn = key + '_INTERNAL_CHECKPOINT_FILE'
+                       valn = val + tmpl_ + '_internal_checkpoint'
+                       ldasrcInp[keyn] = valn
 
-                # checkpoint file and its type
-                if self.with_land :
-                   keyn = catch_ + '_INTERNAL_CHECKPOINT_FILE'
-                   valn = self.catch+tmpl_+'_internal_checkpoint'
-                   ldasrcInp[keyn]= valn
-
-                if self.with_landice :
-                   keyn = 'LANDICE_INTERNAL_CHECKPOINT_FILE'
-                   valn = 'landice'+tmpl_+'_internal_checkpoint'
-                   ldasrcInp[keyn]= valn
                 # specify LANDPERT restart file
                 if (self.perturb == 1):
                     keyn = 'LANDPERT_INTERNAL_RESTART_FILE'
