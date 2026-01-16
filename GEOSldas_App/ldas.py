@@ -1004,7 +1004,7 @@ class ldas:
             routeRstFile = ''
             if self.run_route > 0 :
                if RESTART_str == '0' :
-                  exit("RESTART=0 copy from BC")
+                  routeRstFile = "/discover/nobackup/yzeng3/data/river_input_weiyuan/route_restart_package/"+"route_internal_rst."+y4m2[-2:]+"01_0000"
                if RESTART_str in ['1', '2'] :
                   routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
                if RESTART_str  == 'M':
@@ -1013,7 +1013,8 @@ class ldas:
                if os.path.isfile(routeRstFile) :
                   routeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.route_internal_rst.'+y4m2d2_h2m2
                   shutil.copy(routeRstFile,routeLocal)
-
+                  # WY note: after the copy, depending on in_bc and out_bc version, 
+                  # the routeLocal can be changed here
                   routeRstFile = routeLocal
 
                   if '0000' in ensdir :
