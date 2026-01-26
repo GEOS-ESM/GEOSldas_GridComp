@@ -32,10 +32,11 @@ class ldas:
         """
         """
         # These keywords are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
+        # or their values are re-assigned in LDAS.rc 
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
             'RESTART_DOMAIN','RESTART_ID','BCS_PATH','TILING_FILE','GRN_FILE','LAI_FILE','LNFM_FILE','NIRDF_FILE',
-            'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE',
+            'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE', 'TILE2PFAF_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
             'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_FORMAT' ]
@@ -277,6 +278,7 @@ class ldas:
 
         # assigning BC files
         self.ExeInputs['LNFM_FILE'] = ''
+        self.ExeInputs['TILE2PFAF_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
         domain_  = ''
         inpdir_  = self.bcs_dir_land  
@@ -308,28 +310,36 @@ class ldas:
         tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+domain_)
         if (len(tmp_) ==1) :
            self.ExeInputs['LNFM_FILE'] = tmp_[0]
+
         self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_ )[0]
         self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +domain_ )[0]
         self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
+
+        # assigning Gridname
+        if 'GRIDNAME' not in self.ExeInputs :
+           tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
+           extension = os.path.splitext(tmptile)[1]
+           if extension == '.domain':
+             extension = os.path.splitext(tmptile)[0]
+           gridname_ =''
+           if extension == '.til':
+              gridname_ = linecache.getline(tmptile, 3).strip()
+           else:
+              nc_file = netCDF4.Dataset(tmptile,'r')
+              gridname_ = nc_file.getncattr('Grid_Name')
+           # in case it is an old name: SMAP-EASEvx-Mxx
+           gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
+           self.ExeInputs['GRIDNAME']  = gridname_
+
+        if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
+           tmp_= glob.glob(inpgeom_ + '*tile2pfaf*')
+           if (len(tmp_) > 0) : 
+              self.ExecInput['TILE2PFAF_FILE'] = tmp_[0]
+
         inpdir_ = None
         domain_ = None
         inpgeom_= None
-        # assigning Gridname
-        if 'GRIDNAME' not in self.ExeInputs :
-            tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
-            extension = os.path.splitext(tmptile)[1]
-            if extension == '.domain':
-              extension = os.path.splitext(tmptile)[0]
-            gridname_ =''
-            if extension == '.til':
-               gridname_ = linecache.getline(tmptile, 3).strip()
-            else:
-               nc_file = netCDF4.Dataset(tmptile,'r')
-               gridname_ = nc_file.getncattr('Grid_Name')
-            # in case it is an old name: SMAP-EASEvx-Mxx
-            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
-            self.ExeInputs['GRIDNAME']  = gridname_
-
+              
         if 'POSTPROC_HIST' not in self.ExeInputs:
             self.ExeInputs['POSTPROC_HIST'] = 0
 
@@ -768,6 +778,9 @@ class ldas:
               bcs += [self.ExeInputs['LNFM_FILE']]
            if (self.has_vegopacity):
               bcs += [self.ExeInputs['VEGOPACITY_FILE']]
+           if (self.ExeInputs['TILE2PFAF_FILE'] != ''):
+              bcs += [self.ExeInputs['TILE2PFAF_FILE']]
+
            bcstmp=[]
            for bcf in bcs :
                shutil.copy(bcf, self.bcsdir+'/')
@@ -792,8 +805,12 @@ class ldas:
               bcnames += ['lnfm']
            if (self.has_vegopacity):
               bcnames += ['vegopacity']
+           if (self.ExeInputs['TILE2PFAF_FILE'] != ''):
+              bcnames += ['tile2pfaf.nc4']
            for bcln,bc in zip(bcnames,bcs) :
               myBC=self.inpdir+'/'+bcln+'.data'
+              if '.nc4' in bcln:
+                 myBC=self.inpdir+'/'+bcln
               os.symlink(bc,myBC)
 
            if ("catchcn" in self.catch):
@@ -1255,10 +1272,16 @@ class ldas:
                 if self.with_land :
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
+                   if self.ExeInputs['TILE2PFAF_FILE'] !='':
+                      bcval.append('../input/tile2pfaf.nc4')
+                      bckey.append('TILE2PFAF')
                    for key, val in zip(bckey,bcval):
                       keyn = key+'_FILE'
                       valn = val+'.data'
+                      if '.nc4' in val:
+                        valn = val
                       ldasrcInp[keyn]= valn
+
                    if('catchcn' in self.catch):
                       ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
                    else:
