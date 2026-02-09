@@ -530,6 +530,8 @@ EASEv2_M36.LM:           1
                                 'ALBNF'       , 'LANDICE' ,  'ALBNF_GL'           ,
                                 'ASNOW_GL'    , 'LANDICE' ,
                                 'DELTS'       , 'LANDICE' ,
+                                'ICESMB'      , 'LANDICE' ,
+                                'ICEEL'       , 'ISSM'    ,
                                 'DNICFLX'     , 'LANDICE' ,
                                 'EVAPOUT'     , 'LANDICE' ,
                                 'QH'          , 'LANDICE' ,
