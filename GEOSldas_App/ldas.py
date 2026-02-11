@@ -298,7 +298,6 @@ class ldas:
               break
         nc4_tmp  = glob.glob(inpgeom_ + '*.nc4' + domain_)
         nc4_tile = [ item_ for item_ in nc4_tmp if 'tile2pfaf' not in item_ ]
-        nc4_tile = glob.glob(inpgeom_ + '*.nc4' + domain_)
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
