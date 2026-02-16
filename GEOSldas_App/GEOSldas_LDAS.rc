@@ -56,8 +56,6 @@ LSM_CHOICE: 1
 # 
 ISSM_EXPDIR: /discover/nobackup/agstubbl/GEOS/Experiments/LDAS-ISSM-dailytest/issm
 ISSM_EXPNAME: GreenlandGEOS
-ISSM_SAVEMESH: 1 
-
 
 # ---- Choice of tile type(s)
 #
