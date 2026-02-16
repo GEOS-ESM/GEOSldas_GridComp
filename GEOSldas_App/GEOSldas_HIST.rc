@@ -590,7 +590,10 @@ EASEv2_M36.LM:           1
   tavg24_1d_issm_Nt.format:        'CFIO',
   tavg24_1d_issm_Nt.frequency:      240000 ,
   tavg24_1d_issm_Nt.ref_time:       000000 ,
-  tavg24_1d_issm_Nt.fields:      'ICEEL'    , 'ISSM' ,
+  tavg24_1d_issm_Nt.fields:      'ICESURF'    , 'ISSM' ,
+                                 'ICETHICK'   , 'ISSM' ,
+                                 'ICEVEL'     , 'ISSM' ,
+                                 'ICESMB'     , 'ISSM' ,
                                  ::
 
 # ========================== EOF ==============================================================
