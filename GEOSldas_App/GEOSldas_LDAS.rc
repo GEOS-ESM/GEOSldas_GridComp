@@ -50,9 +50,6 @@ LSM_CHOICE: 1
 #    (e.g., via a mesh tilespace), we also have a temporary fix that will be 
 #    eventually removed (note that output on the attached grid or landice tiles
 #    does still work as expected):     
-#
-#    *ISSM_SAVEMESH saves netCDF files of the mesh information, ice elevation, and 
-#     surface mass balance in ISSM_EXPDIR 
 # 
 ISSM_EXPDIR: /discover/nobackup/agstubbl/GEOS/Experiments/LDAS-ISSM-dailytest/issm
 ISSM_EXPNAME: GreenlandGEOS
