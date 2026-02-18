@@ -362,7 +362,7 @@ class ldas:
 
         for key,val in _domain_dic.items() :
             if key in self.ExeInputs :
-                _domain_dic[key]= self.ExeInputs[key]
+               _domain_dic[key]= self.ExeInputs[key]
                assert RESTART_str != 2, "Please comment out " + key + " event you set it global"
         self.domain_def = tempfile.NamedTemporaryFile(mode='w', delete=False)
         self.domain_def.write('&domain_inputs\n')
