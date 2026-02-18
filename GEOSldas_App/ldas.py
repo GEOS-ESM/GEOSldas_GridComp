@@ -279,15 +279,30 @@ class ldas:
         inpdir_  = self.bcs_dir_land  
         inpgeom_ = self.bcs_dir_geom
 
-        if self.ExeInputs['RESTART'] == '1' :
-           inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+
+        # find restart files and tile files (if necessary)
+        RESTART_str  = str(self.ExeInputs['RESTART'])
+
+        inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
+        if RESTART_str == '1' :
+           inpdir_  = inp_
+           inpgeom_ = inp_
            txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
               domain_  = '.domain'
-              inpdir_  = inp_
-              inpgeom_ = inp_
-        
+        elif RESTART_str == '2':
+           txt_tile = glob.glob(inp_ + '*.domain')
+           assert len(txt_tile) == 0, "RESTART = 2 should restart from global domain"
+           in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
+           if len(in_tilefiles_) == 0 :
+              nc4_tmp = glob.glob(inp_+'/*.nc4')
+              in_tilesfile_ = [ item_ for item_ in nc4_tmp if 'tile2pfaf' not in item_ ]
+           if len(in_tilefiles_) == 0 :
+              in_tilefiles_ = glob.glob(inp_+'/*.til')
+           self.in_tilefile =os.path.realpath(in_tilefiles_[0])
+           
+ 
         inpdir_  = os.path.realpath(inpdir_)+'/'
         inpgeom_ = os.path.realpath(inpgeom_)+'/'
  
@@ -317,7 +332,7 @@ class ldas:
             tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
             extension = os.path.splitext(tmptile)[1]
             if extension == '.domain':
-              extension = os.path.splitext(tmptile)[0]
+              extension = os.path.splitext(os.path.splitext(tmptile)[0])[1]
             gridname_ =''
             if extension == '.til':
                gridname_ = linecache.getline(tmptile, 3).strip()
@@ -348,6 +363,7 @@ class ldas:
         for key,val in _domain_dic.items() :
             if key in self.ExeInputs :
                 _domain_dic[key]= self.ExeInputs[key]
+               assert RESTART_str != 2, "Please comment out " + key + " event you set it global"
         self.domain_def = tempfile.NamedTemporaryFile(mode='w', delete=False)
         self.domain_def.write('&domain_inputs\n')
         for key,val in _domain_dic.items() :
@@ -359,21 +375,6 @@ class ldas:
                self.domain_def.write(keyn+ valn +'\n')
         self.domain_def.write('/\n')
         self.domain_def.close()
-
-        # find restart files and tile files (if necessary)
-        RESTART_str  = str(self.ExeInputs['RESTART'])
-
-        if RESTART_str == '2':
-           inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
-           in_tilefiles_ = glob.glob(inpdir+'*tile.data')
-           if len(in_tilefiles_) == 0 :
-              inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
-              in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
-              if len(in_tilefiles_) == 0 :
-                 in_tilefiles_ = glob.glob(inpdir+'/*.til')
-              if len(in_tilefiles_) == 0 :
-                 in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
-           self.in_tilefile =os.path.realpath(in_tilefiles_[0])
 
         if RESTART_str in ['1', '2']:
            y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
