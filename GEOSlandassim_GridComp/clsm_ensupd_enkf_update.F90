@@ -1515,7 +1515,9 @@ contains
   ! ********************************************************************
 
   subroutine output_ObsFcstAna(date_time, exp_id, &
-       N_obsl, Observations_l, N_obs_param, out_ObsFcstAna_mode, rf2f)
+       N_obsl, Observations_l, N_obs_param, obs_param, out_ObsFcstAna_mode, &
+       update_type, xcompact, ycompact, fcsterr_inflation_fac, dtstep_assim, &
+       grid_name, rf2f)
 
     ! obs space output: observations, obs space forecast, obs space analysis, and
     ! associated error variances
@@ -1529,7 +1531,13 @@ contains
     character(*),                                 intent(in) :: exp_id
 
     integer,                                      intent(in) :: N_obsl, N_obs_param
+    type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
     integer,                                      intent(in) :: out_ObsFcstAna_mode
+    integer,                                      intent(in) :: update_type
+    real,                                         intent(in) :: xcompact, ycompact
+    real,                                         intent(in) :: fcsterr_inflation_fac
+    integer,                                      intent(in) :: dtstep_assim
+    character(*),                                 intent(in) :: grid_name
 
 
     type(obs_type),       dimension(N_obsl),      intent(in) :: Observations_l
@@ -1552,6 +1560,7 @@ contains
 
     character(300)                            :: fname
     character( 40)                            :: file_ext
+    character(  8)                            :: out_ObsFcstAna_format
     character(len=*), parameter               :: Iam = 'output_ObsFcstAna'
     character(len=400)                        :: err_msg
 
@@ -1703,6 +1712,15 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
 
+       select case (out_ObsFcstAna_mode)
+       case (OBSFCSTANA_FMT_BIN)
+          out_ObsFcstAna_format = 'BIN'
+       case (OBSFCSTANA_FMT_NC4)
+          out_ObsFcstAna_format = 'NC4'
+       case (OBSFCSTANA_FMT_BOTH)
+          out_ObsFcstAna_format = 'BOTH'
+       end select
+
        if (out_ObsFcstAna_mode == OBSFCSTANA_FMT_BIN .or. &
             out_ObsFcstAna_mode == OBSFCSTANA_FMT_BOTH) then
 
@@ -1756,7 +1774,10 @@ contains
           fname = get_io_filename( './', exp_id, file_tag, date_time=date_time, &
                dir_name=dir_name, ens_id=-1, file_ext=file_ext, no_subdirs=.true. )
 
-          call write_ObsFcstAna_nc4(fname, date_time, N_obsf, Observations_f)
+          call write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf, &
+               Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
+               update_type, xcompact, ycompact, fcsterr_inflation_fac, &
+               dtstep_assim, grid_name)
 
        end if
 
@@ -1767,29 +1788,50 @@ contains
 
   ! ********************************************************************
 
-  subroutine write_ObsFcstAna_nc4(fname, date_time, N_obsf, Observations_f)
+  subroutine write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf, &
+       Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
+       update_type, xcompact, ycompact, fcsterr_inflation_fac, &
+       dtstep_assim, grid_name)
     use netcdf
 
     implicit none
 
     character(*),                             intent(in) :: fname
     type(date_time_type),                     intent(in) :: date_time
+    character(*),                             intent(in) :: exp_id
+    character(*),                             intent(in) :: file_tag
     integer,                                  intent(in) :: N_obsf
+    integer,                                  intent(in) :: N_obs_param
     type(obs_type),       dimension(N_obsf),  intent(in) :: Observations_f
+    type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
+    character(*),                             intent(in) :: out_ObsFcstAna_format
+    integer,                                  intent(in) :: update_type
+    real,                                     intent(in) :: xcompact
+    real,                                     intent(in) :: ycompact
+    real,                                     intent(in) :: fcsterr_inflation_fac
+    integer,                                  intent(in) :: dtstep_assim
+    character(*),                             intent(in) :: grid_name
 
     integer :: ncid
     integer :: nobs_dimid
+    integer :: nspecies_dimid
     integer :: assim_varid, species_varid, tilenum_varid
     integer :: lon_varid, lat_varid
     integer :: obs_varid, obsvar_varid
     integer :: fcst_varid, fcstvar_varid
     integer :: ana_varid, anavar_varid
+    integer :: species_id_varid, species_orbit_varid, species_pol_varid
+    integer :: species_freq_varid, species_assim_varid
 
     integer, dimension(:), allocatable :: assim_int
+    integer, dimension(:), allocatable :: species_assim_int
+    character(len=40) :: attr_name
+    integer :: i
 
     call check( nf90_create(trim(fname), nf90_clobber + NF90_NETCDF4, ncid) )
 
     call check( nf90_def_dim(ncid, 'nobs', NF90_UNLIMITED, nobs_dimid) )
+    call check( nf90_def_dim(ncid, 'n_species', N_obs_param, nspecies_dimid) )
 
     call check( nf90_def_var(ncid, 'assim',   NF90_INT,   [nobs_dimid], assim_varid) )
     call check( nf90_def_var(ncid, 'species', NF90_INT,   [nobs_dimid], species_varid) )
@@ -1803,7 +1845,15 @@ contains
     call check( nf90_def_var(ncid, 'ana',     NF90_FLOAT, [nobs_dimid], ana_varid) )
     call check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
 
+    call check( nf90_def_var(ncid, 'species_id',    NF90_INT,   [nspecies_dimid], species_id_varid) )
+    call check( nf90_def_var(ncid, 'species_orbit', NF90_INT,   [nspecies_dimid], species_orbit_varid) )
+    call check( nf90_def_var(ncid, 'species_pol',   NF90_INT,   [nspecies_dimid], species_pol_varid) )
+    call check( nf90_def_var(ncid, 'species_freq',  NF90_FLOAT, [nspecies_dimid], species_freq_varid) )
+    call check( nf90_def_var(ncid, 'species_assim', NF90_INT,   [nspecies_dimid], species_assim_varid) )
+
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obs_param', N_obs_param) )
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'year',    date_time%year) )
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'month',   date_time%month) )
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'day',     date_time%day) )
@@ -1812,6 +1862,66 @@ contains
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'second',  date_time%sec) )
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'dofyr',   date_time%dofyr) )
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'pentad',  date_time%pentad) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'exp_id', trim(exp_id)) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'file_tag', trim(file_tag)) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'out_ObsFcstAna_format', trim(out_ObsFcstAna_format)) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'xcompact', xcompact) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'ycompact', ycompact) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'fcsterr_inflation_fac', fcsterr_inflation_fac) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
+
+    do i=1,N_obs_param
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_descr'
+       call check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_varname'
+       call check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%varname)) )
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_units'
+       call check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%units)) )
+    end do
+
+    call check( nf90_put_att(ncid, assim_varid, 'long_name', 'assimilation flag') )
+    call check( nf90_put_att(ncid, assim_varid, 'units', '1') )
+    call check( nf90_put_att(ncid, species_varid, 'long_name', 'observation species identifier') )
+    call check( nf90_put_att(ncid, species_varid, 'units', '1') )
+    call check( nf90_put_att(ncid, tilenum_varid, 'long_name', 'tile number (full domain)') )
+    call check( nf90_put_att(ncid, tilenum_varid, 'units', '1') )
+    call check( nf90_put_att(ncid, lon_varid, 'long_name', 'observation longitude') )
+    call check( nf90_put_att(ncid, lon_varid, 'units', 'degrees_east') )
+    call check( nf90_put_att(ncid, lon_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, lat_varid, 'long_name', 'observation latitude') )
+    call check( nf90_put_att(ncid, lat_varid, 'units', 'degrees_north') )
+    call check( nf90_put_att(ncid, lat_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, obs_varid, 'long_name', 'observation value') )
+    call check( nf90_put_att(ncid, obs_varid, 'units', 'species-dependent') )
+    call check( nf90_put_att(ncid, obs_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, obsvar_varid, 'long_name', 'observation error variance') )
+    call check( nf90_put_att(ncid, obsvar_varid, 'units', 'species-dependent') )
+    call check( nf90_put_att(ncid, obsvar_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, fcst_varid, 'long_name', 'forecast observation equivalent') )
+    call check( nf90_put_att(ncid, fcst_varid, 'units', 'species-dependent') )
+    call check( nf90_put_att(ncid, fcst_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, fcstvar_varid, 'long_name', 'forecast error variance in obs space') )
+    call check( nf90_put_att(ncid, fcstvar_varid, 'units', 'species-dependent') )
+    call check( nf90_put_att(ncid, fcstvar_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, ana_varid, 'long_name', 'analysis observation equivalent') )
+    call check( nf90_put_att(ncid, ana_varid, 'units', 'species-dependent') )
+    call check( nf90_put_att(ncid, ana_varid, 'missing_value', nodata_generic) )
+    call check( nf90_put_att(ncid, anavar_varid, 'long_name', 'analysis error variance in obs space') )
+    call check( nf90_put_att(ncid, anavar_varid, 'units', 'species-dependent') )
+    call check( nf90_put_att(ncid, anavar_varid, 'missing_value', nodata_generic) )
+
+    call check( nf90_put_att(ncid, species_id_varid, 'long_name', 'observation species identifier') )
+    call check( nf90_put_att(ncid, species_id_varid, 'units', '1') )
+    call check( nf90_put_att(ncid, species_orbit_varid, 'long_name', 'observation orbit type') )
+    call check( nf90_put_att(ncid, species_orbit_varid, 'units', '1') )
+    call check( nf90_put_att(ncid, species_pol_varid, 'long_name', 'observation polarization') )
+    call check( nf90_put_att(ncid, species_pol_varid, 'units', '1') )
+    call check( nf90_put_att(ncid, species_freq_varid, 'long_name', 'observation frequency') )
+    call check( nf90_put_att(ncid, species_freq_varid, 'units', 'Hz') )
+    call check( nf90_put_att(ncid, species_assim_varid, 'long_name', 'species assimilation flag') )
+    call check( nf90_put_att(ncid, species_assim_varid, 'units', '1') )
 
     call check( nf90_enddef(ncid) )
 
@@ -1834,6 +1944,22 @@ contains
        call check( nf90_put_var(ncid, anavar_varid,  Observations_f(1:N_obsf)%anavar) )
 
        deallocate(assim_int)
+
+    end if
+
+    if (N_obs_param > 0) then
+
+       allocate(species_assim_int(N_obs_param))
+       species_assim_int = 0
+       where (obs_param(1:N_obs_param)%assim) species_assim_int = 1
+
+       call check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
+       call check( nf90_put_var(ncid, species_orbit_varid, obs_param(1:N_obs_param)%orbit) )
+       call check( nf90_put_var(ncid, species_pol_varid,   obs_param(1:N_obs_param)%pol) )
+       call check( nf90_put_var(ncid, species_freq_varid,  obs_param(1:N_obs_param)%freq) )
+       call check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
+
+       deallocate(species_assim_int)
 
     end if
 
@@ -1860,6 +1986,7 @@ contains
        N_catl, tile_coord_l,                                                 &
        N_catf, tile_coord_f, pert_grid_g,                                    &
        N_catl_vec, low_ind, f2l,                                             &
+       update_type, xcompact, ycompact, fcsterr_inflation_fac, dtstep_assim, &
        obs_param,                                                            &
        met_force, lai, cat_param, cat_progn, mwRTM_param,                    &
        Observations_l, rf2f )
@@ -1882,6 +2009,9 @@ contains
     character(len=*),       intent(in) :: exp_id
 
     integer,                intent(in) :: N_obsl, N_obs_param, N_ens, N_catl, N_catf
+
+    integer,                intent(in) :: update_type, dtstep_assim
+    real,                   intent(in) :: xcompact, ycompact, fcsterr_inflation_fac
 
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_l  ! input
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_f  ! input
@@ -1947,7 +2077,9 @@ contains
        ! write out model, observations, and "OminusA" information
 
        call output_ObsFcstAna( date_time, exp_id, N_obsl, &
-            Observations_l(1:N_obsl), N_obs_param, out_ObsFcstAna_mode, rf2f=rf2f )
+            Observations_l(1:N_obsl), N_obs_param, obs_param, out_ObsFcstAna_mode, &
+            update_type, xcompact, ycompact, fcsterr_inflation_fac, dtstep_assim, &
+            trim(pert_grid_g%gridtype), rf2f=rf2f )
 
     end if
 
