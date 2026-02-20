@@ -162,6 +162,10 @@ module clsm_ensupd_upd_routines
   public :: TileNnzObs
   public :: dist_km2deg
 
+  integer, parameter, public :: OBSFCSTANA_FMT_BIN  = 1
+  integer, parameter, public :: OBSFCSTANA_FMT_NC4  = 2
+  integer, parameter, public :: OBSFCSTANA_FMT_BOTH = 3
+
   ! threshold below which FOV is considered zero (regardless of units)
   
   real, parameter, public :: FOV_threshold = 1e-4  
@@ -189,6 +193,7 @@ contains
        obs_param,                               &
        out_obslog,                              &
        out_ObsFcstAna,                          &
+       out_ObsFcstAna_mode,                     &
        out_smapL4SMaup,                         &
        N_obsbias_max                            &
        )
@@ -236,6 +241,7 @@ contains
     
     logical,              intent(out)   :: out_obslog
     logical,              intent(out)   :: out_ObsFcstAna
+    integer,              intent(out)   :: out_ObsFcstAna_mode
     logical,              intent(out)   :: out_smapL4SMaup
 
     integer,              intent(out)   :: N_obsbias_max
@@ -257,6 +263,7 @@ contains
 
     character(200)  :: ens_upd_inputs_path
     character( 40)  :: ens_upd_inputs_file, dir_name, file_tag, file_ext
+    character( 40)  :: out_ObsFcstAna_format
     
     integer :: i, j, k, N_tmp, k_hD, k_hA, k_vD, k_vA
 
@@ -279,6 +286,7 @@ contains
          update_type,              &
          out_obslog,               &
          out_ObsFcstAna,           &
+         out_ObsFcstAna_format,    &
          out_smapL4SMaup,          &
          xcompact, ycompact,       &
          fcsterr_inflation_fac,    &
@@ -290,6 +298,7 @@ contains
     
     ens_upd_inputs_path = '.'                                       ! set default 
     ens_upd_inputs_file = 'LDASsa_DEFAULT_inputs_ensupd.nml'
+    out_ObsFcstAna_format = 'BIN'
     
     ! Read data from default ens_upd_inputs namelist file 
     
@@ -340,6 +349,23 @@ contains
     ! -----------------------------------------------------------------
     !
     ! consistency checks etc
+
+    select case (trim(out_ObsFcstAna_format))
+
+    case ('BIN')
+       out_ObsFcstAna_mode = OBSFCSTANA_FMT_BIN
+
+    case ('NC4')
+       out_ObsFcstAna_mode = OBSFCSTANA_FMT_NC4
+
+    case ('BOTH')
+       out_ObsFcstAna_mode = OBSFCSTANA_FMT_BOTH
+
+    case default
+       err_msg = 'unknown value of "out_ObsFcstAna_format": "' // &
+            trim(out_ObsFcstAna_format) // '"'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end select
     
     if (update_type==0) then
        err_msg = 'executable was built for assimilation but update_type=0'

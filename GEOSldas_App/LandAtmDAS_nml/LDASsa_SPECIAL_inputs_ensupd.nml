@@ -38,6 +38,8 @@ update_type = 10
 
 out_obslog      = .true.
 out_ObsFcstAna  = .true.
+! out_ObsFcstAna_format: 'BIN' (legacy unformatted), 'NC4', or 'BOTH'
+out_ObsFcstAna_format = 'BIN'
 out_smapL4SMaup = .false.
 
 ! ---------------------------------------------------------------------

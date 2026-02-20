@@ -99,6 +99,7 @@ module GEOS_LandAssimGridCompMod
   integer :: N_obs_param
   logical :: out_obslog
   logical :: out_ObsFcstAna
+  integer :: out_ObsFcstAna_mode
   logical :: out_smapL4SMaup
   integer :: N_obsbias_max
   
@@ -1385,6 +1386,7 @@ contains
             obs_param,                               &
             out_obslog,                              &
             out_ObsFcstAna,                          &
+            out_ObsFcstAna_mode,                     &
             out_smapL4SMaup,                         &
             N_obsbias_max                            &
             )
@@ -1408,6 +1410,7 @@ contains
     call MPI_BCAST(N_obs_param,           1, MPI_INTEGER,        0,MPICOMM,mpierr)
     call MPI_BCAST(out_obslog,            1, MPI_LOGICAL,        0,MPICOMM,mpierr)
     call MPI_BCAST(out_ObsFcstAna,        1, MPI_LOGICAL,        0,MPICOMM,mpierr)
+    call MPI_BCAST(out_ObsFcstAna_mode,   1, MPI_INTEGER,        0,MPICOMM,mpierr)
     call MPI_BCAST(out_smapL4SMaup,       1, MPI_LOGICAL,        0,MPICOMM,mpierr)
     call MPI_BCAST(N_obsbias_max,         1, MPI_INTEGER,        0,MPICOMM,mpierr)
    
@@ -1948,6 +1951,7 @@ contains
     if (.true.) then  ! replace obsolete check for analysis time with "if true" to keep indents
 
        call output_ObsFcstAna_wrapper( out_ObsFcstAna,                   &
+            out_ObsFcstAna_mode,                                         &
             date_time_new, trim(exp_id),                                 &
             N_obsl, N_obs_param, NUM_ENSEMBLE,                           &
             N_catl, tile_coord_l,                                        &

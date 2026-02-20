@@ -97,7 +97,10 @@ module clsm_ensupd_enkf_update
        halo_type,                                 &
        FOV_threshold,                             &
        get_halo_around_tile,                      &
-       TileNnzObs
+       TileNnzObs,                                &
+       OBSFCSTANA_FMT_BIN,                        &
+       OBSFCSTANA_FMT_NC4,                        &
+       OBSFCSTANA_FMT_BOTH
 
   use clsm_ensupd_read_obs,             ONLY:     &
        collect_obs
@@ -1512,7 +1515,7 @@ contains
   ! ********************************************************************
 
   subroutine output_ObsFcstAna(date_time, exp_id, &
-       N_obsl, Observations_l, N_obs_param, rf2f)
+       N_obsl, Observations_l, N_obs_param, out_ObsFcstAna_mode, rf2f)
 
     ! obs space output: observations, obs space forecast, obs space analysis, and
     ! associated error variances
@@ -1526,6 +1529,7 @@ contains
     character(*),                                 intent(in) :: exp_id
 
     integer,                                      intent(in) :: N_obsl, N_obs_param
+    integer,                                      intent(in) :: out_ObsFcstAna_mode
 
 
     type(obs_type),       dimension(N_obsl),      intent(in) :: Observations_l
@@ -1547,6 +1551,9 @@ contains
     integer,        dimension(numprocs)       :: N_obsl_vec, tmp_low_ind
 
     character(300)                            :: fname
+    character( 40)                            :: file_ext
+    character(len=*), parameter               :: Iam = 'output_ObsFcstAna'
+    character(len=400)                        :: err_msg
 
 #ifdef LDAS_MPI
 
@@ -1689,55 +1696,165 @@ contains
        
        ! write to file
 
-       fname = get_io_filename( './', exp_id, file_tag, date_time=date_time, &
-            dir_name=dir_name, ens_id=-1, no_subdirs=.true. )
+       if ( (out_ObsFcstAna_mode /= OBSFCSTANA_FMT_BIN ) .and. &
+            (out_ObsFcstAna_mode /= OBSFCSTANA_FMT_NC4 ) .and. &
+            (out_ObsFcstAna_mode /= OBSFCSTANA_FMT_BOTH) ) then
+          err_msg = 'unknown out_ObsFcstAna_mode'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+
+       if (out_ObsFcstAna_mode == OBSFCSTANA_FMT_BIN .or. &
+            out_ObsFcstAna_mode == OBSFCSTANA_FMT_BOTH) then
+
+          fname = get_io_filename( './', exp_id, file_tag, date_time=date_time, &
+               dir_name=dir_name, ens_id=-1, no_subdirs=.true. )
          
-       open( 10, file=fname, form='unformatted', action='write')
+          open( 10, file=fname, form='unformatted', action='write')
 
-       ! write header
+          ! write header
 
-       write (10) N_obsf, date_time%year, date_time%month, &
-            date_time%day, date_time%hour, date_time%min, date_time%sec, &
-            date_time%dofyr, date_time%pentad
+          write (10) N_obsf, date_time%year, date_time%month, &
+               date_time%day, date_time%hour, date_time%min, date_time%sec, &
+               date_time%dofyr, date_time%pentad
 
-       ! write data
+          ! write data
 
-       ! Assuming a linear model and uncorrelated obs/model errors,
-       !
-       ! the expected var of OminusF is   HPHt + R,   and
-       ! the expected var of OminusA is   R - HAHt,   where
-       !
-       !   P = prior state error covariance
-       !   A = posterior state error covariance
-       !   H = observation operator
+          ! Assuming a linear model and uncorrelated obs/model errors,
+          !
+          ! the expected var of OminusF is   HPHt + R,   and
+          ! the expected var of OminusA is   R - HAHt,   where
+          !
+          !   P = prior state error covariance
+          !   A = posterior state error covariance
+          !   H = observation operator
 
-       write (10) (Observations_f(n)%assim,   n=1,N_obsf)
-       write (10) (Observations_f(n)%species, n=1,N_obsf)
+          write (10) (Observations_f(n)%assim,   n=1,N_obsf)
+          write (10) (Observations_f(n)%species, n=1,N_obsf)
 
-       write (10) (Observations_f(n)%tilenum, n=1,N_obsf)
+          write (10) (Observations_f(n)%tilenum, n=1,N_obsf)
 
-       write (10) (Observations_f(n)%lon,     n=1,N_obsf)
-       write (10) (Observations_f(n)%lat,     n=1,N_obsf)
+          write (10) (Observations_f(n)%lon,     n=1,N_obsf)
+          write (10) (Observations_f(n)%lat,     n=1,N_obsf)
 
-       write (10) (Observations_f(n)%obs,     n=1,N_obsf)
-       write (10) (Observations_f(n)%obsvar,  n=1,N_obsf)     ! R
+          write (10) (Observations_f(n)%obs,     n=1,N_obsf)
+          write (10) (Observations_f(n)%obsvar,  n=1,N_obsf)     ! R
 
-       write (10) (Observations_f(n)%fcst,    n=1,N_obsf)
-       write (10) (Observations_f(n)%fcstvar, n=1,N_obsf)     ! HPHt
+          write (10) (Observations_f(n)%fcst,    n=1,N_obsf)
+          write (10) (Observations_f(n)%fcstvar, n=1,N_obsf)     ! HPHt
 
-       write (10) (Observations_f(n)%ana,     n=1,N_obsf)
-       write (10) (Observations_f(n)%anavar,  n=1,N_obsf)     ! HAHt
+          write (10) (Observations_f(n)%ana,     n=1,N_obsf)
+          write (10) (Observations_f(n)%anavar,  n=1,N_obsf)     ! HAHt
 
-       close(10,status='keep')
+          close(10,status='keep')
+
+       end if
+
+       if (out_ObsFcstAna_mode == OBSFCSTANA_FMT_NC4 .or. &
+            out_ObsFcstAna_mode == OBSFCSTANA_FMT_BOTH) then
+
+          file_ext = '.nc4'
+          fname = get_io_filename( './', exp_id, file_tag, date_time=date_time, &
+               dir_name=dir_name, ens_id=-1, file_ext=file_ext, no_subdirs=.true. )
+
+          call write_ObsFcstAna_nc4(fname, date_time, N_obsf, Observations_f)
+
+       end if
 
     end if
     if (allocated(Observations_f)) deallocate(Observations_f)
 
   end subroutine output_ObsFcstAna
 
+  ! ********************************************************************
+
+  subroutine write_ObsFcstAna_nc4(fname, date_time, N_obsf, Observations_f)
+    use netcdf
+
+    implicit none
+
+    character(*),                             intent(in) :: fname
+    type(date_time_type),                     intent(in) :: date_time
+    integer,                                  intent(in) :: N_obsf
+    type(obs_type),       dimension(N_obsf),  intent(in) :: Observations_f
+
+    integer :: ncid
+    integer :: nobs_dimid
+    integer :: assim_varid, species_varid, tilenum_varid
+    integer :: lon_varid, lat_varid
+    integer :: obs_varid, obsvar_varid
+    integer :: fcst_varid, fcstvar_varid
+    integer :: ana_varid, anavar_varid
+
+    integer, dimension(:), allocatable :: assim_int
+
+    call check( nf90_create(trim(fname), nf90_clobber + NF90_NETCDF4, ncid) )
+
+    call check( nf90_def_dim(ncid, 'nobs', NF90_UNLIMITED, nobs_dimid) )
+
+    call check( nf90_def_var(ncid, 'assim',   NF90_INT,   [nobs_dimid], assim_varid) )
+    call check( nf90_def_var(ncid, 'species', NF90_INT,   [nobs_dimid], species_varid) )
+    call check( nf90_def_var(ncid, 'tilenum', NF90_INT,   [nobs_dimid], tilenum_varid) )
+    call check( nf90_def_var(ncid, 'lon',     NF90_FLOAT, [nobs_dimid], lon_varid) )
+    call check( nf90_def_var(ncid, 'lat',     NF90_FLOAT, [nobs_dimid], lat_varid) )
+    call check( nf90_def_var(ncid, 'obs',     NF90_FLOAT, [nobs_dimid], obs_varid) )
+    call check( nf90_def_var(ncid, 'obsvar',  NF90_FLOAT, [nobs_dimid], obsvar_varid) )
+    call check( nf90_def_var(ncid, 'fcst',    NF90_FLOAT, [nobs_dimid], fcst_varid) )
+    call check( nf90_def_var(ncid, 'fcstvar', NF90_FLOAT, [nobs_dimid], fcstvar_varid) )
+    call check( nf90_def_var(ncid, 'ana',     NF90_FLOAT, [nobs_dimid], ana_varid) )
+    call check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
+
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'year',    date_time%year) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'month',   date_time%month) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'day',     date_time%day) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'hour',    date_time%hour) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'minute',  date_time%min) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'second',  date_time%sec) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'dofyr',   date_time%dofyr) )
+    call check( nf90_put_att(ncid, NF90_GLOBAL, 'pentad',  date_time%pentad) )
+
+    call check( nf90_enddef(ncid) )
+
+    if (N_obsf > 0) then
+
+       allocate(assim_int(N_obsf))
+       assim_int = 0
+       where (Observations_f(1:N_obsf)%assim) assim_int = 1
+
+       call check( nf90_put_var(ncid, assim_varid,   assim_int) )
+       call check( nf90_put_var(ncid, species_varid, Observations_f(1:N_obsf)%species) )
+       call check( nf90_put_var(ncid, tilenum_varid, Observations_f(1:N_obsf)%tilenum) )
+       call check( nf90_put_var(ncid, lon_varid,     Observations_f(1:N_obsf)%lon) )
+       call check( nf90_put_var(ncid, lat_varid,     Observations_f(1:N_obsf)%lat) )
+       call check( nf90_put_var(ncid, obs_varid,     Observations_f(1:N_obsf)%obs) )
+       call check( nf90_put_var(ncid, obsvar_varid,  Observations_f(1:N_obsf)%obsvar) )
+       call check( nf90_put_var(ncid, fcst_varid,    Observations_f(1:N_obsf)%fcst) )
+       call check( nf90_put_var(ncid, fcstvar_varid, Observations_f(1:N_obsf)%fcstvar) )
+       call check( nf90_put_var(ncid, ana_varid,     Observations_f(1:N_obsf)%ana) )
+       call check( nf90_put_var(ncid, anavar_varid,  Observations_f(1:N_obsf)%anavar) )
+
+       deallocate(assim_int)
+
+    end if
+
+    call check( nf90_close(ncid) )
+
+  contains
+    subroutine check(status)
+      integer, intent ( in) :: status
+
+      if(status /= nf90_noerr) then
+         print *, trim(nf90_strerror(status))
+         stop 1
+      end if
+    end subroutine check
+
+  end subroutine write_ObsFcstAna_nc4
+
   ! **********************************************************************
 
   subroutine output_ObsFcstAna_wrapper( out_ObsFcstAna,                      &
+       out_ObsFcstAna_mode,                                                  &
        date_time, exp_id,                                                    &
        N_obsl, N_obs_param, N_ens,                                           &
        N_catl, tile_coord_l,                                                 &
@@ -1757,6 +1874,7 @@ contains
     ! major revisions for new obs handling and MPI
 
     logical,                intent(in) :: out_ObsFcstAna
+    integer,                intent(in) :: out_ObsFcstAna_mode
 
 
     type(date_time_type),   intent(in) :: date_time
@@ -1829,7 +1947,7 @@ contains
        ! write out model, observations, and "OminusA" information
 
        call output_ObsFcstAna( date_time, exp_id, N_obsl, &
-            Observations_l(1:N_obsl), N_obs_param, rf2f=rf2f )
+            Observations_l(1:N_obsl), N_obs_param, out_ObsFcstAna_mode, rf2f=rf2f )
 
     end if
 
