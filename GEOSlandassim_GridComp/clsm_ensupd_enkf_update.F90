@@ -1820,8 +1820,7 @@ contains
     integer :: obs_varid, obsvar_varid
     integer :: fcst_varid, fcstvar_varid
     integer :: ana_varid, anavar_varid
-    integer :: species_id_varid, species_orbit_varid, species_pol_varid
-    integer :: species_freq_varid, species_assim_varid
+    integer :: species_id_varid, species_assim_varid
 
     integer, dimension(:), allocatable :: assim_int
     integer, dimension(:), allocatable :: species_assim_int
@@ -1846,9 +1845,6 @@ contains
     call check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
 
     call check( nf90_def_var(ncid, 'species_id',    NF90_INT,   [nspecies_dimid], species_id_varid) )
-    call check( nf90_def_var(ncid, 'species_orbit', NF90_INT,   [nspecies_dimid], species_orbit_varid) )
-    call check( nf90_def_var(ncid, 'species_pol',   NF90_INT,   [nspecies_dimid], species_pol_varid) )
-    call check( nf90_def_var(ncid, 'species_freq',  NF90_FLOAT, [nspecies_dimid], species_freq_varid) )
     call check( nf90_def_var(ncid, 'species_assim', NF90_INT,   [nspecies_dimid], species_assim_varid) )
 
     call check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
@@ -1914,12 +1910,6 @@ contains
 
     call check( nf90_put_att(ncid, species_id_varid, 'long_name', 'observation species identifier') )
     call check( nf90_put_att(ncid, species_id_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, species_orbit_varid, 'long_name', 'observation orbit type') )
-    call check( nf90_put_att(ncid, species_orbit_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, species_pol_varid, 'long_name', 'observation polarization') )
-    call check( nf90_put_att(ncid, species_pol_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, species_freq_varid, 'long_name', 'observation frequency') )
-    call check( nf90_put_att(ncid, species_freq_varid, 'units', 'Hz') )
     call check( nf90_put_att(ncid, species_assim_varid, 'long_name', 'species assimilation flag') )
     call check( nf90_put_att(ncid, species_assim_varid, 'units', '1') )
 
@@ -1954,9 +1944,6 @@ contains
        where (obs_param(1:N_obs_param)%assim) species_assim_int = 1
 
        call check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
-       call check( nf90_put_var(ncid, species_orbit_varid, obs_param(1:N_obs_param)%orbit) )
-       call check( nf90_put_var(ncid, species_pol_varid,   obs_param(1:N_obs_param)%pol) )
-       call check( nf90_put_var(ncid, species_freq_varid,  obs_param(1:N_obs_param)%freq) )
        call check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
 
        deallocate(species_assim_int)
