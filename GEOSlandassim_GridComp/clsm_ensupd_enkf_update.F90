@@ -1826,94 +1826,96 @@ contains
     integer, dimension(:), allocatable :: species_assim_int
     character(len=40) :: attr_name
     integer :: i
+    character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
+    character(len=400)          :: err_msg
 
-    call check( nf90_create(trim(fname), nf90_clobber + NF90_NETCDF4, ncid) )
+    call nc4_check( nf90_create(trim(fname), nf90_clobber + NF90_NETCDF4, ncid) )
 
-    call check( nf90_def_dim(ncid, 'nobs', NF90_UNLIMITED, nobs_dimid) )
-    call check( nf90_def_dim(ncid, 'n_species', N_obs_param, nspecies_dimid) )
+    call nc4_check( nf90_def_dim(ncid, 'nobs', NF90_UNLIMITED, nobs_dimid) )
+    call nc4_check( nf90_def_dim(ncid, 'n_species', N_obs_param, nspecies_dimid) )
 
-    call check( nf90_def_var(ncid, 'assim',   NF90_INT,   [nobs_dimid], assim_varid) )
-    call check( nf90_def_var(ncid, 'species', NF90_INT,   [nobs_dimid], species_varid) )
-    call check( nf90_def_var(ncid, 'tilenum', NF90_INT,   [nobs_dimid], tilenum_varid) )
-    call check( nf90_def_var(ncid, 'lon',     NF90_FLOAT, [nobs_dimid], lon_varid) )
-    call check( nf90_def_var(ncid, 'lat',     NF90_FLOAT, [nobs_dimid], lat_varid) )
-    call check( nf90_def_var(ncid, 'obs',     NF90_FLOAT, [nobs_dimid], obs_varid) )
-    call check( nf90_def_var(ncid, 'obsvar',  NF90_FLOAT, [nobs_dimid], obsvar_varid) )
-    call check( nf90_def_var(ncid, 'fcst',    NF90_FLOAT, [nobs_dimid], fcst_varid) )
-    call check( nf90_def_var(ncid, 'fcstvar', NF90_FLOAT, [nobs_dimid], fcstvar_varid) )
-    call check( nf90_def_var(ncid, 'ana',     NF90_FLOAT, [nobs_dimid], ana_varid) )
-    call check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
+    call nc4_check( nf90_def_var(ncid, 'assim',   NF90_INT,   [nobs_dimid], assim_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species', NF90_INT,   [nobs_dimid], species_varid) )
+    call nc4_check( nf90_def_var(ncid, 'tilenum', NF90_INT,   [nobs_dimid], tilenum_varid) )
+    call nc4_check( nf90_def_var(ncid, 'lon',     NF90_FLOAT, [nobs_dimid], lon_varid) )
+    call nc4_check( nf90_def_var(ncid, 'lat',     NF90_FLOAT, [nobs_dimid], lat_varid) )
+    call nc4_check( nf90_def_var(ncid, 'obs',     NF90_FLOAT, [nobs_dimid], obs_varid) )
+    call nc4_check( nf90_def_var(ncid, 'obsvar',  NF90_FLOAT, [nobs_dimid], obsvar_varid) )
+    call nc4_check( nf90_def_var(ncid, 'fcst',    NF90_FLOAT, [nobs_dimid], fcst_varid) )
+    call nc4_check( nf90_def_var(ncid, 'fcstvar', NF90_FLOAT, [nobs_dimid], fcstvar_varid) )
+    call nc4_check( nf90_def_var(ncid, 'ana',     NF90_FLOAT, [nobs_dimid], ana_varid) )
+    call nc4_check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
 
-    call check( nf90_def_var(ncid, 'species_id',    NF90_INT,   [nspecies_dimid], species_id_varid) )
-    call check( nf90_def_var(ncid, 'species_assim', NF90_INT,   [nspecies_dimid], species_assim_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_id',    NF90_INT,   [nspecies_dimid], species_id_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_assim', NF90_INT,   [nspecies_dimid], species_assim_varid) )
 
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obs_param', N_obs_param) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'year',    date_time%year) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'month',   date_time%month) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'day',     date_time%day) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'hour',    date_time%hour) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'minute',  date_time%min) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'second',  date_time%sec) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'dofyr',   date_time%dofyr) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'pentad',  date_time%pentad) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'exp_id', trim(exp_id)) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'file_tag', trim(file_tag)) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'out_ObsFcstAna_format', trim(out_ObsFcstAna_format)) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'xcompact', xcompact) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'ycompact', ycompact) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'fcsterr_inflation_fac', fcsterr_inflation_fac) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
-    call check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obs_param', N_obs_param) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'year',    date_time%year) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'month',   date_time%month) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'day',     date_time%day) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'hour',    date_time%hour) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'minute',  date_time%min) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'second',  date_time%sec) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dofyr',   date_time%dofyr) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'pentad',  date_time%pentad) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'exp_id', trim(exp_id)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'file_tag', trim(file_tag)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'out_ObsFcstAna_format', trim(out_ObsFcstAna_format)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'xcompact', xcompact) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'ycompact', ycompact) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'fcsterr_inflation_fac', fcsterr_inflation_fac) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
 
     do i=1,N_obs_param
        write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_descr'
-       call check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
        write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_varname'
-       call check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%varname)) )
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%varname)) )
        write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_units'
-       call check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%units)) )
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%units)) )
     end do
 
-    call check( nf90_put_att(ncid, assim_varid, 'long_name', 'assimilation flag') )
-    call check( nf90_put_att(ncid, assim_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, species_varid, 'long_name', 'observation species identifier') )
-    call check( nf90_put_att(ncid, species_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, tilenum_varid, 'long_name', 'tile number (full domain)') )
-    call check( nf90_put_att(ncid, tilenum_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, lon_varid, 'long_name', 'observation longitude') )
-    call check( nf90_put_att(ncid, lon_varid, 'units', 'degrees_east') )
-    call check( nf90_put_att(ncid, lon_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, lat_varid, 'long_name', 'observation latitude') )
-    call check( nf90_put_att(ncid, lat_varid, 'units', 'degrees_north') )
-    call check( nf90_put_att(ncid, lat_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, obs_varid, 'long_name', 'observation value') )
-    call check( nf90_put_att(ncid, obs_varid, 'units', 'species-dependent') )
-    call check( nf90_put_att(ncid, obs_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, obsvar_varid, 'long_name', 'observation error variance') )
-    call check( nf90_put_att(ncid, obsvar_varid, 'units', 'species-dependent') )
-    call check( nf90_put_att(ncid, obsvar_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, fcst_varid, 'long_name', 'forecast observation equivalent') )
-    call check( nf90_put_att(ncid, fcst_varid, 'units', 'species-dependent') )
-    call check( nf90_put_att(ncid, fcst_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, fcstvar_varid, 'long_name', 'forecast error variance in obs space') )
-    call check( nf90_put_att(ncid, fcstvar_varid, 'units', 'species-dependent') )
-    call check( nf90_put_att(ncid, fcstvar_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, ana_varid, 'long_name', 'analysis observation equivalent') )
-    call check( nf90_put_att(ncid, ana_varid, 'units', 'species-dependent') )
-    call check( nf90_put_att(ncid, ana_varid, 'missing_value', nodata_generic) )
-    call check( nf90_put_att(ncid, anavar_varid, 'long_name', 'analysis error variance in obs space') )
-    call check( nf90_put_att(ncid, anavar_varid, 'units', 'species-dependent') )
-    call check( nf90_put_att(ncid, anavar_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, assim_varid, 'long_name', 'assimilation flag') )
+    call nc4_check( nf90_put_att(ncid, assim_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, species_varid, 'long_name', 'observation species identifier') )
+    call nc4_check( nf90_put_att(ncid, species_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, tilenum_varid, 'long_name', 'tile number (full domain)') )
+    call nc4_check( nf90_put_att(ncid, tilenum_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, lon_varid, 'long_name', 'observation longitude') )
+    call nc4_check( nf90_put_att(ncid, lon_varid, 'units', 'degrees_east') )
+    call nc4_check( nf90_put_att(ncid, lon_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, lat_varid, 'long_name', 'observation latitude') )
+    call nc4_check( nf90_put_att(ncid, lat_varid, 'units', 'degrees_north') )
+    call nc4_check( nf90_put_att(ncid, lat_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, obs_varid, 'long_name', 'observation value') )
+    call nc4_check( nf90_put_att(ncid, obs_varid, 'units', 'species-dependent') )
+    call nc4_check( nf90_put_att(ncid, obs_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, obsvar_varid, 'long_name', 'observation error variance') )
+    call nc4_check( nf90_put_att(ncid, obsvar_varid, 'units', 'species-dependent') )
+    call nc4_check( nf90_put_att(ncid, obsvar_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, fcst_varid, 'long_name', 'forecast observation equivalent') )
+    call nc4_check( nf90_put_att(ncid, fcst_varid, 'units', 'species-dependent') )
+    call nc4_check( nf90_put_att(ncid, fcst_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, fcstvar_varid, 'long_name', 'forecast error variance in obs space') )
+    call nc4_check( nf90_put_att(ncid, fcstvar_varid, 'units', 'species-dependent') )
+    call nc4_check( nf90_put_att(ncid, fcstvar_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, ana_varid, 'long_name', 'analysis observation equivalent') )
+    call nc4_check( nf90_put_att(ncid, ana_varid, 'units', 'species-dependent') )
+    call nc4_check( nf90_put_att(ncid, ana_varid, 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, anavar_varid, 'long_name', 'analysis error variance in obs space') )
+    call nc4_check( nf90_put_att(ncid, anavar_varid, 'units', 'species-dependent') )
+    call nc4_check( nf90_put_att(ncid, anavar_varid, 'missing_value', nodata_generic) )
 
-    call check( nf90_put_att(ncid, species_id_varid, 'long_name', 'observation species identifier') )
-    call check( nf90_put_att(ncid, species_id_varid, 'units', '1') )
-    call check( nf90_put_att(ncid, species_assim_varid, 'long_name', 'species assimilation flag') )
-    call check( nf90_put_att(ncid, species_assim_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, species_id_varid, 'long_name', 'observation species identifier') )
+    call nc4_check( nf90_put_att(ncid, species_id_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, species_assim_varid, 'long_name', 'species assimilation flag') )
+    call nc4_check( nf90_put_att(ncid, species_assim_varid, 'units', '1') )
 
-    call check( nf90_enddef(ncid) )
+    call nc4_check( nf90_enddef(ncid) )
 
     if (N_obsf > 0) then
 
@@ -1921,17 +1923,17 @@ contains
        assim_int = 0
        where (Observations_f(1:N_obsf)%assim) assim_int = 1
 
-       call check( nf90_put_var(ncid, assim_varid,   assim_int) )
-       call check( nf90_put_var(ncid, species_varid, Observations_f(1:N_obsf)%species) )
-       call check( nf90_put_var(ncid, tilenum_varid, Observations_f(1:N_obsf)%tilenum) )
-       call check( nf90_put_var(ncid, lon_varid,     Observations_f(1:N_obsf)%lon) )
-       call check( nf90_put_var(ncid, lat_varid,     Observations_f(1:N_obsf)%lat) )
-       call check( nf90_put_var(ncid, obs_varid,     Observations_f(1:N_obsf)%obs) )
-       call check( nf90_put_var(ncid, obsvar_varid,  Observations_f(1:N_obsf)%obsvar) )
-       call check( nf90_put_var(ncid, fcst_varid,    Observations_f(1:N_obsf)%fcst) )
-       call check( nf90_put_var(ncid, fcstvar_varid, Observations_f(1:N_obsf)%fcstvar) )
-       call check( nf90_put_var(ncid, ana_varid,     Observations_f(1:N_obsf)%ana) )
-       call check( nf90_put_var(ncid, anavar_varid,  Observations_f(1:N_obsf)%anavar) )
+       call nc4_check( nf90_put_var(ncid, assim_varid,   assim_int) )
+       call nc4_check( nf90_put_var(ncid, species_varid, Observations_f(1:N_obsf)%species) )
+       call nc4_check( nf90_put_var(ncid, tilenum_varid, Observations_f(1:N_obsf)%tilenum) )
+       call nc4_check( nf90_put_var(ncid, lon_varid,     Observations_f(1:N_obsf)%lon) )
+       call nc4_check( nf90_put_var(ncid, lat_varid,     Observations_f(1:N_obsf)%lat) )
+       call nc4_check( nf90_put_var(ncid, obs_varid,     Observations_f(1:N_obsf)%obs) )
+       call nc4_check( nf90_put_var(ncid, obsvar_varid,  Observations_f(1:N_obsf)%obsvar) )
+       call nc4_check( nf90_put_var(ncid, fcst_varid,    Observations_f(1:N_obsf)%fcst) )
+       call nc4_check( nf90_put_var(ncid, fcstvar_varid, Observations_f(1:N_obsf)%fcstvar) )
+       call nc4_check( nf90_put_var(ncid, ana_varid,     Observations_f(1:N_obsf)%ana) )
+       call nc4_check( nf90_put_var(ncid, anavar_varid,  Observations_f(1:N_obsf)%anavar) )
 
        deallocate(assim_int)
 
@@ -1943,24 +1945,24 @@ contains
        species_assim_int = 0
        where (obs_param(1:N_obs_param)%assim) species_assim_int = 1
 
-       call check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
-       call check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
+       call nc4_check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
+       call nc4_check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
 
        deallocate(species_assim_int)
 
     end if
 
-    call check( nf90_close(ncid) )
+    call nc4_check( nf90_close(ncid) )
 
   contains
-    subroutine check(status)
-      integer, intent ( in) :: status
+    subroutine nc4_check(status)
+      integer, intent(in) :: status
 
-      if(status /= nf90_noerr) then
-         print *, trim(nf90_strerror(status))
-         stop 1
+      if (status /= nf90_noerr) then
+         err_msg = 'NetCDF error in ' // Iam // ': ' // trim(nf90_strerror(status))
+         call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
       end if
-    end subroutine check
+    end subroutine nc4_check
 
   end subroutine write_ObsFcstAna_nc4
 

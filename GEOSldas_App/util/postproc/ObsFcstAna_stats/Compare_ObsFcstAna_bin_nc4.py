@@ -45,6 +45,14 @@ def _as_array(x):
 
 
 def _normalize_missing(a, fill_value=-9999.0):
+    """Replace fill_value sentinels with NaN for consistent comparison.
+
+    The binary reader (read_ObsFcstAna) converts obs_obsvar/fcst/fcstvar/ana/
+    anavar to NaN but leaves obs_obs, obs_lon, and obs_lat as raw -9999.
+    The NC4 reader uses the per-variable missing_value attribute (also -9999).
+    Calling this function on both sides guarantees a uniform NaN-based
+    comparison regardless of which fields each reader normalizes internally.
+    """
     out = np.asarray(a, dtype=np.float64).copy()
     out[np.isclose(out, fill_value)] = np.nan
     return out
