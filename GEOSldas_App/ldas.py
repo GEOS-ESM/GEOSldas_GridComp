@@ -288,6 +288,14 @@ class ldas:
         if RESTART_str == '1' :
            inpdir_  = inp_
            inpgeom_ = inp_
+           BCS_txt  = glob.glob(inp_ + 'BCS.txt')
+           if len(BCS_txt)== 0:
+              print("Warning: There is no BCS.txt in rc_out. The BCS in the restart directory may not be consistent with " + self.ExeInputs['BCS_PATH'])
+           elif len(BCS_txt)== 1:
+              BCS_tmp = parseInputFile(BCS_txt[0])
+              assert self.ExeInputs['BCS_PATH'] == BCS_tmp['BCS_PATH'], "BCS_PATH does not match " + BCS_tmp['BCS_PATH'] + " in restart directoy"
+              assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS resolution or gridname should be the same for RESTART =1"
+
            txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
               domain_  = '.domain'
@@ -474,7 +482,7 @@ class ldas:
         self.scratchdir = self.expdir   + '/scratch'
         self.blddirLn   = self.expdir   + '/build'
         self.out_path   = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']
-        self.bcsdir     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rc_out/'
+        self.rc_out     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rc_out/'
         self.rstdir     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rs/'
         self.exefyl     = self.blddirLn + exefyl
 
@@ -691,13 +699,13 @@ class ldas:
         # update tile file
         tile= self.ExeInputs['TILING_FILE']
         short_tile= os.path.basename(self.ExeInputs['TILING_FILE'])
-        newtile = self.bcsdir+'/'+short_tile
+        newtile = self.rc_out+'/'+short_tile
         shutil.copy(tile, newtile)
         tile=newtile
         # if three extra lines exist, remove them and save it to inputdir
 
         print ('\nCorrect the tile file if it is an old EASE tile format... \n')
-        EASEtile=self.bcsdir+'/MAPL_'+short_tile
+        EASEtile=self.rc_out+'/MAPL_'+short_tile
         cmd = self.bindir + '/preprocess_ldas.x correctease  '+ tile + ' '+ EASEtile
         print ("cmd:   " + cmd)
 
@@ -764,8 +772,8 @@ class ldas:
               bcs += [self.ExeInputs['VEGOPACITY_FILE']]
            bcstmp=[]
            for bcf in bcs :
-               shutil.copy(bcf, self.bcsdir+'/')
-               bcstmp=bcstmp+[self.bcsdir+'/'+os.path.basename(bcf)]
+               shutil.copy(bcf, self.rc_out+'/')
+               bcstmp=bcstmp+[self.rc_out+'/'+os.path.basename(bcf)]
            bcs=bcstmp
 
            if self.isZoomIn:
@@ -803,13 +811,6 @@ class ldas:
 
         myRstDir = self.inpdir + '/restart/'
 
-        rstpath = self.ExeInputs['RESTART_PATH']+ \
-                  self.ExeInputs['RESTART_ID'] + \
-                  '/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rs/'
-        rcoutpath = self.ExeInputs['RESTART_PATH']+ \
-                  self.ExeInputs['RESTART_ID'] + \
-                  '/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
-
         # pass into remap_config_ldas
         exp_id    = self.ExeInputs['EXP_ID']
         RESTART_str  = str(self.ExeInputs['RESTART'])
@@ -818,6 +819,7 @@ class ldas:
         rstid     = self.ExeInputs['RESTART_ID']
         rstdomain = self.ExeInputs['RESTART_DOMAIN']
         rstpath0  = self.ExeInputs['RESTART_PATH']
+        rstpath   = rstpath0 + rstid + '/output/'+ rstdomain + '/rs/'
 
         # just copy the landassim pert seed if it exists
         for iens in range(self.nens) :
@@ -1012,13 +1014,13 @@ class ldas:
                os.symlink(pertRstFile,    myPertRst)
 
         # catch_param restar file
-        catch_param_file = self.bcsdir+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
+        catch_param_file = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
         if self.with_land:
            assert os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file
 
         if self.has_mwrtm :
            mwRTMRstFile = self.mwrtm_file
-           mwRTMLocal = self.bcsdir+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
+           mwRTMLocal = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
            if self.isZoomIn :
               print ("Creating the local mwRTM restart file... \n")
               cmd= self.bindir +'/preprocess_ldas.x zoomin_mwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
@@ -1032,11 +1034,13 @@ class ldas:
            mymwRTMRst = myRstDir+'/mwrtm_param_rst'
            os.symlink(mwRTMRstFile,  mymwRTMRst)
 
+        #create BCS.txt
+        with open(self.rc_out+'/BCS.txt','wt') as fout :
+           fout.write("BCS_PATH: " + self.ExeInputs['BCS_PATH'])
+           fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
         # update 'restart_path' to use relative path from outdir
         print ("Updating restart path...")
         self.ExeInputs['RESTART_PATH'] = myRstDir
-        #if os.path.isfile(tmp_f2g_file.name):
-        #   os.remove(tmp_f2g_file.name)
         status = True
         return status
 
