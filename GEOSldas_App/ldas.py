@@ -129,18 +129,13 @@ class ldas:
         if 'RESTART' not in self.ExeInputs :
             self.ExeInputs['RESTART'] = "1"
 
-        if self.ExeInputs['RESTART'].isdigit() :
-            if int(self.ExeInputs['RESTART']) ==0 :
-                self.ExeInputs['RESTART_ID']     = 'None'
-                self.ExeInputs['RESTART_DOMAIN'] = 'None'
-                self.ExeInputs['RESTART_PATH']   = 'None'
-        else:
-            if self.ExeInputs['RESTART'] =='G' :
-                self.ExeInputs['RESTART_DOMAIN'] = 'None'
-            else:
-                self.ExeInputs['RESTART_ID']     = 'None'
-                self.ExeInputs['RESTART_DOMAIN'] = 'None'
-                self.ExeInputs['RESTART_PATH']   = 'None'
+        RESTART_str  = str(self.ExeInputs['RESTART'])
+        assert RESTART_str in ["1", "2", "3", "M"], "Only support restart = 1,2,3, M"
+
+        if RESTART_str == 'M':
+            self.ExeInputs['RESTART_ID']     = 'None'
+            self.ExeInputs['RESTART_DOMAIN'] = 'None'
+            self.ExeInputs['RESTART_PATH']   = 'None'
     
         ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
         if self.ladas_cpl > 0 :
@@ -281,7 +276,6 @@ class ldas:
 
 
         # find restart files and tile files (if necessary)
-        RESTART_str  = str(self.ExeInputs['RESTART'])
 
         inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
@@ -309,7 +303,6 @@ class ldas:
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.til')
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
-           
  
         inpdir_  = os.path.realpath(inpdir_)+'/'
         inpgeom_ = os.path.realpath(inpgeom_)+'/'
@@ -384,7 +377,7 @@ class ldas:
         self.domain_def.write('/\n')
         self.domain_def.close()
 
-        if RESTART_str in ['1', '2']:
+        if RESTART_str in ['1','2','3']:
            y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
            y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
                                                   self.begDates[0].day,self.begDates[0].hour,self.begDates[0].minute)
@@ -404,24 +397,6 @@ class ldas:
               tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
               landiceRstFile=self.in_rstdir+'/'+tmpFile
               assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
-
-        if RESTART_str == '0':
-           assert ( self.with_land and not self.with_landice), "RESTART = 0 is only for land"
-           if (self.catch == 'catch'):
-             self.in_rstdir = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                               '/Catch/M09/20170101/' #catch_internal_rst
-             self.in_tilefile = '/discover/nobackup/projects/gmao/ssd/land/l_data/geos5/bcs/CLSM_params' \
-                                '/mkCatchParam_SMAP_L4SM_v002/SMAP_EASEv2_M09/SMAP_EASEv2_M09_3856x1624.til'
-           elif (self.catch == 'catchcnclm40'):
-             self.in_rstdir  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                '/CatchCN/M36/20150301_0000/' #catchcnclm40_internal_dummy
-             self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Heracles-NL/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-           elif (self.catch == 'catchcnclm45'):
-             self.in_rstdir  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                '/CatchCN/M36/19800101_0000/' #catchcnclm45_internal_dummy
-             self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Icarus-NLv3/Icarus-NLv3_EASE/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-           else:
-             sys.exit('need to provide at least dummy files')
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -503,8 +478,6 @@ class ldas:
        ExeInputs = self.ExeInputs
        #) verify keys
        option = '1'
-       if (ExeInputs['RESTART'] == 'G' or  ExeInputs['RESTART'] == '0'):
-          option = '0'
      
        rqdExeInpKeys = getExeKeys(option)
        for key in rqdExeInpKeys:
@@ -553,11 +526,6 @@ class ldas:
                     '%Y%m%d %H%M%S'
                     )
                 )
-        if self.ExeInputs['RESTART'].isdigit() :
-            if int(self.ExeInputs['RESTART']) == 0 :
-                print ("No restart file (cold restart): Forcing start date to January 1, 0z")
-                year = self.begDates[0].year
-                self.begDates[0]=datetime(year =year,month=1,day =1,hour =0, minute= 0,second= 0)
 
         assert self.endDates[0]>self.begDates[0], \
             'END_DATE <= BEG_DATE'
@@ -833,7 +801,7 @@ class ldas:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        if (RESTART_str != '1' and (self.with_land or self.with_landice)):
+        if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_landice)):
            bcs_path = self.ExeInputs['BCS_PATH']
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
            bc_base    = os.path.dirname(bcs_path)
@@ -848,7 +816,7 @@ class ldas:
            config['input']['surface']['catch_tilefile']  = self.in_tilefile
            config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
            config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-           if RESTART_str != 'M':
+           if RESTART_str == '2':
              config['input']['shared']['rst_dir']        = self.in_rstdir
            config['input']['surface']['wemin']           = wemin_in
            config['input']['surface']['catch_model']     = self.catch
@@ -915,24 +883,18 @@ class ldas:
             catchRstFile  = ''
             vegdynRstFile = ''
             pertRstFile   = ''
-            print ("restart: " + self.ExeInputs['RESTART'])
+            print ("restart: " + RESTART_str)
 
             if self.with_land :
-               if self.ExeInputs['RESTART'].isdigit() :
 
-                   if int(self.ExeInputs['RESTART']) == 0 or int(self.ExeInputs['RESTART']) == 2 :
+               if RESTART_str in ['2', 'M']: # remap_restart has generated the file in mk_restarts directory
+                    vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
+                    catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
+               if RESTART_str in ['1', '3']:
+                    catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
+                    vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
+                    if RESTART_str == '3':
                        vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                       catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
-                   else : # RESTART == 1
-                       catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                       vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
-                       if not os.path.isfile(vegdynRstFile): # no vegdyn restart from LDASsa
-                          if not os.path.isfile(vegdynRstFile0):
-                            vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-               else :
-                   vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                   if self.with_land:
-                     catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
 
                # catchment restart file
                if os.path.isfile(catchRstFile) :
@@ -972,11 +934,9 @@ class ldas:
 
             landiceRstFile = ''
             if self.with_landice :
-               if RESTART_str == '0' :
-                  exit("RESTART=0 not supported for landice tiles. Please use RESTART=M, 1, or 2")
-               if RESTART_str == '1' :
+               if RESTART_str in ['1', '3'] :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-               if RESTART_str == '2' or RESTART_str == 'M':
+               if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
 
                if os.path.isfile(landiceRstFile) :
