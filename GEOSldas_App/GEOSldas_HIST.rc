@@ -593,5 +593,8 @@ EASEv2_M36.LM:           1
   tavg24_1d_route.fields:       'QSFLOW'      , 'ROUTE' ,
                                 'QOUTFLOW'    , 'ROUTE' ,
                                 'QRES'        , 'ROUTE' ,
+                                'QCAT'        , 'ROUTE' ,
+                                'QINFLOW'     , 'ROUTE' ,
+                                'QRUNOFF_CAT' , 'ROUTE' ,
                                  ::                                 
 # ========================== EOF ==============================================================

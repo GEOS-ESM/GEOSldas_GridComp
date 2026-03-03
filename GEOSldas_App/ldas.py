@@ -332,9 +332,9 @@ class ldas:
            self.ExeInputs['GRIDNAME']  = gridname_
 
         if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
-           tmp_= glob.glob(inpgeom_ + '*tile2pfaf*')
+           tmp_= glob.glob(inpgeom_ + '*_Pfafstetter.til')
            if (len(tmp_) > 0) : 
-              self.ExecInput['TILE2PFAF_FILE'] = tmp_[0]
+              self.ExeInputs['TILE2PFAF_FILE'] = tmp_[0]
 
         inpdir_ = None
         domain_ = None
@@ -806,7 +806,7 @@ class ldas:
            if (self.has_vegopacity):
               bcnames += ['vegopacity']
            if (self.ExeInputs['TILE2PFAF_FILE'] != ''):
-              bcnames += ['tile2pfaf.nc4']
+              bcnames += ['route_tile']
            for bcln,bc in zip(bcnames,bcs) :
               myBC=self.inpdir+'/'+bcln+'.data'
               if '.nc4' in bcln:
@@ -1273,7 +1273,7 @@ class ldas:
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
                    if self.ExeInputs['TILE2PFAF_FILE'] !='':
-                      bcval.append('../input/tile2pfaf.nc4')
+                      bcval.append('../input/route_tile')
                       bckey.append('TILE2PFAF')
                    for key, val in zip(bckey,bcval):
                       keyn = key+'_FILE'
