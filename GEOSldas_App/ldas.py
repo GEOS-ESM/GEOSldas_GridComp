@@ -275,8 +275,7 @@ class ldas:
         inpgeom_ = self.bcs_dir_geom
 
 
-        # find restart files and tile files (if necessary)
-
+        # find restart files and tile file in restart dir (if necessary)
         inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
         if RESTART_str == '1' :
