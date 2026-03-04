@@ -130,7 +130,7 @@ class ldas:
             self.ExeInputs['RESTART'] = "1"
 
         RESTART_str  = str(self.ExeInputs['RESTART'])
-        assert RESTART_str in ["1", "2", "3", "M"], "Only support restart = 1,2,3, M"
+        assert RESTART_str in ["1", "2", "3", "M"], "RESTART must be 1, 2, 3, or M"
 
         if RESTART_str == 'M':
             self.ExeInputs['RESTART_ID']     = 'None'
@@ -261,7 +261,7 @@ class ldas:
         if self.ExeInputs['RESTART_PATH'][-1] != '/':
            self.ExeInputs['RESTART_PATH'] = self.ExeInputs['RESTART_PATH']+'/'
 
-        # make sure catchment and vegdyn restart files ( at least one for each) exist
+        # make sure catchment and vegdyn restart files exist (at least one of each)
         if 'CATCH_DEF_FILE' not in self.ExeInputs :
            self.ExeInputs['CATCH_DEF_FILE']= self.bcs_dir_land + 'clsm/catchment.def'
         if self.with_land :
@@ -284,18 +284,18 @@ class ldas:
            inpgeom_ = inp_
            BCS_txt  = glob.glob(inp_ + 'BCS_info.txt')
            if len(BCS_txt)== 0:
-              print("Warning: There is no BCS_info.txt in rc_out. The BCS in the restart directory may not be consistent with " + self.ExeInputs['BCS_PATH'])
+              print("Warning: BCS_info.txt not found for restart experiment. User is responsible for ensuring consistency of restart and experiment BCS.")
            elif len(BCS_txt)== 1:
               BCS_tmp = parseInputFile(BCS_txt[0])
-              assert self.ExeInputs['BCS_PATH'] == BCS_tmp['BCS_PATH'], "BCS_PATH does not match " + BCS_tmp['BCS_PATH'] + " in restart directoy"
-              assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS resolution or gridname should be the same for RESTART =1"
+              assert self.ExeInputs['BCS_PATH']       == BCS_tmp['BCS_PATH'],       "BCS_PATH does not match path from restart dir ("             + BCS_tmp['BCS_PATH']       + ")"
+              assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
 
            txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
               domain_  = '.domain'
         elif RESTART_str == '2':
            txt_tile = glob.glob(inp_ + '*.domain')
-           assert len(txt_tile) == 0, "RESTART = 2 should restart from global domain"
+           assert len(txt_tile) == 0, "For RESTART=2, must restart from (and run on) global domain"
            in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
            if len(in_tilefiles_) == 0 :
               nc4_tmp = glob.glob(inp_+'/*.nc4')
@@ -417,7 +417,7 @@ class ldas:
 
 
         # ------------------
-        # Read rm input file
+        # Read resource manager (rm) input file
         # ------------------
 
         if self.ladas_cpl == 0 :
