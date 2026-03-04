@@ -282,9 +282,9 @@ class ldas:
         if RESTART_str == '1' :
            inpdir_  = inp_
            inpgeom_ = inp_
-           BCS_txt  = glob.glob(inp_ + 'BCS.txt')
+           BCS_txt  = glob.glob(inp_ + 'BCS_info.txt')
            if len(BCS_txt)== 0:
-              print("Warning: There is no BCS.txt in rc_out. The BCS in the restart directory may not be consistent with " + self.ExeInputs['BCS_PATH'])
+              print("Warning: There is no BCS_info.txt in rc_out. The BCS in the restart directory may not be consistent with " + self.ExeInputs['BCS_PATH'])
            elif len(BCS_txt)== 1:
               BCS_tmp = parseInputFile(BCS_txt[0])
               assert self.ExeInputs['BCS_PATH'] == BCS_tmp['BCS_PATH'], "BCS_PATH does not match " + BCS_tmp['BCS_PATH'] + " in restart directoy"
@@ -994,8 +994,8 @@ class ldas:
            mymwRTMRst = myRstDir+'/mwrtm_param_rst'
            os.symlink(mwRTMRstFile,  mymwRTMRst)
 
-        #create BCS.txt
-        with open(self.rc_out+'/BCS.txt','wt') as fout :
+        #create BCS_info.txt
+        with open(self.rc_out+'/BCS_info.txt','wt') as fout :
            fout.write("BCS_PATH: " + self.ExeInputs['BCS_PATH'])
            fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
         # update 'restart_path' to use relative path from outdir
