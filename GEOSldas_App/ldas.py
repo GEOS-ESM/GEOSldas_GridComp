@@ -274,7 +274,7 @@ class ldas:
         inpdir_  = self.bcs_dir_land  
         inpgeom_ = self.bcs_dir_geom
 
-
+        
         # find restart files and tile file in restart dir (if necessary)
         inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
@@ -285,8 +285,13 @@ class ldas:
            if len(BCS_txt)== 0:
               print("Warning: BCS_info.txt not found for restart experiment. User is responsible for ensuring consistency of restart and experiment BCS.")
            elif len(BCS_txt)== 1:
-              BCS_tmp = parseInputFile(BCS_txt[0])
-              assert self.ExeInputs['BCS_PATH']       == BCS_tmp['BCS_PATH'],       "BCS_PATH does not match path from restart dir ("             + BCS_tmp['BCS_PATH']       + ")"
+              BCS_tmp   = parseInputFile(BCS_txt[0])
+              bcs_version_=[]
+              for bcs_path_ in  [self.ExeInputs['BCS_PATH'], BCS_tmp['BCS_PATH']]:
+                while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
+                bc_version_.append(os.path.basename(bcs_path_))
+
+              assert bc_version_[0]  == bc_version_[1],       "BCS version does not match version from restart dir ("  + bc_version_[1] + ")"
               assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
 
            txt_tile = glob.glob(inp_ + '*.domain')
@@ -298,9 +303,10 @@ class ldas:
            in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
            if len(in_tilefiles_) == 0 :
               nc4_tmp = glob.glob(inp_+'/*.nc4')
-              in_tilesfile_ = [ item_ for item_ in nc4_tmp if 'tile2pfaf' not in item_ ]
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.til')
+           if 'EASEv' in in_tilesfile_[0]:
+              in_tilesfile_ = [ item_ for item_ in in_tilesfile_ if '-Pfafstetter' not in item_ ]
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
  
         inpdir_  = os.path.realpath(inpdir_)+'/'
@@ -311,8 +317,10 @@ class ldas:
            if 'MAPL_' in os.path.basename(f):
               txt_tile = [f]
               break
-        nc4_tmp  = glob.glob(inpgeom_ + '*.nc4' + domain_)
-        nc4_tile = [ item_ for item_ in nc4_tmp if 'tile2pfaf' not in item_ ]
+        nc4_tile = glob.glob(inpgeom_ + '*.nc4' + domain_)
+        if len(nc4_tile) > 0:
+           if 'EASEv' in nc4_tile[0]:
+             nc4_tile = [ item_ for item_ in nc4_tile if '-Pfafstetter' not in item_ ]
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
