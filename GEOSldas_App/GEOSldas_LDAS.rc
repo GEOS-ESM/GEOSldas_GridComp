@@ -38,21 +38,10 @@ LSM_CHOICE: 1
 
 # ---- Ice-Sheet and Sea-Level System Model (ISSM) initialization (for LANDICE tiles)
 #
-#    The first two parameters are arguments needed to initialize ISSM: 
-#
 #    *ISSM_EXPDIR points to the directory containing the ISSM input file, which will be 
 #     replaced by a restart directory in the future
-#
-#    *ISSM_EXPNAME is the name of the binary input file (ISSM_EXPNAME.bin) and PETSc 
-#     options file (ISSM_EXPNAME.toolkits)
-#
-#    Because we can't yet output variables defined on ISSM's mesh via HISTORY 
-#    (e.g., via a mesh tilespace), we also have a temporary fix that will be 
-#    eventually removed (note that output on the attached grid or landice tiles
-#    does still work as expected):     
 # 
-ISSM_EXPDIR: /discover/nobackup/agstubbl/GEOS/Experiments/LDAS-ISSM-dailytest/issm
-ISSM_EXPNAME: GreenlandGEOS
+ISSM_EXPDIR: /discover/nobackup/agstubbl/GEOS/Experiments/issm_expdir
 
 # ---- Choice of tile type(s)
 #
