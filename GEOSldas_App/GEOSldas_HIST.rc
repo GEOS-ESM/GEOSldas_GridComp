@@ -596,7 +596,7 @@ EASEv2_M36.LM:           1
   tavg24_1d_issm_Nt.fields:      'ICESURF'    , 'ISSM' ,
                                  'ICETHICK'   , 'ISSM' ,
                                  'ICEVEL'     , 'ISSM' ,
-                                 'ICESMB'     , 'ISSM' ,
+                                 'ICEEQSMB'   , 'ISSM' ,
                                  ::
 
 # ========================== EOF ==============================================================
