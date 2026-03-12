@@ -1812,12 +1812,9 @@ contains
     integer :: obs_varid, obsvar_varid
     integer :: fcst_varid, fcstvar_varid
     integer :: ana_varid, anavar_varid
-    integer :: species_id_varid, species_assim_varid
-    integer :: species_scale_varid, species_getinnov_varid, species_errstd_varid
+    integer :: species_id_varid
 
     integer, dimension(:), allocatable :: assim_int
-    integer, dimension(:), allocatable :: species_assim_int
-    integer, dimension(:), allocatable :: species_scale_int, species_getinnov_int
     character(len=40) :: attr_name
     integer :: i
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
@@ -1840,11 +1837,7 @@ contains
     call nc4_check( nf90_def_var(ncid, 'ana',     NF90_FLOAT, [nobs_dimid], ana_varid) )
     call nc4_check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
 
-    call nc4_check( nf90_def_var(ncid, 'species_id',    NF90_INT,   [nspecies_dimid], species_id_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_assim', NF90_INT,   [nspecies_dimid], species_assim_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_scale', NF90_INT,   [nspecies_dimid], species_scale_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_getinnov', NF90_INT,   [nspecies_dimid], species_getinnov_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_errstd', NF90_FLOAT, [nspecies_dimid], species_errstd_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_id', NF90_INT, [nspecies_dimid], species_id_varid) )
 
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
@@ -1871,6 +1864,14 @@ contains
        call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%varname)) )
        write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_units'
        call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%units)) )
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_assim'
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), merge(1, 0, obs_param(i)%assim)) )
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_scale'
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), merge(1, 0, obs_param(i)%scale)) )
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_getinnov'
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), merge(1, 0, obs_param(i)%getinnov)) )
+       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_errstd'
+       call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), obs_param(i)%errstd) )
     end do
 
     call nc4_check( nf90_put_att(ncid, assim_varid, 'long_name', 'assimilation flag') )
@@ -1906,14 +1907,6 @@ contains
 
     call nc4_check( nf90_put_att(ncid, species_id_varid, 'long_name', 'observation species identifier') )
     call nc4_check( nf90_put_att(ncid, species_id_varid, 'units', '1') )
-    call nc4_check( nf90_put_att(ncid, species_assim_varid, 'long_name', 'species assimilation flag') )
-    call nc4_check( nf90_put_att(ncid, species_assim_varid, 'units', '1') )
-    call nc4_check( nf90_put_att(ncid, species_scale_varid, 'long_name', 'species scaling flag') )
-    call nc4_check( nf90_put_att(ncid, species_scale_varid, 'units', '1') )
-    call nc4_check( nf90_put_att(ncid, species_getinnov_varid, 'long_name', 'species innovation-output flag') )
-    call nc4_check( nf90_put_att(ncid, species_getinnov_varid, 'units', '1') )
-    call nc4_check( nf90_put_att(ncid, species_errstd_varid, 'long_name', 'species default observation error standard deviation') )
-    call nc4_check( nf90_put_att(ncid, species_errstd_varid, 'units', 'species-dependent') )
 
     call nc4_check( nf90_enddef(ncid) )
 
@@ -1941,25 +1934,7 @@ contains
 
     if (N_obs_param > 0) then
 
-       allocate(species_assim_int(N_obs_param))
-       allocate(species_scale_int(N_obs_param))
-       allocate(species_getinnov_int(N_obs_param))
-       species_assim_int = 0
-       species_scale_int = 0
-       species_getinnov_int = 0
-       where (obs_param(1:N_obs_param)%assim) species_assim_int = 1
-       where (obs_param(1:N_obs_param)%scale) species_scale_int = 1
-       where (obs_param(1:N_obs_param)%getinnov) species_getinnov_int = 1
-
-      call nc4_check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
-      call nc4_check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
-      call nc4_check( nf90_put_var(ncid, species_scale_varid, species_scale_int) )
-      call nc4_check( nf90_put_var(ncid, species_getinnov_varid, species_getinnov_int) )
-      call nc4_check( nf90_put_var(ncid, species_errstd_varid, obs_param(1:N_obs_param)%errstd) )
-
-       deallocate(species_assim_int)
-       deallocate(species_scale_int)
-       deallocate(species_getinnov_int)
+      call nc4_check( nf90_put_var(ncid, species_id_varid, obs_param(1:N_obs_param)%species) )
 
     end if
 
