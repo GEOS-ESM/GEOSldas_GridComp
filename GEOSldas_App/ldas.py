@@ -291,7 +291,7 @@ class ldas:
                 while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
                 bc_version_.append(os.path.basename(bcs_path_))
 
-              assert bc_version_[0]  == bc_version_[1],       "BCS version does not match version from restart dir ("  + bc_version_[1] + ")"
+              assert                   bc_version_[0] == bc_version_[1],            "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bc_version_[1] + ")"
               assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
 
            txt_tile = glob.glob(inp_ + '*.domain')
@@ -299,14 +299,14 @@ class ldas:
               domain_  = '.domain'
         elif RESTART_str == '2':
            txt_tile = glob.glob(inp_ + '*.domain')
-           assert len(txt_tile) == 0, "For RESTART=2, must restart from (and run on) global domain"
+           assert len(txt_tile) == 0, "For RESTART=2, must restart from and run on global domain"
            in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
            if len(in_tilefiles_) == 0 :
               nc4_tmp = glob.glob(inp_+'/*.nc4')
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.til')
            if 'EASEv' in in_tilesfile_[0]:
-              in_tilesfile_ = [ item_ for item_ in in_tilesfile_ if '-Pfafstetter' not in item_ ]
+              in_tilefiles_ = [ item_ for item_ in in_tilefiles_ if '-Pfafstetter' not in item_ ]
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
  
         inpdir_  = os.path.realpath(inpdir_)+'/'
@@ -1001,9 +1001,9 @@ class ldas:
            mymwRTMRst = myRstDir+'/mwrtm_param_rst'
            os.symlink(mwRTMRstFile,  mymwRTMRst)
 
-        #create BCS_info.txt
+        # create BCS_info.txt
         with open(self.rc_out+'/BCS_info.txt','wt') as fout :
-           fout.write("BCS_PATH: " + self.ExeInputs['BCS_PATH'])
+           fout.write("BCS_PATH: "       + self.ExeInputs['BCS_PATH'])
            fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
         # update 'restart_path' to use relative path from outdir
         print ("Updating restart path...")
