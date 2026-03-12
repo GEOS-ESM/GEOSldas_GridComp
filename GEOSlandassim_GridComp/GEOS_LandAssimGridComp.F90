@@ -1957,8 +1957,7 @@ contains
             N_catl, tile_coord_l,                                        &
             N_catf, tile_coord_rf, tcinternal%pgrid_g,                   &
             N_catl_vec, low_ind, rf2l,                                   &
-            update_type, xcompact, ycompact, fcsterr_inflation_fac,      &
-            LandAssimDTstep,                                              &
+            update_type, LandAssimDTstep,                                &
             obs_param,                                                   &
             met_force, lai,                                              &
             cat_param, cat_progn, mwRTM_param,                           &

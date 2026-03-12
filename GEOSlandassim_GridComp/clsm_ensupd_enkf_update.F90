@@ -1516,8 +1516,7 @@ contains
 
   subroutine output_ObsFcstAna(date_time, exp_id, &
        N_obsl, Observations_l, N_obs_param, obs_param, out_ObsFcstAna_mode, &
-       update_type, xcompact, ycompact, fcsterr_inflation_fac, dtstep_assim, &
-       grid_name, rf2f)
+       update_type, dtstep_assim, grid_name, rf2f)
 
     ! obs space output: observations, obs space forecast, obs space analysis, and
     ! associated error variances
@@ -1534,8 +1533,6 @@ contains
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
     integer,                                      intent(in) :: out_ObsFcstAna_mode
     integer,                                      intent(in) :: update_type
-    real,                                         intent(in) :: xcompact, ycompact
-    real,                                         intent(in) :: fcsterr_inflation_fac
     integer,                                      intent(in) :: dtstep_assim
     character(*),                                 intent(in) :: grid_name
 
@@ -1776,8 +1773,7 @@ contains
 
           call write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf, &
                Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
-               update_type, xcompact, ycompact, fcsterr_inflation_fac, &
-               dtstep_assim, grid_name)
+               update_type, dtstep_assim, grid_name)
 
        end if
 
@@ -1790,8 +1786,7 @@ contains
 
   subroutine write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf, &
        Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
-       update_type, xcompact, ycompact, fcsterr_inflation_fac, &
-       dtstep_assim, grid_name)
+       update_type, dtstep_assim, grid_name)
     use netcdf
 
     implicit none
@@ -1806,9 +1801,6 @@ contains
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
     character(*),                             intent(in) :: out_ObsFcstAna_format
     integer,                                  intent(in) :: update_type
-    real,                                     intent(in) :: xcompact
-    real,                                     intent(in) :: ycompact
-    real,                                     intent(in) :: fcsterr_inflation_fac
     integer,                                  intent(in) :: dtstep_assim
     character(*),                             intent(in) :: grid_name
 
@@ -1821,9 +1813,11 @@ contains
     integer :: fcst_varid, fcstvar_varid
     integer :: ana_varid, anavar_varid
     integer :: species_id_varid, species_assim_varid
+    integer :: species_scale_varid, species_getinnov_varid, species_errstd_varid
 
     integer, dimension(:), allocatable :: assim_int
     integer, dimension(:), allocatable :: species_assim_int
+    integer, dimension(:), allocatable :: species_scale_int, species_getinnov_int
     character(len=40) :: attr_name
     integer :: i
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
@@ -1848,6 +1842,9 @@ contains
 
     call nc4_check( nf90_def_var(ncid, 'species_id',    NF90_INT,   [nspecies_dimid], species_id_varid) )
     call nc4_check( nf90_def_var(ncid, 'species_assim', NF90_INT,   [nspecies_dimid], species_assim_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_scale', NF90_INT,   [nspecies_dimid], species_scale_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_getinnov', NF90_INT,   [nspecies_dimid], species_getinnov_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_errstd', NF90_FLOAT, [nspecies_dimid], species_errstd_varid) )
 
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
@@ -1864,9 +1861,6 @@ contains
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'file_tag', trim(file_tag)) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'out_ObsFcstAna_format', trim(out_ObsFcstAna_format)) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'xcompact', xcompact) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'ycompact', ycompact) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'fcsterr_inflation_fac', fcsterr_inflation_fac) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
 
@@ -1914,6 +1908,12 @@ contains
     call nc4_check( nf90_put_att(ncid, species_id_varid, 'units', '1') )
     call nc4_check( nf90_put_att(ncid, species_assim_varid, 'long_name', 'species assimilation flag') )
     call nc4_check( nf90_put_att(ncid, species_assim_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, species_scale_varid, 'long_name', 'species scaling flag') )
+    call nc4_check( nf90_put_att(ncid, species_scale_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, species_getinnov_varid, 'long_name', 'species innovation-output flag') )
+    call nc4_check( nf90_put_att(ncid, species_getinnov_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, species_errstd_varid, 'long_name', 'species default observation error standard deviation') )
+    call nc4_check( nf90_put_att(ncid, species_errstd_varid, 'units', 'species-dependent') )
 
     call nc4_check( nf90_enddef(ncid) )
 
@@ -1942,13 +1942,24 @@ contains
     if (N_obs_param > 0) then
 
        allocate(species_assim_int(N_obs_param))
+       allocate(species_scale_int(N_obs_param))
+       allocate(species_getinnov_int(N_obs_param))
        species_assim_int = 0
+       species_scale_int = 0
+       species_getinnov_int = 0
        where (obs_param(1:N_obs_param)%assim) species_assim_int = 1
+       where (obs_param(1:N_obs_param)%scale) species_scale_int = 1
+       where (obs_param(1:N_obs_param)%getinnov) species_getinnov_int = 1
 
-       call nc4_check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
-       call nc4_check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
+      call nc4_check( nf90_put_var(ncid, species_id_varid,    obs_param(1:N_obs_param)%species) )
+      call nc4_check( nf90_put_var(ncid, species_assim_varid, species_assim_int) )
+      call nc4_check( nf90_put_var(ncid, species_scale_varid, species_scale_int) )
+      call nc4_check( nf90_put_var(ncid, species_getinnov_varid, species_getinnov_int) )
+      call nc4_check( nf90_put_var(ncid, species_errstd_varid, obs_param(1:N_obs_param)%errstd) )
 
        deallocate(species_assim_int)
+       deallocate(species_scale_int)
+       deallocate(species_getinnov_int)
 
     end if
 
@@ -1975,7 +1986,7 @@ contains
        N_catl, tile_coord_l,                                                 &
        N_catf, tile_coord_f, pert_grid_g,                                    &
        N_catl_vec, low_ind, f2l,                                             &
-       update_type, xcompact, ycompact, fcsterr_inflation_fac, dtstep_assim, &
+       update_type, dtstep_assim,                                            &
        obs_param,                                                            &
        met_force, lai, cat_param, cat_progn, mwRTM_param,                    &
        Observations_l, rf2f )
@@ -2000,7 +2011,6 @@ contains
     integer,                intent(in) :: N_obsl, N_obs_param, N_ens, N_catl, N_catf
 
     integer,                intent(in) :: update_type, dtstep_assim
-    real,                   intent(in) :: xcompact, ycompact, fcsterr_inflation_fac
 
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_l  ! input
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_f  ! input
@@ -2067,7 +2077,7 @@ contains
 
        call output_ObsFcstAna( date_time, exp_id, N_obsl, &
             Observations_l(1:N_obsl), N_obs_param, obs_param, out_ObsFcstAna_mode, &
-            update_type, xcompact, ycompact, fcsterr_inflation_fac, dtstep_assim, &
+            update_type, dtstep_assim, &
             trim(pert_grid_g%gridtype), rf2f=rf2f )
 
     end if
