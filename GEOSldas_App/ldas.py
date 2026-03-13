@@ -133,6 +133,7 @@ class ldas:
         assert RESTART_str in ["1", "2", "3", "M"], "RESTART must be 1, 2, 3, or M"
 
         if RESTART_str == 'M':
+            # use archived MERRA-2 restarts, no need for RESTART_ID/DOMAIN/PATH
             self.ExeInputs['RESTART_ID']     = 'None'
             self.ExeInputs['RESTART_DOMAIN'] = 'None'
             self.ExeInputs['RESTART_PATH']   = 'None'
@@ -281,22 +282,25 @@ class ldas:
         if RESTART_str == '1' :
            inpdir_  = inp_
            inpgeom_ = inp_
+
+           # verify that BCS_VERSION and BCS_RESOLUTION of restart experiment match those of new experiment           
            BCS_txt  = glob.glob(inp_ + 'BCS_info.txt')
            if len(BCS_txt)== 0:
               print("Warning: BCS_info.txt not found for restart experiment. User is responsible for ensuring consistency of restart and experiment BCS.")
            elif len(BCS_txt)== 1:
               BCS_tmp   = parseInputFile(BCS_txt[0])
+              # get BCS_VERSION (trailing dir name of BCS_PATH)
               bcs_version_=[]
               for bcs_path_ in  [self.ExeInputs['BCS_PATH'], BCS_tmp['BCS_PATH']]:
                 while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
                 bc_version_.append(os.path.basename(bcs_path_))
-
               assert                   bc_version_[0] == bc_version_[1],            "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bc_version_[1] + ")"
               assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
 
            txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
               domain_  = '.domain'
+              
         elif RESTART_str == '2':
            txt_tile = glob.glob(inp_ + '*.domain')
            assert len(txt_tile) == 0, "For RESTART=2, must restart from and run on global domain"
@@ -305,7 +309,8 @@ class ldas:
               nc4_tmp = glob.glob(inp_+'/*.nc4')
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.til')
-           if 'EASEv' in in_tilesfile_[0]:
+           # for EASE tile space, pick "standard" tile file (one tile per grid cell) and not "-Pfafstetter" tile file
+           if 'EASEv' in in_tilefiles_[0]:
               in_tilefiles_ = [ item_ for item_ in in_tilefiles_ if '-Pfafstetter' not in item_ ]
            self.in_tilefile =os.path.realpath(in_tilefiles_[0])
  
@@ -359,6 +364,7 @@ class ldas:
 
         if 'AEROSOL_DEPOSITION' not in self.ExeInputs:
             self.ExeInputs['AEROSOL_DEPOSITION'] = 0
+            
         # default is global
         _domain_dic=OrderedDict()
         _domain_dic['MINLON']=-180.
@@ -1001,7 +1007,7 @@ class ldas:
            mymwRTMRst = myRstDir+'/mwrtm_param_rst'
            os.symlink(mwRTMRstFile,  mymwRTMRst)
 
-        # create BCS_info.txt
+        # create BCS_info.txt (facilitates BCS consistency check when exp is later used as restart for another exp) 
         with open(self.rc_out+'/BCS_info.txt','wt') as fout :
            fout.write("BCS_PATH: "       + self.ExeInputs['BCS_PATH'])
            fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
