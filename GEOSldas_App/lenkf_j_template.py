@@ -471,17 +471,7 @@ while ( $counter <= ${{NUM_SGMT}} )
 
    # must be done before moving HISTORY files
 
-   set ObsFcses = `ls *.ldas_ObsFcstAna.*.bin`
-   foreach obsfcs ( $ObsFcses )
-      set ThisTime = `echo $obsfcs | rev | cut -d'.' -f2 | rev`
-      set TY = `echo $ThisTime | cut -c1-4`
-      set TM = `echo $ThisTime | cut -c5-6`
-      set THISDIR = $EXPDIR/output/$EXPDOMAIN/ana/ens_avg/Y${{TY}}/M${{TM}}/
-      if (! -e $THISDIR            ) mkdir -p $THISDIR
-      /bin/mv $obsfcs ${{THISDIR}}$obsfcs
-   end
-
-   set ObsFcses = `ls *.ldas_ObsFcstAna.*.nc4`
+   set ObsFcses = `ls *.ldas_ObsFcstAna.*`
    foreach obsfcs ( $ObsFcses )
       set ThisTime = `echo $obsfcs | rev | cut -d'.' -f2 | rev`
       set TY = `echo $ThisTime | cut -c1-4`
