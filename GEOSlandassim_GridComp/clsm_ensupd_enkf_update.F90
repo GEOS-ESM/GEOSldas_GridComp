@@ -1807,7 +1807,6 @@ contains
     integer :: ncid
     integer :: nobs_dimid
     integer :: nspecies_dimid
-    integer :: species_strlen_dimid
     integer :: assim_varid, species_varid, tilenum_varid
     integer :: lon_varid, lat_varid
     integer :: obs_varid, obsvar_varid
@@ -1832,7 +1831,6 @@ contains
 
     call nc4_check( nf90_def_dim(ncid, 'nobs', NF90_UNLIMITED, nobs_dimid) )
     call nc4_check( nf90_def_dim(ncid, 'n_species', N_obs_param, nspecies_dimid) )
-    call nc4_check( nf90_def_dim(ncid, 'species_strlen', 40, species_strlen_dimid) )
 
     call nc4_check( nf90_def_var(ncid, 'assim',   NF90_INT,   [nobs_dimid], assim_varid) )
     call nc4_check( nf90_def_var(ncid, 'species', NF90_INT,   [nobs_dimid], species_varid) )
@@ -1851,9 +1849,9 @@ contains
     call nc4_check( nf90_def_var(ncid, 'species_scale',    NF90_INT,   [nspecies_dimid], species_scale_varid) )
     call nc4_check( nf90_def_var(ncid, 'species_getinnov', NF90_INT,   [nspecies_dimid], species_getinnov_varid) )
     call nc4_check( nf90_def_var(ncid, 'species_errstd',   NF90_FLOAT, [nspecies_dimid], species_errstd_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_varname',  NF90_CHAR,  [species_strlen_dimid, nspecies_dimid], species_varname_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_units',    NF90_CHAR,  [species_strlen_dimid, nspecies_dimid], species_units_varid) )
-    call nc4_check( nf90_def_var(ncid, 'species_descr',    NF90_CHAR,  [species_strlen_dimid, nspecies_dimid], species_descr_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_varname',  NF90_STRING, [nspecies_dimid], species_varname_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_units',    NF90_STRING, [nspecies_dimid], species_units_varid) )
+    call nc4_check( nf90_def_var(ncid, 'species_descr',    NF90_STRING, [nspecies_dimid], species_descr_varid) )
 
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
