@@ -1820,8 +1820,6 @@ contains
     integer, dimension(:), allocatable :: species_assim_int, species_scale_int
     integer, dimension(:), allocatable :: species_getinnov_int
     real,    dimension(:), allocatable :: species_errstd_r4
-    character(len=40), dimension(:), allocatable :: species_varname_c40, species_units_c40
-    character(len=40), dimension(:), allocatable :: species_descr_c40
     character(len=40) :: attr_name
     integer :: i
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
@@ -1951,10 +1949,6 @@ contains
        allocate(species_scale_int(N_obs_param))
        allocate(species_getinnov_int(N_obs_param))
        allocate(species_errstd_r4(N_obs_param))
-       allocate(species_varname_c40(N_obs_param))
-       allocate(species_units_c40(N_obs_param))
-       allocate(species_descr_c40(N_obs_param))
-
        species_assim_int = 0
        species_scale_int = 0
        species_getinnov_int = 0
@@ -1964,10 +1958,7 @@ contains
        where (obs_param(1:N_obs_param)%getinnov) species_getinnov_int = 1
 
        do i=1,N_obs_param
-          species_errstd_r4(i)   = obs_param(i)%errstd
-          species_varname_c40(i) = obs_param(i)%varname
-          species_units_c40(i)   = obs_param(i)%units
-          species_descr_c40(i)   = obs_param(i)%descr
+          species_errstd_r4(i) = obs_param(i)%errstd
        end do
 
        call nc4_check( nf90_put_var(ncid, species_id_varid,       obs_param(1:N_obs_param)%species) )
@@ -1975,17 +1966,16 @@ contains
        call nc4_check( nf90_put_var(ncid, species_scale_varid,    species_scale_int) )
        call nc4_check( nf90_put_var(ncid, species_getinnov_varid, species_getinnov_int) )
        call nc4_check( nf90_put_var(ncid, species_errstd_varid,   species_errstd_r4) )
-       call nc4_check( nf90_put_var(ncid, species_varname_varid,  species_varname_c40) )
-       call nc4_check( nf90_put_var(ncid, species_units_varid,    species_units_c40) )
-       call nc4_check( nf90_put_var(ncid, species_descr_varid,    species_descr_c40) )
+       do i=1,N_obs_param
+          call nc4_check( nf90_put_var(ncid, species_varname_varid, trim(obs_param(i)%varname), start=[i], count=[1]) )
+          call nc4_check( nf90_put_var(ncid, species_units_varid,   trim(obs_param(i)%units),   start=[i], count=[1]) )
+          call nc4_check( nf90_put_var(ncid, species_descr_varid,   trim(obs_param(i)%descr),   start=[i], count=[1]) )
+       end do
 
        deallocate(species_assim_int)
        deallocate(species_scale_int)
        deallocate(species_getinnov_int)
        deallocate(species_errstd_r4)
-       deallocate(species_varname_c40)
-       deallocate(species_units_c40)
-       deallocate(species_descr_c40)
 
     end if
 
