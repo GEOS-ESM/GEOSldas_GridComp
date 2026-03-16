@@ -1872,7 +1872,7 @@ contains
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
 
     do i=1,N_obs_param
-       write(attr_name, '(A,I4.4,A)') 'species_', obs_param(i)%species, '_descr'
+       write(attr_name, '(A,I0.3,A)') 'species_', obs_param(i)%species, '_descr'
        call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
     end do
 
