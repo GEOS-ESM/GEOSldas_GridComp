@@ -1788,6 +1788,7 @@ contains
        Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
        update_type, dtstep_assim, grid_name)
     use netcdf
+    use pfio_NetCDF_Supplement, only: pfio_nf90_put_var_string
 
     implicit none
 
@@ -1974,9 +1975,9 @@ contains
        call nc4_check( nf90_put_var(ncid, species_scale_varid,    species_scale_int) )
        call nc4_check( nf90_put_var(ncid, species_getinnov_varid, species_getinnov_int) )
        call nc4_check( nf90_put_var(ncid, species_errstd_varid,   species_errstd_r4) )
-       call nc4_check( nf90_put_var(ncid, species_varname_varid, species_varname_s) )
-       call nc4_check( nf90_put_var(ncid, species_units_varid,   species_units_s) )
-       call nc4_check( nf90_put_var(ncid, species_descr_varid,   species_descr_s) )
+       call nc4_check( pfio_nf90_put_var_string(ncid, species_varname_varid, species_varname_s) )
+       call nc4_check( pfio_nf90_put_var_string(ncid, species_units_varid,   species_units_s) )
+       call nc4_check( pfio_nf90_put_var_string(ncid, species_descr_varid,   species_descr_s) )
 
        deallocate(species_assim_int)
        deallocate(species_scale_int)
