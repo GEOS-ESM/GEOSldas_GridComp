@@ -98,6 +98,7 @@ module clsm_ensupd_enkf_update
        FOV_threshold,                             &
        get_halo_around_tile,                      &
        TileNnzObs,                                &
+       obsfcstana_mode_to_format,                 &
        OBSFCSTANA_FMT_BIN,                        &
        OBSFCSTANA_FMT_NC4,                        &
        OBSFCSTANA_FMT_BOTH
@@ -1558,6 +1559,7 @@ contains
     character(300)                            :: fname
     character( 40)                            :: file_ext
     character(  8)                            :: out_ObsFcstAna_format
+    logical                                   :: mode_ok
     character(len=*), parameter               :: Iam = 'output_ObsFcstAna'
     character(len=400)                        :: err_msg
 
@@ -1702,21 +1704,11 @@ contains
        
        ! write to file
 
-       if ( (out_ObsFcstAna_mode /= OBSFCSTANA_FMT_BIN ) .and. &
-            (out_ObsFcstAna_mode /= OBSFCSTANA_FMT_NC4 ) .and. &
-            (out_ObsFcstAna_mode /= OBSFCSTANA_FMT_BOTH) ) then
+       call obsfcstana_mode_to_format(out_ObsFcstAna_mode, out_ObsFcstAna_format, mode_ok)
+       if (.not. mode_ok) then
           err_msg = 'unknown out_ObsFcstAna_mode'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
-
-       select case (out_ObsFcstAna_mode)
-       case (OBSFCSTANA_FMT_BIN)
-          out_ObsFcstAna_format = 'BIN'
-       case (OBSFCSTANA_FMT_NC4)
-          out_ObsFcstAna_format = 'NC4'
-       case (OBSFCSTANA_FMT_BOTH)
-          out_ObsFcstAna_format = 'BOTH'
-       end select
 
        if (out_ObsFcstAna_mode == OBSFCSTANA_FMT_BIN .or. &
             out_ObsFcstAna_mode == OBSFCSTANA_FMT_BOTH) then
@@ -2026,7 +2018,7 @@ contains
 
     ! major revisions for new obs handling and MPI
 
-    logical,                intent(in) :: out_ObsFcstAna
+    integer,                intent(in) :: out_ObsFcstAna
     integer,                intent(in) :: out_ObsFcstAna_mode
 
 
@@ -2079,7 +2071,7 @@ contains
 
     ! output "O-A" (obs - analysis) whenever innovations are output
 
-    if (out_ObsFcstAna) then
+    if (out_ObsFcstAna > 0) then
 
        ! compute model forecast of observations
 

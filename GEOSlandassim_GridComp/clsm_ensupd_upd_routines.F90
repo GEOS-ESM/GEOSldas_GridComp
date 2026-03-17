@@ -161,7 +161,9 @@ module clsm_ensupd_upd_routines
   public :: get_halo_around_tile
   public :: TileNnzObs
   public :: dist_km2deg
+  public :: obsfcstana_mode_to_format
 
+  integer, parameter, public :: OBSFCSTANA_FMT_OFF  = 0
   integer, parameter, public :: OBSFCSTANA_FMT_BIN  = 1
   integer, parameter, public :: OBSFCSTANA_FMT_NC4  = 2
   integer, parameter, public :: OBSFCSTANA_FMT_BOTH = 3
@@ -176,6 +178,38 @@ module clsm_ensupd_upd_routines
   
 contains
   
+  ! ********************************************************************
+
+  subroutine obsfcstana_mode_to_format(mode, format, is_valid)
+
+    implicit none
+
+    integer,      intent(in)  :: mode
+    character(*), intent(out) :: format
+    logical, optional, intent(out) :: is_valid
+
+    logical :: valid_mode
+
+    valid_mode = .true.
+
+    select case (mode)
+    case (OBSFCSTANA_FMT_OFF)
+       format = 'OFF'
+    case (OBSFCSTANA_FMT_BIN)
+       format = 'BIN'
+    case (OBSFCSTANA_FMT_NC4)
+       format = 'NC4'
+    case (OBSFCSTANA_FMT_BOTH)
+       format = 'BOTH'
+    case default
+       format = 'UNKNOWN'
+       valid_mode = .false.
+    end select
+
+    if (present(is_valid)) is_valid = valid_mode
+
+  end subroutine obsfcstana_mode_to_format
+
   ! ********************************************************************
  
   subroutine read_ens_upd_inputs(               &    
@@ -240,7 +274,7 @@ contains
     type(obs_param_type), dimension(:), pointer :: obs_param     ! output
     
     logical,              intent(out)   :: out_obslog
-    logical,              intent(out)   :: out_ObsFcstAna
+    integer,              intent(out)   :: out_ObsFcstAna
     integer,              intent(out)   :: out_ObsFcstAna_mode
     logical,              intent(out)   :: out_smapL4SMaup
 
@@ -263,7 +297,6 @@ contains
 
     character(200)  :: ens_upd_inputs_path
     character( 40)  :: ens_upd_inputs_file, dir_name, file_tag, file_ext
-    character( 40)  :: out_ObsFcstAna_format
     
     integer :: i, j, k, N_tmp, k_hD, k_hA, k_vD, k_vA
 
@@ -279,6 +312,8 @@ contains
     character(len=400) :: err_msg
     character(len=  6) :: tmpstring6
     logical :: file_exists
+    integer :: ios
+    character(len=400) :: iomsg
 
     ! -----------------------------------------------------------------
     
@@ -286,7 +321,6 @@ contains
          update_type,              &
          out_obslog,               &
          out_ObsFcstAna,           &
-         out_ObsFcstAna_format,    &
          out_smapL4SMaup,          &
          xcompact, ycompact,       &
          fcsterr_inflation_fac,    &
@@ -298,7 +332,7 @@ contains
     
     ens_upd_inputs_path = '.'                                       ! set default 
     ens_upd_inputs_file = 'LDASsa_DEFAULT_inputs_ensupd.nml'
-    out_ObsFcstAna_format = 'BIN'
+    out_ObsFcstAna = OBSFCSTANA_FMT_OFF
     
     ! Read data from default ens_upd_inputs namelist file 
     
@@ -310,7 +344,12 @@ contains
     if (logit) write (logunit,'(400A)') 'reading *default* EnKF inputs from ' // trim(fname)
     if (logit) write (logunit,*)
 
-    read (10, nml=ens_upd_inputs)
+    read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
+    if (ios /= 0) then
+       err_msg = 'error reading ens_upd_inputs from ' // trim(fname) // &
+            '; out_ObsFcstAna must be integer 0/1/2/3 (OFF/BIN/NC4/BOTH). ' // trim(iomsg)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
     
     close(10,status='keep')
     
@@ -334,7 +373,12 @@ contains
        if (logit) write (logunit,'(400A)') 'reading *special* EnKF inputs from ' // trim(fname)
        if (logit) write (logunit,*)
 
-       read (10, nml=ens_upd_inputs)
+       read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
+       if (ios /= 0) then
+          err_msg = 'error reading ens_upd_inputs from ' // trim(fname) // &
+               '; out_ObsFcstAna must be integer 0/1/2/3 (OFF/BIN/NC4/BOTH). ' // trim(iomsg)
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
 
        close(10,status='keep')
        
@@ -350,20 +394,19 @@ contains
     !
     ! consistency checks etc
 
-    select case (trim(out_ObsFcstAna_format))
-
-    case ('BIN')
+    select case (out_ObsFcstAna)
+    case (0)
+       out_ObsFcstAna_mode = OBSFCSTANA_FMT_OFF
+    case (1)
        out_ObsFcstAna_mode = OBSFCSTANA_FMT_BIN
-
-    case ('NC4')
+    case (2)
        out_ObsFcstAna_mode = OBSFCSTANA_FMT_NC4
-
-    case ('BOTH')
+    case (3)
        out_ObsFcstAna_mode = OBSFCSTANA_FMT_BOTH
-
     case default
-       err_msg = 'unknown value of "out_ObsFcstAna_format": "' // &
-            trim(out_ObsFcstAna_format) // '"'
+       write(tmpstring6,'(I6)') out_ObsFcstAna
+       err_msg = 'unknown integer value of "out_ObsFcstAna": "' // &
+            trim(tmpstring6) // '". Use 0=OFF, 1=BIN, 2=NC4, 3=BOTH.'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end select
     
