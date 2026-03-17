@@ -1800,7 +1800,7 @@ contains
     integer :: ncid
     integer :: nobs_dimid
     integer :: nspecies_dimid
-    integer :: assim_varid, species_varid, tilenum_varid
+    integer :: assim_flag_varid, species_varid, tilenum_varid
     integer :: lon_varid, lat_varid
     integer :: obs_varid, obsvar_varid
     integer :: fcst_varid, fcstvar_varid
@@ -1825,7 +1825,7 @@ contains
     call nc4_check( nf90_def_dim(ncid, 'nobs', NF90_UNLIMITED, nobs_dimid) )
     call nc4_check( nf90_def_dim(ncid, 'n_species', N_obs_param, nspecies_dimid) )
 
-    call nc4_check( nf90_def_var(ncid, 'assim',   NF90_INT,   [nobs_dimid], assim_varid) )
+    call nc4_check( nf90_def_var(ncid, 'assim_flag', NF90_INT, [nobs_dimid], assim_flag_varid) )
     call nc4_check( nf90_def_var(ncid, 'species', NF90_INT,   [nobs_dimid], species_varid) )
     call nc4_check( nf90_def_var(ncid, 'tilenum', NF90_INT,   [nobs_dimid], tilenum_varid) )
     call nc4_check( nf90_def_var(ncid, 'lon',     NF90_FLOAT, [nobs_dimid], lon_varid) )
@@ -1867,8 +1867,8 @@ contains
        call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
     end do
 
-    call nc4_check( nf90_put_att(ncid, assim_varid, 'long_name', 'assimilation flag') )
-    call nc4_check( nf90_put_att(ncid, assim_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, assim_flag_varid, 'long_name', 'assimilation flag') )
+    call nc4_check( nf90_put_att(ncid, assim_flag_varid, 'units', '1') )
     call nc4_check( nf90_put_att(ncid, species_varid, 'long_name', 'observation species identifier') )
     call nc4_check( nf90_put_att(ncid, species_varid, 'units', '1') )
     call nc4_check( nf90_put_att(ncid, tilenum_varid, 'long_name', 'tile number (full domain)') )
@@ -1920,7 +1920,7 @@ contains
        assim_int = 0
        where (Observations_f(1:N_obsf)%assim) assim_int = 1
 
-       call nc4_check( nf90_put_var(ncid, assim_varid,   assim_int) )
+       call nc4_check( nf90_put_var(ncid, assim_flag_varid, assim_int) )
        call nc4_check( nf90_put_var(ncid, species_varid, Observations_f(1:N_obsf)%species) )
        call nc4_check( nf90_put_var(ncid, tilenum_varid, Observations_f(1:N_obsf)%tilenum) )
        call nc4_check( nf90_put_var(ncid, lon_varid,     Observations_f(1:N_obsf)%lon) )
