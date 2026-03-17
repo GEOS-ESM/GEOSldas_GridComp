@@ -1847,8 +1847,6 @@ contains
     call nc4_check( nf90_def_var(ncid, 'species_descr',    NF90_STRING, [nspecies_dimid], species_descr_varid) )
 
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obsf',  N_obsf) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'N_obs_param', N_obs_param) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'year',    date_time%year) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'month',   date_time%month) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'day',     date_time%day) )
