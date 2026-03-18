@@ -290,11 +290,11 @@ class ldas:
            elif len(BCS_txt)== 1:
               BCS_tmp   = parseInputFile(BCS_txt[0])
               # get BCS_VERSION (trailing dir name of BCS_PATH)
-              bcs_version_=[]
-              for bcs_path_ in  [self.ExeInputs['BCS_PATH'], BCS_tmp['BCS_PATH']]:
-                while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
-                bc_version_.append(os.path.basename(bcs_path_))
-              assert                   bc_version_[0] == bc_version_[1],            "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bc_version_[1] + ")"
+              bcs_path_ = self.ExeInputs['BCS_PATH']
+              while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
+              bcs_version_ = os.path.basename(bcs_path_)
+              
+              assert bcs_version_ == BCS_tmp['BCS_VERSION'], "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bcs_version_ + ")"
               assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
 
            txt_tile = glob.glob(inp_ + '*.domain')
@@ -1009,7 +1009,12 @@ class ldas:
 
         # create BCS_info.txt (facilitates BCS consistency check when exp is later used as restart for another exp) 
         with open(self.rc_out+'/BCS_info.txt','wt') as fout :
-           fout.write("BCS_PATH: "       + self.ExeInputs['BCS_PATH'])
+           # get BCS_VERSION (trailing dir name of BCS_PATH)
+           bcs_path_ = self.ExeInputs['BCS_PATH']
+           while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
+           bc_version_ = os.path.basename(bcs_path_)
+           
+           fout.write("BCS_VERSION: "    + bc_version_ + '\n')
            fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
         # update 'restart_path' to use relative path from outdir
         print ("Updating restart path...")
