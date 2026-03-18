@@ -1865,18 +1865,17 @@ contains
        created_by = 'GEOSldas write_ObsFcstAna_nc4'
     end if
 
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Date', trim(write_datetime_iso)) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'CreatedBy', trim(created_by)) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'exp_id', trim(exp_id)) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
 
     do i=1,N_obs_param
        write(attr_name, '(A,I0.3,A)') 'species_', obs_param(i)%species, '_descr'
        call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
     end do
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Date', trim(write_datetime_iso)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'CreatedBy', trim(created_by)) )
 
     call nc4_check( nf90_put_att(ncid, assim_flag_varid, 'long_name', 'assimilation flag') )
     call nc4_check( nf90_put_att(ncid, assim_flag_varid, 'units', '1') )
