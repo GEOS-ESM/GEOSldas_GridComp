@@ -1805,7 +1805,7 @@ contains
     integer :: obs_varid, obsvar_varid
     integer :: fcst_varid, fcstvar_varid
     integer :: ana_varid, anavar_varid
-    integer :: obsparam_species_varid, obsparam_assim_varid, obsparam_scale_varid
+    integer :: obsparam_species_id_varid, obsparam_assim_varid, obsparam_scale_varid
     integer :: obsparam_getinnov_varid, obsparam_errstd_varid
     integer :: obsparam_varname_varid, obsparam_units_varid, obsparam_descr_varid
 
@@ -1816,6 +1816,13 @@ contains
     character(len=40), dimension(:), allocatable :: species_varname_s, species_units_s
     character(len=40), dimension(:), allocatable :: species_descr_s
     character(len=40) :: attr_name
+    character(len=8)  :: write_date_yyyymmdd
+    character(len=10) :: write_time_hhmmss
+    character(len=5)  :: write_zone
+    character(len=24) :: write_datetime_iso
+    character(len=64) :: user_name
+    character(len=128) :: created_by
+    integer :: user_len, user_status
     integer :: i
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
     character(len=400)          :: err_msg
@@ -1837,7 +1844,7 @@ contains
     call nc4_check( nf90_def_var(ncid, 'ana',     NF90_FLOAT, [nobs_dimid], ana_varid) )
     call nc4_check( nf90_def_var(ncid, 'anavar',  NF90_FLOAT, [nobs_dimid], anavar_varid) )
 
-    call nc4_check( nf90_def_var(ncid, 'obsparam_species',  NF90_INT,    [nspecies_dimid], obsparam_species_varid) )
+    call nc4_check( nf90_def_var(ncid, 'obsparam_species_id',  NF90_INT,    [nspecies_dimid], obsparam_species_id_varid) )
     call nc4_check( nf90_def_var(ncid, 'obsparam_assim',    NF90_INT,    [nspecies_dimid], obsparam_assim_varid) )
     call nc4_check( nf90_def_var(ncid, 'obsparam_scale',    NF90_INT,    [nspecies_dimid], obsparam_scale_varid) )
     call nc4_check( nf90_def_var(ncid, 'obsparam_getinnov', NF90_INT,    [nspecies_dimid], obsparam_getinnov_varid) )
@@ -1846,18 +1853,22 @@ contains
     call nc4_check( nf90_def_var(ncid, 'obsparam_units',    NF90_STRING, [nspecies_dimid], obsparam_units_varid) )
     call nc4_check( nf90_def_var(ncid, 'obsparam_descr',    NF90_STRING, [nspecies_dimid], obsparam_descr_varid) )
 
+    call date_and_time(write_date_yyyymmdd, write_time_hhmmss, write_zone)
+    write(write_datetime_iso, '(A4,A1,A2,A1,A2,A1,A2,A1,A2,A1,A2,A5)') &
+         write_date_yyyymmdd(1:4), '-', write_date_yyyymmdd(5:6), '-', &
+         write_date_yyyymmdd(7:8), 'T', write_time_hhmmss(1:2), ':', &
+         write_time_hhmmss(3:4), ':', write_time_hhmmss(5:6), write_zone
+    call get_environment_variable('USER', user_name, length=user_len, status=user_status)
+    if (user_status == 0 .and. user_len > 0) then
+       created_by = trim(user_name(1:user_len)) // ' via write_ObsFcstAna_nc4'
+    else
+       created_by = 'GEOSldas write_ObsFcstAna_nc4'
+    end if
+
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'year',    date_time%year) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'month',   date_time%month) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'day',     date_time%day) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'hour',    date_time%hour) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'minute',  date_time%min) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'second',  date_time%sec) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dofyr',   date_time%dofyr) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'pentad',  date_time%pentad) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Date', trim(write_datetime_iso)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'CreatedBy', trim(created_by)) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'exp_id', trim(exp_id)) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'file_tag', trim(file_tag)) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'out_ObsFcstAna_format', trim(out_ObsFcstAna_format)) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'grid_name', trim(grid_name)) )
@@ -1898,8 +1909,8 @@ contains
     call nc4_check( nf90_put_att(ncid, anavar_varid, 'units', 'species-dependent') )
     call nc4_check( nf90_put_att(ncid, anavar_varid, 'missing_value', nodata_generic) )
 
-    call nc4_check( nf90_put_att(ncid, obsparam_species_varid, 'long_name', 'obs parameter species identifier') )
-    call nc4_check( nf90_put_att(ncid, obsparam_species_varid, 'units', '1') )
+    call nc4_check( nf90_put_att(ncid, obsparam_species_id_varid, 'long_name', 'obs parameter species identifier') )
+    call nc4_check( nf90_put_att(ncid, obsparam_species_id_varid, 'units', '1') )
     call nc4_check( nf90_put_att(ncid, obsparam_assim_varid, 'long_name', 'obs parameter assimilation flag') )
     call nc4_check( nf90_put_att(ncid, obsparam_assim_varid, 'units', '1') )
     call nc4_check( nf90_put_att(ncid, obsparam_scale_varid, 'long_name', 'obs parameter scaling flag') )
@@ -1960,7 +1971,7 @@ contains
           species_descr_s(i)   = trim(obs_param(i)%descr)
        end do
 
-       call nc4_check( nf90_put_var(ncid, obsparam_species_varid,  obs_param(1:N_obs_param)%species) )
+       call nc4_check( nf90_put_var(ncid, obsparam_species_id_varid,  obs_param(1:N_obs_param)%species) )
        call nc4_check( nf90_put_var(ncid, obsparam_assim_varid,    species_assim_int) )
        call nc4_check( nf90_put_var(ncid, obsparam_scale_varid,    species_scale_int) )
        call nc4_check( nf90_put_var(ncid, obsparam_getinnov_varid, species_getinnov_int) )
