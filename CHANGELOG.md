@@ -13,8 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Revised and cleaned up RESTART options:
+  - Clarified scope and constraints of RESTART=1 and RESTART=2.
+  - Added RESTART=3 (formerly RESTART=G, which had been removed).
+
 ### Fixed
 
+- Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes.
 - Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected.
 
 ### Removed
