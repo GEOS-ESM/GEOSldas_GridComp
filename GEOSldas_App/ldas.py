@@ -819,20 +819,24 @@ class ldas:
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
            bc_base    = os.path.dirname(bcs_path)
            bc_version = os.path.basename(bcs_path)
-
-           remap_tpl = os.path.dirname(os.path.realpath(__file__)) + '/remap_params.tpl'
-           config = yaml_to_config(remap_tpl)
+           answers={}
+           if RESTART_str == 'M' : 
+              answers['input:shared:MERRA-2']   = True
+              answers['input:shared:yyyymmddhh']= YYYYMMDDHH
+              answers['output:shared:out_dir']  = mk_outdir
+              init_merra2(answers)
+           config = get_config_from_answers(answers, config_tpl = True)
 
            config['slurm_pbs']['account'] = self.RmInputs['account']
            config['slurm_pbs']['qos'] = 'debug'
 
-           config['input']['surface']['catch_tilefile']  = self.in_tilefile
-           config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
-           config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-           if RESTART_str == '2':
-             config['input']['shared']['rst_dir']        = self.in_rstdir
-           config['input']['surface']['wemin']           = wemin_in
-           config['input']['surface']['catch_model']     = self.catch
+           if RESTART_str == '2' : 
+              config['input']['surface']['catch_tilefile']  = self.in_tilefile
+              config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
+              config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
+              config['input']['shared']['rst_dir']          = self.in_rstdir
+              config['input']['surface']['wemin']           = wemin_in
+              config['input']['surface']['catch_model']     = self.catch
 
            config['output']['shared']['out_dir']         = mk_outdir
            config['output']['surface']['catch_remap']    = True
@@ -844,33 +848,6 @@ class ldas:
            config['output']['shared']['expid']           = self.ExeInputs['EXP_ID']
            config['output']['surface']['surflay']        = dzsf
            config['output']['surface']['wemin']          = wemin_out
-
-           if RESTART_str == "M" : # restart from merra2
-             yyyymm = int(YYYYMMDDHH[0:6])
-             merra2_expid = "d5124_m2_jan10"
-             if yyyymm < 197901 :
-                exit("Error. MERRA-2 data < 1979 not available\n")
-             elif (yyyymm < 199201):
-                merra2_expid = "d5124_m2_jan79"
-             elif (yyyymm < 200106):
-                merra2_expid = "d5124_m2_jan91"
-             elif (yyyymm < 201101):
-                merra2_expid = "d5124_m2_jan00"
-             elif (yyyymm < 202106):
-                merra2_expid = "d5124_m2_jan10"
-             # There was a rewind in MERRA2 from Jun 2021 to Sept 2021
-             elif (yyyymm < 202110):
-                merra2_expid = "d5124_m2_jun21"
-             config['input']['shared']['expid']      = merra2_expid
-             config['input']['shared']['rst_dir']    = mk_outdir+ '/merra2_tmp_'+ YYYYMMDDHH
-             config['input']['surface']['wemin']     = 26
-             config['input']['shared']['bc_base']    = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles'
-             config['input']['shared']['bc_version'] = 'GM4'
-             config['input']['shared']['agrid']      = 'C180'
-             config['input']['shared']['ogrid']      = '1440x720'
-             config['input']['shared']['omodel']     = 'data'
-             config['input']['shared']['MERRA-2']    = True
-             config['input']['surface']['catch_tilefile'] = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles/GM4/geometry/CF0180x6C_DE1440xPE0720/CF0180x6C_DE1440xPE0720-Pfafstetter.til'
 
            if self.with_land:
              catch_obj = catchANDcn(config_obj = config)
