@@ -36,7 +36,7 @@ class ldas:
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
             'RESTART_DOMAIN','RESTART_ID','BCS_PATH','TILING_FILE','GRN_FILE','LAI_FILE','LNFM_FILE','NIRDF_FILE',
-            'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE', 'TILE2PFAF_FILE',
+            'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE', 'TILINGNC4_FILE','TILE2PFAF_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
             'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_FORMAT' ]
@@ -278,6 +278,7 @@ class ldas:
 
         # assigning BC files
         self.ExeInputs['LNFM_FILE'] = ''
+        self.ExeInputs['TILINGNC4_FILE'] = ''        
         self.ExeInputs['TILE2PFAF_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
         domain_  = ''
@@ -301,7 +302,7 @@ class ldas:
            if 'MAPL_' in os.path.basename(f):
               txt_tile = [f]
               break
-        nc4_tile = glob.glob(inpgeom_ + '*.nc4' + domain_)
+        nc4_tile = [f for f in glob.glob(inpgeom_ + '*.nc4' + domain_) if 'Pfafstetter' not in f]        
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
@@ -332,7 +333,10 @@ class ldas:
            self.ExeInputs['GRIDNAME']  = gridname_
 
         if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
-           tmp_= glob.glob(inpgeom_ + '*_Pfafstetter.til')
+           tmp_ = [f for f in glob.glob(inpgeom_ + '*.nc4' + domain_) if 'Pfafstetter' not in f] 
+           if (len(tmp_) > 0) : 
+              self.ExeInputs['TILINGNC4_FILE'] = tmp_[0] 
+           tmp_ =  glob.glob(inpgeom_ + '*Pfafstetter.nc4' + domain_)
            if (len(tmp_) > 0) : 
               self.ExeInputs['TILE2PFAF_FILE'] = tmp_[0]
 
@@ -778,6 +782,8 @@ class ldas:
               bcs += [self.ExeInputs['LNFM_FILE']]
            if (self.has_vegopacity):
               bcs += [self.ExeInputs['VEGOPACITY_FILE']]
+           if (self.ExeInputs['TILINGNC4_FILE'] != ''):
+              bcs += [self.ExeInputs['TILINGNC4_FILE']]              
            if (self.ExeInputs['TILE2PFAF_FILE'] != ''):
               bcs += [self.ExeInputs['TILE2PFAF_FILE']]
 
@@ -805,8 +811,10 @@ class ldas:
               bcnames += ['lnfm']
            if (self.has_vegopacity):
               bcnames += ['vegopacity']
+           if (self.ExeInputs['TILINGNC4_FILE'] != ''):
+              bcnames += ['tile.nc4']              
            if (self.ExeInputs['TILE2PFAF_FILE'] != ''):
-              bcnames += ['route_tile']
+              bcnames += ['route_tile.nc4']
            for bcln,bc in zip(bcnames,bcs) :
               myBC=self.inpdir+'/'+bcln+'.data'
               if '.nc4' in bcln:
@@ -1272,9 +1280,12 @@ class ldas:
                 if self.with_land :
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
+                   if self.ExeInputs['TILINGNC4_FILE'] !='':
+                      bcval.append('../input/tile.nc4')
+                      bckey.append('TILINGNC4')
                    if self.ExeInputs['TILE2PFAF_FILE'] !='':
-                      bcval.append('../input/route_tile')
-                      bckey.append('TILE2PFAF')
+                      bcval.append('../input/route_tile.nc4')
+                      bckey.append('TILE2PFAF')                     
                    for key, val in zip(bckey,bcval):
                       keyn = key+'_FILE'
                       valn = val+'.data'
