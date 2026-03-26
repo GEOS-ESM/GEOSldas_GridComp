@@ -11,6 +11,7 @@ esma_add_library (${this}
   DEPENDENCIES GEOS_LdasShared GEOSens_GridComp GEOSland_GridComp MAPL ${MKL_LIBRARIES}
   INCLUDES ${INC_ESMF} ${MKL_INCLUDE_DIRS})
 
-if (NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
-   target_compile_definitions(${this} PRIVATE MKL_AVAILABLE)
+# Enable MKL paths only when MKL was detected and the compiler supports it.
+if (MKL_FOUND AND NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
+  target_compile_definitions(${this} PRIVATE MKL_AVAILABLE)
 endif ()
