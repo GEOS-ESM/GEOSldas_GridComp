@@ -944,7 +944,7 @@ class ldas:
                       
                if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
-                  if self.with_issm:
+                  if self.with_issm: # cheating here since we don't have mk_restarts for issm yet:
                      issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
 
                      
