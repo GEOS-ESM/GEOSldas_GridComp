@@ -419,7 +419,7 @@ class ldas:
            if self.with_issm:
               tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
               issmRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(landiceRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
+              assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -877,6 +877,7 @@ class ldas:
             ensid    = self.ensids[iens]
             myCatchRst = myRstDir+'/'+self.catch +ensid +'_internal_rst'
             myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
+            myIssmRst = myRstDir+'/'+ 'issm' +ensid +'_internal_rst'
             myVegRst   = myRstDir+'/'+'vegdyn'+ensid +'_internal_rst'
             myPertRst  = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
 
@@ -944,7 +945,7 @@ class ldas:
                if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
                   if self.with_issm:
-                     landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')[0]
+                     issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
 
                      
 
@@ -979,6 +980,10 @@ class ldas:
             if self.with_landice :
                print("link landice restart: " + myLandiceRst)
                os.symlink(landiceRstFile, myLandiceRst)
+               if self.with_issm:
+                  print("link issm restart: " + myIssmRst)
+                  os.symlink(issmRstFile, myIssmRst)
+                  
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,    myPertRst)
 
