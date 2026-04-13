@@ -37,8 +37,7 @@
 update_type = 10
 
 out_obslog      = .true.
-! out_ObsFcstAna: 0=OFF, 1=BIN (legacy unformatted), 2=NC4, 3=BOTH
-out_ObsFcstAna  = 1
+out_ObsFcstAna  = 1                 ! 0=OFF, 1=BIN (legacy unformatted), 2=NC4, 3=BIN and NC4
 out_smapL4SMaup = .false.
 
 ! ---------------------------------------------------------------------
