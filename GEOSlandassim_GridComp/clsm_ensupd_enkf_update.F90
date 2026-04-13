@@ -97,11 +97,7 @@ module clsm_ensupd_enkf_update
        halo_type,                                 &
        FOV_threshold,                             &
        get_halo_around_tile,                      &
-       TileNnzObs,                                &
-       obsfcstana_mode_to_format,                 &
-       OBSFCSTANA_FMT_BIN,                        &
-       OBSFCSTANA_FMT_NC4,                        &
-       OBSFCSTANA_FMT_BOTH
+       TileNnzObs
 
   use clsm_ensupd_read_obs,             ONLY:     &
        collect_obs
@@ -1516,7 +1512,7 @@ contains
   ! ********************************************************************
 
   subroutine output_ObsFcstAna(date_time, exp_id, &
-       N_obsl, Observations_l, N_obs_param, obs_param, out_ObsFcstAna_mode, &
+       N_obsl, Observations_l, N_obs_param, obs_param, out_ObsFcstAna, &
        update_type, dtstep_assim, grid_name, rf2f)
 
     ! obs space output: observations, obs space forecast, obs space analysis, and
@@ -1532,7 +1528,7 @@ contains
 
     integer,                                      intent(in) :: N_obsl, N_obs_param
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
-    integer,                                      intent(in) :: out_ObsFcstAna_mode
+    integer,                                      intent(in) :: out_ObsFcstAna
     integer,                                      intent(in) :: update_type
     integer,                                      intent(in) :: dtstep_assim
     character(*),                                 intent(in) :: grid_name
@@ -1558,8 +1554,6 @@ contains
 
     character(300)                            :: fname
     character( 40)                            :: file_ext
-    character(  8)                            :: out_ObsFcstAna_format
-    logical                                   :: mode_ok
     character(len=*), parameter               :: Iam = 'output_ObsFcstAna'
     character(len=400)                        :: err_msg
 
@@ -1704,14 +1698,7 @@ contains
        
        ! write to file
 
-       call obsfcstana_mode_to_format(out_ObsFcstAna_mode, out_ObsFcstAna_format, mode_ok)
-       if (.not. mode_ok) then
-          err_msg = 'unknown out_ObsFcstAna_mode'
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       end if
-
-       if (out_ObsFcstAna_mode == OBSFCSTANA_FMT_BIN .or. &
-            out_ObsFcstAna_mode == OBSFCSTANA_FMT_BOTH) then
+       if (out_ObsFcstAna == 1 .or. out_ObsFcstAna == 3) then
 
           fname = get_io_filename( './', exp_id, file_tag, date_time=date_time, &
                dir_name=dir_name, ens_id=-1, no_subdirs=.true. )
@@ -1756,16 +1743,14 @@ contains
 
        end if
 
-       if (out_ObsFcstAna_mode == OBSFCSTANA_FMT_NC4 .or. &
-            out_ObsFcstAna_mode == OBSFCSTANA_FMT_BOTH) then
+       if (out_ObsFcstAna == 2 .or. out_ObsFcstAna == 3) then
 
           file_ext = '.nc4'
           fname = get_io_filename( './', exp_id, file_tag, date_time=date_time, &
                dir_name=dir_name, ens_id=-1, file_ext=file_ext, no_subdirs=.true. )
-
-          call write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf, &
-               Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
-               update_type, dtstep_assim, grid_name)
+          
+          call write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf,                 &
+               Observations_f, N_obs_param, obs_param, update_type, dtstep_assim, grid_name)
 
        end if
 
@@ -1775,10 +1760,10 @@ contains
   end subroutine output_ObsFcstAna
 
   ! ********************************************************************
-
-  subroutine write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf, &
-       Observations_f, N_obs_param, obs_param, out_ObsFcstAna_format, &
-       update_type, dtstep_assim, grid_name)
+  
+  subroutine write_ObsFcstAna_nc4(fname, date_time, exp_id, file_tag, N_obsf,         &
+       Observations_f, N_obs_param, obs_param, update_type, dtstep_assim, grid_name)
+    
     use netcdf
     use pfio_NetCDF_Supplement, only: pfio_nf90_put_var_string
 
@@ -1792,7 +1777,6 @@ contains
     integer,                                  intent(in) :: N_obs_param
     type(obs_type),       dimension(N_obsf),  intent(in) :: Observations_f
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
-    character(*),                             intent(in) :: out_ObsFcstAna_format
     integer,                                  intent(in) :: update_type
     integer,                                  intent(in) :: dtstep_assim
     character(*),                             intent(in) :: grid_name
@@ -1990,23 +1974,23 @@ contains
     end if
 
     call nc4_check( nf90_close(ncid) )
-
+    
   contains
+    
     subroutine nc4_check(status)
       integer, intent(in) :: status
-
+      
       if (status /= nf90_noerr) then
          err_msg = 'NetCDF error in ' // Iam // ': ' // trim(nf90_strerror(status))
          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
       end if
     end subroutine nc4_check
-
+    
   end subroutine write_ObsFcstAna_nc4
 
   ! **********************************************************************
-
+  
   subroutine output_ObsFcstAna_wrapper( out_ObsFcstAna,                      &
-       out_ObsFcstAna_mode,                                                  &
        date_time, exp_id,                                                    &
        N_obsl, N_obs_param, N_ens,                                           &
        N_catl, tile_coord_l,                                                 &
@@ -2027,8 +2011,6 @@ contains
     ! major revisions for new obs handling and MPI
 
     integer,                intent(in) :: out_ObsFcstAna
-    integer,                intent(in) :: out_ObsFcstAna_mode
-
 
     type(date_time_type),   intent(in) :: date_time
 
@@ -2102,7 +2084,7 @@ contains
        ! write out model, observations, and "OminusA" information
 
        call output_ObsFcstAna( date_time, exp_id, N_obsl, &
-            Observations_l(1:N_obsl), N_obs_param, obs_param, out_ObsFcstAna_mode, &
+            Observations_l(1:N_obsl), N_obs_param, obs_param, out_ObsFcstAna, &
             update_type, dtstep_assim, &
             trim(pert_grid_g%gridtype), rf2f=rf2f )
 

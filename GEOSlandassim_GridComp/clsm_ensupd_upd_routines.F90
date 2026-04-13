@@ -161,12 +161,6 @@ module clsm_ensupd_upd_routines
   public :: get_halo_around_tile
   public :: TileNnzObs
   public :: dist_km2deg
-  public :: obsfcstana_mode_to_format
-
-  integer, parameter, public :: OBSFCSTANA_FMT_OFF  = 0
-  integer, parameter, public :: OBSFCSTANA_FMT_BIN  = 1
-  integer, parameter, public :: OBSFCSTANA_FMT_NC4  = 2
-  integer, parameter, public :: OBSFCSTANA_FMT_BOTH = 3
 
   ! threshold below which FOV is considered zero (regardless of units)
   
@@ -178,38 +172,6 @@ module clsm_ensupd_upd_routines
   
 contains
   
-  ! ********************************************************************
-
-  subroutine obsfcstana_mode_to_format(mode, format, is_valid)
-
-    implicit none
-
-    integer,      intent(in)  :: mode
-    character(*), intent(out) :: format
-    logical, optional, intent(out) :: is_valid
-
-    logical :: valid_mode
-
-    valid_mode = .true.
-
-    select case (mode)
-    case (OBSFCSTANA_FMT_OFF)
-       format = 'OFF'
-    case (OBSFCSTANA_FMT_BIN)
-       format = 'BIN'
-    case (OBSFCSTANA_FMT_NC4)
-       format = 'NC4'
-    case (OBSFCSTANA_FMT_BOTH)
-       format = 'BOTH'
-    case default
-       format = 'UNKNOWN'
-       valid_mode = .false.
-    end select
-
-    if (present(is_valid)) is_valid = valid_mode
-
-  end subroutine obsfcstana_mode_to_format
-
   ! ********************************************************************
  
   subroutine read_ens_upd_inputs(               &    
@@ -227,7 +189,6 @@ contains
        obs_param,                               &
        out_obslog,                              &
        out_ObsFcstAna,                          &
-       out_ObsFcstAna_mode,                     &
        out_smapL4SMaup,                         &
        N_obsbias_max                            &
        )
@@ -275,7 +236,6 @@ contains
     
     logical,              intent(out)   :: out_obslog
     integer,              intent(out)   :: out_ObsFcstAna
-    integer,              intent(out)   :: out_ObsFcstAna_mode
     logical,              intent(out)   :: out_smapL4SMaup
 
     integer,              intent(out)   :: N_obsbias_max
@@ -332,7 +292,6 @@ contains
     
     ens_upd_inputs_path = '.'                                       ! set default 
     ens_upd_inputs_file = 'LDASsa_DEFAULT_inputs_ensupd.nml'
-    out_ObsFcstAna = OBSFCSTANA_FMT_OFF
     
     ! Read data from default ens_upd_inputs namelist file 
     
@@ -343,11 +302,10 @@ contains
     if (logit) write (logunit,*)
     if (logit) write (logunit,'(400A)') 'reading *default* EnKF inputs from ' // trim(fname)
     if (logit) write (logunit,*)
-
+    
     read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
     if (ios /= 0) then
-       err_msg = 'error reading ens_upd_inputs from ' // trim(fname) // &
-            '; out_ObsFcstAna must be integer 0/1/2/3 (OFF/BIN/NC4/BOTH). ' // trim(iomsg)
+       err_msg = 'Error reading ens_upd_inputs.  NOTE: "out_ObsFcstAna" must be integer.  ' // trim(iomsg)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
     
@@ -375,8 +333,7 @@ contains
 
        read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
        if (ios /= 0) then
-          err_msg = 'error reading ens_upd_inputs from ' // trim(fname) // &
-               '; out_ObsFcstAna must be integer 0/1/2/3 (OFF/BIN/NC4/BOTH). ' // trim(iomsg)
+          err_msg = 'Error reading ens_upd_inputs.  NOTE: "out_ObsFcstAna" must be integer.  ' // trim(iomsg)
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
 
@@ -394,21 +351,11 @@ contains
     !
     ! consistency checks etc
 
-    select case (out_ObsFcstAna)
-    case (0)
-       out_ObsFcstAna_mode = OBSFCSTANA_FMT_OFF
-    case (1)
-       out_ObsFcstAna_mode = OBSFCSTANA_FMT_BIN
-    case (2)
-       out_ObsFcstAna_mode = OBSFCSTANA_FMT_NC4
-    case (3)
-       out_ObsFcstAna_mode = OBSFCSTANA_FMT_BOTH
-    case default
+    if (out_ObsFcstAna<0 .or. out_ObsFcstAna>3) then        
        write(tmpstring6,'(I6)') out_ObsFcstAna
-       err_msg = 'unknown integer value of "out_ObsFcstAna": "' // &
-            trim(tmpstring6) // '". Use 0=OFF, 1=BIN, 2=NC4, 3=BOTH.'
+       err_msg = 'Unknown integer value of "out_ObsFcstAna": "' // trim(tmpstring6) // '". Use 0=OFF, 1=BIN, 2=NC4, 3=BIN and NC4.'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end select
+    end if
     
     if (update_type==0) then
        err_msg = 'executable was built for assimilation but update_type=0'
