@@ -1513,7 +1513,7 @@ contains
 
   subroutine output_ObsFcstAna(date_time, exp_id, &
        N_obsl, Observations_l, N_obs_param, obs_param, out_ObsFcstAna, &
-       update_type, dtstep_assim, grid_name, rf2f)
+       update_type, dtstep_assim, rf2f)
 
     ! obs space output: observations, obs space forecast, obs space analysis, and
     ! associated error variances
@@ -1531,8 +1531,6 @@ contains
     integer,                                      intent(in) :: out_ObsFcstAna
     integer,                                      intent(in) :: update_type
     integer,                                      intent(in) :: dtstep_assim
-    character(*),                                 intent(in) :: grid_name
-
 
     type(obs_type),       dimension(N_obsl),      intent(in) :: Observations_l
 
@@ -1751,7 +1749,7 @@ contains
                dir_name=dir_name, ens_id=-1, file_ext=file_ext, no_subdirs=.true. )
           
           call write_ObsFcstAna_nc4( fname, exp_id, N_obsf, Observations_f,              &
-               N_obs_param, obs_param, update_type, dtstep_assim, grid_name)
+               N_obs_param, obs_param, update_type, dtstep_assim )
           
        end if
 
@@ -1764,14 +1762,14 @@ contains
   ! ********************************************************************
   
   subroutine write_ObsFcstAna_nc4(fname, exp_id, N_obsf, Observations_f,  &
-       N_obs_param, obs_param, update_type, dtstep_assim, grid_name)
+       N_obs_param, obs_param, update_type, dtstep_assim )
     
     use netcdf
     use pfio_NetCDF_Supplement, only: pfio_nf90_put_var_string
 
     implicit none
 
-    character(*),                                 intent(in) :: fname, exp_id, grid_name
+    character(*),                                 intent(in) :: fname, exp_id
     integer,                                      intent(in) :: N_obsf, N_obs_param, update_type, dtstep_assim
     type(obs_type),       dimension(N_obsf),      intent(in) :: Observations_f
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
@@ -2093,10 +2091,9 @@ contains
 
        ! write out model, observations, and "OminusA" information
 
-       call output_ObsFcstAna( date_time, exp_id, N_obsl, &
-            Observations_l(1:N_obsl), N_obs_param, obs_param, out_ObsFcstAna, &
-            update_type, dtstep_assim, &
-            trim(pert_grid_g%gridtype), rf2f=rf2f )
+       call output_ObsFcstAna( date_time, exp_id, N_obsl,                       &
+            Observations_l(1:N_obsl), N_obs_param, obs_param, out_ObsFcstAna,   &
+            update_type, dtstep_assim, rf2f=rf2f )
 
     end if
 
