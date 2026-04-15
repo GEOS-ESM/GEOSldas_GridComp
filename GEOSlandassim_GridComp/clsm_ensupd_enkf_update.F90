@@ -1843,24 +1843,31 @@ contains
     ! get user info (if available)
     call get_environment_variable('USER', user_name, length=user_len, status=user_status)
     if (user_status == 0 .and. user_len > 0) then
-       created_by = trim(user_name(1:user_len)) // ' via write_ObsFcstAna_nc4'
+       created_by = trim(user_name(1:user_len)) // ' via write_ObsFcstAna_nc4()'
     else
        created_by = 'GEOSldas write_ObsFcstAna_nc4'
     end if
 
     ! write attributes
+
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Comment',     'NetCDF-4') )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Contact',     '') )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Conventions', 'CF') )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Filename',    trim(fname)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Institution', 'NASA Global Modeling and Assimilation Office') )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Source',      'Experiment_ID: ' // trim(exp_id)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Title' ,      'Observation-space,Single-Level,Assimilation,Land Surface Diagnostics') )
     
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'exp_id', trim(exp_id)) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'update_type', update_type) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'dtstep_assim', dtstep_assim) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'GEOSldas_update_type',                       update_type) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'GEOSldas_assimilation_time_step_in_seconds', dtstep_assim) )
     
     do i=1,N_obs_param
-       write(attr_name, '(A,I0.3,A)') 'species_', obs_param(i)%species, '_descr'
+       write(attr_name, '(A,I0.3,A)') 'GEOSldas_observation_species_', obs_param(i)%species, '_descr'
        call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, trim(attr_name), trim(obs_param(i)%descr)) )
     end do
     call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'schema_version', 'ObsFcstAna_nc4_v1') )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'Date', trim(write_datetime_iso)) )
-    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'CreatedBy', trim(created_by)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'DateCreated',    trim(write_datetime_iso)) )
+    call nc4_check( nf90_put_att(ncid, NF90_GLOBAL, 'CreatedBy',      trim(created_by)) )
     
     call nc4_check( nf90_put_att(ncid, assim_flag_varid,          'long_name', 'assimilation flag') )
     call nc4_check( nf90_put_att(ncid, assim_flag_varid,          'units', '1') )
@@ -1870,9 +1877,11 @@ contains
     call nc4_check( nf90_put_att(ncid, tilenum_varid,             'units', '1') )
     
     call nc4_check( nf90_put_att(ncid, lon_varid,                 'long_name', 'observation longitude') )
+    call nc4_check( nf90_put_att(ncid, lon_varid,                 'standard_name', 'longitude') )
     call nc4_check( nf90_put_att(ncid, lon_varid,                 'units', 'degrees_east') )
     call nc4_check( nf90_put_att(ncid, lon_varid,                 'missing_value', nodata_generic) )
     call nc4_check( nf90_put_att(ncid, lat_varid,                 'long_name', 'observation latitude') )
+    call nc4_check( nf90_put_att(ncid, lat_varid,                 'standard_name', 'latitude') )
     call nc4_check( nf90_put_att(ncid, lat_varid,                 'units', 'degrees_north') )
     call nc4_check( nf90_put_att(ncid, lat_varid,                 'missing_value', nodata_generic) )
     call nc4_check( nf90_put_att(ncid, obs_varid,                 'long_name', 'observation value') )
