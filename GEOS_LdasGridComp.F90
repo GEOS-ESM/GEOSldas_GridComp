@@ -15,7 +15,7 @@ module GEOS_LdasGridCompMod
   use GEOS_EnsGridCompMod,       only: EnsSetServices       => SetServices
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
-  use GEOS_RouteGridCompMod,     only: RouteSetServices    => SetServices
+  use GEOS_RouteGridCompMod,     only: RouteSetServices     => SetServices
 
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
@@ -64,7 +64,7 @@ module GEOS_LdasGridCompMod
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
   logical :: with_landice       ! true if landice tiles requested by config
   logical :: with_land          ! true if land    tiles requested by config
-  integer :: RUN_ROUTE          ! 1/2 if run river-routine grid comp without/with reservoirs, 
+  integer :: RUN_ROUTE          ! 0:, no river routing, 1: routing w/o reservoirs, 2: routing w/ reservoirs
   
 contains
 
