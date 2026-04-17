@@ -332,6 +332,8 @@ contains
        if (logit) write (logunit,*)
 
        read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
+       
+       ! if read error, exit gracefully; hint at possible cause (out_ObsFcstAna changed from logical to integer, Apr 2026)
        if (ios /= 0) then
           err_msg = 'Error reading ens_upd_inputs.  NOTE: "out_ObsFcstAna" must be integer.  ' // trim(iomsg)
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -347,6 +349,46 @@ contains
     !
     ! none implemented so far (reichle, 19 Jul 2005)
     
+
+    ! -----------------------------------------------------------------
+
+    ! fill obs_param%fcstvarname and obs_param%fcstunits
+    
+    do i=1,N_obs_species_nml
+
+       ! expect "fcstvarname" and "fcstunits" to be 'NULL'; they are not meant to be filled by the user in the config nml file
+       
+       if ( .not. ( (trim(obs_param_nml(i)%fcstvarname) /= 'NULL') .or. (trim(obs_param_nml(i)%fcstvarname) /= 'null') ) )     &
+            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstvarname must be NULL on input')
+              
+       if ( .not. ( (trim(obs_param_nml(i)%fcstunits  ) /= 'NULL') .or. (trim(obs_param_nml(i)%fcstunits  ) /= 'null') ) )     &
+            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstunits   must be NULL on input')
+
+       ! IMPORTANT: Must maintain consistency in the mapping between obs and model variables 
+       !            that is encoded here with that in get_obs_pred().
+
+       select case (trim(obs_param_nml(i)%varname))
+          
+       case ('sfmc', 'sfds')
+          
+          ! NOTE: 'sfds' is scaled into volumetric units of sfmc
+          
+          obs_param_nml(i)%fcstvarname = 'sfmc'
+          obs_param_nml(i)%fcstunits   = 'm3 m-3'
+          
+       case ('rzmc', 'tsurf', 'FT', 'Tb', 'asnow')
+          
+          obs_param_nml(i)%fcstvarname = obs_param_nml(i)%varname 
+          obs_param_nml(i)%fcstunits   = obs_param_nml(i)%units  
+          
+       case default
+          
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown obs_param_nml%varname')
+          
+       end select
+       
+    end do
+        
     ! -----------------------------------------------------------------
     !
     ! consistency checks etc
@@ -362,6 +404,8 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
+    ! obs bias init and checks
+    
     N_obsbias_max = 0  ! initialize
 
     do i=1,N_obs_species_nml
@@ -1181,6 +1225,9 @@ contains
     j = 0
     
     do i=1,N_obs_param  
+       
+       ! IMPORTANT: Must maintain consistency in the mapping between obs and model ("lH") variables 
+       !            that is encoded here with that in read_ens_upd_inputs().
        
        select case (trim(obs_param(i)%varname))
           
