@@ -1057,6 +1057,8 @@ contains
           call MAPL_TimerOn(MAPL, gcnames(igc))
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
           VERIFY_(status)
+          call ESMF_GridCompRun(gcs(ENSAVG), importState=gex(igc), exportState=gex(ENSAVG), clock=clock,phase=4, userRC=status)
+          VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! river-routine
 
