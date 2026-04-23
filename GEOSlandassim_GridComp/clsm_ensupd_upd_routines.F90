@@ -376,7 +376,7 @@ contains
           obs_param_nml(i)%fcstvarname = 'sfmc'
           obs_param_nml(i)%fcstunits   = 'm3 m-3'
           
-       case ('rzmc', 'tsurf', 'FT', 'Tb', 'asnow')
+       case ('rzmc', 'tsurf', 'FT', 'Tb', 'asnow', 'NULL')
           
           obs_param_nml(i)%fcstvarname = obs_param_nml(i)%varname 
           obs_param_nml(i)%fcstunits   = obs_param_nml(i)%units  
