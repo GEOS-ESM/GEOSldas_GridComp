@@ -2340,6 +2340,12 @@ contains
     VERIFY_(status)
     Iam = trim(comp_name) // "::Run_route_ens_averaging"
 
+    if(NUM_ENSEMBLE ==1) then
+      _RETURN(_SUCCESS)
+    else
+      _ASSERT(.true., "It is not ready to collect route ensemble average")
+    endif
+
     call MAPL_GetObjectFromGC(gc, MAPL, rc=status)
     VERIFY_(status)
 
