@@ -358,11 +358,11 @@ contains
 
        ! expect "fcstvarname" and "fcstunits" to be 'NULL'; they are not meant to be filled by the user in the config nml file
        
-       if ( .not. ( (trim(obs_param_nml(i)%fcstvarname) /= 'NULL') .or. (trim(obs_param_nml(i)%fcstvarname) /= 'null') ) )     &
+       if ( .not. ( (trim(obs_param_nml(i)%fcstvarname) /= 'NULL') .and. (trim(obs_param_nml(i)%fcstvarname) /= 'null') ) )     &
             call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstvarname must be NULL on input')
               
-       if ( .not. ( (trim(obs_param_nml(i)%fcstunits  ) /= 'NULL') .or. (trim(obs_param_nml(i)%fcstunits  ) /= 'null') ) )     &
-            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstunits   must be NULL on input')
+       if ( .not. ( (trim(obs_param_nml(i)%fcstunits  ) /= 'NULL') .and. (trim(obs_param_nml(i)%fcstunits  ) /= 'null') ) )     &
+            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstunits must be NULL on input')
 
        ! IMPORTANT: Must maintain consistency in the mapping between obs and model variables 
        !            that is encoded here with that in get_obs_pred().
