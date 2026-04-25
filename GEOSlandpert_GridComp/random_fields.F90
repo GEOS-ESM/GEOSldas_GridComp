@@ -311,12 +311,14 @@ contains
     ! assemble spectrum in "wrap-around" order
     i1 = 1
     i2 = this%N_x_fft
+#ifdef MKL_AVAILABLE
     if (this%comm /= MPI_COMM_NULL) then
        call MPI_COMM_Rank(this%node_comm, rank, ierror)
        i1 = sum(this%dim1_counts(1:rank)) + 1
        i2 = sum(this%dim1_counts(1:rank+1))
     endif
- 
+#endif
+
     do j=1,this%N_y_fft
        this%field1_fft(i1:i2,j) = fac*exp(-.25*(lx2kx2(i1:i2)+ly2ky2(j)))  
     end do
@@ -392,6 +394,7 @@ contains
     !real :: theta, ran_num ! rng
     real,allocatable,dimension(:,:) :: theta, ran_num ! rng
     integer :: N_xy_fft, k ! fft
+    integer :: n1, n2
     integer :: i, j
     integer :: N_x_fft, N_y_fft
     real :: N_xy_fft_real
@@ -624,6 +627,7 @@ contains
     
   end subroutine quit
 
+#ifdef MKL_AVAILABLE
   subroutine win_allocate(this, nx, ny, rc)
      class(random_fields), intent(inout) :: this
      integer, intent(in) :: nx, ny
@@ -662,6 +666,7 @@ contains
      _VERIFY(status)
 
   end subroutine win_deallocate
+#endif
   
 end module Random_fieldsMod
 
