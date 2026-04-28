@@ -9,6 +9,9 @@
 
 module clsm_ensupd_enkf_update
 
+  use MAPL_BaseMod,                     ONLY:     &
+       MAPL_UNDEF
+
   use MAPL_SortMod,                     ONLY:     &
        MAPL_Sort
 
@@ -30,7 +33,8 @@ module clsm_ensupd_enkf_update
        logit,                                     &
        logunit,                                   &
        nodata_generic,                            &
-       nodata_tolfrac_generic
+       nodata_tolfrac_generic,                    &
+       LDAS_is_nodata
 
   use LDAS_DateTimeMod,                 ONLY:     &
        date_time_type,                            &
@@ -1789,7 +1793,6 @@ contains
     integer :: obsparam_varname_varid,     obsparam_units_varid,     obsparam_descr_varid
     integer :: obsparam_fcstvarname_varid, obsparam_fcstunits_varid
 
-    integer,           dimension(:), allocatable :: assim_int
     integer,           dimension(:), allocatable :: species_assim_int, species_scale_int
     real,              dimension(:), allocatable :: species_errstd_r4
     character(len=40), dimension(:), allocatable :: species_varname_s,     species_units_s
@@ -1804,6 +1807,9 @@ contains
     character(len=128)                           :: created_by
     integer                                      :: user_len, user_status
     integer                                      :: i
+
+    integer,           dimension(N_obsf)         :: tmpvecint
+    real,              dimension(N_obsf)         :: tmpvecreal
     
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
     character(len=400)          :: err_msg
@@ -1881,29 +1887,28 @@ contains
     call nc4_check( nf90_put_att(ncid, lon_varid,                  'long_name', 'observation longitude') )
     call nc4_check( nf90_put_att(ncid, lon_varid,                  'standard_name', 'longitude') )
     call nc4_check( nf90_put_att(ncid, lon_varid,                  'units', 'degrees_east') )
-    call nc4_check( nf90_put_att(ncid, lon_varid,                  'missing_value', nodata_generic) )
     call nc4_check( nf90_put_att(ncid, lat_varid,                  'long_name', 'observation latitude') )
     call nc4_check( nf90_put_att(ncid, lat_varid,                  'standard_name', 'latitude') )
     call nc4_check( nf90_put_att(ncid, lat_varid,                  'units', 'degrees_north') )
-    call nc4_check( nf90_put_att(ncid, lat_varid,                  'missing_value', nodata_generic) )
+
     call nc4_check( nf90_put_att(ncid, obs_varid,                  'long_name', 'observation value (after scaling)') )
     call nc4_check( nf90_put_att(ncid, obs_varid,                  'units', 'species-dependent') )
-    call nc4_check( nf90_put_att(ncid, obs_varid,                  'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, obs_varid,                  'missing_value', MAPL_UNDEF) )
     call nc4_check( nf90_put_att(ncid, obsvar_varid,               'long_name', 'observation error variance (after scaling)') )
     call nc4_check( nf90_put_att(ncid, obsvar_varid,               'units', 'species-dependent') )
-    call nc4_check( nf90_put_att(ncid, obsvar_varid,               'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, obsvar_varid,               'missing_value', MAPL_UNDEF) )
     call nc4_check( nf90_put_att(ncid, fcst_varid,                 'long_name', 'observation-equivalent model forecast value') )
     call nc4_check( nf90_put_att(ncid, fcst_varid,                 'units', 'species-dependent') )
-    call nc4_check( nf90_put_att(ncid, fcst_varid,                 'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, fcst_varid,                 'missing_value', MAPL_UNDEF) )
     call nc4_check( nf90_put_att(ncid, fcstvar_varid,              'long_name', 'observation-equivalent model forecast error variance') )
     call nc4_check( nf90_put_att(ncid, fcstvar_varid,              'units', 'species-dependent') )
-    call nc4_check( nf90_put_att(ncid, fcstvar_varid,              'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, fcstvar_varid,              'missing_value', MAPL_UNDEF) )
     call nc4_check( nf90_put_att(ncid, ana_varid,                  'long_name', 'observation-equivalent model analysis value') )
     call nc4_check( nf90_put_att(ncid, ana_varid,                  'units', 'species-dependent') )
-    call nc4_check( nf90_put_att(ncid, ana_varid,                  'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, ana_varid,                  'missing_value', MAPL_UNDEF) )
     call nc4_check( nf90_put_att(ncid, anavar_varid,               'long_name', 'observation-equivalent model analysis error variance') )
     call nc4_check( nf90_put_att(ncid, anavar_varid,               'units', 'species-dependent') )
-    call nc4_check( nf90_put_att(ncid, anavar_varid,               'missing_value', nodata_generic) )
+    call nc4_check( nf90_put_att(ncid, anavar_varid,               'missing_value', MAPL_UNDEF) )
     
     call nc4_check( nf90_put_att(ncid, obsparam_species_id_varid,  'long_name', 'species-level observation parameter: observation species identifier') )
     call nc4_check( nf90_put_att(ncid, obsparam_species_id_varid,  'units', '1') )
@@ -1925,26 +1930,23 @@ contains
     ! write variables
     
     if (N_obsf > 0) then
-
-       ! convert logical to integer
-       allocate(assim_int(N_obsf))
-       assim_int = 0
-       where (Observations_f(1:N_obsf)%assim) assim_int = 1
        
-       call nc4_check( nf90_put_var(ncid, assim_flag_varid, assim_int) )
-       call nc4_check( nf90_put_var(ncid, species_varid,    Observations_f(1:N_obsf)%species) )
-       call nc4_check( nf90_put_var(ncid, tilenum_varid,    Observations_f(1:N_obsf)%tilenum) )
-       call nc4_check( nf90_put_var(ncid, lon_varid,        Observations_f(1:N_obsf)%lon) )
-       call nc4_check( nf90_put_var(ncid, lat_varid,        Observations_f(1:N_obsf)%lat) )
-       call nc4_check( nf90_put_var(ncid, obs_varid,        Observations_f(1:N_obsf)%obs) )
-       call nc4_check( nf90_put_var(ncid, obsvar_varid,     Observations_f(1:N_obsf)%obsvar) )
-       call nc4_check( nf90_put_var(ncid, fcst_varid,       Observations_f(1:N_obsf)%fcst) )
-       call nc4_check( nf90_put_var(ncid, fcstvar_varid,    Observations_f(1:N_obsf)%fcstvar) )
-       call nc4_check( nf90_put_var(ncid, ana_varid,        Observations_f(1:N_obsf)%ana) )
-       call nc4_check( nf90_put_var(ncid, anavar_varid,     Observations_f(1:N_obsf)%anavar) )
-
-       deallocate(assim_int)
-
+       call nc4_check( nf90_put_var(ncid, species_varid, Observations_f(1:N_obsf)%species) )
+       call nc4_check( nf90_put_var(ncid, tilenum_varid, Observations_f(1:N_obsf)%tilenum) )       
+       call nc4_check( nf90_put_var(ncid, lon_varid,     Observations_f(1:N_obsf)%lon) )
+       call nc4_check( nf90_put_var(ncid, lat_varid,     Observations_f(1:N_obsf)%lat) )
+       
+       ! for assim flag, convert logical to integer
+       tmpvecint = 0;                                 where (Observations_f(1:N_obsf)%assim) tmpvecint = 1;     call nc4_check( nf90_put_var(ncid, assim_flag_varid, tmpvecint))
+       
+       ! for data fields, replace LDAS no-data-value with MAPL_UNDEF for consistency with MAPL HISTORY output
+       tmpvecreal = Observations_f(1:N_obsf)%obs    ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, obs_varid,     tmpvecreal))
+       tmpvecreal = Observations_f(1:N_obsf)%obsvar ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, obsvar_varid,  tmpvecreal))
+       tmpvecreal = Observations_f(1:N_obsf)%fcst   ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, fcst_varid,    tmpvecreal))
+       tmpvecreal = Observations_f(1:N_obsf)%fcstvar; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, fcstvar_varid, tmpvecreal))
+       tmpvecreal = Observations_f(1:N_obsf)%ana    ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, ana_varid,     tmpvecreal))
+       tmpvecreal = Observations_f(1:N_obsf)%anavar ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, anavar_varid,  tmpvecreal))
+       
     end if
 
     if (N_obs_param > 0) then
