@@ -1816,8 +1816,8 @@ contains
 
     call nc4_check( nf90_create( trim(fname), nf90_clobber + NF90_NETCDF4, ncid ) )
 
-    call nc4_check( nf90_def_dim(ncid, 'nobs',      NF90_UNLIMITED, nobs_dimid) )
-    call nc4_check( nf90_def_dim(ncid, 'n_species', N_obs_param,    nspecies_dimid) )
+    call nc4_check( nf90_def_dim(ncid, 'n_obs',     N_obsf,       nobs_dimid) )
+    call nc4_check( nf90_def_dim(ncid, 'n_species', N_obs_param,  nspecies_dimid) )
 
     call nc4_check( nf90_def_var(ncid, 'assim_flag',           NF90_INT,    [nobs_dimid],     assim_flag_varid) )
     call nc4_check( nf90_def_var(ncid, 'species',              NF90_INT,    [nobs_dimid],     species_varid) )
