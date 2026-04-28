@@ -105,7 +105,7 @@ module GEOS_LandAssimGridCompMod
   integer,                 dimension(:), pointer     :: N_catl_vec,low_ind
   integer                                            :: N_catf
 
-  !reordered tile_coord_rf and mapping l2rf
+  ! reordered tile_coord_rf and mapping l2rf
   integer,                 dimension(:), pointer     :: l2rf, rf2l,rf2g, rf2f
   type(tile_coord_type),   dimension(:), pointer     :: tile_coord_rf => null()
 

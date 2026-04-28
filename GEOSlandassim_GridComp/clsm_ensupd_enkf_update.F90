@@ -1538,7 +1538,7 @@ contains
 
     type(obs_type),       dimension(N_obsl),      intent(in) :: Observations_l
 
-    integer,              dimension(:), optional, intent(in) :: rf2f
+    integer,              dimension(:), optional, intent(in) :: rf2f             ! re-ordered to LDASsa 
 
     ! ---------------------
 
@@ -2072,9 +2072,9 @@ contains
     type(mwRTM_param_type), dimension(N_catl),        intent(in)    :: mwRTM_param
 
 
-    type(obs_type),         dimension(:),     pointer :: Observations_l ! inout
+    type(obs_type),         dimension(:),      pointer              :: Observations_l   ! inout
 
-    integer,                dimension(N_catf), optional, intent(in) :: rf2f ! re-ordered to LDASsa 
+    integer,                dimension(N_catf), optional, intent(in) :: rf2f             ! re-ordered to LDASsa 
 
     ! local variables
 
