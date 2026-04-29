@@ -101,6 +101,7 @@ class ldas:
         self.tile_types         = ''
         self.with_land          = False
         self.with_landice       = False
+        self.with_issm          = False
         self.adas_expdir        = ''
 
         # assert necessary optional arguments in command line if exeinp file does not exsit
@@ -230,6 +231,10 @@ class ldas:
           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
         if  "20" in self.tile_types :
           self.with_landice = True
+        
+        if self.with_landice == True:
+            if int(self.ExeInputs.get('DO_ISSM'))==1:
+                self.with_issm = True
 
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
@@ -410,6 +415,11 @@ class ldas:
               tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
               landiceRstFile=self.in_rstdir+'/'+tmpFile
               assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
+
+           if self.with_issm:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+              issmRstFile=self.in_rstdir+'/'+tmpFile
+              assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -867,6 +877,7 @@ class ldas:
             ensid    = self.ensids[iens]
             myCatchRst = myRstDir+'/'+self.catch +ensid +'_internal_rst'
             myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
+            myIssmRst = myRstDir+'/'+ 'issm' +ensid +'_internal_rst'
             myVegRst   = myRstDir+'/'+'vegdyn'+ensid +'_internal_rst'
             myPertRst  = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
 
@@ -926,8 +937,17 @@ class ldas:
             if self.with_landice :
                if RESTART_str in ['1', '3'] :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
+                  if self.with_issm:
+                     issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+ 
+                      
+                      
                if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+                  if self.with_issm: # cheating here since we don't have mk_restarts for issm yet:
+                     issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+
+                     
 
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
@@ -960,6 +980,10 @@ class ldas:
             if self.with_landice :
                print("link landice restart: " + myLandiceRst)
                os.symlink(landiceRstFile, myLandiceRst)
+               if self.with_issm:
+                  print("link issm restart: " + myIssmRst)
+                  os.symlink(issmRstFile, myIssmRst)
+                  
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,    myPertRst)
 
@@ -1215,6 +1239,9 @@ class ldas:
                 if self.with_landice:
                   rstkey.append('LANDICE')
                   rstval.append('landice')
+                  if self.with_issm:
+                     rstkey.append('ISSM')
+                     rstval.append('issm')
 
                 if self.has_mwrtm :
                    keyn='LANDASSIM_INTERNAL_RESTART_FILE'
@@ -1255,6 +1282,12 @@ class ldas:
                    keyn = 'LANDICE_INTERNAL_CHECKPOINT_FILE'
                    valn = 'landice'+tmpl_+'_internal_checkpoint'
                    ldasrcInp[keyn]= valn
+                   if self.with_issm:
+                      keyn = 'ISSM_INTERNAL_CHECKPOINT_FILE'
+                      valn = 'issm'+tmpl_+'_internal_checkpoint'
+                      ldasrcInp[keyn]= valn
+                      
+                   
                 # specify LANDPERT restart file
                 if (self.perturb == 1):
                     keyn = 'LANDPERT_INTERNAL_RESTART_FILE'
