@@ -31,8 +31,10 @@ class ldas:
     def __init__(self, cmdLineArgs):
         """
         """
-        # These keywords are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
-        # or their values are re-assigned in LDAS.rc 
+        # List of keywords, including:
+        # - keywords that are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
+        # - keywords whose values are re-assigned between the exeinp and LDAS.rc files
+        # - keywords that are not in exeinp file but are in LDAS.rc file
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
             'RESTART_DOMAIN','RESTART_ID','BCS_PATH','TILING_FILE','GRN_FILE','LAI_FILE','LNFM_FILE','NIRDF_FILE',
@@ -813,7 +815,7 @@ class ldas:
            if (self.has_vegopacity):
               bcnames += ['vegopacity']            
            if (self.ExeInputs['EASE_PFAF_FILE'] != ''):
-              bcnames += ['route_tile.nc4']
+              bcnames += ['EASE_tile2pfaf.nc4']
            for bcln,bc in zip(bcnames,bcs) :
               myBC=self.inpdir+'/'+bcln+'.data'
               if '.nc4' in bcln:
@@ -1251,7 +1253,7 @@ class ldas:
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
                    if self.ExeInputs['EASE_PFAF_FILE'] !='':
-                      bcval.append('../input/route_tile.nc4')
+                      bcval.append('../input/EASE_tile2pfaf.nc4')
                       bckey.append('EASE_PFAF')                     
                    for key, val in zip(bckey,bcval):
                       keyn = key+'_FILE'
