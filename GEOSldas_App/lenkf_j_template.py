@@ -158,6 +158,10 @@ cd $SCRDIR
 /bin/cp -f  $HOMDIR/*.rc .
 /bin/cp -f  $HOMDIR/*.nml .
 
+# placeholder: will link to ISSM files in input/bcs when ready
+/bin/cp /discover/nobackup/agstubbl/GEOS/Experiments/issm_expdir/*.bin .
+/bin/cp /discover/nobackup/agstubbl/GEOS/Experiments/issm_expdir/*.toolkits .
+
 set LSMCHOICE = `grep -n -m 1 "LSM_CHOICE" $HOMDIR/LDAS.rc | cut -d':' -f3`
 
 #######################################################################
