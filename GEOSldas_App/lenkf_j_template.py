@@ -763,8 +763,9 @@ EOF
        set rstfiles2 = `ls landpert${{ENSID}}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${{ENSID}}_checkpoint.*`
        set rstfiles4 = `ls landice${{ENSID}}_internal_checkpoint.*`
+       set rstfiles5 = `ls issm${{ENSID}}_internal_checkpoint.*`
    
-       foreach rfile ( $rstfiles1 $rstfiles4 ) 
+       foreach rfile ( $rstfiles1 $rstfiles4 $rstfiles5 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
           set TM = `echo $ThisTime | cut -c5-6`
