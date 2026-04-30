@@ -1943,15 +1943,48 @@ contains
        call nc4_check( nf90_put_var(ncid, lat_varid,     Observations_f(1:N_obsf)%lat) )
        
        ! for assim flag, convert logical to integer
-       tmpvecint = 0;                                 where (Observations_f(1:N_obsf)%assim) tmpvecint = 1;     call nc4_check( nf90_put_var(ncid, assim_flag_varid, tmpvecint))
+       tmpvecint = 0
+       where (Observations_f(1:N_obsf)%assim)
+          tmpvecint = 1
+       end where
+       call nc4_check( nf90_put_var(ncid, assim_flag_varid, tmpvecint) )
        
        ! for data fields, replace LDAS no-data-value with MAPL_UNDEF for consistency with MAPL HISTORY output
-       tmpvecreal = Observations_f(1:N_obsf)%obs    ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, obs_varid,     tmpvecreal))
-       tmpvecreal = Observations_f(1:N_obsf)%obsvar ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, obsvar_varid,  tmpvecreal))
-       tmpvecreal = Observations_f(1:N_obsf)%fcst   ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, fcst_varid,    tmpvecreal))
-       tmpvecreal = Observations_f(1:N_obsf)%fcstvar; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, fcstvar_varid, tmpvecreal))
-       tmpvecreal = Observations_f(1:N_obsf)%ana    ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, ana_varid,     tmpvecreal))
-       tmpvecreal = Observations_f(1:N_obsf)%anavar ; where (LDAS_is_nodata(tmpvecreal)) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, anavar_varid,  tmpvecreal))
+       tmpvecreal = Observations_f(1:N_obsf)%obs
+       do i=1,N_obsf
+          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
+       end do
+       call nc4_check( nf90_put_var(ncid, obs_varid, tmpvecreal) )
+
+       tmpvecreal = Observations_f(1:N_obsf)%obsvar
+       do i=1,N_obsf
+          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
+       end do
+       call nc4_check( nf90_put_var(ncid, obsvar_varid, tmpvecreal) )
+
+       tmpvecreal = Observations_f(1:N_obsf)%fcst
+       do i=1,N_obsf
+          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
+       end do
+       call nc4_check( nf90_put_var(ncid, fcst_varid, tmpvecreal) )
+
+       tmpvecreal = Observations_f(1:N_obsf)%fcstvar
+       do i=1,N_obsf
+          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
+       end do
+       call nc4_check( nf90_put_var(ncid, fcstvar_varid, tmpvecreal) )
+
+       tmpvecreal = Observations_f(1:N_obsf)%ana
+       do i=1,N_obsf
+          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
+       end do
+       call nc4_check( nf90_put_var(ncid, ana_varid, tmpvecreal) )
+
+       tmpvecreal = Observations_f(1:N_obsf)%anavar
+       do i=1,N_obsf
+          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
+       end do
+       call nc4_check( nf90_put_var(ncid, anavar_varid, tmpvecreal) )
        
     end if
 
