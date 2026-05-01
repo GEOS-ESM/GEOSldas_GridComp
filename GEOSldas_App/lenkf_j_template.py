@@ -471,7 +471,7 @@ while ( $counter <= ${{NUM_SGMT}} )
 
    # must be done before moving HISTORY files
 
-   set ObsFcses = `ls *.ldas_ObsFcstAna.*.bin`
+   set ObsFcses = `ls *.ldas_ObsFcstAna.*`
    foreach obsfcs ( $ObsFcses )
       set ThisTime = `echo $obsfcs | rev | cut -d'.' -f2 | rev`
       set TY = `echo $ThisTime | cut -c1-4`
