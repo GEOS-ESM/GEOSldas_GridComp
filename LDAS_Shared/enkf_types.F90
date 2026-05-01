@@ -56,7 +56,8 @@ module enkf_types
   ! added "varname" field to "obs_param_type" - reichle 14 Jun 2011
   ! major revisions to "obs_type" fields - reichle 16 Jun 2011
   ! added "units" field to "obs_param_type" - reichle 22 Nov 2011
-
+  ! added "fcstvarname" and "fcstunits" to "obs_param_type" - reichle 17 Apr 2026
+  
   type :: obs_type
 
      ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -73,8 +74,8 @@ module enkf_types
      real*8  :: time      ! time of obs (J2000 seconds w/ 'TT12' epoch; see date_time_util.F90)
      real    :: lon       ! longitude of obs
      real    :: lat       ! latitude of obs
-     real    :: obs       ! observed value
-     real    :: obsvar    ! obs error var
+     real    :: obs       ! observed value (after scaling)
+     real    :: obsvar    ! obs error var (after scaling)
      real    :: fcst      ! "forecast": value of obs pred before EnKF update (ens mean)
      real    :: fcstvar   ! forecast error var (in obs space), a.k.a. HPHt
      real    :: ana       ! "analysis": value of obs pred after EnKF update (ens mean)
@@ -94,68 +95,74 @@ module enkf_types
      !          any subroutines or operators defined herein
      ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!     
 
-     character(40)                 :: descr     ! description
-     integer                       :: species   ! identifier for type of measurement
+     character(40)                 :: descr           ! description
+     integer                       :: species         ! identifier for type of observation
 
-     integer                       :: orbit     ! type of (half-)orbit
-                                                !                     0 = n/a  [eg., in situ obs]
-                                                !                     1 = ascending
-                                                !                     2 = descending
-                                                !                     3 = ascending or descending
-                                                !                     4 = geostationary
+     integer                       :: orbit           ! type of (half-)orbit
+                                                      !   0 = n/a  [eg., in situ obs]
+                                                      !   1 = ascending
+                                                      !   2 = descending
+                                                      !   3 = ascending or descending
+                                                      !   4 = geostationary
 
-     integer                       :: pol       ! polarization
-                                                ! 0 = n/a  [eg., multi-pol. retrieval]
-                                                ! 1 = horizontal
-                                                ! 2 = vertical 
-                                                ! 3 = ...
-                                                ! [add 3rd/4th Stokes, HH, HV, VH, VV]
+     integer                       :: pol             ! polarization
+                                                      !   0 = n/a  [eg., multi-pol. retrieval]
+                                                      !   1 = horizontal
+                                                      !   2 = vertical 
+                                                      !   3 = ... [cpuld add 3rd/4th Stokes, HH, HV, VH, VV]
 
-     integer                       :: N_ang     ! # satellite viewing angles in species (radiance obs only)
+     integer                       :: N_ang           ! # satellite viewing angles in species (radiance obs only)
 
      real, &
-          dimension(N_obs_ang_max) :: ang       ! vector of satellite viewing angles
+          dimension(N_obs_ang_max) :: ang             ! vector of satellite viewing angles
      
-     real                          :: freq      ! frequency [Hz]
+     real                          :: freq            ! frequency [Hz]
 
-     real                          :: FOV       ! field-of-view *radius* 
-                                                ! if FOV==0. equate obs footprint w/ tile
-                                                ! for details see LDASsa_DEFAULT_inputs ensupd.nml
-     character(40)                 :: FOV_units ! FOV units ('km' or 'deg') 
+     real                          :: FOV             ! field-of-view *radius* 
+                                                      ! if FOV==0. equate obs footprint w/ tile
+                                                      ! for details see LDASsa_DEFAULT_inputs ensupd.nml
+     character(40)                 :: FOV_units       ! FOV units ('km' or 'deg') 
 
-     logical                       :: assim     ! assimilate yes/no? (see also "obs_type")
-     logical                       :: scale     ! scale yes/no?
-     logical                       :: getinnov  ! compute innovs? (.T. if assim==.T.)
+     logical                       :: assim           ! assimilate obs species: yes/no? (see also "obs_type")
+     logical                       :: scale           ! scale      obs species: yes/no?
+     logical                       :: getinnov        ! compute innovs? (set .T. if assim==.T.)
 
-     integer                       :: RTM_ID    ! ID of radiative transfer model 
+     integer                       :: RTM_ID          ! ID of radiative transfer model to use for Tb forward modeling (see get_obs_pred()) 
+                                                      !   0 = none
+                                                      !   1 = L-band tau-omega model as in De Lannoy et al. 2013 (doi:10.1175/JHM-D-12-092.1) (old SMOS preproc)
+                                                      !   2 = same as 1 but without Pellarin atm corr (SMAP)
+                                                      !   3 = same as 1 but with Mironov and SMAP L2_SM pol mixing 
+                                                      !   4 = same as 3 but without Pellarin atm corr (SMAP L4_SM Version 8)
+     
+     integer                       :: bias_Npar       ! number of obs bias states tracked per day
+     integer                       :: bias_trel       ! e-folding time scale of obs bias memory [s]
+     integer                       :: bias_tcut       ! cutoff time for confident obs bias estimate [s]
 
-     integer                       :: bias_Npar ! number of bias states tracked per day
-     integer                       :: bias_trel ! e-folding time scale of obs bias memory [s]
-     integer                       :: bias_tcut ! cutoff time for confident obs bias est [s]
+     real                          :: nodata          ! no-data-value
 
-     real                          :: nodata    ! no-data-value
+     character(40)                 :: varname         ! observation native variable name (before scaling)
+     character(40)                 :: units           ! observation native units (before scaling; eg., 'K' or 'm3/m3')
+     character(40)                 :: fcstvarname     ! observation-equivalent model variable name (Obs_pred)           [do not edit, filled by read_ens_upd_inputs()]
+     character(40)                 :: fcstunits       ! observation-equivalent model units (eg., 'K' or 'm3/m3')        [do not edit, filled by read_ens_upd_inputs()]
 
-     character(40)                 :: varname   ! equivalent model variable name (Obs_pred)
-     character(40)                 :: units     ! units (eg., 'K' or 'm3/m3')
+     character(200)                :: path            ! path to observations file 
+     character(80)                 :: name            ! name identifier for file containing observations 
+     character(200)                :: maskpath        ! path to obs mask file
+     character(80)                 :: maskname        ! filename for obs mask
+     character(200)                :: scalepath       ! path to file(s) with scaling parameters
+     character(80)                 :: scalename       ! filename for scaling parameters
+     character(200)                :: flistpath       ! path to file with list of obs file names
+     character(80)                 :: flistname       ! name of file with list of obs file names
 
-     character(200)                :: path      ! path to measurements file 
-     character(80)                 :: name      ! name identifier for measurements 
-     character(200)                :: maskpath  ! path to obs mask file
-     character(80)                 :: maskname  ! filename for obs mask
-     character(200)                :: scalepath ! path to file with scaling parameters
-     character(80)                 :: scalename ! filename for scaling parameters
-     character(200)                :: flistpath ! path to file with list of obs file names
-     character(80)                 :: flistname ! name of file with list of obs file names
-
-     real                          :: errstd    ! default obs error std
+     real                          :: errstd          ! default obs error std (before scaling)
                                   
-     real                          :: std_normal_max  ! see pert_param_type
-     logical                       :: zeromean        ! see pert_param_type
-     logical                       :: coarsen_pert    ! see pert_param_type ("%coarsen")
-     real                          :: xcorr           ! see pert_param_type
-     real                          :: ycorr           ! see pert_param_type
+     real                          :: std_normal_max  ! maximum allowed obs perturbation (relative to N(0,1))       (see pert_param_type)
+     logical                       :: zeromean        ! enforce zero mean across ensemble                           (see pert_param_type)
+     logical                       :: coarsen_pert    ! generate obs perturbations on coarser grid                  (see pert_param_type)
+     real                          :: xcorr           ! obs error correlation length (deg) in longitude direction   (see pert_param_type)
+     real                          :: ycorr           ! obs error correlation length (deg) in latitude direction    (see pert_param_type)
      
-     integer                       :: adapt     ! identifier for adaptive filtering
+     integer                       :: adapt           ! identifier for adaptive filtering
      
   end type obs_param_type
   
@@ -201,16 +208,18 @@ contains
        write (unitnumber,       *) obs_param(i)%bias_trel
        write (unitnumber,       *) obs_param(i)%bias_tcut
        write (unitnumber,       *) obs_param(i)%nodata    
-       write (unitnumber, '(42A)') "'" // trim(obs_param(i)%varname)   // "'"
-       write (unitnumber, '(42A)') "'" // trim(obs_param(i)%units)     // "'"
-       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%path)      // "'"    
-       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%name)      // "'"      
-       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%maskpath)  // "'"    
-       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%maskname)  // "'"      
-       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%scalepath) // "'" 
-       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%scalename) // "'" 
-       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%flistpath) // "'" 
-       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%flistname) // "'" 
+       write (unitnumber, '(42A)') "'" // trim(obs_param(i)%varname)       // "'"
+       write (unitnumber, '(42A)') "'" // trim(obs_param(i)%units)         // "'"
+       write (unitnumber, '(42A)') "'" // trim(obs_param(i)%fcstvarname)   // "'"
+       write (unitnumber, '(42A)') "'" // trim(obs_param(i)%fcstunits)     // "'"
+       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%path)          // "'"    
+       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%name)          // "'"      
+       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%maskpath)      // "'"    
+       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%maskname)      // "'"      
+       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%scalepath)     // "'" 
+       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%scalename)     // "'" 
+       write (unitnumber,'(202A)') "'" // trim(obs_param(i)%flistpath)     // "'" 
+       write (unitnumber, '(82A)') "'" // trim(obs_param(i)%flistname)     // "'" 
        write (unitnumber,       *) obs_param(i)%errstd    
        write (unitnumber,       *) obs_param(i)%std_normal_max
        write (unitnumber,       *) obs_param(i)%zeromean

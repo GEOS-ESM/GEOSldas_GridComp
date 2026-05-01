@@ -98,14 +98,14 @@ module GEOS_LandAssimGridCompMod
   real    :: fcsterr_inflation_fac
   integer :: N_obs_param
   logical :: out_obslog
-  logical :: out_ObsFcstAna
+  integer :: out_ObsFcstAna
   logical :: out_smapL4SMaup
   integer :: N_obsbias_max
   
   integer,                 dimension(:), pointer     :: N_catl_vec,low_ind
   integer                                            :: N_catf
 
-  !reordered tile_coord_rf and mapping l2rf
+  ! reordered tile_coord_rf and mapping l2rf
   integer,                 dimension(:), pointer     :: l2rf, rf2l,rf2g, rf2f
   type(tile_coord_type),   dimension(:), pointer     :: tile_coord_rf => null()
 
@@ -1407,7 +1407,7 @@ contains
     call MPI_BCAST(fcsterr_inflation_fac, 1, MPI_REAL,           0,MPICOMM,mpierr)
     call MPI_BCAST(N_obs_param,           1, MPI_INTEGER,        0,MPICOMM,mpierr)
     call MPI_BCAST(out_obslog,            1, MPI_LOGICAL,        0,MPICOMM,mpierr)
-    call MPI_BCAST(out_ObsFcstAna,        1, MPI_LOGICAL,        0,MPICOMM,mpierr)
+    call MPI_BCAST(out_ObsFcstAna,        1, MPI_INTEGER,        0,MPICOMM,mpierr)
     call MPI_BCAST(out_smapL4SMaup,       1, MPI_LOGICAL,        0,MPICOMM,mpierr)
     call MPI_BCAST(N_obsbias_max,         1, MPI_INTEGER,        0,MPICOMM,mpierr)
    
@@ -1953,6 +1953,7 @@ contains
             N_catl, tile_coord_l,                                        &
             N_catf, tile_coord_rf, tcinternal%pgrid_g,                   &
             N_catl_vec, low_ind, rf2l,                                   &
+            update_type, LandAssimDTstep,                                &
             obs_param,                                                   &
             met_force, lai,                                              &
             cat_param, cat_progn, mwRTM_param,                           &

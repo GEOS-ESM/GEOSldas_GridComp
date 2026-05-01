@@ -739,6 +739,8 @@ contains
     !  real                          :: nodata                ! block  #7 (real)
     !  character(40)                 :: varname               ! block  #8 (character)
     !  character(40)                 :: units
+    !  character(40)                 :: fcstvarname
+    !  character(40)                 :: fcstunits
     !  character(200)                :: path    
     !  character(80)                 :: name    
     !  character(200)                :: maskpath    
@@ -781,7 +783,7 @@ contains
     iblock( 5) = 3  
     iblock( 6) = 4
     iblock( 7) = 1                  
-    iblock( 8) = 40+40+200+80+200+80+200+80+200+80     
+    iblock( 8) = 40+40+40+40+200+80+200+80+200+80+200+80     
     iblock( 9) = 2                  
     iblock(10) = 2                  
     iblock(11) = 2                  
