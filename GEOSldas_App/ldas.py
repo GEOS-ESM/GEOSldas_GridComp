@@ -17,7 +17,7 @@ from datetime                     import timedelta
 from collections                  import OrderedDict
 from dateutil.relativedelta       import relativedelta
 from remap_utils                  import *
-from remap_lake_landice_saltwater import *
+from remap_other_restarts         import *
 from remap_catchANDcn             import *
 from lenkf_j_template             import *
 from setup_utils                  import *
@@ -898,7 +898,7 @@ class ldas:
            if self.with_landice:
              config['output']['surface']['remap_water'] = True
              config['input']['surface']['zoom'] = '2'
-             landice_obj = lake_landice_saltwater(config_obj = config)
+             landice_obj = other_restarts(config_obj = config)
              landice_obj.remap()
 
         #for ens in self.ensdirs :
