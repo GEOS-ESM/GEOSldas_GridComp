@@ -20,3 +20,8 @@ esma_add_library (${this}
   INCLUDES ${INC_ESMF} ${INC_HDF5})
 
 target_compile_definitions (${this} PRIVATE LDAS_MPI)
+
+# NAG: HDF4 Fortran API (VSFREAD) is called with varying types intentionally
+if (CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
+  target_compile_options(${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-wmismatch=VSFREAD>)
+endif()

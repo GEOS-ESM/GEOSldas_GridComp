@@ -78,7 +78,7 @@ PROGRAM mwrtm_bin2nc4
 
   do n = 1, nVars
 
-     status = NF_DEF_VAR(NCFOutID,trim(shnms(n)) , NF_FLOAT, 1 ,CellID, vid)
+     status = NF_DEF_VAR(NCFOutID,trim(shnms(n)) , NF_FLOAT, 1 ,(/CellID/), vid)
      status = NF_PUT_ATT_TEXT(NCFOutID, vid, 'long_name',               &
           LEN_TRIM(getAttribute(shnms(n), LNAME = 1)),  &
           getAttribute(shnms(n), LNAME = 1) )
