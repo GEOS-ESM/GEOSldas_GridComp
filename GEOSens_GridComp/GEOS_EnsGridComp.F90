@@ -2041,9 +2041,6 @@ contains
     character(len=ESMF_MAXSTR) :: Iam
     character(len=ESMF_MAXSTR) :: comp_name
 
-    ! ESMF variables
-    type(ESMF_VM) :: vm
-
     ! MAPL variables
     type(MAPL_MetaComp), pointer :: MAPL=>null() ! MAPL obj
 
@@ -2263,9 +2260,6 @@ contains
     integer :: status
     character(len=ESMF_MAXSTR) :: Iam
     character(len=ESMF_MAXSTR) :: comp_name
-
-    ! ESMF variables
-    type(ESMF_VM) :: vm
 
     ! MAPL variables
     type(MAPL_MetaComp), pointer :: MAPL=>null() ! MAPL obj
