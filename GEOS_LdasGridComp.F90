@@ -15,6 +15,7 @@ module GEOS_LdasGridCompMod
   use GEOS_EnsGridCompMod,       only: EnsSetServices       => SetServices
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
+  use GEOS_RouteGridCompMod,     only: RouteSetServices     => SetServices
 
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
@@ -51,6 +52,7 @@ module GEOS_LdasGridCompMod
   ! All children
   integer,allocatable :: LAND(:)
   integer,allocatable :: LANDICE(:)
+  integer,allocatable :: ROUTE(:)
   integer,allocatable :: LANDPERT(:)
   integer,allocatable :: METFORCE(:)
   integer             :: ENSAVG, LANDASSIM
@@ -62,6 +64,7 @@ module GEOS_LdasGridCompMod
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
   logical :: with_landice       ! true if landice tiles requested by config
   logical :: with_land          ! true if land    tiles requested by config
+  integer :: RUN_ROUTE          ! 0:, no river routing, 1: routing w/o reservoirs, 2: routing w/ reservoirs
   
 contains
 
@@ -143,13 +146,15 @@ contains
     !create ensemble children
     call MAPL_GetObjectFromGC(gc, MAPL, rc=status)
     VERIFY_(status)
-    call MAPL_GetResource ( MAPL, NUM_ENSEMBLE, Label="NUM_LDAS_ENSEMBLE:", DEFAULT=1,       RC=STATUS)
+    call MAPL_GetResource ( MAPL, NUM_ENSEMBLE,    Label="NUM_LDAS_ENSEMBLE:", DEFAULT=1,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, ens_id_width, Label="ENS_ID_WIDTH:",      DEFAULT=0,       RC=STATUS)
+    call MAPL_GetResource ( MAPL, ens_id_width,    Label="ENS_ID_WIDTH:",      DEFAULT=0,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, FIRST_ENS_ID, Label="FIRST_ENS_ID:", DEFAULT=0, RC=STATUS)
+    call MAPL_GetResource ( MAPL, RUN_ROUTE,       Label="RUN_ROUTE:",         DEFAULT=0,    RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:", DEFAULT="NO", RC=STATUS)
+    call MAPL_GetResource ( MAPL, FIRST_ENS_ID,    Label="FIRST_ENS_ID:",      DEFAULT=0,    RC=STATUS)
+    VERIFY_(STATUS)
+    call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:",  DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
     ENS_FORCING_STR =  ESMF_UtilStringUpperCase(ENS_FORCING_STR, rc=STATUS)
     VERIFY_(STATUS)
@@ -173,6 +178,10 @@ contains
     if (any(tile_types == MAPL_LANDICE)) with_landice = .true.
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
 !   if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
+
+    if (NUM_ENSEMBLE>1) then
+       _ASSERT( .not. (with_landice .or. RUN_ROUTE>0), "Landice and route not supported in ensemble mode.")
+    endif
 
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
@@ -205,7 +214,10 @@ contains
 
     if (with_land)    allocate(LAND(   NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
     if (with_landice) allocate(LANDICE(NUM_ENSEMBLE))
-
+    if (RUN_ROUTE >= 1) then
+       _ASSERT( with_land, "RUNOFF must be from the export of land_gridcomp for now.")
+       allocate(ROUTE(NUM_ENSEMBLE))
+    endif
     ! ens_id_with = 2 + number of digits = total number of chars in ensid_string ("_eXXXX")
     !
     ! Assert ens_id_width<=2+9 so number of digits remains single-digit and "I1" can be
@@ -253,6 +265,12 @@ contains
           LANDICE(i) = MAPL_AddChild(gc, name=childname, ss=LandiceSetServices, rc=status)
           VERIFY_(status)
        endif
+
+      if (RUN_ROUTE >= 1) then
+          childname='ROUTE'//trim(ensid_string)
+          ROUTE(i) = MAPL_AddChild(gc, name=childname, ss=RouteSetServices, rc=status)
+          VERIFY_(status)
+      endif
     enddo
 
     if (with_land) then
@@ -302,6 +320,17 @@ contains
                rc = status                                                                            &
                )
           VERIFY_(status)
+
+          IF(RUN_ROUTE >= 1) THEN
+             call MAPL_AddConnectivity (                              &
+                  GC                                                 ,&
+                  SHORT_NAME  = (/'RUNOFF  '/)                       ,&   ! RUNOFF = total runoff = surface runoff + baseflow
+                  SRC_ID =  LAND(I)                                  ,&
+                  DST_ID =  ROUTE(I)                                 ,&
+                  RC=STATUS )
+             VERIFY_(STATUS)
+          ENDIF
+
        enddo
 
        if(land_assim .or. mwRTM) then
@@ -788,6 +817,13 @@ contains
           call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
           VERIFY_(status)
        endif
+
+       if (RUN_ROUTE >= 1) then
+          call MAPL_GetObjectFromGC(gcs(ROUTE(i)), CHILD_MAPL, rc=status)
+          VERIFY_(status) ! CHILD = ens_avg
+          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+          VERIFY_(status)
+       endif
        
     enddo
 
@@ -1015,6 +1051,16 @@ contains
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land_ice
+
+       if ( RUN_ROUTE >= 1 ) then
+          igc = ROUTE(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          VERIFY_(status)
+          call ESMF_GridCompRun(gcs(ENSAVG), importState=gex(igc), exportState=gex(ENSAVG), clock=clock,phase=4, userRC=status)
+          VERIFY_(status)
+          call MAPL_TimerOff(MAPL, gcnames(igc))
+       endif ! river-routine
 
        if (with_land) then
           ! ApplyPrognPert - moved: now before calculating ensemble average that is picked up by land analysis and HISTORY; reichle 28 May 2020 
