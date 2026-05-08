@@ -9752,7 +9752,11 @@ contains
           ! check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(ind)>0.                       .and.          &
+          if ( sclprm_mean_obs(ind)==sclprm_mean_obs(ind) .and.          &
+               sclprm_mean_mod(ind)==sclprm_mean_mod(ind) .and.          &
+               sclprm_std_obs(ind) ==sclprm_std_obs(ind)  .and.          &
+               sclprm_std_mod(ind) ==sclprm_std_mod(ind)  .and.          &
+               sclprm_mean_obs(ind)>0.                       .and.          &
                sclprm_mean_mod(ind)>0.                       .and.          &
                sclprm_std_obs(ind)>=0.                       .and.          &
                sclprm_std_mod(ind)>=0.                             ) then
@@ -9986,7 +9990,11 @@ contains
           ! Check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(j_ind, i_ind)>0.   .and.        &
+          if ( sclprm_mean_obs(j_ind, i_ind)==sclprm_mean_obs(j_ind, i_ind) .and.  &
+               sclprm_mean_mod(j_ind, i_ind)==sclprm_mean_mod(j_ind, i_ind) .and.  &
+               sclprm_std_obs(j_ind, i_ind) ==sclprm_std_obs(j_ind, i_ind)  .and.  &
+               sclprm_std_mod(j_ind, i_ind) ==sclprm_std_mod(j_ind, i_ind)  .and.  &
+               sclprm_mean_obs(j_ind, i_ind)>0.   .and.        &
                sclprm_mean_mod(j_ind, i_ind)>0.   .and.        &
                sclprm_std_obs(j_ind, i_ind)>=0.   .and.        &
                sclprm_std_mod(j_ind, i_ind)>=0.         ) then
@@ -10381,7 +10389,11 @@ contains
           ! check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(ind)>0.   .and.          &
+          if ( sclprm_mean_obs(ind)==sclprm_mean_obs(ind) .and.  &
+               sclprm_mean_mod(ind)==sclprm_mean_mod(ind) .and.  &
+               sclprm_std_obs( ind)==sclprm_std_obs( ind) .and.  &
+               sclprm_std_mod( ind)==sclprm_std_mod( ind) .and.  &
+               sclprm_mean_obs(ind)>0.   .and.          &
                sclprm_mean_mod(ind)>0.   .and.          &
                sclprm_std_obs( ind)>0.   .and.          &
                sclprm_std_mod( ind)>0.          ) then
