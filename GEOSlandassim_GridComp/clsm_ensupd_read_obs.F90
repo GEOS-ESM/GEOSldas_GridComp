@@ -5979,10 +5979,10 @@ contains
         
     N_lat        = last_ind(1) - start_ind(1) + 1
     
-    start_ind    = (lon_min_vec - CMG_ll_lon)/CMG_dlon
-    last_ind     = (lon_max_vec - CMG_ll_lon)/CMG_dlon
+    start_ind(1:N_files) = (lon_min_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
+    last_ind(1:N_files)  = (lon_max_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
     
-    N_lon_vec    = last_ind - start_ind  + 1  
+    N_lon_vec(1:N_files) = last_ind(1:N_files) - start_ind(1:N_files) + 1  
     
     N_lon        = sum( N_lon_vec(1:N_files) )
     
