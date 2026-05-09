@@ -39,8 +39,8 @@ module LDAS_ensdrv_Globals
   real, parameter :: nodata_generic         = -9999.
   real, parameter :: nodata_tolfrac_generic = 1.e-4
   
-  real :: nodata_tol_generic     = abs(nodata_generic*nodata_tolfrac_generic)
-  real :: MAPL_UNDEF_tol_generic = abs(MAPL_UNDEF    *nodata_tolfrac_generic) 
+  real, parameter :: nodata_tol_generic     = abs(nodata_generic*nodata_tolfrac_generic)
+  real, parameter :: MAPL_UNDEF_tol_generic = abs(MAPL_UNDEF    *nodata_tolfrac_generic) 
 
   ! ----------------------------------------------------------------
   !

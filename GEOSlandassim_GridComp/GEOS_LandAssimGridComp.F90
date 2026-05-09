@@ -2758,7 +2758,7 @@ contains
     
     integer :: N_catl_tmp, n, mpierr, status
     logical :: mwp_nodata, all_nodata_l
-
+    real, allocatable :: tmpR(:)
 
     if(.not. allocated(mwRTM_param)) then
 
@@ -2806,8 +2806,15 @@ contains
        
        allocate(mwRTM_param(N_catl))
        mwRTM_param(:)%sand      = SAND(:)
-       mwRTM_param(:)%vegcls    = nint(VEGCLS(:))
-       mwRTM_param(:)%soilcls   = nint(SOILCLS(:))
+       ! when in debug mode, nint(VEGCLS) with 1.0e15 may crash
+       allocate(tmpR(N_catl))
+       tmpR = VEGCLS(:)
+       where(tmpR > 1.0e10) tmpR = nodata_generic 
+       mwRTM_param(:)%vegcls    = nint(tmpR(:))
+       tmpR = SOILCLS(:)
+       where(tmpR > 1.0e10) tmpR = nodata_generic
+       mwRTM_param(:)%soilcls   = nint(tmpR(:))
+
        mwRTM_param(:)%clay      = CLAY(:)
        mwRTM_param(:)%poros     = mw_POROS(:)
        mwRTM_param(:)%wang_wt   = WANGWT(:)
