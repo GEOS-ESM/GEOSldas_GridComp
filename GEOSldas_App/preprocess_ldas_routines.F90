@@ -2734,7 +2734,7 @@ end block
       status = nf90_enddef(NCFOutID)
       ! 4) writing
 
-      status= NF90_PUT_VAR(NCFOutID,seedid ,real(Pert_rseed,kind=8))
+      status= NF90_PUT_VAR(NCFOutID,seedid ,real(Pert_rseed,kind=REAL64))
 
       xstart = 1 + pert_grid_f%i_offg
       ystart = 1 + pert_grid_f%j_offg
