@@ -275,7 +275,6 @@ class ldas:
            assert os.path.isfile(self.ExeInputs['CATCH_DEF_FILE']),"[%s] file does not exist " % self.ExeInputs['CATCH_DEF_FILE']
 
         # assigning BC files
-        self.ExeInputs['LNFM_FILE'] = ''      
         self.ExeInputs['EASE_PFAF_TILE_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
         domain_  = ''
@@ -336,15 +335,29 @@ class ldas:
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
-        self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+domain_)[0]
-        self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +domain_)[0]
-        tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+domain_)
-        if (len(tmp_) ==1) :
-           self.ExeInputs['LNFM_FILE'] = tmp_[0]
+        tmp_    = glob.glob(inpdir_ + 'green_clim_*.data'+domain_)
+        self.ExeInputs['GRN_FILE'] = ''
+        if (len(tmp_) ==1) : self.ExeInputs['GRN_FILE'] = tmp_[0]
+    
+        tmp_ = glob.glob(inpdir_ + 'lai_clim_*.data'+domain_)
+        self.ExeInputs['LAI_FILE'] = ''
+        if (len(tmp_) ==1) : self.ExeInputs['LAI_FILE'] = tmp_[0]
+        
+        tmp_ = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_)
+        self.ExeInputs['NDVI_FILE'] = ''
+        if (len(tmp_) ==1) : self.ExeInputs['NDVI_FILE'] = tmp_[0]
+            
+        tmp_ = glob.glob(inpdir_ + 'nirdf*.dat'+domain_)
+        self.ExeInputs['NIRDF_FILE'] = ''
+        if (len(tmp_) ==1) : self.ExeInputs['NIRDF_FILE'] = tmp_[0]
+            
+        tmp_ = glob.glob(inpdir_ + 'visdf*.dat'+domain_)
+        self.ExeInputs['VISDF_FILE'] = ''
+        if (len(tmp_) ==1) : self.ExeInputs['VISDF_FILE'] = tmp_[0]
 
-        self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_ )[0]
-        self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +domain_ )[0]
-        self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
+        tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+domain_)
+        self.ExeInputs['LNFM_FILE'] = ''      
+        if (len(tmp_) ==1) : self.ExeInputs['LNFM_FILE'] = tmp_[0]
 
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
@@ -778,13 +791,12 @@ class ldas:
         os.symlink(tile,myTile)
 
         if self.with_land:
-           bcs=[self.ExeInputs['GRN_FILE'],
-                self.ExeInputs['LAI_FILE'],
-                self.ExeInputs['NDVI_FILE'],
-                self.ExeInputs['NIRDF_FILE'],
-                self.ExeInputs['VISDF_FILE'] ]
-           if (self.ExeInputs['LNFM_FILE'] != ''):
-              bcs += [self.ExeInputs['LNFM_FILE']]
+           bcfiles =['GRN_FILE','LAI_FILE','NDVI_FILE','NIRDF_FILE','VISDF_FILE', 'LNFM_FILE']
+           bcs =[]
+           for file in bcfiles:
+              if (self.ExeInputs[file] != ''):
+                 bcs += [self.ExeInputs[file]]
+
            if (self.has_vegopacity):
               bcs += [self.ExeInputs['VEGOPACITY_FILE']]            
            if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
@@ -809,9 +821,11 @@ class ldas:
 
            # link BC
            print ("linking bcs...")
-           bcnames=['green','lai','ndvi','nirdf','visdf']
-           if (self.ExeInputs['LNFM_FILE'] != ''):
-              bcnames += ['lnfm']
+           bcnames_=['green','lai','ndvi','nirdf','visdf','lnfm']
+           bcnames =[]
+           for file, name in zip (bcfiles, bcnames_) :
+             if (self.ExeInputs[file] != ''):
+               bcnames += name
            if (self.has_vegopacity):
               bcnames += ['vegopacity']            
            if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
