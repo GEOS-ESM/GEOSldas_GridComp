@@ -362,6 +362,7 @@ class ldas:
            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
            self.ExeInputs['GRIDNAME']  = gridname_
 
+        # to run routing on standard EASE tile space, need EASE_PFAF_TILE_FILE
         if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
            tmp_ =  glob.glob(inpgeom_ + '*Pfafstetter.nc4' + domain_)
            if (len(tmp_) > 0) : 
@@ -763,6 +764,10 @@ class ldas:
            self.isZoomIn= True
         #os.remove(self.domain_def.name)
 
+        # if running routing, make sure domain is global
+        if self.run_route>0 and self.isZoomIn=True:
+            exit( "Must have global domain to run routing model, RUN_ROUTE=" + self.run_route )
+        
         # update tile domain
         if self.isZoomIn:
             newZoominTile = tile+'.domain'
@@ -908,11 +913,11 @@ class ldas:
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
-            myCatchRst   = myRstDir+'/'+self.catch +ensid +'_internal_rst'
-            myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
-            myVegRst     = myRstDir+'/'+ 'vegdyn'+ensid +'_internal_rst'
+            myCatchRst   = myRstDir+'/'+ self.catch +ensid +'_internal_rst'
+            myLandiceRst = myRstDir+'/'+ 'landice'  +ensid +'_internal_rst'
+            myVegRst     = myRstDir+'/'+ 'vegdyn'   +ensid +'_internal_rst'
             myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
-            myRouteRst   = myRstDir+'/'+ 'route' +ensid +'_internal_rst'
+            myRouteRst   = myRstDir+'/'+ 'route'    +ensid +'_internal_rst'
 
             catchRstFile  = ''
             vegdynRstFile = ''
