@@ -1359,10 +1359,10 @@ class ldas:
                        valn = val + tmpl_ + '_internal_checkpoint'
                        ldasrcInp[keyn] = valn
 
-                   if self.with_issm:
-                      keyn = 'ISSM_INTERNAL_CHECKPOINT_FILE'
-                      valn = 'issm'+tmpl_+'_internal_checkpoint'
-                      ldasrcInp[keyn]= valn
+                    if self.with_issm:
+                       keyn = 'ISSM_INTERNAL_CHECKPOINT_FILE'
+                       valn = 'issm'+tmpl_+'_internal_checkpoint'
+                       ldasrcInp[keyn]= valn
                       
                    
                 # specify LANDPERT restart file
