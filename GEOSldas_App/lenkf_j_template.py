@@ -475,7 +475,7 @@ while ( $counter <= ${{NUM_SGMT}} )
 
    # must be done before moving HISTORY files
 
-   set ObsFcses = `ls *.ldas_ObsFcstAna.*.bin`
+   set ObsFcses = `ls *.ldas_ObsFcstAna.*`
    foreach obsfcs ( $ObsFcses )
       set ThisTime = `echo $obsfcs | rev | cut -d'.' -f2 | rev`
       set TY = `echo $ThisTime | cut -c1-4`
@@ -725,7 +725,7 @@ EOF
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
    
-       set rstfs = (${{LANDMODEL}} 'landice' 'issm')
+       set rstfs = (${{LANDMODEL}} 'landice' 'route' 'issm')
        foreach rstf ( $rstfs )
           if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
              set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}

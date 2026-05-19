@@ -25,6 +25,7 @@ COLLECTIONS:
 #                'tavg24_2d_glc_Nx'
 #                'tavg24_1d_glc_Nt'
 #                'tavg24_1d_issm_Nt'
+#                'tavg24_1d_route'
            ::
 
 # --------------------------------------------------------------------------------------------------
@@ -585,6 +586,22 @@ EASEv2_M36.LM:           1
                                 'WESNBOT'     , 'LANDICE' ,
                                 'WESNEXT'     , 'LANDICE' ,
                                  ::
+
+  tavg24_1d_route.descr:          'Catchment-space,Daily,Time-Averaged,Single-level,Runoff Routing Diagnostics',
+  tavg24_1d_route.nbits:          12,
+  tavg24_1d_route.template:       '%y4%m2%d2_%h2%n2z.nc4',
+  tavg24_1d_route.archive:        '%c/Y%y4',
+  tavg24_1d_route.format:         'CFIO',
+  tavg24_1d_route.mode:           'time-averaged',
+  tavg24_1d_route.frequency:       240000,
+  tavg24_1d_route.ref_time:        000000,
+  tavg24_1d_route.fields:       'QSFLOW'      , 'ROUTE' ,
+                                'QOUTFLOW'    , 'ROUTE' ,
+                                'QRES'        , 'ROUTE' ,
+                                'QCAT'        , 'ROUTE' ,
+                                'QINFLOW'     , 'ROUTE' ,
+                                'QRUNOFF_CAT' , 'ROUTE' ,
+                                 ::                                 
 
   tavg24_1d_issm_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,ISSM Diagnostics',
   tavg24_1d_issm_Nt.nbits:         12,
