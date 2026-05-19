@@ -1136,7 +1136,8 @@ class ldas:
                         + str(self.ExeInputs['LSM_CHOICE'])         + ' ' \
                         + str(self.ExeInputs['AEROSOL_DEPOSITION']) + ' ' \
                         + str(self.ExeInputs['RUN_IRRIG'])          + ' ' \
-                        + str(self.nens)
+                        + str(self.nens)                            + ' ' \
+                        + str(self.ExeInputs['DO_ISSM'])   
                     print(cmd)
                     #os.system(cmd)
                     sp.call(shlex.split(cmd))
