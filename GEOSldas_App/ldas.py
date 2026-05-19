@@ -101,6 +101,7 @@ class ldas:
         self.bcs_dir_land       = ''
         self.bcs_dir_geom       = ''
         self.bcs_dir_landshared = ''
+        self.bcs_dir_landiceshared = ''
         self.tile_types         = ''
         self.with_land          = False
         self.with_landice       = False
@@ -266,6 +267,8 @@ class ldas:
         self.bcs_dir_land       = self.ExeInputs['BCS_PATH']+ '/land/'       + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_geom       = self.ExeInputs['BCS_PATH']+ '/geometry/'   + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_landshared = self.ExeInputs['BCS_PATH']+ '/land/shared/'
+        self.bcs_dir_landiceshared = self.ExeInputs['BCS_PATH']+ '/landice/shared/'
+        
 
         # make sure MET_PATH and RESTART_PATH have trailing '/'
         if self.ExeInputs['MET_PATH'][-1] != '/':
@@ -835,7 +838,12 @@ class ldas:
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
-
+           if self.with_issm:
+              for pattern in ('*.bin', '*.toolkits'):
+                 for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
+                    myISSMBC = self.inpdir + os.path.basename(issmbc)
+                    os.symlink(issmbc, myISSMBC)        
+      
         # create and link restart
         print ("Creating and linking restart...")
         _start = self.begDates[0]
