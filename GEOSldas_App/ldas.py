@@ -765,7 +765,7 @@ class ldas:
         #os.remove(self.domain_def.name)
 
         # if running routing, make sure domain is global
-        if self.run_route>0 and self.isZoomIn=True:
+        if self.run_route>0 and self.isZoomIn:
             exit( "Must have global domain to run routing model, RUN_ROUTE=" + self.run_route )
         
         # update tile domain
