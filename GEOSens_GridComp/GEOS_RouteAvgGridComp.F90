@@ -3,6 +3,7 @@
 module GEOS_RouteAvgGridCompMod
   use ESMF
   use MAPL_Mod
+  use GEOS_RouteGridCompMod, only : pfaf_grid, pfaf_locstream
 
   implicit none
 
@@ -148,6 +149,12 @@ contains
     VERIFY_(STATUS)
 
     collect_route_counter    = 0
+
+    call MAPL%grid%set(pfaf_grid, _RC)
+    call ESMF_GridCompSet(gc, grid=pfaf_grid, RC=status)
+    VERIFY_(STATUS)
+    call MAPL_set(MAPL, locstream = pfaf_locstream, rc=status)
+    VERIFY_(STATUS)
 
     call MAPL_GenericInitialize(gc, import, export, clock, rc=status)
     VERIFY_(status)
