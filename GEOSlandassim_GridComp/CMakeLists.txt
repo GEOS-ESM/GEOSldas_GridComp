@@ -6,7 +6,7 @@ set (alldirs
 
 set (SRCS
   io_hdf5.F90 enkf_general.F90 adapt_types.F90 mwRTM_types.F90 clsm_ensupd_glob_param.F90
-  mwRTM_routines.F90 clsm_ensupd_upd_routines.F90 clsm_ensdrv_drv_routines.F90
+  mwRTM_routines.F90 cygnss_preprocessed_obs.F90 clsm_ensupd_upd_routines.F90 clsm_ensdrv_drv_routines.F90
   clsm_ensupd_read_obs.F90 catch_bias_types.F90 clsm_bias_routines.F90 clsm_adapt_routines.F90
   clsm_ensupd_enkf_update.F90 clsm_ensdrv_out_routines.F90 GEOS_LandAssimGridComp.F90
   )

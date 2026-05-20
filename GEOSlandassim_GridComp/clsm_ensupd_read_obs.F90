@@ -2695,6 +2695,19 @@ contains
     ! most one observation per tile and species, so this first bridge assigns
     ! each scalar observation to its nearest specular-point owner tile.
     !
+    ! The coefficient/support arrays are read later by cygnss_preprocessed_obs;
+    ! this reader only creates the observed-value arrays that the standard
+    ! EnKF observation collection code expects.
+    !
+    ! Product contract:
+    ! - product_type = cygnss_tile_coefficient_preprocessor_netcdf
+    ! - schema_version = 0.3
+    ! - sp_nearest_tile_index0 is zero-based and becomes the one-based
+    !   GEOSldas owner tile number.
+    ! - observed_y_db is the scalar observed value in dB.
+    !
+    ! amfox+codex, 20 May 2026
+    !
     ! --------------------------------------------------------------------
 
     use netcdf
@@ -2756,8 +2769,11 @@ contains
     CYGNSS_lat     = tile_coord%com_lat
     CYGNSS_time    = datetime_to_J2000seconds(date_time, J2000_epoch_id)
 
+    ! ----------------------------------------------------------------
+    !
     ! The default namelist entry is disabled. Avoid requiring a product file
     ! until diagnostics or assimilation are explicitly requested.
+
     if (.not. this_obs_param%assim .and. .not. this_obs_param%getinnov) return
 
     if (trim(this_obs_param%name) == '') then
@@ -2794,6 +2810,9 @@ contains
     if (nf90_get_att(ncid, NF90_GLOBAL, 'ldas_state', ldas_state) /= nf90_noerr) ldas_state = ''
     if (nf90_get_att(ncid, NF90_GLOBAL, 'mwrtm_param', mwrtm_param) /= nf90_noerr) mwrtm_param = ''
 
+    ! Fail fast if the file is not the preprocessed scalar coefficient product
+    ! expected by both this reader and cygnss_preprocessed_obs.
+
     if (trim(product_type) /= 'cygnss_tile_coefficient_preprocessor_netcdf') then
        err_msg = 'unexpected CYGNSS product_type: ' // trim(product_type)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -2803,6 +2822,10 @@ contains
        err_msg = 'unexpected CYGNSS schema_version: ' // trim(schema_version)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
+
+    ! The selected-50 files currently encode the EASE grid in filename or
+    ! provenance attributes. Abort rather than silently mapping an M36 product
+    ! into an M09 run, or vice versa.
 
     if (index(tmpfname,   'M36') /= 0 .or. index(tmpfname,   'm36') /= 0 .or. &
         index(ldas_state, 'M36') /= 0 .or. index(ldas_state, 'm36') /= 0 .or. &
@@ -2870,6 +2893,11 @@ contains
     J2000_seconds_low = datetime_to_J2000seconds(date_time_low, J2000_epoch_id)
     J2000_seconds_up  = datetime_to_J2000seconds(date_time_up,  J2000_epoch_id)
 
+    ! Keep observations in the same half-open assimilation window used by
+    ! the rest of the EnKF readers:
+    !
+    !     (date_time - dtstep_assim/2, date_time + dtstep_assim/2]
+
     best_owner_distance = huge_distance
     tol = abs(this_obs_param%nodata*nodata_tolfrac_generic)
 
@@ -2880,6 +2908,9 @@ contains
     N_outside_time = 0
 
     do i=1,N_obs
+
+       ! Product tile indices are zero-based; GEOSldas tile numbers are
+       ! one-based full-domain indices.
 
        owner_tilenum = owner_tile_index0(i) + 1
 
@@ -2899,6 +2930,11 @@ contains
           N_outside_time = N_outside_time + 1
           cycle
        end if
+
+       ! If more than one scalar observation maps to the same owner tile,
+       ! retain the one whose specular point is closest to that tile. This
+       ! keeps the first implementation consistent with the one-observation-
+       ! per-tile collection machinery.
 
        if (owner_distance(i) < best_owner_distance(owner_tilenum)) then
           if (best_owner_distance(owner_tilenum) < huge_distance) N_duplicate = N_duplicate + 1

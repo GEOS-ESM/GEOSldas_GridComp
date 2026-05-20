@@ -96,6 +96,9 @@ module clsm_ensupd_upd_routines
   use mwRTM_routines,                   ONLY:     &
        mwRTM_get_Tb,                              &
        catch2mwRTM_vars
+
+  use cygnss_preprocessed_obs,          ONLY:     &
+       cygnss_preproc_get_obs_pred
   
   use catchment_model,                  ONLY:     &
        catch_calc_tsurf,                          &
@@ -1099,6 +1102,7 @@ contains
     logical                                 :: get_Tb_l,     get_Tb_lH
     logical                                 :: get_FT_l,     get_FT_lH
     logical                                 :: get_asnow_l,  get_asnow_lH
+    logical                                 :: get_cygl1scal_lH
     type(grid_def_type)                     :: tile_grid_lH        
     
     integer, dimension(N_obs_param)         :: ind_obsparam2Tbspecies
@@ -1127,6 +1131,7 @@ contains
     real,    dimension(N_catl,N_ens)        :: sfmc_l,   rzmc_l
     real,    dimension(N_catl,N_ens)        :: tsurf_l,  stemp_l
     real,    dimension(N_catl,N_ens)        :: FT_l,     asnow_l
+    real,    dimension(N_catl,N_ens)        :: mwp_clay_l, mwp_poros_l
     
     real,    dimension(:,:,:), allocatable  :: Tb_h_l, Tb_v_l
 
@@ -1146,6 +1151,7 @@ contains
     real,    dimension(:,:),   allocatable  :: sfmc_lH,   rzmc_lH
     real,    dimension(:,:),   allocatable  :: tsurf_lH,  stemp_lH
     real,    dimension(:,:),   allocatable  :: FT_lH,     asnow_lH
+    real,    dimension(:,:),   allocatable  :: mwp_clay_lH, mwp_poros_lH
     
     real,    dimension(:,:,:), allocatable  :: Tb_h_lH, Tb_v_lH
     
@@ -1213,6 +1219,7 @@ contains
     get_FT_l     = .false.
     get_Tb_l     = .false.
     get_asnow_l  = .false.
+    get_cygl1scal_lH = .false.
 
     ! get_*_lH : directly match observed fields
     
@@ -1289,6 +1296,7 @@ contains
 
           get_sfmc_l   = .true.
           get_sfmc_lH  = .true.
+          get_cygl1scal_lH = .true.
          
        case default
           
@@ -1467,6 +1475,13 @@ contains
                asnow_l(:,n_e) )
           
        end if
+
+       if (get_cygl1scal_lH) then
+
+          mwp_clay_l( :,n_e) = mwRTM_param%clay
+          mwp_poros_l(:,n_e) = mwRTM_param%poros
+
+       end if
  
        if (get_Tb_l) then
           
@@ -1567,23 +1582,28 @@ contains
     if (get_Tb_lH)     allocate(stemp_lH(N_catlH,                     N_ens))
     if (get_Tb_lH)     allocate(Tb_h_lH( N_catlH,N_TbuniqFreqAngRTMid,N_ens))
     if (get_Tb_lH)     allocate(Tb_v_lH( N_catlH,N_TbuniqFreqAngRTMid,N_ens))
+    if (get_cygl1scal_lH) allocate(mwp_clay_lH( N_catlH,              N_ens))
+    if (get_cygl1scal_lH) allocate(mwp_poros_lH(N_catlH,              N_ens))
     
 #ifdef LDAS_MPI
     
     ! count number of fields that need to be communicated (N_fields), allocate as needed
 
     call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields)
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_cygl1scal_lH, N_fields)
     
     ! allocate and assemble tile_data_l
 
     if (allocated(tile_data_l))  deallocate(tile_data_l)
     allocate(tile_data_l(N_catl,N_fields,N_ens))
     call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields, &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_cygl1scal_lH, N_fields,                                             &
          option=1, tile_data=tile_data_l,                                        &
          sfmc=sfmc_l, rzmc=rzmc_l, tsurf=tsurf_l, FT=FT_l, stemp=stemp_l,        &
-         Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l )
+         Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l,                                &
+         mwp_clay=mwp_clay_l, mwp_poros=mwp_poros_l )
     
     ! communicate tile_data_l as needed and get tile_data_lH
 
@@ -1594,10 +1614,12 @@ contains
     ! read out sfmc, rzmc, etc. from tile_data_lH    
 
     call get_obs_pred_comm_helper( N_catlH, N_ens, N_TbuniqFreqAngRTMid,         &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields, &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_cygl1scal_lH, N_fields,                                             &
          option=2, tile_data=tile_data_lH,                                       &
          sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_l, stemp=stemp_lH,    &
-         Tb_h=Tb_h_lH, Tb_v=Tb_v_lH )
+         Tb_h=Tb_h_lH, Tb_v=Tb_v_lH,                                             &
+         mwp_clay=mwp_clay_lH, mwp_poros=mwp_poros_lH )
     
     ! clean up
     
@@ -1613,7 +1635,9 @@ contains
     if (get_Tb_lH)     stemp_lH = stemp_l
     if (get_Tb_lH)     Tb_h_lH  = Tb_h_l
     if (get_Tb_lH)     Tb_v_lH  = Tb_v_l
-    
+    if (get_cygl1scal_lH) mwp_clay_lH  = mwp_clay_l
+    if (get_cygl1scal_lH) mwp_poros_lH = mwp_poros_l
+
 #endif
     if (allocated(tile_data_l))  deallocate(tile_data_l)
     ! ----------------------------------------------------------------
@@ -1679,6 +1703,20 @@ contains
        this_FOV           = obs_param(this_species)%FOV
        
        this_pol           = obs_param(this_species)%pol
+
+       if (trim(obs_param(this_species)%varname) == 'cygl1scal') then
+
+          ! CYGNSS preprocessed observations carry their own support-tile
+          ! coefficients, so do not use the generic FOV/ellipse tile mapping.
+
+          call cygnss_preproc_get_obs_pred(                                      &
+               obs_param(this_species), N_catlH, tile_coord_lH, N_ens,           &
+               sfmc_lH, mwp_clay_lH, mwp_poros_lH, this_tilenum,                 &
+               Obs_pred_l(i,1:N_ens) )
+
+          cycle
+
+       end if
        
        ! ----------------------------------------
        !
@@ -1882,9 +1920,9 @@ contains
 
              case ('cygl1scal')
 
-                err_msg = 'CYGNSS L1 scalar forward operator not yet implemented'
+                err_msg = 'cygl1scal should be handled before generic tile2obs mapping'
                 call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-                
+
              case default
                 
                 err_msg = 'unknown obs_param%varname'
@@ -1985,6 +2023,8 @@ contains
     if (get_Tb_lH)          deallocate(stemp_lH)           
     if (get_Tb_lH)          deallocate(Tb_h_lH) 
     if (get_Tb_lH)          deallocate(Tb_v_lH) 
+    if (get_cygl1scal_lH)   deallocate(mwp_clay_lH)
+    if (get_cygl1scal_lH)   deallocate(mwp_poros_lH)
     
     ! ----------------------------------------------------------------
     ! 
@@ -2085,7 +2125,8 @@ contains
 
   subroutine get_obs_pred_comm_helper(                                                  &
        N_cat, N_ens, N_Tb, get_sfmc, get_rzmc, get_tsurf, get_FT, get_asnow, get_Tb,    &
-       N_fields, option, tile_data, sfmc, rzmc, tsurf, FT, asnow, stemp, Tb_h, Tb_v )
+       get_cygl1scal, N_fields, option, tile_data,                                      &
+       sfmc, rzmc, tsurf, FT, asnow, stemp, Tb_h, Tb_v, mwp_clay, mwp_poros )
     
     ! bundle/unbundle individual fields into/from single array for more 
     ! efficient communication across processors
@@ -2103,7 +2144,8 @@ contains
 
     integer, intent(in)    :: N_cat, N_ens, N_Tb
     
-    logical, intent(in)    :: get_sfmc, get_rzmc, get_tsurf, get_FT, get_Tb, get_asnow 
+    logical, intent(in)    :: get_sfmc, get_rzmc, get_tsurf, get_FT, get_Tb, get_asnow
+    logical, intent(in)    :: get_cygl1scal
     
     integer, intent(inout) :: N_fields
     
@@ -2113,6 +2155,7 @@ contains
     
     real, dimension(N_cat,         N_ens), intent(inout), optional :: sfmc, rzmc
     real, dimension(N_cat,         N_ens), intent(inout), optional :: tsurf, FT, asnow, stemp
+    real, dimension(N_cat,         N_ens), intent(inout), optional :: mwp_clay, mwp_poros
     real, dimension(N_cat,N_Tb,    N_ens), intent(inout), optional :: Tb_h, Tb_v
     
     ! -----------------------------------
@@ -2146,11 +2189,14 @@ contains
             ((get_FT)    .and. (.not. present(FT   )))    .or.            &
             ((get_Tb)    .and. (.not. present(stemp)))    .or.            &
             ((get_Tb)    .and. (.not. present(Tb_h )))    .or.            &
-            ((get_Tb)    .and. (.not. present(Tb_v )))             ) then
+            ((get_Tb)    .and. (.not. present(Tb_v )))    .or.            &
+            ((get_cygl1scal) .and. (.not. present(mwp_clay ))) .or.       &
+            ((get_cygl1scal) .and. (.not. present(mwp_poros)))      ) then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error 1')
        end if
        
-       if ( (get_sfmc .or. get_rzmc .or. get_tsurf .or. get_FT .or. get_Tb .or. get_asnow) .and.   &
+       if ( (get_sfmc .or. get_rzmc .or. get_tsurf .or. get_FT .or. get_Tb .or. get_asnow .or. &
+            get_cygl1scal) .and.                                                    &
             (.not. present(tile_data))                                              &
             )  then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error 2')
@@ -2209,6 +2255,22 @@ contains
        if (opt==1)  tile_data(1:N_cat,k,1:N_ens) = asnow
 
        if (opt==2)  asnow = tile_data(1:N_cat,k,1:N_ens)
+
+    end if
+
+    if (get_cygl1scal) then
+
+       k = k+1
+
+       if (opt==1)  tile_data(1:N_cat,k,1:N_ens) = mwp_clay
+
+       if (opt==2)  mwp_clay = tile_data(1:N_cat,k,1:N_ens)
+
+       k = k+1
+
+       if (opt==1)  tile_data(1:N_cat,k,1:N_ens) = mwp_poros
+
+       if (opt==2)  mwp_poros = tile_data(1:N_cat,k,1:N_ens)
 
     end if
         
