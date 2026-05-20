@@ -159,7 +159,7 @@ cd $SCRDIR
 /bin/cp -f  $HOMDIR/*.nml .
 
 # copy ISSM input files to scratch if they exist
-foreach pattern ( "$HOMDIR/input/ISSM*.bin" "$HOMDIR/input/ISSM*.toolkits" )
+foreach pattern ( "$EXPDIR/input/ISSM*.bin" "$EXPDIR/input/ISSM*.toolkits" )
     set issm_files = ( $pattern )
     if ( -e "$issm_files[1]" ) /bin/cp $issm_files .
 end
