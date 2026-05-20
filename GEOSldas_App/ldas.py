@@ -1060,9 +1060,9 @@ class ldas:
                print("link route restart: " + myRouteRst)
                os.symlink(routeRstFile, myRouteRst)
 
-               if self.with_issm:
-                  print("link issm restart: " + myIssmRst)
-                  os.symlink(issmRstFile, myIssmRst)
+            if self.with_issm:
+               print("link issm restart: " + myIssmRst)
+               os.symlink(issmRstFile, myIssmRst)
                   
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,    myPertRst)
