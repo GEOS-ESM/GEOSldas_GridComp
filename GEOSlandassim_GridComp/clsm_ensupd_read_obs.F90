@@ -88,7 +88,28 @@ module clsm_ensupd_read_obs
 
 contains
  
-  ! ***************************************************************** 
+  ! *****************************************************************
+
+  subroutine read_obs_nc_check(status, caller, context)
+
+    use netcdf
+    implicit none
+
+    integer,      intent(in) :: status
+    character(*), intent(in) :: caller
+    character(*), intent(in) :: context
+
+    character(len=400) :: err_msg
+
+    if (status /= nf90_noerr) then
+       err_msg = trim(context) // ': ' // trim(nf90_strerror(status))
+       call ldas_abort(LDAS_GENERIC_ERROR, caller, err_msg)
+    end if
+
+  end subroutine read_obs_nc_check
+
+
+  ! *****************************************************************
 
   subroutine read_ae_l2_sm_hdf( &
        N_files, fnames, N_data, lon, lat, ae_l2_sm, ease_col, ease_row )
@@ -2659,6 +2680,265 @@ contains
    if (associated(tmp_jtime))    deallocate(tmp_jtime)
 
   end subroutine read_obs_sm_CYGNSS
+
+  ! ***************************************************************************
+
+  subroutine read_obs_cygnss_l1_scalar(                                         &
+       date_time, dtstep_assim, N_catd, tile_coord, tile_grid_d,                &
+       this_obs_param,                                                          &
+       found_obs, CYGNSS_obs, CYGNSS_obs_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
+
+    !---------------------------------------------------------------------
+    !
+    ! Read the preprocessed CYGNSS Level-1 local DDM-crop scalar coefficient
+    ! product. The GEOSldas observation collection path currently supports at
+    ! most one observation per tile and species, so this first bridge assigns
+    ! each scalar observation to its nearest specular-point owner tile.
+    !
+    ! --------------------------------------------------------------------
+
+    use netcdf
+    implicit none
+
+    type(date_time_type), intent(in) :: date_time
+
+    integer, intent(in) :: dtstep_assim, N_catd
+
+    type(tile_coord_type), dimension(:), pointer :: tile_coord
+
+    type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(obs_param_type), intent(in) :: this_obs_param
+
+    logical, intent(out)                    :: found_obs
+
+    real,    intent(out), dimension(N_catd) :: CYGNSS_obs
+    real,    intent(out), dimension(N_catd) :: CYGNSS_obs_std
+    real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
+    real*8,  intent(out), dimension(N_catd) :: CYGNSS_time
+
+    character(4),      parameter :: J2000_epoch_id = 'TT12'
+    character(len=*),  parameter :: Iam = 'read_obs_cygnss_l1_scalar'
+    real,              parameter :: huge_distance = 1.0e30
+
+    type(date_time_type) :: date_time_low, date_time_up, date_time_obs
+
+    character(400) :: err_msg
+    character(300) :: tmpfname
+    character(100) :: product_type, schema_version
+    character(300) :: ldas_state, mwrtm_param
+    character( 16) :: product_grid
+
+    integer :: i, owner_tilenum
+    integer :: ncid, dimid, varid
+    integer :: N_obs, N_read, N_kept, N_duplicate, N_bad_owner, N_outside_time
+    integer :: obs_seconds
+
+    integer, allocatable :: owner_tile_index0(:)
+    integer, allocatable :: obs_year(:), obs_day(:)
+
+    logical :: file_exists
+
+    real :: tol
+    real, allocatable :: obs_db(:)
+    real, allocatable :: obs_lon(:), obs_lat(:)
+    real, allocatable :: owner_distance(:)
+    real, allocatable :: best_owner_distance(:)
+
+    real*8 :: J2000_seconds_low, J2000_seconds_up, J2000_seconds_obs
+    real*8, allocatable :: obs_seconds_utc(:)
+
+    found_obs = .false.
+
+    CYGNSS_obs     = this_obs_param%nodata
+    CYGNSS_obs_std = this_obs_param%errstd
+    CYGNSS_lon     = tile_coord%com_lon
+    CYGNSS_lat     = tile_coord%com_lat
+    CYGNSS_time    = datetime_to_J2000seconds(date_time, J2000_epoch_id)
+
+    ! The default namelist entry is disabled. Avoid requiring a product file
+    ! until diagnostics or assimilation are explicitly requested.
+    if (.not. this_obs_param%assim .and. .not. this_obs_param%getinnov) return
+
+    if (trim(this_obs_param%name) == '') then
+       err_msg = 'CYGNSS L1 scalar obs requested but obs_param%name is empty'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (trim(this_obs_param%path) == '') then
+       tmpfname = trim(this_obs_param%name)
+    else
+       tmpfname = trim(this_obs_param%path) // '/' // trim(this_obs_param%name)
+    end if
+
+    if (logit) write (logunit, '(400A)') 'Reading CYGNSS L1 scalar data from file: ', trim(tmpfname)
+
+    inquire(file=tmpfname, exist=file_exists)
+
+    if (.not. file_exists) then
+       err_msg = 'CYGNSS L1 scalar obs file not found: ' // trim(tmpfname)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    call read_obs_nc_check(nf90_open(trim(tmpfname), nf90_nowrite, ncid), Iam, 'open CYGNSS L1 scalar file')
+
+    product_type   = ''
+    schema_version = ''
+    ldas_state     = ''
+    mwrtm_param    = ''
+    product_grid   = ''
+
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'product_type', product_type), Iam, 'read product_type')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'schema_version', schema_version), Iam, 'read schema_version')
+
+    if (nf90_get_att(ncid, NF90_GLOBAL, 'ldas_state', ldas_state) /= nf90_noerr) ldas_state = ''
+    if (nf90_get_att(ncid, NF90_GLOBAL, 'mwrtm_param', mwrtm_param) /= nf90_noerr) mwrtm_param = ''
+
+    if (trim(product_type) /= 'cygnss_tile_coefficient_preprocessor_netcdf') then
+       err_msg = 'unexpected CYGNSS product_type: ' // trim(product_type)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (trim(schema_version) /= '0.3') then
+       err_msg = 'unexpected CYGNSS schema_version: ' // trim(schema_version)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (index(tmpfname,   'M36') /= 0 .or. index(tmpfname,   'm36') /= 0 .or. &
+        index(ldas_state, 'M36') /= 0 .or. index(ldas_state, 'm36') /= 0 .or. &
+        index(mwrtm_param,'M36') /= 0 .or. index(mwrtm_param,'m36') /= 0) product_grid = 'M36'
+
+    if (index(tmpfname,   'M09') /= 0 .or. index(tmpfname,   'm09') /= 0 .or. &
+        index(ldas_state, 'M09') /= 0 .or. index(ldas_state, 'm09') /= 0 .or. &
+        index(mwrtm_param,'M09') /= 0 .or. index(mwrtm_param,'m09') /= 0) product_grid = 'M09'
+
+    if (trim(product_grid) == '') then
+       err_msg = 'cannot determine CYGNSS coefficient product grid from filename or product metadata'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (index(tile_grid_d%gridtype, trim(product_grid)) == 0) then
+       err_msg = 'CYGNSS coefficient product grid ' // trim(product_grid) // &
+            ' does not match model tile grid ' // trim(tile_grid_d%gridtype)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    call read_obs_nc_check(nf90_inq_dimid(ncid, 'obs', dimid), Iam, 'inq obs dim')
+    call read_obs_nc_check(nf90_inquire_dimension(ncid, dimid, len=N_obs), Iam, 'inquire obs dim')
+
+    allocate(owner_tile_index0(N_obs))
+    allocate(obs_year(N_obs))
+    allocate(obs_day(N_obs))
+    allocate(obs_db(N_obs))
+    allocate(obs_lon(N_obs))
+    allocate(obs_lat(N_obs))
+    allocate(owner_distance(N_obs))
+    allocate(obs_seconds_utc(N_obs))
+    allocate(best_owner_distance(N_catd))
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_index0', varid), Iam, 'inq sp_nearest_tile_index0')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_index0), Iam, 'read sp_nearest_tile_index0')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'observed_y_db', varid), Iam, 'inq observed_y_db')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_db), Iam, 'read observed_y_db')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_lon', varid), Iam, 'inq sp_lon')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_lon), Iam, 'read sp_lon')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_lat', varid), Iam, 'inq sp_lat')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_lat), Iam, 'read sp_lat')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_distance_km', varid), Iam, 'inq sp_nearest_tile_distance_km')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_distance), Iam, 'read sp_nearest_tile_distance_km')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'year', varid), Iam, 'inq year')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_year), Iam, 'read year')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'day', varid), Iam, 'inq day')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_day), Iam, 'read day')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'ddm_timestamp_utc_sec', varid), Iam, 'inq ddm_timestamp_utc_sec')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_seconds_utc), Iam, 'read ddm_timestamp_utc_sec')
+
+    call read_obs_nc_check(nf90_close(ncid), Iam, 'close CYGNSS L1 scalar file')
+
+    date_time_low = date_time
+    call augment_date_time( -(dtstep_assim/2), date_time_low )
+    date_time_up = date_time
+    call augment_date_time(  (dtstep_assim/2), date_time_up )
+
+    J2000_seconds_low = datetime_to_J2000seconds(date_time_low, J2000_epoch_id)
+    J2000_seconds_up  = datetime_to_J2000seconds(date_time_up,  J2000_epoch_id)
+
+    best_owner_distance = huge_distance
+    tol = abs(this_obs_param%nodata*nodata_tolfrac_generic)
+
+    N_read         = N_obs
+    N_kept         = 0
+    N_duplicate    = 0
+    N_bad_owner    = 0
+    N_outside_time = 0
+
+    do i=1,N_obs
+
+       owner_tilenum = owner_tile_index0(i) + 1
+
+       if (owner_tilenum < 1 .or. owner_tilenum > N_catd) then
+          N_bad_owner = N_bad_owner + 1
+          cycle
+       end if
+
+       if (abs(obs_db(i)-this_obs_param%nodata) <= tol) cycle
+
+       obs_seconds = nint(obs_seconds_utc(i))
+       date_time_obs = date_time_type(obs_year(i), 1, 1, 0, 0, 0, -9999, -9999)
+       call augment_date_time( (obs_day(i)-1)*86400 + obs_seconds, date_time_obs )
+       J2000_seconds_obs = datetime_to_J2000seconds(date_time_obs, J2000_epoch_id)
+
+       if (J2000_seconds_obs <= J2000_seconds_low .or. J2000_seconds_obs > J2000_seconds_up) then
+          N_outside_time = N_outside_time + 1
+          cycle
+       end if
+
+       if (owner_distance(i) < best_owner_distance(owner_tilenum)) then
+          if (best_owner_distance(owner_tilenum) < huge_distance) N_duplicate = N_duplicate + 1
+
+          CYGNSS_obs(owner_tilenum)     = obs_db(i)
+          CYGNSS_obs_std(owner_tilenum) = this_obs_param%errstd
+          CYGNSS_lon(owner_tilenum)     = obs_lon(i)
+          CYGNSS_lat(owner_tilenum)     = obs_lat(i)
+          CYGNSS_time(owner_tilenum)    = J2000_seconds_obs
+
+          best_owner_distance(owner_tilenum) = owner_distance(i)
+       else
+          N_duplicate = N_duplicate + 1
+       end if
+
+    end do
+
+    N_kept = count(best_owner_distance < huge_distance)
+    found_obs = N_kept > 0
+
+    if (logit) then
+       write (logunit,*) 'CYGNSS preprocessed obs read: ', N_read
+       write (logunit,*) 'CYGNSS preprocessed obs kept one-per-owner-tile: ', N_kept
+       write (logunit,*) 'CYGNSS preprocessed obs dropped duplicate-owner-tile: ', N_duplicate
+       write (logunit,*) 'CYGNSS preprocessed obs dropped bad owner tile: ', N_bad_owner
+       write (logunit,*) 'CYGNSS preprocessed obs outside assimilation window: ', N_outside_time
+    end if
+
+    deallocate(owner_tile_index0)
+    deallocate(obs_year)
+    deallocate(obs_day)
+    deallocate(obs_db)
+    deallocate(obs_lon)
+    deallocate(obs_lat)
+    deallocate(owner_distance)
+    deallocate(obs_seconds_utc)
+    deallocate(best_owner_distance)
+
+  end subroutine read_obs_cygnss_l1_scalar
+
 
   ! ***************************************************************************
 
@@ -9167,6 +9447,14 @@ contains
                tmp_obs, tmp_std_obs )
           
        end if
+
+    case ('CYGNSS_L1_DDM3X5_CROP_SCALAR')
+
+       call read_obs_cygnss_l1_scalar(                                &
+            date_time, dtstep_assim, N_catd, tile_coord, tile_grid_d, &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
        
     case ('isccp_tskin_gswp2_v1')
        

@@ -380,6 +380,11 @@ contains
           
           obs_param_nml(i)%fcstvarname = obs_param_nml(i)%varname 
           obs_param_nml(i)%fcstunits   = obs_param_nml(i)%units  
+
+       case ('cygl1scal')
+
+          obs_param_nml(i)%fcstvarname = 'cygl1scal'
+          obs_param_nml(i)%fcstunits   = 'dB'
           
        case default
           
@@ -1279,6 +1284,11 @@ contains
           get_asnow_l   = .true.
           get_asnow_lH  = .true.
           get_tp_l      = .true.   ! needed for model-based QC
+
+       case ('cygl1scal')
+
+          get_sfmc_l   = .true.
+          get_sfmc_lH  = .true.
          
        case default
           
@@ -1869,6 +1879,11 @@ contains
                    end select
                    
                 end if
+
+             case ('cygl1scal')
+
+                err_msg = 'CYGNSS L1 scalar forward operator not yet implemented'
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
                 
              case default
                 
