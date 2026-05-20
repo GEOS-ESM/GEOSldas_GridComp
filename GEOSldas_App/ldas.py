@@ -838,11 +838,12 @@ class ldas:
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
-           if self.with_issm:
-              for pattern in ('*.bin', '*.toolkits'):
-                 for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
-                    myISSMBC = self.inpdir+'/'+os.path.basename(issmbc)
-                    os.symlink(issmbc, myISSMBC)        
+        
+        if self.with_issm:
+           for pattern in ('*.bin', '*.toolkits'):
+              for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
+                 myISSMBC = self.inpdir+'/'+os.path.basename(issmbc)
+                 os.symlink(issmbc, myISSMBC)        
       
         # create and link restart
         print ("Creating and linking restart...")
