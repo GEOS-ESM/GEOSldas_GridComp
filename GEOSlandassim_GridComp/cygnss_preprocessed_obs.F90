@@ -319,7 +319,8 @@ contains
 
   subroutine cygnss_preproc_get_obs_pred(                                      &
        this_obs_param, N_catlH, tile_coord_lH, N_ens,                          &
-       sfmc_lH, mwp_clay_lH, mwp_poros_lH, tilenum, obs_pred)
+       sfmc_lH, mwp_clay_lH, mwp_poros_lH, tilenum, obs_pred,                  &
+       N_refl_nodata, N_hx_nonpos)
 
     ! Evaluate the CYGNSS coefficient operator for one GEOSldas observation
     ! and all ensemble members.
@@ -341,12 +342,15 @@ contains
 
     integer,                                 intent(in)  :: tilenum
     real, dimension(N_ens),                  intent(out) :: obs_pred
+    integer, optional,                       intent(out) :: N_refl_nodata
+    integer, optional,                       intent(out) :: N_hx_nonpos
 
     integer :: obs_ind
     integer :: n_e, k, k1, k2
     integer :: support_tilenum, ind_lH
 
     real    :: refl_lr, hx_linear
+    logical :: refl_nodata
 
     character(len=400) :: err_msg
 
@@ -355,6 +359,9 @@ contains
     call cygnss_preproc_load(this_obs_param)
 
     obs_pred = nodata_generic
+
+    if (present(N_refl_nodata)) N_refl_nodata = 0
+    if (present(N_hx_nonpos))   N_hx_nonpos   = 0
 
     obs_ind = cygnss_preproc_find_obs(tilenum)
 
@@ -374,6 +381,7 @@ contains
     do n_e=1,N_ens
 
        hx_linear = 0.
+       refl_nodata = .false.
 
        do k=k1,k2
 
@@ -397,6 +405,7 @@ contains
 
           if (LDAS_is_nodata(refl_lr)) then
              hx_linear = nodata_generic
+             refl_nodata = .true.
              exit
           end if
 
@@ -405,7 +414,15 @@ contains
        end do
 
        if (.not. LDAS_is_nodata(hx_linear)) then
-          if (hx_linear > 0.) obs_pred(n_e) = 10. * log10(hx_linear)
+          if (hx_linear > 0.) then
+             obs_pred(n_e) = 10. * log10(hx_linear)
+          else
+             if (present(N_hx_nonpos)) N_hx_nonpos = N_hx_nonpos + 1
+          end if
+       else
+          if (refl_nodata) then
+             if (present(N_refl_nodata)) N_refl_nodata = N_refl_nodata + 1
+          end if
        end if
 
     end do

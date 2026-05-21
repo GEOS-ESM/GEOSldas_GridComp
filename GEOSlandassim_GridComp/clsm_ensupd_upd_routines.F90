@@ -1084,6 +1084,9 @@ contains
     integer                                 :: istart, iend
     integer                                 :: N_cygl1_total, N_cygl1_valid, N_cygl1_nodata
     integer                                 :: N_cygl1_total_g, N_cygl1_valid_g, N_cygl1_nodata_g
+    integer                                 :: N_cygl1_refl_nodata, N_cygl1_hx_nonpos
+    integer                                 :: N_cygl1_refl_nodata_g, N_cygl1_hx_nonpos_g
+    integer                                 :: N_cygl1_refl_nodata_obs, N_cygl1_hx_nonpos_obs
 
     real                                    :: this_lon, this_FOV, r_y
     real, dimension(1)                      :: this_lat, r_x
@@ -1682,6 +1685,9 @@ contains
     allocate(tmp_weights(N_catlH))
     allocate(tmp_data(   N_catlH))
 
+    N_cygl1_refl_nodata = 0
+    N_cygl1_hx_nonpos   = 0
+
     do i=1,N_obsl
        
        this_species       = Observations_l(i)%species
@@ -1715,7 +1721,11 @@ contains
           call cygnss_preproc_get_obs_pred(                                      &
                obs_param(this_species), N_catlH, tile_coord_lH, N_ens,           &
                sfmc_lH, mwp_clay_lH, mwp_poros_lH, this_tilenum,                 &
-               Obs_pred_l(i,1:N_ens) )
+               Obs_pred_l(i,1:N_ens),                                            &
+               N_cygl1_refl_nodata_obs, N_cygl1_hx_nonpos_obs )
+
+          if (N_cygl1_refl_nodata_obs > 0) N_cygl1_refl_nodata = N_cygl1_refl_nodata + 1
+          if (N_cygl1_hx_nonpos_obs   > 0) N_cygl1_hx_nonpos   = N_cygl1_hx_nonpos   + 1
 
           cycle
 
@@ -2102,16 +2112,23 @@ contains
        call MPI_Reduce( N_cygl1_total,  N_cygl1_total_g,  1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
        call MPI_Reduce( N_cygl1_valid,  N_cygl1_valid_g,  1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
        call MPI_Reduce( N_cygl1_nodata, N_cygl1_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_refl_nodata, N_cygl1_refl_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_hx_nonpos,   N_cygl1_hx_nonpos_g,   1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
 #else
        N_cygl1_total_g  = N_cygl1_total
        N_cygl1_valid_g  = N_cygl1_valid
        N_cygl1_nodata_g = N_cygl1_nodata
+       N_cygl1_refl_nodata_g = N_cygl1_refl_nodata
+       N_cygl1_hx_nonpos_g   = N_cygl1_hx_nonpos
 #endif
 
        if (logit .and. root_proc .and. N_cygl1_total_g > 0) then
-          write(logunit,*) 'CYGNSS preprocessed Obs_pred model-QC global: total=', &
-               N_cygl1_total_g, ' valid=', N_cygl1_valid_g,                      &
-               ' nodata=', N_cygl1_nodata_g
+          write(logunit,'(A,I8,A,I8,A,I8,A,I8,A,I8)')                         &
+               'CYGNSS preprocessed Obs_pred model-QC global: total=',         &
+               N_cygl1_total_g, ' valid=', N_cygl1_valid_g,                   &
+               ' nodata=', N_cygl1_nodata_g,                                  &
+               ' refl_nodata_obs=', N_cygl1_refl_nodata_g,                    &
+               ' hx_nonpos_obs=', N_cygl1_hx_nonpos_g
        end if
 
        if (logit .and. N_cygl1_total > 0) then
