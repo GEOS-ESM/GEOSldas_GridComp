@@ -5341,13 +5341,16 @@ contains
        
        if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds obs'
        
-       ! Get all species associated with *assimilated* Tb, sfmc, and sfds observations
+       ! Get all species associated with *assimilated* Tb, sfmc, sfds, and
+       ! CYGNSS L1 scalar observations.  The CYGNSS preprocessed scalar has
+       ! its own H(x), but uses the soil-moisture state vector in update_type 13.
 
-       N_select_varnames  = 3
+       N_select_varnames  = 4
        
        select_varnames(1) = 'Tb'
        select_varnames(2) = 'sfmc'
        select_varnames(3) = 'sfds'
+       select_varnames(4) = 'cygl1scal'
        
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
