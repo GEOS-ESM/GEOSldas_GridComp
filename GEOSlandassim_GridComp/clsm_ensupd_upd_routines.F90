@@ -1081,6 +1081,7 @@ contains
     integer                                 :: this_species, this_tilenum, this_pol
     integer                                 :: this_Tbspecies, this_TbuniqFreqAngRTMid, RTM_id
     integer                                 :: istart, iend
+    integer                                 :: N_cygl1_total, N_cygl1_valid, N_cygl1_nodata
 
     real                                    :: this_lon, this_FOV, r_y
     real, dimension(1)                      :: this_lat, r_x
@@ -2035,8 +2036,30 @@ contains
        ! when used for "forecast" delete obs if Obs_pred is no-data-value
        
        j = 0
+
+       N_cygl1_total  = 0
+       N_cygl1_valid  = 0
+       N_cygl1_nodata = 0
        
        do i=1,N_obsl
+
+          this_species = Observations_l(i)%species
+
+          if (trim(obs_param(this_species)%varname) == 'cygl1scal') then
+
+             N_cygl1_total = N_cygl1_total + 1
+
+             if (all(abs(Obs_pred_l(i,1:N_ens)-nodata_generic)>nodata_tol_generic))  then
+                N_cygl1_valid = N_cygl1_valid + 1
+             else
+                N_cygl1_nodata = N_cygl1_nodata + 1
+                if (logit) write(logunit,*)                                      &
+                     'CYGNSS preprocessed Obs_pred nodata on rank ', myid,        &
+                     ' tilenum=', Observations_l(i)%tilenum,                     &
+                     ' obs=', Observations_l(i)%obs
+             end if
+
+          end if
           
           if (all(abs(Obs_pred_l(i,1:N_ens)-nodata_generic)>nodata_tol_generic))  then
              
@@ -2072,6 +2095,12 @@ contains
           end if
           
        end do
+
+       if (logit .and. N_cygl1_total > 0) then
+          write(logunit,*) 'CYGNSS preprocessed Obs_pred model-QC rank ', myid,   &
+               ': total=', N_cygl1_total, ' valid=', N_cygl1_valid,              &
+               ' nodata=', N_cygl1_nodata
+       end if
        
        N_obsl = j
        
