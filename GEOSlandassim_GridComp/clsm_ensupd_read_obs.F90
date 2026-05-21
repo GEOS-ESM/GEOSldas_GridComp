@@ -2683,6 +2683,73 @@ contains
 
   ! ***************************************************************************
 
+  subroutine read_obs_cygnss_l1_replace_token(string, token, value)
+
+    ! Replace all occurrences of a fixed-width date token in string.
+
+    implicit none
+
+    character(len=*), intent(inout) :: string
+    character(len=*), intent(in)    :: token
+    character(len=*), intent(in)    :: value
+
+    integer :: ind
+
+    ind = index(string, token)
+
+    do while (ind > 0)
+       string = string(:ind-1) // value // string(ind+len(token):)
+       ind = index(string, token)
+    end do
+
+  end subroutine read_obs_cygnss_l1_replace_token
+
+  ! ***************************************************************************
+
+  subroutine read_obs_cygnss_l1_make_fname(this_obs_param, date_time_file, fname)
+
+    ! Build the daily CYGNSS L1 scalar filename from a root path and a
+    ! date-tokenized filename template.
+
+    implicit none
+
+    type(obs_param_type), intent(in)  :: this_obs_param
+    type(date_time_type), intent(in)  :: date_time_file
+    character(len=400),   intent(out) :: fname
+
+    integer :: lpath
+
+    character(len=4)   :: yyyy
+    character(len=2)   :: mm, dd
+    character(len=400) :: filename
+
+    character(len=*), parameter :: Iam = 'read_obs_cygnss_l1_make_fname'
+
+    fname = ''
+
+    if ((len_trim(this_obs_param%path) == 0) .or. (len_trim(this_obs_param%name) == 0)) then
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'empty CYGNSS L1 scalar path/name')
+    end if
+
+    lpath = len_trim(this_obs_param%path)
+
+    write(yyyy,'(I4.4)') date_time_file%year
+    write(mm,  '(I2.2)') date_time_file%month
+    write(dd,  '(I2.2)') date_time_file%day
+
+    filename = trim(this_obs_param%name)
+    call read_obs_cygnss_l1_replace_token(filename, 'yyyymmdd', yyyy//mm//dd)
+
+    if (this_obs_param%path(lpath:lpath) == '/') then
+       fname = trim(this_obs_param%path) // 'Y' // yyyy // '/M' // mm // '/' // trim(filename)
+    else
+       fname = trim(this_obs_param%path) // '/Y' // yyyy // '/M' // mm // '/' // trim(filename)
+    end if
+
+  end subroutine read_obs_cygnss_l1_make_fname
+
+  ! ***************************************************************************
+
   subroutine read_obs_cygnss_l1_scalar(                                         &
        date_time, dtstep_assim, N_catd, tile_coord, tile_grid_d,                &
        this_obs_param,                                                          &
@@ -2734,10 +2801,10 @@ contains
     character(len=*),  parameter :: Iam = 'read_obs_cygnss_l1_scalar'
     real,              parameter :: huge_distance = 1.0e30
 
-    type(date_time_type) :: date_time_low, date_time_up, date_time_obs
+    type(date_time_type) :: date_time_low, date_time_up, date_time_file, date_time_obs
 
     character(400) :: err_msg
-    character(300) :: tmpfname
+    character(400) :: tmpfname
     character(100) :: product_type, schema_version
     character(300) :: ldas_state, mwrtm_param
     character( 16) :: product_grid
@@ -2745,6 +2812,7 @@ contains
     integer :: i, owner_tilenum
     integer :: ncid, dimid, varid
     integer :: N_obs, N_read, N_kept, N_duplicate, N_bad_owner, N_outside_time
+    integer :: N_files_read
     integer :: obs_seconds
 
     integer, allocatable :: owner_tile_index0(:)
@@ -2776,25 +2844,42 @@ contains
 
     if (.not. this_obs_param%assim .and. .not. this_obs_param%getinnov) return
 
-    if (trim(this_obs_param%name) == '') then
-       err_msg = 'CYGNSS L1 scalar obs requested but obs_param%name is empty'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
+    date_time_low = date_time
+    call augment_date_time( -(dtstep_assim/2), date_time_low )
+    date_time_up = date_time
+    call augment_date_time(  (dtstep_assim/2), date_time_up )
 
-    if (trim(this_obs_param%path) == '') then
-       tmpfname = trim(this_obs_param%name)
-    else
-       tmpfname = trim(this_obs_param%path) // '/' // trim(this_obs_param%name)
+    J2000_seconds_low = datetime_to_J2000seconds(date_time_low, J2000_epoch_id)
+    J2000_seconds_up  = datetime_to_J2000seconds(date_time_up,  J2000_epoch_id)
+
+    allocate(best_owner_distance(N_catd))
+    best_owner_distance = huge_distance
+    tol = abs(this_obs_param%nodata*nodata_tolfrac_generic)
+
+    N_files_read   = 0
+    N_read         = 0
+    N_duplicate    = 0
+    N_bad_owner    = 0
+    N_outside_time = 0
+
+    date_time_file = date_time_type(date_time_low%year, date_time_low%month, date_time_low%day, &
+         0, 0, 0, -9999, -9999)
+
+    do while (datetime_le_refdatetime(date_time_file, date_time_up))
+
+    call read_obs_cygnss_l1_make_fname(this_obs_param, date_time_file, tmpfname)
+
+    inquire(file=trim(tmpfname), exist=file_exists)
+
+    if (.not. file_exists) then
+       if (logit) write (logunit, '(400A)') 'Skipping missing CYGNSS L1 scalar data file: ', trim(tmpfname)
+       call augment_date_time(86400, date_time_file)
+       cycle
     end if
 
     if (logit) write (logunit, '(400A)') 'Reading CYGNSS L1 scalar data from file: ', trim(tmpfname)
 
-    inquire(file=tmpfname, exist=file_exists)
-
-    if (.not. file_exists) then
-       err_msg = 'CYGNSS L1 scalar obs file not found: ' // trim(tmpfname)
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
+    N_files_read = N_files_read + 1
 
     call read_obs_nc_check(nf90_open(trim(tmpfname), nf90_nowrite, ncid), Iam, 'open CYGNSS L1 scalar file')
 
@@ -2857,7 +2942,6 @@ contains
     allocate(obs_lat(N_obs))
     allocate(owner_distance(N_obs))
     allocate(obs_seconds_utc(N_obs))
-    allocate(best_owner_distance(N_catd))
 
     call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_index0', varid), Iam, 'inq sp_nearest_tile_index0')
     call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_index0), Iam, 'read sp_nearest_tile_index0')
@@ -2885,27 +2969,12 @@ contains
 
     call read_obs_nc_check(nf90_close(ncid), Iam, 'close CYGNSS L1 scalar file')
 
-    date_time_low = date_time
-    call augment_date_time( -(dtstep_assim/2), date_time_low )
-    date_time_up = date_time
-    call augment_date_time(  (dtstep_assim/2), date_time_up )
-
-    J2000_seconds_low = datetime_to_J2000seconds(date_time_low, J2000_epoch_id)
-    J2000_seconds_up  = datetime_to_J2000seconds(date_time_up,  J2000_epoch_id)
-
     ! Keep observations in the same half-open assimilation window used by
     ! the rest of the EnKF readers:
     !
     !     (date_time - dtstep_assim/2, date_time + dtstep_assim/2]
 
-    best_owner_distance = huge_distance
-    tol = abs(this_obs_param%nodata*nodata_tolfrac_generic)
-
-    N_read         = N_obs
-    N_kept         = 0
-    N_duplicate    = 0
-    N_bad_owner    = 0
-    N_outside_time = 0
+    N_read = N_read + N_obs
 
     do i=1,N_obs
 
@@ -2952,17 +3021,6 @@ contains
 
     end do
 
-    N_kept = count(best_owner_distance < huge_distance)
-    found_obs = N_kept > 0
-
-    if (logit) then
-       write (logunit,*) 'CYGNSS preprocessed obs read: ', N_read
-       write (logunit,*) 'CYGNSS preprocessed obs kept one-per-owner-tile: ', N_kept
-       write (logunit,*) 'CYGNSS preprocessed obs dropped duplicate-owner-tile: ', N_duplicate
-       write (logunit,*) 'CYGNSS preprocessed obs dropped bad owner tile: ', N_bad_owner
-       write (logunit,*) 'CYGNSS preprocessed obs outside assimilation window: ', N_outside_time
-    end if
-
     deallocate(owner_tile_index0)
     deallocate(obs_year)
     deallocate(obs_day)
@@ -2971,6 +3029,28 @@ contains
     deallocate(obs_lat)
     deallocate(owner_distance)
     deallocate(obs_seconds_utc)
+
+    call augment_date_time(86400, date_time_file)
+
+    end do
+
+    if (N_files_read == 0) then
+       err_msg = 'no CYGNSS L1 scalar obs files found for assimilation window'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    N_kept = count(best_owner_distance < huge_distance)
+    found_obs = N_kept > 0
+
+    if (logit) then
+       write (logunit,*) 'CYGNSS preprocessed obs daily files read: ', N_files_read
+       write (logunit,*) 'CYGNSS preprocessed obs read: ', N_read
+       write (logunit,*) 'CYGNSS preprocessed obs kept one-per-owner-tile: ', N_kept
+       write (logunit,*) 'CYGNSS preprocessed obs dropped duplicate-owner-tile: ', N_duplicate
+       write (logunit,*) 'CYGNSS preprocessed obs dropped bad owner tile: ', N_bad_owner
+       write (logunit,*) 'CYGNSS preprocessed obs outside assimilation window: ', N_outside_time
+    end if
+
     deallocate(best_owner_distance)
 
   end subroutine read_obs_cygnss_l1_scalar

@@ -1001,7 +1001,7 @@ contains
   ! *********************************************************************
   
   subroutine get_obs_pred(                                       &
-       beforeEnKFupdate,                                         &
+       beforeEnKFupdate, date_time, dtstep_assim,                &
        N_obs_param, N_ens,                                       &
        N_catl, tile_coord_l,                                     &
        N_catf, tile_coord_f, f2l,                                &
@@ -1036,7 +1036,9 @@ contains
     implicit none
     
     logical,                intent(in)                             :: beforeEnKFupdate
+    type(date_time_type),   intent(in)                             :: date_time
     
+    integer,                intent(in)                             :: dtstep_assim
     integer,                intent(in)                             :: N_obs_param, N_ens
     integer,                intent(in)                             :: N_catl, N_catf
     
@@ -1712,6 +1714,7 @@ contains
           call cygnss_preproc_get_obs_pred(                                      &
                obs_param(this_species), N_catlH, tile_coord_lH, N_ens,           &
                sfmc_lH, mwp_clay_lH, mwp_poros_lH, this_tilenum,                 &
+               date_time, dtstep_assim,                                          &
                Obs_pred_l(i,1:N_ens) )
 
           cycle

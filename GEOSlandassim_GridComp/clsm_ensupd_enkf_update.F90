@@ -508,7 +508,7 @@ contains
           ! incl. obs bias estimation
 
           call get_obs_pred(                                      &
-               .true.,                                            & ! -> before EnKF update
+               .true., date_time, dtstep_assim,                   & ! -> before EnKF update
                N_obs_param, N_ens,                                &
                N_catl, tile_coord_l,                              &
                N_catf, tile_coord_f, f2l,                         &
@@ -2131,7 +2131,7 @@ contains
        N_obsl_tmp = N_obsl ! cannot pass N_obsl into get_obs_pred() b/c of intent(in)
 
        call get_obs_pred(                                      &
-            .false.,                                           & ! -> after EnKF update
+            .false., date_time, dtstep_assim,                  & ! -> after EnKF update
             N_obs_param, N_ens,                                &
             N_catl, tile_coord_l,                              &
             N_catf, tile_coord_f, f2l,                         &

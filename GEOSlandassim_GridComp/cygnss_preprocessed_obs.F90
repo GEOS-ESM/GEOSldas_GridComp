@@ -31,6 +31,11 @@ module cygnss_preprocessed_obs
        ldas_abort,                                &
        LDAS_GENERIC_ERROR
 
+  use LDAS_DateTimeMod,                 ONLY:     &
+       date_time_type,                            &
+       augment_date_time,                         &
+       datetime_le_refdatetime
+
   use mwRTM_routines,                   ONLY:     &
        mwRTM_get_lr_reflectivity
 
@@ -41,7 +46,7 @@ module cygnss_preprocessed_obs
   public :: cygnss_preproc_get_obs_pred
 
   logical                  :: is_loaded = .false.
-  character(len=400)       :: loaded_fname = ''
+  character(len=2000)      :: loaded_fname = ''
 
   integer                  :: N_obs_file = 0
   integer                  :: N_support_file = 0
@@ -81,17 +86,45 @@ contains
 
   ! *****************************************************************
 
-  subroutine cygnss_preproc_make_fname(this_obs_param, fname)
+  subroutine cygnss_preproc_replace_token(string, token, value)
 
-    ! Build the coefficient-product filename from obs_param%path and
-    ! obs_param%name.
+    ! Replace all occurrences of a fixed-width date token in string.
 
     implicit none
 
-    type(obs_param_type), intent(in)  :: this_obs_param
-    character(len=400),  intent(out) :: fname
+    character(len=*), intent(inout) :: string
+    character(len=*), intent(in)    :: token
+    character(len=*), intent(in)    :: value
+
+    integer :: ind
+
+    ind = index(string, token)
+
+    do while (ind > 0)
+       string = string(:ind-1) // value // string(ind+len(token):)
+       ind = index(string, token)
+    end do
+
+  end subroutine cygnss_preproc_replace_token
+
+  ! *****************************************************************
+
+  subroutine cygnss_preproc_make_fname(this_obs_param, date_time_file, fname)
+
+    ! Build the coefficient-product filename from obs_param%path and
+    ! obs_param%name.  Daily products live under Yyyyy/Mmm directories.
+
+    implicit none
+
+    type(obs_param_type), intent(in)      :: this_obs_param
+    type(date_time_type), intent(in)      :: date_time_file
+    character(len=400),   intent(out)     :: fname
 
     integer :: lpath
+
+    character(len=4) :: yyyy
+    character(len=2) :: mm, dd
+    character(len=400) :: filename
 
     character(len=*), parameter :: Iam = 'cygnss_preproc_make_fname'
 
@@ -102,11 +135,17 @@ contains
     end if
 
     lpath = len_trim(this_obs_param%path)
+    write(yyyy,'(I4.4)') date_time_file%year
+    write(mm,  '(I2.2)') date_time_file%month
+    write(dd,  '(I2.2)') date_time_file%day
+
+    filename = trim(this_obs_param%name)
+    call cygnss_preproc_replace_token(filename, 'yyyymmdd', yyyy//mm//dd)
 
     if (this_obs_param%path(lpath:lpath) == '/') then
-       fname = trim(this_obs_param%path) // trim(this_obs_param%name)
+       fname = trim(this_obs_param%path) // 'Y' // yyyy // '/M' // mm // '/' // trim(filename)
     else
-       fname = trim(this_obs_param%path) // '/' // trim(this_obs_param%name)
+       fname = trim(this_obs_param%path) // '/Y' // yyyy // '/M' // mm // '/' // trim(filename)
     end if
 
   end subroutine cygnss_preproc_make_fname
@@ -115,7 +154,7 @@ contains
 
   subroutine cygnss_preproc_clear()
 
-    ! Clear the one-file coefficient-product cache.
+    ! Clear the daily-file-set coefficient-product cache.
 
     implicit none
 
@@ -136,66 +175,109 @@ contains
 
   ! *****************************************************************
 
-  subroutine cygnss_preproc_load(this_obs_param)
+  subroutine cygnss_preproc_load(this_obs_param, date_time, dtstep_assim)
 
     ! Load the coefficient-product metadata and sparse support arrays.
     !
-    ! The cache intentionally holds one product file at a time.  Repeated
-    ! calls with the same obs_param%path/name are cheap.
+    ! The cache holds all daily product files touched by the current
+    ! assimilation window.  Repeated calls for the same window are cheap.
 
     implicit none
 
-    type(obs_param_type), intent(in) :: this_obs_param
+    type(obs_param_type), intent(in)    :: this_obs_param
+    type(date_time_type), intent(in)    :: date_time
+    integer,             intent(in)    :: dtstep_assim
 
     integer :: ncid, dimid, varid
     integer :: status
+    integer :: N_obs_this, N_support_this
+    integer :: N_obs_total, N_support_total
+    integer :: obs_offset, support_offset
 
     integer, allocatable :: tmp_tilenum0(:)
+    integer, allocatable :: tmp_tile_start(:)
 
     character(len=400) :: fname
+    character(len=2000) :: fname_key
     character(len=256) :: product_type
     character(len=256) :: schema_version
 
+    logical :: file_exists
+    type(date_time_type) :: date_time_low, date_time_up, date_time_file
+
     character(len=*), parameter :: Iam = 'cygnss_preproc_load'
 
-    call cygnss_preproc_make_fname(this_obs_param, fname)
+    date_time_low = date_time
+    call augment_date_time( -(dtstep_assim/2), date_time_low )
+    date_time_up = date_time
+    call augment_date_time(  (dtstep_assim/2), date_time_up )
 
-    if (is_loaded .and. (trim(fname) == trim(loaded_fname))) return
+    date_time_file = date_time_type(date_time_low%year, date_time_low%month, date_time_low%day, &
+         0, 0, 0, -9999, -9999)
+
+    fname_key = ''
+    N_obs_total = 0
+    N_support_total = 0
+
+    do while (datetime_le_refdatetime(date_time_file, date_time_up))
+
+       call cygnss_preproc_make_fname(this_obs_param, date_time_file, fname)
+       inquire(file=trim(fname), exist=file_exists)
+
+       if (file_exists) then
+
+          fname_key = trim(fname_key) // '|' // trim(fname)
+
+          status = nf90_open(trim(fname), nf90_nowrite, ncid)
+          call cygnss_preproc_nc_check(status, Iam, 'opening ' // trim(fname))
+
+          status = nf90_get_att(ncid, nf90_global, 'product_type', product_type)
+          call cygnss_preproc_nc_check(status, Iam, 'reading global attribute product_type')
+
+          status = nf90_get_att(ncid, nf90_global, 'schema_version', schema_version)
+          call cygnss_preproc_nc_check(status, Iam, 'reading global attribute schema_version')
+
+          if (trim(product_type) /= 'cygnss_tile_coefficient_preprocessor_netcdf') then
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient product_type')
+          end if
+
+          if (trim(schema_version) /= '0.3') then
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient schema_version')
+          end if
+
+          status = nf90_inq_dimid(ncid, 'obs', dimid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring obs dimension')
+          status = nf90_inquire_dimension(ncid, dimid, len=N_obs_this)
+          call cygnss_preproc_nc_check(status, Iam, 'reading obs dimension')
+
+          status = nf90_inq_dimid(ncid, 'support', dimid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring support dimension')
+          status = nf90_inquire_dimension(ncid, dimid, len=N_support_this)
+          call cygnss_preproc_nc_check(status, Iam, 'reading support dimension')
+
+          status = nf90_close(ncid)
+          call cygnss_preproc_nc_check(status, Iam, 'closing ' // trim(fname))
+
+          N_obs_total = N_obs_total + N_obs_this
+          N_support_total = N_support_total + N_support_this
+
+       end if
+
+       call augment_date_time(86400, date_time_file)
+
+    end do
+
+    if (is_loaded .and. (trim(fname_key) == trim(loaded_fname))) return
 
     call cygnss_preproc_clear()
 
-    if (logit) write(logunit,'(400A)') 'Reading CYGNSS coefficient operator file: ' // trim(fname)
-
-    status = nf90_open(trim(fname), nf90_nowrite, ncid)
-    call cygnss_preproc_nc_check(status, Iam, 'opening ' // trim(fname))
-
-    status = nf90_get_att(ncid, nf90_global, 'product_type', product_type)
-    call cygnss_preproc_nc_check(status, Iam, 'reading global attribute product_type')
-
-    status = nf90_get_att(ncid, nf90_global, 'schema_version', schema_version)
-    call cygnss_preproc_nc_check(status, Iam, 'reading global attribute schema_version')
-
-    if (trim(product_type) /= 'cygnss_tile_coefficient_preprocessor_netcdf') then
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient product_type')
+    if (N_obs_total < 1) then
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'no CYGNSS coefficient operator files found for window')
     end if
 
-    if (trim(schema_version) /= '0.3') then
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient schema_version')
-    end if
+    N_obs_file = N_obs_total
+    N_support_file = N_support_total
 
-    status = nf90_inq_dimid(ncid, 'obs', dimid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring obs dimension')
-
-    status = nf90_inquire_dimension(ncid, dimid, len=N_obs_file)
-    call cygnss_preproc_nc_check(status, Iam, 'reading obs dimension')
-
-    status = nf90_inq_dimid(ncid, 'support', dimid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring support dimension')
-
-    status = nf90_inquire_dimension(ncid, dimid, len=N_support_file)
-    call cygnss_preproc_nc_check(status, Iam, 'reading support dimension')
-
-    allocate(tmp_tilenum0(N_obs_file))
     allocate(obs_tilenum(N_obs_file))
     allocate(tile_start(N_obs_file))
     allocate(tile_count(N_obs_file))
@@ -204,52 +286,90 @@ contains
     allocate(support_tile_index0(N_support_file))
     allocate(coefficient(N_support_file))
 
-    status = nf90_inq_varid(ncid, 'sp_nearest_tile_index0', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_index0')
-    status = nf90_get_var(ncid, varid, tmp_tilenum0)
-    call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_index0')
+    obs_offset = 0
+    support_offset = 0
 
-    ! The product stores zero-based full-domain tile indices; GEOSldas
-    ! observation tile numbers are one-based.
+    date_time_file = date_time_type(date_time_low%year, date_time_low%month, date_time_low%day, &
+         0, 0, 0, -9999, -9999)
 
-    obs_tilenum = tmp_tilenum0 + 1
+    do while (datetime_le_refdatetime(date_time_file, date_time_up))
 
-    status = nf90_inq_varid(ncid, 'tile_start', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_start')
-    status = nf90_get_var(ncid, varid, tile_start)
-    call cygnss_preproc_nc_check(status, Iam, 'reading tile_start')
+       call cygnss_preproc_make_fname(this_obs_param, date_time_file, fname)
+       inquire(file=trim(fname), exist=file_exists)
 
-    status = nf90_inq_varid(ncid, 'tile_count', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_count')
-    status = nf90_get_var(ncid, varid, tile_count)
-    call cygnss_preproc_nc_check(status, Iam, 'reading tile_count')
+       if (file_exists) then
 
-    status = nf90_inq_varid(ncid, 'sp_inc_angle', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_inc_angle')
-    status = nf90_get_var(ncid, varid, sp_inc_angle)
-    call cygnss_preproc_nc_check(status, Iam, 'reading sp_inc_angle')
+          if (logit) write(logunit,'(400A)') 'Reading CYGNSS coefficient operator file: ' // trim(fname)
 
-    status = nf90_inq_varid(ncid, 'sp_nearest_tile_distance_km', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_distance_km')
-    status = nf90_get_var(ncid, varid, sp_nearest_tile_distance_km)
-    call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_distance_km')
+          status = nf90_open(trim(fname), nf90_nowrite, ncid)
+          call cygnss_preproc_nc_check(status, Iam, 'opening ' // trim(fname))
 
-    status = nf90_inq_varid(ncid, 'tile_index0', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_index0')
-    status = nf90_get_var(ncid, varid, support_tile_index0)
-    call cygnss_preproc_nc_check(status, Iam, 'reading tile_index0')
+          status = nf90_inq_dimid(ncid, 'obs', dimid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring obs dimension')
+          status = nf90_inquire_dimension(ncid, dimid, len=N_obs_this)
+          call cygnss_preproc_nc_check(status, Iam, 'reading obs dimension')
 
-    status = nf90_inq_varid(ncid, 'coefficient', varid)
-    call cygnss_preproc_nc_check(status, Iam, 'inquiring coefficient')
-    status = nf90_get_var(ncid, varid, coefficient)
-    call cygnss_preproc_nc_check(status, Iam, 'reading coefficient')
+          status = nf90_inq_dimid(ncid, 'support', dimid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring support dimension')
+          status = nf90_inquire_dimension(ncid, dimid, len=N_support_this)
+          call cygnss_preproc_nc_check(status, Iam, 'reading support dimension')
 
-    status = nf90_close(ncid)
-    call cygnss_preproc_nc_check(status, Iam, 'closing ' // trim(fname))
+          allocate(tmp_tilenum0(N_obs_this))
+          allocate(tmp_tile_start(N_obs_this))
 
-    deallocate(tmp_tilenum0)
+          status = nf90_inq_varid(ncid, 'sp_nearest_tile_index0', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_index0')
+          status = nf90_get_var(ncid, varid, tmp_tilenum0)
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_index0')
+          obs_tilenum(obs_offset+1:obs_offset+N_obs_this) = tmp_tilenum0 + 1
 
-    loaded_fname = fname
+          status = nf90_inq_varid(ncid, 'tile_start', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_start')
+          status = nf90_get_var(ncid, varid, tmp_tile_start)
+          call cygnss_preproc_nc_check(status, Iam, 'reading tile_start')
+          tile_start(obs_offset+1:obs_offset+N_obs_this) = tmp_tile_start + support_offset
+
+          status = nf90_inq_varid(ncid, 'tile_count', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_count')
+          status = nf90_get_var(ncid, varid, tile_count(obs_offset+1:obs_offset+N_obs_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading tile_count')
+
+          status = nf90_inq_varid(ncid, 'sp_inc_angle', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_inc_angle')
+          status = nf90_get_var(ncid, varid, sp_inc_angle(obs_offset+1:obs_offset+N_obs_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_inc_angle')
+
+          status = nf90_inq_varid(ncid, 'sp_nearest_tile_distance_km', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_distance_km')
+          status = nf90_get_var(ncid, varid, sp_nearest_tile_distance_km(obs_offset+1:obs_offset+N_obs_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_distance_km')
+
+          status = nf90_inq_varid(ncid, 'tile_index0', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_index0')
+          status = nf90_get_var(ncid, varid, support_tile_index0(support_offset+1:support_offset+N_support_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading tile_index0')
+
+          status = nf90_inq_varid(ncid, 'coefficient', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring coefficient')
+          status = nf90_get_var(ncid, varid, coefficient(support_offset+1:support_offset+N_support_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading coefficient')
+
+          status = nf90_close(ncid)
+          call cygnss_preproc_nc_check(status, Iam, 'closing ' // trim(fname))
+
+          deallocate(tmp_tilenum0)
+          deallocate(tmp_tile_start)
+
+          obs_offset = obs_offset + N_obs_this
+          support_offset = support_offset + N_support_this
+
+       end if
+
+       call augment_date_time(86400, date_time_file)
+
+    end do
+
+    loaded_fname = fname_key
     is_loaded = .true.
 
   end subroutine cygnss_preproc_load
@@ -319,7 +439,8 @@ contains
 
   subroutine cygnss_preproc_get_obs_pred(                                      &
        this_obs_param, N_catlH, tile_coord_lH, N_ens,                          &
-       sfmc_lH, mwp_clay_lH, mwp_poros_lH, tilenum, obs_pred)
+       sfmc_lH, mwp_clay_lH, mwp_poros_lH, tilenum,                            &
+       date_time, dtstep_assim, obs_pred)
 
     ! Evaluate the CYGNSS coefficient operator for one GEOSldas observation
     ! and all ensemble members.
@@ -340,6 +461,8 @@ contains
     real, dimension(N_catlH,N_ens),          intent(in)  :: mwp_poros_lH
 
     integer,                                 intent(in)  :: tilenum
+    type(date_time_type),                    intent(in)  :: date_time
+    integer,                                 intent(in)  :: dtstep_assim
     real, dimension(N_ens),                  intent(out) :: obs_pred
 
     integer :: obs_ind
@@ -352,7 +475,7 @@ contains
 
     character(len=*), parameter :: Iam = 'cygnss_preproc_get_obs_pred'
 
-    call cygnss_preproc_load(this_obs_param)
+    call cygnss_preproc_load(this_obs_param, date_time, dtstep_assim)
 
     obs_pred = nodata_generic
 
