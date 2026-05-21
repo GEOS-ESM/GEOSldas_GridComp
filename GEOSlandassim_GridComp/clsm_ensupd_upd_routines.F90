@@ -5324,22 +5324,22 @@ contains
        
        ! ----------------------------------------------------------------------------------------------------------------------  
        
-    case (13) select_update_type   ! 3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds obs
+    case (13) select_update_type   ! 3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds+cygl1scal obs
        
        ! update each tile separately using all observations within customized halo around each tile
        !
        ! state vector differs for each tile depending on assimilated obs and soil type 
        !
-       ! obs             | soil    | N_state | state vector
+       ! obs                  | soil    | N_state | state vector
        ! ----------------------------------------------------------------------
-       ! sfcm/sfds only  | mineral |     2   | srfexc, rzexc
-       ! sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
-       ! sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
-       ! sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       ! sfmc/sfds/cygl1scal  | mineral |     2   | srfexc, rzexc
+       ! sfmc/sfds/cygl1scal  | peat    |     3   | srfexc, rzexc, catdef
+       ! any of above & Tb    | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       ! any of above & Tb    | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
        ! amfox+rreichle, 26 Feb 2024
        
-       if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds obs'
+       if (logit) write (logunit,*) 'get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds+cygl1scal obs'
        
        ! Get all species associated with *assimilated* Tb, sfmc, sfds, and
        ! CYGNSS L1 scalar observations.  The CYGNSS preprocessed scalar has
