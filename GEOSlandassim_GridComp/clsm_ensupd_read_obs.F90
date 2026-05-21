@@ -2686,6 +2686,7 @@ contains
   subroutine read_obs_cygnss_l1_replace_token(string, token, value)
 
     ! Replace all occurrences of a fixed-width date token in string.
+    ! Keep synchronized with cygnss_preproc_replace_token().
 
     implicit none
 

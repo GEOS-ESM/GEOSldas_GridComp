@@ -89,6 +89,7 @@ contains
   subroutine cygnss_preproc_replace_token(string, token, value)
 
     ! Replace all occurrences of a fixed-width date token in string.
+    ! Keep synchronized with read_obs_cygnss_l1_replace_token().
 
     implicit none
 
@@ -216,8 +217,32 @@ contains
          0, 0, 0, -9999, -9999)
 
     fname_key = ''
+
+    ! Cheap cache-key pass.  Avoid opening NetCDF files on every warm-cache
+    ! observation lookup; the expensive dimension-count pass is only needed
+    ! when the date-window file set changes.
+    do while (datetime_le_refdatetime(date_time_file, date_time_up))
+
+       call cygnss_preproc_make_fname(this_obs_param, date_time_file, fname)
+       inquire(file=trim(fname), exist=file_exists)
+
+       if (file_exists) then
+          fname_key = trim(fname_key) // '|' // trim(fname)
+       end if
+
+       call augment_date_time(86400, date_time_file)
+
+    end do
+
+    if (is_loaded .and. (trim(fname_key) == trim(loaded_fname))) return
+
+    call cygnss_preproc_clear()
+
     N_obs_total = 0
     N_support_total = 0
+
+    date_time_file = date_time_type(date_time_low%year, date_time_low%month, date_time_low%day, &
+         0, 0, 0, -9999, -9999)
 
     do while (datetime_le_refdatetime(date_time_file, date_time_up))
 
@@ -225,8 +250,6 @@ contains
        inquire(file=trim(fname), exist=file_exists)
 
        if (file_exists) then
-
-          fname_key = trim(fname_key) // '|' // trim(fname)
 
           status = nf90_open(trim(fname), nf90_nowrite, ncid)
           call cygnss_preproc_nc_check(status, Iam, 'opening ' // trim(fname))
@@ -266,10 +289,6 @@ contains
        call augment_date_time(86400, date_time_file)
 
     end do
-
-    if (is_loaded .and. (trim(fname_key) == trim(loaded_fname))) return
-
-    call cygnss_preproc_clear()
 
     if (N_obs_total < 1) then
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'no CYGNSS coefficient operator files found for window')
