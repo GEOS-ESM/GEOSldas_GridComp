@@ -4898,7 +4898,7 @@ contains
        
        ! ----------------------------------------------------------------------------------------------------------------------  
 
-    case (12) select_update_type   !   3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds obs
+    case (12) select_update_type   !   3d soil moisture/Tskin/ght(1) analysis; Tb+sfmc+sfds+cygl1scal obs
                                    ! & 1d snow analysis (Toure et al. 2018 empirical gain); snow cover fraction obs
        
        ! update_type 12 is a combination of update_type 11 and update_type 13:
@@ -4913,12 +4913,12 @@ contains
        !   Update each tile separately using all observations within customized halo around the tile.
        !   State vector of each tile depends on assimilated obs and soil type.
        !
-       !   obs             | soil    | N_state | state vector
+       !   obs                  | soil    | N_state | state vector
        !   ----------------------------------------------------------------------
-       !   sfcm/sfds only  | mineral |     2   | srfexc, rzexc
-       !   sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
-       !   sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
-       !   sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       !   sfmc/sfds/cygl1scal  | mineral |     2   | srfexc, rzexc
+       !   sfmc/sfds/cygl1scal  | peat    |     3   | srfexc, rzexc, catdef
+       !   any of above & Tb    | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       !   any of above & Tb    | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
        ! amfox+rreichle, Dec 2024
        !
@@ -4948,12 +4948,15 @@ contains
        end if
        
        ! determine species of assimilated obs associated with soil moisture (+Tskin/ght(1)) analysis:
+       ! CYGNSS preprocessed scalar observations have their own H(x), but use
+       ! the soil-moisture state vector in update_type 12.
        
-       N_select_varnames  = 3
+       N_select_varnames  = 4
        
        select_varnames(1) = 'Tb'
        select_varnames(2) = 'sfmc'
        select_varnames(3) = 'sfds'
+       select_varnames(4) = 'cygl1scal'
        
        call get_select_species(                                                    &
             N_select_varnames, select_varnames(1:N_select_varnames),               &
@@ -4964,14 +4967,14 @@ contains
        call get_select_species(1, 'Tb', N_obs_param, obs_param, N_select_species_Tb, select_species_Tb )
        
        if ((N_select_species_smTb>0) .and. logit) &
-            write (logunit, *) '- get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds obs'
+            write (logunit, *) '- get 3d soil moisture/Tskin/ght(1) increments; Tb+sfmc+sfds+cygl1scal obs'
  
        ! check consistency of update_type and obs_param%assim config
        
        if     ( N_select_species_asnow==0 .and. N_select_species_smTb==0 ) then
           
           err_msg =                                                                                              &
-               'update_type not consistent with obs_param%assim==.false. for all asnow/Tb/sfmc/sfds species '    &
+               'update_type not consistent with obs_param%assim==.false. for all asnow/Tb/sfmc/sfds/cygl1scal species '    &
                // '(may be intentional for "innovations" run, i.e., with obs_param%innov==.true.)'
 
           call ldas_warn(LDAS_GENERIC_ERROR, Iam, err_msg)
