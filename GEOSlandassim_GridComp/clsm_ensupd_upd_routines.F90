@@ -131,6 +131,7 @@ module clsm_ensupd_upd_routines
   use LDAS_ensdrv_mpi,                  ONLY:     &
        numprocs,                                  &
        myid,                                      &
+       root_proc,                                 &
        mpicomm,                                   &
        MPI_obs_type,                              &
        mpistatus,                                 &
@@ -1082,6 +1083,7 @@ contains
     integer                                 :: this_Tbspecies, this_TbuniqFreqAngRTMid, RTM_id
     integer                                 :: istart, iend
     integer                                 :: N_cygl1_total, N_cygl1_valid, N_cygl1_nodata
+    integer                                 :: N_cygl1_total_g, N_cygl1_valid_g, N_cygl1_nodata_g
 
     real                                    :: this_lon, this_FOV, r_y
     real, dimension(1)                      :: this_lat, r_x
@@ -2095,6 +2097,22 @@ contains
           end if
           
        end do
+
+#ifdef LDAS_MPI
+       call MPI_Reduce( N_cygl1_total,  N_cygl1_total_g,  1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_valid,  N_cygl1_valid_g,  1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_nodata, N_cygl1_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+#else
+       N_cygl1_total_g  = N_cygl1_total
+       N_cygl1_valid_g  = N_cygl1_valid
+       N_cygl1_nodata_g = N_cygl1_nodata
+#endif
+
+       if (logit .and. root_proc .and. N_cygl1_total_g > 0) then
+          write(logunit,*) 'CYGNSS preprocessed Obs_pred model-QC global: total=', &
+               N_cygl1_total_g, ' valid=', N_cygl1_valid_g,                      &
+               ' nodata=', N_cygl1_nodata_g
+       end if
 
        if (logit .and. N_cygl1_total > 0) then
           write(logunit,*) 'CYGNSS preprocessed Obs_pred model-QC rank ', myid,   &
