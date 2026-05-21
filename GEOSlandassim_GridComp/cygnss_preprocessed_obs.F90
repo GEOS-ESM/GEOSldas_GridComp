@@ -320,7 +320,8 @@ contains
   subroutine cygnss_preproc_get_obs_pred(                                      &
        this_obs_param, N_catlH, tile_coord_lH, N_ens,                          &
        sfmc_lH, mwp_clay_lH, mwp_poros_lH, tilenum, obs_pred,                  &
-       N_refl_nodata, N_hx_nonpos)
+       N_refl_nodata, N_hx_nonpos,                                             &
+       N_sfmc_nodata, N_clay_nodata, N_poros_nodata, N_refl_call_nodata)
 
     ! Evaluate the CYGNSS coefficient operator for one GEOSldas observation
     ! and all ensemble members.
@@ -344,6 +345,10 @@ contains
     real, dimension(N_ens),                  intent(out) :: obs_pred
     integer, optional,                       intent(out) :: N_refl_nodata
     integer, optional,                       intent(out) :: N_hx_nonpos
+    integer, optional,                       intent(out) :: N_sfmc_nodata
+    integer, optional,                       intent(out) :: N_clay_nodata
+    integer, optional,                       intent(out) :: N_poros_nodata
+    integer, optional,                       intent(out) :: N_refl_call_nodata
 
     integer :: obs_ind
     integer :: n_e, k, k1, k2
@@ -351,6 +356,7 @@ contains
 
     real    :: refl_lr, hx_linear
     logical :: refl_nodata
+    logical :: sfmc_nodata, clay_nodata, poros_nodata
 
     character(len=400) :: err_msg
 
@@ -362,6 +368,10 @@ contains
 
     if (present(N_refl_nodata)) N_refl_nodata = 0
     if (present(N_hx_nonpos))   N_hx_nonpos   = 0
+    if (present(N_sfmc_nodata)) N_sfmc_nodata = 0
+    if (present(N_clay_nodata)) N_clay_nodata = 0
+    if (present(N_poros_nodata)) N_poros_nodata = 0
+    if (present(N_refl_call_nodata)) N_refl_call_nodata = 0
 
     obs_ind = cygnss_preproc_find_obs(tilenum)
 
@@ -398,6 +408,26 @@ contains
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
           end if
 
+          sfmc_nodata  = LDAS_is_nodata(sfmc_lH(     ind_lH,n_e))
+          clay_nodata  = LDAS_is_nodata(mwp_clay_lH( ind_lH,n_e))
+          poros_nodata = LDAS_is_nodata(mwp_poros_lH(ind_lH,n_e))
+
+          if (sfmc_nodata .or. clay_nodata .or. poros_nodata) then
+             if (sfmc_nodata) then
+                if (present(N_sfmc_nodata)) N_sfmc_nodata = N_sfmc_nodata + 1
+             end if
+             if (clay_nodata) then
+                if (present(N_clay_nodata)) N_clay_nodata = N_clay_nodata + 1
+             end if
+             if (poros_nodata) then
+                if (present(N_poros_nodata)) N_poros_nodata = N_poros_nodata + 1
+             end if
+
+             hx_linear = nodata_generic
+             refl_nodata = .true.
+             exit
+          end if
+
           call mwRTM_get_lr_reflectivity(                                       &
                this_obs_param%freq, sp_inc_angle(obs_ind),                      &
                mwp_clay_lH(ind_lH,n_e), mwp_poros_lH(ind_lH,n_e),               &
@@ -406,6 +436,7 @@ contains
           if (LDAS_is_nodata(refl_lr)) then
              hx_linear = nodata_generic
              refl_nodata = .true.
+             if (present(N_refl_call_nodata)) N_refl_call_nodata = N_refl_call_nodata + 1
              exit
           end if
 

@@ -1087,6 +1087,16 @@ contains
     integer                                 :: N_cygl1_refl_nodata, N_cygl1_hx_nonpos
     integer                                 :: N_cygl1_refl_nodata_g, N_cygl1_hx_nonpos_g
     integer                                 :: N_cygl1_refl_nodata_obs, N_cygl1_hx_nonpos_obs
+    integer                                 :: N_cygl1_sfmc_nodata, N_cygl1_clay_nodata
+    integer                                 :: N_cygl1_poros_nodata, N_cygl1_refl_call_nodata
+    integer                                 :: N_cygl1_sfmc_nodata_g, N_cygl1_clay_nodata_g
+    integer                                 :: N_cygl1_poros_nodata_g, N_cygl1_refl_call_nodata_g
+    integer                                 :: N_cygl1_sfmc_nodata_obs, N_cygl1_clay_nodata_obs
+    integer                                 :: N_cygl1_poros_nodata_obs, N_cygl1_refl_call_nodata_obs
+    integer                                 :: N_cygl1_sfmc_nodata_obs_g, N_cygl1_clay_nodata_obs_g
+    integer                                 :: N_cygl1_poros_nodata_obs_g, N_cygl1_refl_call_nodata_obs_g
+    integer                                 :: N_cygl1_sfmc_nodata_this, N_cygl1_clay_nodata_this
+    integer                                 :: N_cygl1_poros_nodata_this, N_cygl1_refl_call_nodata_this
 
     real                                    :: this_lon, this_FOV, r_y
     real, dimension(1)                      :: this_lat, r_x
@@ -1687,6 +1697,14 @@ contains
 
     N_cygl1_refl_nodata = 0
     N_cygl1_hx_nonpos   = 0
+    N_cygl1_sfmc_nodata = 0
+    N_cygl1_clay_nodata = 0
+    N_cygl1_poros_nodata = 0
+    N_cygl1_refl_call_nodata = 0
+    N_cygl1_sfmc_nodata_obs = 0
+    N_cygl1_clay_nodata_obs = 0
+    N_cygl1_poros_nodata_obs = 0
+    N_cygl1_refl_call_nodata_obs = 0
 
     do i=1,N_obsl
        
@@ -1722,10 +1740,22 @@ contains
                obs_param(this_species), N_catlH, tile_coord_lH, N_ens,           &
                sfmc_lH, mwp_clay_lH, mwp_poros_lH, this_tilenum,                 &
                Obs_pred_l(i,1:N_ens),                                            &
-               N_cygl1_refl_nodata_obs, N_cygl1_hx_nonpos_obs )
+               N_cygl1_refl_nodata_obs, N_cygl1_hx_nonpos_obs,                  &
+               N_cygl1_sfmc_nodata_this, N_cygl1_clay_nodata_this,              &
+               N_cygl1_poros_nodata_this, N_cygl1_refl_call_nodata_this )
 
           if (N_cygl1_refl_nodata_obs > 0) N_cygl1_refl_nodata = N_cygl1_refl_nodata + 1
           if (N_cygl1_hx_nonpos_obs   > 0) N_cygl1_hx_nonpos   = N_cygl1_hx_nonpos   + 1
+          if (N_cygl1_sfmc_nodata_this > 0) N_cygl1_sfmc_nodata_obs = N_cygl1_sfmc_nodata_obs + 1
+          if (N_cygl1_clay_nodata_this > 0) N_cygl1_clay_nodata_obs = N_cygl1_clay_nodata_obs + 1
+          if (N_cygl1_poros_nodata_this > 0) N_cygl1_poros_nodata_obs = N_cygl1_poros_nodata_obs + 1
+          if (N_cygl1_refl_call_nodata_this > 0) &
+               N_cygl1_refl_call_nodata_obs = N_cygl1_refl_call_nodata_obs + 1
+
+          N_cygl1_sfmc_nodata = N_cygl1_sfmc_nodata + N_cygl1_sfmc_nodata_this
+          N_cygl1_clay_nodata = N_cygl1_clay_nodata + N_cygl1_clay_nodata_this
+          N_cygl1_poros_nodata = N_cygl1_poros_nodata + N_cygl1_poros_nodata_this
+          N_cygl1_refl_call_nodata = N_cygl1_refl_call_nodata + N_cygl1_refl_call_nodata_this
 
           cycle
 
@@ -2114,12 +2144,28 @@ contains
        call MPI_Reduce( N_cygl1_nodata, N_cygl1_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
        call MPI_Reduce( N_cygl1_refl_nodata, N_cygl1_refl_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
        call MPI_Reduce( N_cygl1_hx_nonpos,   N_cygl1_hx_nonpos_g,   1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_sfmc_nodata, N_cygl1_sfmc_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_clay_nodata, N_cygl1_clay_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_poros_nodata, N_cygl1_poros_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_refl_call_nodata, N_cygl1_refl_call_nodata_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_sfmc_nodata_obs, N_cygl1_sfmc_nodata_obs_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_clay_nodata_obs, N_cygl1_clay_nodata_obs_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_poros_nodata_obs, N_cygl1_poros_nodata_obs_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
+       call MPI_Reduce( N_cygl1_refl_call_nodata_obs, N_cygl1_refl_call_nodata_obs_g, 1, MPI_integer, MPI_SUM, 0, mpicomm, mpierr )
 #else
        N_cygl1_total_g  = N_cygl1_total
        N_cygl1_valid_g  = N_cygl1_valid
        N_cygl1_nodata_g = N_cygl1_nodata
        N_cygl1_refl_nodata_g = N_cygl1_refl_nodata
        N_cygl1_hx_nonpos_g   = N_cygl1_hx_nonpos
+       N_cygl1_sfmc_nodata_g = N_cygl1_sfmc_nodata
+       N_cygl1_clay_nodata_g = N_cygl1_clay_nodata
+       N_cygl1_poros_nodata_g = N_cygl1_poros_nodata
+       N_cygl1_refl_call_nodata_g = N_cygl1_refl_call_nodata
+       N_cygl1_sfmc_nodata_obs_g = N_cygl1_sfmc_nodata_obs
+       N_cygl1_clay_nodata_obs_g = N_cygl1_clay_nodata_obs
+       N_cygl1_poros_nodata_obs_g = N_cygl1_poros_nodata_obs
+       N_cygl1_refl_call_nodata_obs_g = N_cygl1_refl_call_nodata_obs
 #endif
 
        if (logit .and. root_proc .and. N_cygl1_total_g > 0) then
@@ -2129,6 +2175,16 @@ contains
                ' nodata=', N_cygl1_nodata_g,                                  &
                ' refl_nodata_obs=', N_cygl1_refl_nodata_g,                    &
                ' hx_nonpos_obs=', N_cygl1_hx_nonpos_g
+          write(logunit,'(A,I8,A,I8,A,I8,A,I8)')                               &
+               'CYGNSS preprocessed Obs_pred nodata obs causes: sfmc=',         &
+               N_cygl1_sfmc_nodata_obs_g, ' clay=', N_cygl1_clay_nodata_obs_g, &
+               ' poros=', N_cygl1_poros_nodata_obs_g,                          &
+               ' refl_call=', N_cygl1_refl_call_nodata_obs_g
+          write(logunit,'(A,I8,A,I8,A,I8,A,I8)')                               &
+               'CYGNSS preprocessed Obs_pred nodata event counts: sfmc=',       &
+               N_cygl1_sfmc_nodata_g, ' clay=', N_cygl1_clay_nodata_g,         &
+               ' poros=', N_cygl1_poros_nodata_g,                              &
+               ' refl_call=', N_cygl1_refl_call_nodata_g
        end if
 
        if (logit .and. N_cygl1_total > 0) then
