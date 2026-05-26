@@ -158,11 +158,8 @@ cd $SCRDIR
 /bin/cp -f  $HOMDIR/*.rc .
 /bin/cp -f  $HOMDIR/*.nml .
 
-# copy ISSM input files to scratch if they exist
-foreach pattern ( "$EXPDIR/input/ISSM*.bin" "$EXPDIR/input/ISSM*.toolkits" )
-    set issm_files = ( $pattern )
-    if ( -e "$issm_files[1]" ) /bin/cp $issm_files .
-end
+# copy ISSM input files to scratch
+/bin/find $EXPDIR/input -maxdepth 1 -name "ISSM*" -exec /bin/cp {} . \;
 
 set LSMCHOICE = `grep -n -m 1 "LSM_CHOICE" $HOMDIR/LDAS.rc | cut -d':' -f3`
 
