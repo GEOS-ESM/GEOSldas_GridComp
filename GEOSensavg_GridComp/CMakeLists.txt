@@ -1,7 +1,6 @@
 esma_set_this ()
 
 set (SRCS
-   GEOS_EnsGridComp.F90
    GEOS_ForceAvgGridComp.F90
    GEOS_LandiceAvgGridComp.F90
    GEOS_LandAvgGridComp.F90

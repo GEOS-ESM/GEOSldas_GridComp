@@ -12,17 +12,21 @@ module GEOS_LdasGridCompMod
   use GEOS_MetforceGridCompMod,  only: MetforceSetServices  => SetServices
   use GEOS_LandGridCompMod,      only: LandSetServices      => SetServices
   use GEOS_LandPertGridCompMod,  only: LandPertSetServices  => SetServices
-  use GEOS_EnsGridCompMod,       only: EnsSetServices       => SetServices
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
   use GEOS_RouteGridCompMod,     only: RouteSetServices     => SetServices
+
+  use GEOS_ForceAvgGridCompMod,  only: ForceAvgSetServices  => SetServices
+  use GEOS_LandAvgGridCompMod,   only: LandAvgSetServices   => SetServices
+  use GEOS_LandiceAvgGridCompMod,only: LandiceAvgSetServices=> SetServices
+  use GEOS_RouteAvgGridCompMod,  only: RouteAvgSetServices  => SetServices
 
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
   use LDAS_TileCoordRoutines, only: get_minExtent_grid, get_ij_ind_from_latlon, io_domain_files
   use LDAS_ConvertMod,        only: esmf2ldas
   use LDAS_PertRoutinesMod,   only: get_pert_grid
-  use LDAS_ensdrv_functions,  only:  get_io_filename 
+  use LDAS_ensdrv_functions,  only: get_io_filename 
   use LDAS_DateTimeMod,       only: date_time_type
   use LDAS_ensdrv_mpi,        only: MPI_tile_coord_type, MPI_grid_def_type
   use LDAS_ensdrv_mpi,        only: init_MPI_types,mpicomm,numprocs,myid 
@@ -55,7 +59,8 @@ module GEOS_LdasGridCompMod
   integer,allocatable :: ROUTE(:)
   integer,allocatable :: LANDPERT(:)
   integer,allocatable :: METFORCE(:)
-  integer             :: ENSAVG, LANDASSIM
+  integer             :: LANDASSIM
+  integer             :: FORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG
 
   ! other global variables
   integer :: NUM_ENSEMBLE       ! number of land ensemble members
@@ -179,10 +184,6 @@ contains
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
 !   if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
 
-    if (NUM_ENSEMBLE>1) then
-       _ASSERT( .not. (with_landice .or. RUN_ROUTE>0), "Landice and route not supported in ensemble mode.")
-    endif
-
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
     LAND_ASSIM_STR =  ESMF_UtilStringUpperCase(LAND_ASSIM_STR, rc=STATUS)
@@ -274,9 +275,7 @@ contains
     enddo
 
     if (with_land) then
-       ENSAVG    = MAPL_AddChild(gc, name='ENSAVG', ss=EnsSetServices, rc=status)
-       VERIFY_(status)
-    
+
        if(land_assim .or. mwRTM ) then
           LANDASSIM = MAPL_AddChild(gc, name='LANDASSIM', ss=LandAssimSetServices, rc=status)
           VERIFY_(status)
@@ -351,6 +350,21 @@ contains
        endif
     end if !with_land
 
+    FORCEAVG      = MAPL_AddChild(gc, name='FORCEAVG',  ss=ForceAvgSetServices, rc=status)
+    VERIFY_(status)
+    if (with_land) then
+       LANDAVG    = MAPL_AddChild(gc, name='LANDAVG',   ss=LandAvgSetServices, rc=status)
+       VERIFY_(status)
+    endif
+    if (with_landice) then
+       LANDICEAVG = MAPL_AddChild(gc, name='LANDICEAVG', ss=LandiceAvgSetServices, rc=status)
+       VERIFY_(status)
+    endif
+    if (RUN_ROUTE>0) then
+       ROUTEAVG   = MAPL_AddChild(gc, name='ROUTEAVG',   ss=RouteAvgSetServices, rc=status)
+       VERIFY_(status)
+    endif
+
     call MAPL_TimerAdd(gc, name="Initialize", rc=status)
     VERIFY_(status)
     call MAPL_TimerAdd(gc, name="-LocStreamCreate", rc=status)
@@ -370,18 +384,7 @@ contains
 
   end subroutine SetServices
 
-
-  !BOP
-
-  ! !IROTUINE: Initialize -- initialize method for LDAS GC
-
-  ! !INTERFACE:
-
   subroutine Initialize(gc, import, export, clock, rc)
-    !use MAPL_LatLonToCubeRegridderMod
-    !use MAPL_CubeToLatLonRegridderMod
-    !use MAPL_CubeToCubeRegridderMod
-    ! !ARGUMENTS:
 
     type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
     type(ESMF_State),    intent(inout) :: import ! Import state
@@ -785,13 +788,6 @@ contains
        if (.not. ensemble_forcing) exit
     enddo
 
-    if ( with_land) then
-       call MAPL_GetObjectFromGC(gcs(ENSAVG), CHILD_MAPL, rc=status)
-       VERIFY_(status) ! CHILD = ens_avg
-       call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
-       VERIFY_(status)
-    endif
-
     do i = 1,NUM_ENSEMBLE
        if (with_land) then 
           call MAPL_GetObjectFromGC(gcs(LAND(i)), CHILD_MAPL, rc=status)
@@ -816,6 +812,7 @@ contains
           VERIFY_(status)
           call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
           VERIFY_(status)
+          
        endif
 
        if (RUN_ROUTE >= 1) then
@@ -836,6 +833,29 @@ contains
        call ESMF_UserCompSetInternalState(gcs(LANDASSIM), 'TILE_COORD', tcwrap, status)
        VERIFY_(status)
     endif
+
+    call MAPL_GetObjectFromGC(gcs(FORCEAVG), CHILD_MAPL, rc=status)
+    VERIFY_(status)  
+    call MAPL_Set(CHILD_MAPL, LocStream=force_locstream, rc=status)
+    VERIFY_(status)
+
+    if ( with_land) then
+       call MAPL_GetObjectFromGC(gcs(LANDAVG), CHILD_MAPL, rc=status)
+       VERIFY_(status) ! CHILD = ens_avg
+       call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+       VERIFY_(status)
+    endif
+    if ( with_landice) then
+       call MAPL_GetObjectFromGC(gcs(LANDICEAVG), CHILD_MAPL, rc=status)
+       VERIFY_(status) ! CHILD = ens_avg
+       call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
+       VERIFY_(status)
+    endif
+
+    !if ( RUN_ROUTE>0) then
+    !   ! not necessary. Route Avg has its own pfaf_locstream
+    !   call MAPL_GetObjectFromGC(gcs(ROUTEAVG), CHILD_MAPL, rc=status)
+    !endif
 
     call MAPL_GenericInitialize(gc, import, export, clock, rc=status)
     VERIFY_(status)
@@ -871,12 +891,6 @@ contains
 
   end subroutine Initialize
 
-
-  !BOP
-
-  ! !IROTUINE: Run -- Run method for the composite Ldas GridComp
-
-  ! !INTERFACE:
 
   subroutine Run(gc, import, export, clock, rc)
 
@@ -1027,8 +1041,9 @@ contains
           ! Use landpert's output as the input to calculate the ensemble average forcing
           ! W.J note: So far it is only for the Catchment model. 
           ! To make CatchmentCN work with assim, the export from landgrid and catchmentCN grid need to be modified.  
-          if ( LSM_CHOICE == 1 ) then
-             call ESMF_GridCompRun(gcs(ENSAVG), importState=gex(igc), exportState=gex(ENSAVG), clock=clock,phase=1, userRC=status)
+          if ( LSM_CHOICE == 1 ) then 
+             !WJ note: The forcing ens avg would fail if there is landice. need to revisit this run
+             call ESMF_GridCompRun(gcs(FORCEAVG), importState=gex(igc), exportState=gex(FORCEAVG), clock=clock, userRC=status)
              VERIFY_(status)
           endif
 
@@ -1049,6 +1064,8 @@ contains
           VERIFY_(status)
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
           VERIFY_(status)
+          call ESMF_GridCompRun(gcs(LANDICEAVG), importState=gex(igc), exportState=gex(LANDICEAVG), clock=clock, userRC=status)
+          VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land_ice
 
@@ -1057,7 +1074,7 @@ contains
           call MAPL_TimerOn(MAPL, gcnames(igc))
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(ENSAVG), importState=gex(igc), exportState=gex(ENSAVG), clock=clock,phase=4, userRC=status)
+          call ESMF_GridCompRun(gcs(ROUTEAVG), importState=gex(igc), exportState=gex(ROUTEAVG), clock=clock, userRC=status)
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! river-routine
@@ -1085,9 +1102,9 @@ contains
              call ESMF_StateGet(gex(igc), "LAI", field, _RC)
              call ESMF_StateAddReplace(member_export, [field],_RC)
 
-             call ESMF_GridCompRun(gcs(ENSAVG), importState=member_export, exportState=gex(ENSAVG), clock=clock,phase=3, userRC=status)
+             call ESMF_GridCompRun(gcs(LANDAVG), importState=member_export, exportState=gex(LANDAVG), clock=clock,phase=2, userRC=status)
              VERIFY_(status)
-             call ESMF_GridCompRun(gcs(ENSAVG), importState=member_export, exportState=gex(ENSAVG), clock=clock,phase=2, userRC=status)
+             call ESMF_GridCompRun(gcs(LANDAVG), importState=member_export, exportState=gex(LANDAVG), clock=clock,phase=1, userRC=status)
              VERIFY_(status)
 
              if( mwRTM ) then
@@ -1110,7 +1127,7 @@ contains
        igc = LANDASSIM
        call MAPL_TimerOn(MAPL, gcnames(igc))
        ! Get EnKF increments and apply to "cat_progn" (imported from ENSAVG via "use" statement!); otherwise import state is export from ENSAVG
-       call ESMF_GridCompRun(gcs(igc), importState=gex(ENSAVG), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+       call ESMF_GridCompRun(gcs(igc), importState=gex(LANDAVG), exportState=gex(igc), clock=clock, phase=1, userRC=status)
        VERIFY_(status)
 
        do i = 1, NUM_ENSEMBLE

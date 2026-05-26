@@ -44,8 +44,8 @@ module GEOS_LandAssimGridCompMod
   use GEOS_LandPertGridCompMod,  only: force_pert_param
   
   use catch_constants,           only: DZGT=>CATCH_DZGT
-  use GEOS_EnsGridCompMod,       only: cat_progn=>catch_progn
-  use GEOS_EnsGridCompMod,       only: cat_param=>catch_param
+  use GEOS_LandAvgGridCompMod,   only: cat_progn=>catch_progn
+  use GEOS_LandAvgGridCompMod,   only: cat_param=>catch_param
   use mwRTM_types,               only: mwRTM_param_type, mwRTM_param_nodata_check
   use catch_bias_types,          only: obs_bias_type
   use catch_bias_types,          only: cat_bias_param_type
