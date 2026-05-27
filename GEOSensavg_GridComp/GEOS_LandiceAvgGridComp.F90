@@ -10,7 +10,7 @@ module GEOS_LandiceAvgGridCompMod
 
   public   :: SetServices
 
-  integer  :: NUM_ENSEMBLE
+  integer  :: NUM_ENSEMBLE_LANDICE = 1
   integer  :: collect_landice_counter
 
 contains
@@ -770,8 +770,8 @@ contains
     call MAPL_TimerOn(MAPL, "TOTAL")
     call MAPL_TimerOn(MAPL, "Initialize")
 
-    call MAPL_GetResource ( MAPL, NUM_ENSEMBLE, Label="NUM_LDAS_ENSEMBLE:", DEFAULT=1, RC=STATUS)
-    VERIFY_(STATUS)
+    !call MAPL_GetResource ( MAPL, NUM_ENSEMBLE, Label="NUM_LDAS_ENSEMBLE:", DEFAULT=1, RC=STATUS)
+    !VERIFY_(STATUS)
 
     collect_landice_counter = 0
 
@@ -1336,95 +1336,95 @@ contains
 
     collect_landice_counter = collect_landice_counter + 1
 
-    if (collect_landice_counter == NUM_ENSEMBLE) then
+    if (collect_landice_counter == NUM_ENSEMBLE_LANDICE) then
        collect_landice_counter = 0
 
-       ! Divide by NUM_ENSEMBLE (1d fields)
-       if (associated(EMIS_enavg))        EMIS_enavg        = EMIS_enavg        / NUM_ENSEMBLE
-       if (associated(ALBVR_enavg))       ALBVR_enavg       = ALBVR_enavg       / NUM_ENSEMBLE
-       if (associated(ALBVF_enavg))       ALBVF_enavg       = ALBVF_enavg       / NUM_ENSEMBLE
-       if (associated(ALBNR_enavg))       ALBNR_enavg       = ALBNR_enavg       / NUM_ENSEMBLE
-       if (associated(ALBNF_enavg))       ALBNF_enavg       = ALBNF_enavg       / NUM_ENSEMBLE
-       if (associated(TST_enavg))         TST_enavg         = TST_enavg         / NUM_ENSEMBLE
-       if (associated(LST_enavg))         LST_enavg         = LST_enavg         / NUM_ENSEMBLE
-       if (associated(QST_enavg))         QST_enavg         = QST_enavg         / NUM_ENSEMBLE
-       if (associated(TH_enavg))          TH_enavg          = TH_enavg          / NUM_ENSEMBLE
-       if (associated(QH_enavg))          QH_enavg          = QH_enavg          / NUM_ENSEMBLE
-       if (associated(DELTS_enavg))       DELTS_enavg       = DELTS_enavg       / NUM_ENSEMBLE
-       if (associated(DELQS_enavg))       DELQS_enavg       = DELQS_enavg       / NUM_ENSEMBLE
-       if (associated(CHT_enavg))         CHT_enavg         = CHT_enavg         / NUM_ENSEMBLE
-       if (associated(CMT_enavg))         CMT_enavg         = CMT_enavg         / NUM_ENSEMBLE
-       if (associated(CQT_enavg))         CQT_enavg         = CQT_enavg         / NUM_ENSEMBLE
-       if (associated(CNT_enavg))         CNT_enavg         = CNT_enavg         / NUM_ENSEMBLE
-       if (associated(RIT_enavg))         RIT_enavg         = RIT_enavg         / NUM_ENSEMBLE
-       if (associated(ACCUM_enavg))       ACCUM_enavg       = ACCUM_enavg       / NUM_ENSEMBLE
-       if (associated(EVPICE_GL_enavg))   EVPICE_GL_enavg   = EVPICE_GL_enavg   / NUM_ENSEMBLE
-       if (associated(SUBLIM_enavg))      SUBLIM_enavg      = SUBLIM_enavg      / NUM_ENSEMBLE
-       if (associated(SNOMAS_GL_enavg))   SNOMAS_GL_enavg   = SNOMAS_GL_enavg   / NUM_ENSEMBLE
-       if (associated(SNOWMASS_enavg))    SNOWMASS_enavg    = SNOWMASS_enavg    / NUM_ENSEMBLE
-       if (associated(SNOWDP_GL_enavg))   SNOWDP_GL_enavg   = SNOWDP_GL_enavg   / NUM_ENSEMBLE
-       if (associated(ASNOW_GL_enavg))    ASNOW_GL_enavg    = ASNOW_GL_enavg    / NUM_ENSEMBLE
-       if (associated(WESNEXT_enavg))     WESNEXT_enavg     = WESNEXT_enavg     / NUM_ENSEMBLE
-       if (associated(WESNSC_enavg))      WESNSC_enavg      = WESNSC_enavg      / NUM_ENSEMBLE
-       if (associated(SNDZSC_enavg))      SNDZSC_enavg      = SNDZSC_enavg      / NUM_ENSEMBLE
-       if (associated(WESNPREC_enavg))    WESNPREC_enavg    = WESNPREC_enavg    / NUM_ENSEMBLE
-       if (associated(SNDZPREC_enavg))    SNDZPREC_enavg    = SNDZPREC_enavg    / NUM_ENSEMBLE
-       if (associated(SNDZ1PERC_enavg))   SNDZ1PERC_enavg   = SNDZ1PERC_enavg   / NUM_ENSEMBLE
-       if (associated(WESNBOT_enavg))     WESNBOT_enavg     = WESNBOT_enavg     / NUM_ENSEMBLE
-       if (associated(RAINRFZ_enavg))     RAINRFZ_enavg     = RAINRFZ_enavg     / NUM_ENSEMBLE
-       if (associated(SMELT_enavg))       SMELT_enavg       = SMELT_enavg       / NUM_ENSEMBLE
-       if (associated(IMELT_enavg))       IMELT_enavg       = IMELT_enavg       / NUM_ENSEMBLE
-       if (associated(SNOWALB_enavg))     SNOWALB_enavg     = SNOWALB_enavg     / NUM_ENSEMBLE
-       if (associated(SNICEALB_enavg))    SNICEALB_enavg    = SNICEALB_enavg    / NUM_ENSEMBLE
-       if (associated(MELTWTR_enavg))     MELTWTR_enavg     = MELTWTR_enavg     / NUM_ENSEMBLE
-       if (associated(MELTWTRCONT_enavg)) MELTWTRCONT_enavg = MELTWTRCONT_enavg / NUM_ENSEMBLE
-       if (associated(LWC_enavg))         LWC_enavg         = LWC_enavg         / NUM_ENSEMBLE
-       if (associated(RUNOFF_enavg))      RUNOFF_enavg      = RUNOFF_enavg      / NUM_ENSEMBLE
-       if (associated(GUST_enavg))        GUST_enavg        = GUST_enavg        / NUM_ENSEMBLE
-       if (associated(VENT_enavg))        VENT_enavg        = VENT_enavg        / NUM_ENSEMBLE
-       if (associated(Z0_enavg))          Z0_enavg          = Z0_enavg          / NUM_ENSEMBLE
-       if (associated(Z0H_enavg))         Z0H_enavg         = Z0H_enavg         / NUM_ENSEMBLE
-       if (associated(MOT2M_enavg))       MOT2M_enavg       = MOT2M_enavg       / NUM_ENSEMBLE
-       if (associated(MOQ2M_enavg))       MOQ2M_enavg       = MOQ2M_enavg       / NUM_ENSEMBLE
-       if (associated(MOU2M_enavg))       MOU2M_enavg       = MOU2M_enavg       / NUM_ENSEMBLE
-       if (associated(MOV2M_enavg))       MOV2M_enavg       = MOV2M_enavg       / NUM_ENSEMBLE
-       if (associated(MOT10M_enavg))      MOT10M_enavg      = MOT10M_enavg      / NUM_ENSEMBLE
-       if (associated(MOQ10M_enavg))      MOQ10M_enavg      = MOQ10M_enavg      / NUM_ENSEMBLE
-       if (associated(MOU10M_enavg))      MOU10M_enavg      = MOU10M_enavg      / NUM_ENSEMBLE
-       if (associated(MOV10M_enavg))      MOV10M_enavg      = MOV10M_enavg      / NUM_ENSEMBLE
-       if (associated(MOU50M_enavg))      MOU50M_enavg      = MOU50M_enavg      / NUM_ENSEMBLE
-       if (associated(MOV50M_enavg))      MOV50M_enavg      = MOV50M_enavg      / NUM_ENSEMBLE
-       if (associated(EVAPOUT_enavg))     EVAPOUT_enavg     = EVAPOUT_enavg     / NUM_ENSEMBLE
-       if (associated(SHOUT_enavg))       SHOUT_enavg       = SHOUT_enavg       / NUM_ENSEMBLE
-       if (associated(HLWUP_enavg))       HLWUP_enavg       = HLWUP_enavg       / NUM_ENSEMBLE
-       if (associated(LWNDSRF_enavg))     LWNDSRF_enavg     = LWNDSRF_enavg     / NUM_ENSEMBLE
-       if (associated(SWNDSRF_enavg))     SWNDSRF_enavg     = SWNDSRF_enavg     / NUM_ENSEMBLE
-       if (associated(HLATN_enavg))       HLATN_enavg       = HLATN_enavg       / NUM_ENSEMBLE
-       if (associated(DNICFLX_enavg))     DNICFLX_enavg     = DNICFLX_enavg     / NUM_ENSEMBLE
-       if (associated(GHSNOW_enavg))      GHSNOW_enavg      = GHSNOW_enavg      / NUM_ENSEMBLE
-       if (associated(GHTSKIN_enavg))     GHTSKIN_enavg     = GHTSKIN_enavg     / NUM_ENSEMBLE
-       if (associated(ITY_enavg))         ITY_enavg         = ITY_enavg         / NUM_ENSEMBLE
-       if (associated(RMELTDU001_enavg))  RMELTDU001_enavg  = RMELTDU001_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTDU002_enavg))  RMELTDU002_enavg  = RMELTDU002_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTDU003_enavg))  RMELTDU003_enavg  = RMELTDU003_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTDU004_enavg))  RMELTDU004_enavg  = RMELTDU004_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTDU005_enavg))  RMELTDU005_enavg  = RMELTDU005_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTBC001_enavg))  RMELTBC001_enavg  = RMELTBC001_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTBC002_enavg))  RMELTBC002_enavg  = RMELTBC002_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTOC001_enavg))  RMELTOC001_enavg  = RMELTOC001_enavg  / NUM_ENSEMBLE
-       if (associated(RMELTOC002_enavg))  RMELTOC002_enavg  = RMELTOC002_enavg  / NUM_ENSEMBLE
+       ! Divide by NUM_ENSEMBLE_LANDICE (1d fields)
+       if (associated(EMIS_enavg))        EMIS_enavg        = EMIS_enavg        / NUM_ENSEMBLE_LANDICE
+       if (associated(ALBVR_enavg))       ALBVR_enavg       = ALBVR_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(ALBVF_enavg))       ALBVF_enavg       = ALBVF_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(ALBNR_enavg))       ALBNR_enavg       = ALBNR_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(ALBNF_enavg))       ALBNF_enavg       = ALBNF_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(TST_enavg))         TST_enavg         = TST_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(LST_enavg))         LST_enavg         = LST_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(QST_enavg))         QST_enavg         = QST_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(TH_enavg))          TH_enavg          = TH_enavg          / NUM_ENSEMBLE_LANDICE
+       if (associated(QH_enavg))          QH_enavg          = QH_enavg          / NUM_ENSEMBLE_LANDICE
+       if (associated(DELTS_enavg))       DELTS_enavg       = DELTS_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(DELQS_enavg))       DELQS_enavg       = DELQS_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(CHT_enavg))         CHT_enavg         = CHT_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(CMT_enavg))         CMT_enavg         = CMT_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(CQT_enavg))         CQT_enavg         = CQT_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(CNT_enavg))         CNT_enavg         = CNT_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(RIT_enavg))         RIT_enavg         = RIT_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(ACCUM_enavg))       ACCUM_enavg       = ACCUM_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(EVPICE_GL_enavg))   EVPICE_GL_enavg   = EVPICE_GL_enavg   / NUM_ENSEMBLE_LANDICE
+       if (associated(SUBLIM_enavg))      SUBLIM_enavg      = SUBLIM_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(SNOMAS_GL_enavg))   SNOMAS_GL_enavg   = SNOMAS_GL_enavg   / NUM_ENSEMBLE_LANDICE
+       if (associated(SNOWMASS_enavg))    SNOWMASS_enavg    = SNOWMASS_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(SNOWDP_GL_enavg))   SNOWDP_GL_enavg   = SNOWDP_GL_enavg   / NUM_ENSEMBLE_LANDICE
+       if (associated(ASNOW_GL_enavg))    ASNOW_GL_enavg    = ASNOW_GL_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNEXT_enavg))     WESNEXT_enavg     = WESNEXT_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNSC_enavg))      WESNSC_enavg      = WESNSC_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(SNDZSC_enavg))      SNDZSC_enavg      = SNDZSC_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNPREC_enavg))    WESNPREC_enavg    = WESNPREC_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(SNDZPREC_enavg))    SNDZPREC_enavg    = SNDZPREC_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(SNDZ1PERC_enavg))   SNDZ1PERC_enavg   = SNDZ1PERC_enavg   / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNBOT_enavg))     WESNBOT_enavg     = WESNBOT_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(RAINRFZ_enavg))     RAINRFZ_enavg     = RAINRFZ_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(SMELT_enavg))       SMELT_enavg       = SMELT_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(IMELT_enavg))       IMELT_enavg       = IMELT_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(SNOWALB_enavg))     SNOWALB_enavg     = SNOWALB_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(SNICEALB_enavg))    SNICEALB_enavg    = SNICEALB_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(MELTWTR_enavg))     MELTWTR_enavg     = MELTWTR_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(MELTWTRCONT_enavg)) MELTWTRCONT_enavg = MELTWTRCONT_enavg / NUM_ENSEMBLE_LANDICE
+       if (associated(LWC_enavg))         LWC_enavg         = LWC_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(RUNOFF_enavg))      RUNOFF_enavg      = RUNOFF_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(GUST_enavg))        GUST_enavg        = GUST_enavg        / NUM_ENSEMBLE_LANDICE
+       if (associated(VENT_enavg))        VENT_enavg        = VENT_enavg        / NUM_ENSEMBLE_LANDICE
+       if (associated(Z0_enavg))          Z0_enavg          = Z0_enavg          / NUM_ENSEMBLE_LANDICE
+       if (associated(Z0H_enavg))         Z0H_enavg         = Z0H_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(MOT2M_enavg))       MOT2M_enavg       = MOT2M_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(MOQ2M_enavg))       MOQ2M_enavg       = MOQ2M_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(MOU2M_enavg))       MOU2M_enavg       = MOU2M_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(MOV2M_enavg))       MOV2M_enavg       = MOV2M_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(MOT10M_enavg))      MOT10M_enavg      = MOT10M_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(MOQ10M_enavg))      MOQ10M_enavg      = MOQ10M_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(MOU10M_enavg))      MOU10M_enavg      = MOU10M_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(MOV10M_enavg))      MOV10M_enavg      = MOV10M_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(MOU50M_enavg))      MOU50M_enavg      = MOU50M_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(MOV50M_enavg))      MOV50M_enavg      = MOV50M_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(EVAPOUT_enavg))     EVAPOUT_enavg     = EVAPOUT_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(SHOUT_enavg))       SHOUT_enavg       = SHOUT_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(HLWUP_enavg))       HLWUP_enavg       = HLWUP_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(LWNDSRF_enavg))     LWNDSRF_enavg     = LWNDSRF_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(SWNDSRF_enavg))     SWNDSRF_enavg     = SWNDSRF_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(HLATN_enavg))       HLATN_enavg       = HLATN_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(DNICFLX_enavg))     DNICFLX_enavg     = DNICFLX_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(GHSNOW_enavg))      GHSNOW_enavg      = GHSNOW_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(GHTSKIN_enavg))     GHTSKIN_enavg     = GHTSKIN_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(ITY_enavg))         ITY_enavg         = ITY_enavg         / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTDU001_enavg))  RMELTDU001_enavg  = RMELTDU001_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTDU002_enavg))  RMELTDU002_enavg  = RMELTDU002_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTDU003_enavg))  RMELTDU003_enavg  = RMELTDU003_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTDU004_enavg))  RMELTDU004_enavg  = RMELTDU004_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTDU005_enavg))  RMELTDU005_enavg  = RMELTDU005_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTBC001_enavg))  RMELTBC001_enavg  = RMELTBC001_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTBC002_enavg))  RMELTBC002_enavg  = RMELTBC002_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTOC001_enavg))  RMELTOC001_enavg  = RMELTOC001_enavg  / NUM_ENSEMBLE_LANDICE
+       if (associated(RMELTOC002_enavg))  RMELTOC002_enavg  = RMELTOC002_enavg  / NUM_ENSEMBLE_LANDICE
 
-       ! Divide by NUM_ENSEMBLE (multi-dimensional fields)
-       if (associated(RHOSNOW_enavg))     RHOSNOW_enavg     = RHOSNOW_enavg     / NUM_ENSEMBLE
-       if (associated(TSNOW_enavg))       TSNOW_enavg       = TSNOW_enavg       / NUM_ENSEMBLE
-       if (associated(TICE0_enavg))       TICE0_enavg       = TICE0_enavg       / NUM_ENSEMBLE
-       if (associated(WSNOW_enavg))       WSNOW_enavg       = WSNOW_enavg       / NUM_ENSEMBLE
-       if (associated(ZSNOW_enavg))       ZSNOW_enavg       = ZSNOW_enavg       / NUM_ENSEMBLE
-       if (associated(DRHOS0_enavg))      DRHOS0_enavg      = DRHOS0_enavg      / NUM_ENSEMBLE
-       if (associated(WESNEX_enavg))      WESNEX_enavg      = WESNEX_enavg      / NUM_ENSEMBLE
-       if (associated(WESNPERC_enavg))    WESNPERC_enavg    = WESNPERC_enavg    / NUM_ENSEMBLE
-       if (associated(WESNDENS_enavg))    WESNDENS_enavg    = WESNDENS_enavg    / NUM_ENSEMBLE
-       if (associated(WESNREPAR_enavg))   WESNREPAR_enavg   = WESNREPAR_enavg   / NUM_ENSEMBLE
+       ! Divide by NUM_ENSEMBLE_LANDICE (multi-dimensional fields)
+       if (associated(RHOSNOW_enavg))     RHOSNOW_enavg     = RHOSNOW_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(TSNOW_enavg))       TSNOW_enavg       = TSNOW_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(TICE0_enavg))       TICE0_enavg       = TICE0_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(WSNOW_enavg))       WSNOW_enavg       = WSNOW_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(ZSNOW_enavg))       ZSNOW_enavg       = ZSNOW_enavg       / NUM_ENSEMBLE_LANDICE
+       if (associated(DRHOS0_enavg))      DRHOS0_enavg      = DRHOS0_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNEX_enavg))      WESNEX_enavg      = WESNEX_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNPERC_enavg))    WESNPERC_enavg    = WESNPERC_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNDENS_enavg))    WESNDENS_enavg    = WESNDENS_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(WESNREPAR_enavg))   WESNREPAR_enavg   = WESNREPAR_enavg   / NUM_ENSEMBLE_LANDICE
     endif
 
     call MAPL_TimerOff(MAPL, "Collect_landice")

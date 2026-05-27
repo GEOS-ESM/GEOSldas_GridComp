@@ -45,7 +45,7 @@ module GEOS_LdasGridCompMod
   public SetServices
 
   ! !DESCRIPTION: This gridded component (GC) combines the GridComps:
-  !     METFORCE, LAND, LANDPERT, ENSAVG, and LANDASSIM
+  !     METFORCE, LAND, LANDPERT, FORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG, and LANDASSIM
   !  into a new composite LDAS GricComp.
   !  Include later: LAKE, LANDICE(?), SALTWATER(?)
 
@@ -261,7 +261,7 @@ contains
           VERIFY_(status)
        endif 
 
-       if (with_landice) then
+       if (with_landice .and. i == 1) then
           childname='LANDICE'//trim(ensid_string)
           LANDICE(i) = MAPL_AddChild(gc, name=childname, ss=LandiceSetServices, rc=status)
           VERIFY_(status)
@@ -807,7 +807,7 @@ contains
           VERIFY_(status)
        endif
 
-       if (with_landice) then
+       if (with_landice .and. i == 1) then
           call MAPL_GetObjectFromGC(gcs(LANDICE(i)), CHILD_MAPL, rc=status)
           VERIFY_(status)
           call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
@@ -817,7 +817,7 @@ contains
 
        if (RUN_ROUTE >= 1) then
           call MAPL_GetObjectFromGC(gcs(ROUTE(i)), CHILD_MAPL, rc=status)
-          VERIFY_(status) ! CHILD = ens_avg
+          VERIFY_(status) 
           call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
           VERIFY_(status)
        endif
@@ -852,7 +852,7 @@ contains
        VERIFY_(status)
     endif
 
-    !if ( RUN_ROUTE>0) then
+    !if ( RUN_ROUTE >= 1) then
     !   ! not necessary. Route Avg has its own pfaf_locstream
     !   call MAPL_GetObjectFromGC(gcs(ROUTEAVG), CHILD_MAPL, rc=status)
     !endif
@@ -1021,7 +1021,7 @@ contains
           VERIFY_(status)
        endif
 
-       if (with_landice) then
+       if (with_landice .and. i ==1 ) then
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDICE(i)),  clock=clock, phase=4, userRC=status)
           VERIFY_(status)
        endif
@@ -1041,8 +1041,9 @@ contains
           ! Use landpert's output as the input to calculate the ensemble average forcing
           ! W.J note: So far it is only for the Catchment model. 
           ! To make CatchmentCN work with assim, the export from landgrid and catchmentCN grid need to be modified.  
-          if ( LSM_CHOICE == 1 ) then 
+          if ( LSM_CHOICE == 1 .and. .not. with_landice ) then 
              !WJ note: The forcing ens avg would fail if there is landice. need to revisit this run
+             !         Reason: the import is from landpert(land_locstream) but the export is in force_locstream)
              call ESMF_GridCompRun(gcs(FORCEAVG), importState=gex(igc), exportState=gex(FORCEAVG), clock=clock, userRC=status)
              VERIFY_(status)
           endif
@@ -1057,7 +1058,7 @@ contains
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land
 
-       if (with_landice) then
+       if (with_landice .and. i ==1 ) then
           igc = LANDICE(i)
           call MAPL_TimerOn(MAPL, gcnames(igc))
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
@@ -1126,7 +1127,8 @@ contains
     if (land_assim) then 
        igc = LANDASSIM
        call MAPL_TimerOn(MAPL, gcnames(igc))
-       ! Get EnKF increments and apply to "cat_progn" (imported from ENSAVG via "use" statement!); otherwise import state is export from ENSAVG
+       ! Get EnKF increments and apply to "cat_progn" (imported from LANDAVG via "use" statement!); otherwise import state is export
+       ! from LANDNSAVG
        call ESMF_GridCompRun(gcs(igc), importState=gex(LANDAVG), exportState=gex(igc), clock=clock, phase=1, userRC=status)
        VERIFY_(status)
 
