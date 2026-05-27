@@ -67,10 +67,10 @@ else
    sed -i 's/>>>HIST_IRRIG<<</''/g'        $HISTRC
 endif
 
-# for ensemble simulations, set 'GridComp' to ENSAVG 
+# for ensemble simulations, set 'GridComp' to LANDAVG 
 
 if($NENS > 1) then
-   set GridComp = ENSAVG
+   set GridComp = LANDAVG
    sed -i 's|VEGDYN|'VEGDYN_e0000'|g' $HISTRC
 #   sed -i 's|TP1|'TSOIL1TILE'|g' $HISTRC
 #   sed -i 's|TP2|'TSOIL2TILE'|g' $HISTRC
