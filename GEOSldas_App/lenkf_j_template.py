@@ -159,10 +159,10 @@ cd $SCRDIR
 /bin/cp -f  $HOMDIR/*.nml .
 
 # copy ISSM input files to scratch
-/bin/find $EXPDIR/input -maxdepth 1 -name "ISSM*" -exec /bin/cp {} . \;
+/bin/find $EXPDIR/input -maxdepth 1 -name "ISSM*" -exec /bin/cp {{}} . \;
 
 # move ISSM auxiliary mesh file to rc_out
-if (-e $EXPDIR/input/ISSM_MESH.nc) mv $EXPDIR/input/ISSM_MESH.nc $EXPDIR/output/$EXPDOMAIN/rc_out
+if (-e $EXPDIR/input/ISSM_MESH.nc) /bin/mv $EXPDIR/input/ISSM_MESH.nc $EXPDIR/output/$EXPDOMAIN/rc_out
 
 set LSMCHOICE = `grep -n -m 1 "LSM_CHOICE" $HOMDIR/LDAS.rc | cut -d':' -f3`
 
