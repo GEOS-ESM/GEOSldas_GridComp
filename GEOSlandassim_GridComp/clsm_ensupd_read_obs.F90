@@ -2342,15 +2342,19 @@ contains
 
     fname_of_fname_list = 'dummy'   ! overridden by this_obs_param%flistname
 
+    ! obs_dir_hier=1: read_obs_fnames prepends Y{YYYY}/M{MM}/ (not D{DD}/)
+    ! so data files live in monthly subdirectories, matching H SAF FTP layout
+
     call read_obs_fnames( date_time_low_fname, this_obs_param,               &
          fname_of_fname_list, N_fnames_max,                                  &
-         N_fnames, fname_list(1:N_fnames_max) )
+         N_fnames, fname_list(1:N_fnames_max), obs_dir_hier=1 )
 
     if (date_time_low_fname%day /= date_time_up%day) then
 
        call read_obs_fnames( date_time_up, this_obs_param,                   &
             fname_of_fname_list, N_fnames_max,                               &
-            N_fnames_tmp, fname_list((N_fnames+1):(N_fnames+N_fnames_max)) )
+            N_fnames_tmp, fname_list((N_fnames+1):(N_fnames+N_fnames_max)),  &
+            obs_dir_hier=1 )
 
        N_fnames = N_fnames + N_fnames_tmp
 
