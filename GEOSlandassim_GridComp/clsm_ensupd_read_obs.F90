@@ -2170,8 +2170,6 @@ contains
     ! QC applied (no external mask file needed):
     !   surface_flag bit 0x01 set         -> open water          -> reject
     !   processing_flag bits 0x01|0x02    -> bad model/sigma0   -> reject
-    !   snow_cover_probability   >= thr_snow    (50%)            -> reject
-    !   frozen_soil_probability  >= thr_frozen  (50%)            -> reject
     !   wetland_fraction         >= thr_wetland (10%)            -> reject
     !   topographic_complexity   >= thr_topo    (10%)            -> reject
     !   subsurface_scattering_probability >= thr_subsfc (10%)    -> reject (new)
@@ -2230,8 +2228,7 @@ contains
     real*8, parameter :: unix_to_J2000_s = 10957.5d0 * 86400.0d0 + 64.184d0
 
     ! QC thresholds [percent]
-    real, parameter :: thr_snow    = 50.
-    real, parameter :: thr_frozen  = 50.
+    ! snow and frozen soil are screened by qc_model_based_for_sat_sfmc using model state
     real, parameter :: thr_wetland = 10.
     real, parameter :: thr_topo    = 10.
     real, parameter :: thr_subsfc  = 10.
@@ -2263,7 +2260,7 @@ contains
     integer :: ncid, ierr, obs_dimid
     integer :: lat_varid, lon_varid, time_varid, ssm_varid
     integer :: sflag_varid, pflag_varid
-    integer :: snow_varid, frozen_varid, wetland_varid, topo_varid, subsfc_varid
+    integer :: wetland_varid, topo_varid, subsfc_varid
 
     ! per-file arrays allocated to actual obs dimension size
     integer,    allocatable :: lat_raw(:), lon_raw(:)
@@ -2271,8 +2268,6 @@ contains
     integer(2), allocatable :: ssm_raw(:)
     integer(1), allocatable :: sflag_raw(:)    ! surface_flag    (NC_UBYTE  -> int8)
     integer(1), allocatable :: pflag_raw(:)    ! processing_flag (NC_UBYTE  -> int8)
-    integer(1), allocatable :: snow_raw(:)     ! snow_cover_probability    (NC_BYTE)
-    integer(1), allocatable :: frozen_raw(:)   ! frozen_soil_probability   (NC_BYTE)
     integer(1), allocatable :: wetland_raw(:)  ! wetland_fraction          (NC_BYTE)
     integer(1), allocatable :: topo_raw(:)     ! topographic_complexity    (NC_BYTE)
     integer(1), allocatable :: subsfc_raw(:)   ! subsurface_scattering_probability (NC_BYTE)
@@ -2460,8 +2455,6 @@ contains
        ierr = nf90_inq_varid(ncid, 'surface_soil_moisture',           ssm_varid)
        ierr = nf90_inq_varid(ncid, 'surface_flag',                    sflag_varid)
        ierr = nf90_inq_varid(ncid, 'processing_flag',                 pflag_varid)
-       ierr = nf90_inq_varid(ncid, 'snow_cover_probability',          snow_varid)
-       ierr = nf90_inq_varid(ncid, 'frozen_soil_probability',         frozen_varid)
        ierr = nf90_inq_varid(ncid, 'wetland_fraction',                wetland_varid)
        ierr = nf90_inq_varid(ncid, 'topographic_complexity',          topo_varid)
        ierr = nf90_inq_varid(ncid, 'subsurface_scattering_probability', subsfc_varid)
@@ -2474,8 +2467,6 @@ contains
        allocate(ssm_raw(   N_obs_file))
        allocate(sflag_raw( N_obs_file))
        allocate(pflag_raw( N_obs_file))
-       allocate(snow_raw(  N_obs_file))
-       allocate(frozen_raw(N_obs_file))
        allocate(wetland_raw(N_obs_file))
        allocate(topo_raw(  N_obs_file))
        allocate(subsfc_raw(N_obs_file))
@@ -2488,8 +2479,6 @@ contains
        ierr = nf90_get_var(ncid, ssm_varid,    ssm_raw)
        ierr = nf90_get_var(ncid, sflag_varid,  sflag_raw)
        ierr = nf90_get_var(ncid, pflag_varid,  pflag_raw)
-       ierr = nf90_get_var(ncid, snow_varid,   snow_raw)
-       ierr = nf90_get_var(ncid, frozen_varid, frozen_raw)
        ierr = nf90_get_var(ncid, wetland_varid,wetland_raw)
        ierr = nf90_get_var(ncid, topo_varid,   topo_raw)
        ierr = nf90_get_var(ncid, subsfc_varid, subsfc_raw)
@@ -2529,12 +2518,6 @@ contains
           ! skip if model or sigma0 not usable (processing_flag bits 0x01 | 0x02)
           if (iand(pflag_raw(ii), 3_1) /= 0_1) cycle
 
-          ! skip if snow cover probability above threshold
-          if (int(snow_raw(ii)) >= int(thr_snow)) cycle
-
-          ! skip if frozen soil probability above threshold
-          if (int(frozen_raw(ii)) >= int(thr_frozen)) cycle
-
           ! skip if wetland fraction above threshold
           if (int(wetland_raw(ii)) >= int(thr_wetland)) cycle
 
@@ -2564,7 +2547,7 @@ contains
 
        deallocate(lat_raw, lon_raw, time_raw, ssm_raw)
        deallocate(sflag_raw, pflag_raw)
-       deallocate(snow_raw, frozen_raw, wetland_raw, topo_raw, subsfc_raw)
+       deallocate(wetland_raw, topo_raw, subsfc_raw)
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
 
