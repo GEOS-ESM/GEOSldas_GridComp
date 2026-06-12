@@ -2556,6 +2556,139 @@ obs_param_nml(55)%ycorr          = 0.25
 obs_param_nml(55)%adapt          = 0
 
 ! --------------------------------------------------------------------
+!
+!  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A, 12.5 km Fibonacci grid)
+!
+! H121 CDR v8: 2007-01-01 to 2021-11-15
+! https://hsaf.meteoam.it/Products/Detail?prod=H121
+!
+! flistpath: directory containing Y{YYYY}/M{MM}/D{DD}/ subdirectory tree
+!            with one flist text file per day listing H121 MetOp-A filenames
+! flistname: name of the flist text file, e.g. 'H121_METOPA.txt'
+! path:      root directory of H121 MetOp-A netCDF files
+!            (read_obs_fnames will prepend Y{YYYY}/M{MM}/D{DD}/ to each entry)
+! errstd:    obs error std in % saturation (mapped to fraction in reader)
+
+obs_param_nml(56)%descr          = 'ASCAT_HSAF_META_SM'
+obs_param_nml(56)%orbit          = 3
+obs_param_nml(56)%pol            = 0
+obs_param_nml(56)%N_ang          = 0
+obs_param_nml(56)%freq           = 0
+obs_param_nml(56)%FOV            = 12.5
+obs_param_nml(56)%FOV_units      = 'km'
+obs_param_nml(56)%assim          = .false.
+obs_param_nml(56)%scale          = .false.
+obs_param_nml(56)%getinnov       = .false.
+obs_param_nml(56)%RTM_ID         = 0
+obs_param_nml(56)%bias_Npar      = 0
+obs_param_nml(56)%bias_trel      = 864000
+obs_param_nml(56)%bias_tcut      = 432000
+obs_param_nml(56)%nodata         = -9999.
+obs_param_nml(56)%varname        = 'sfds'
+obs_param_nml(56)%units          = '%'
+obs_param_nml(56)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(56)%fcstunits      = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(56)%path           = '/discover/nobackup/amfox/ASCAT_HSAF/H121/metop_a/'
+obs_param_nml(56)%name           = ''
+obs_param_nml(56)%maskpath       = ''
+obs_param_nml(56)%maskname       = ''
+obs_param_nml(56)%scalepath      = ''
+obs_param_nml(56)%scalename      = ''
+obs_param_nml(56)%flistpath      = '/discover/nobackup/amfox/ASCAT_fname_lists/H121/metop_a/'
+obs_param_nml(56)%flistname      = 'H121_METOPA.txt'
+obs_param_nml(56)%errstd         = 9.
+obs_param_nml(56)%std_normal_max = 2.5
+obs_param_nml(56)%zeromean       = .true.
+obs_param_nml(56)%coarsen_pert   = .true.
+obs_param_nml(56)%xcorr          = 0.25
+obs_param_nml(56)%ycorr          = 0.25
+obs_param_nml(56)%adapt          = 0
+
+! --------------------------------------------------------------------
+!
+!  57 = ASCAT_HSAF_METB_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-B, 12.5 km)
+!
+! H121 CDR v8: 2013-06-01 to 2024-12-31
+! H139 ICDR:   2025-01-01 onward (same schema, flist covers both products)
+
+obs_param_nml(57)%descr          = 'ASCAT_HSAF_METB_SM'
+obs_param_nml(57)%orbit          = 3
+obs_param_nml(57)%pol            = 0
+obs_param_nml(57)%N_ang          = 0
+obs_param_nml(57)%freq           = 0
+obs_param_nml(57)%FOV            = 12.5
+obs_param_nml(57)%FOV_units      = 'km'
+obs_param_nml(57)%assim          = .false.
+obs_param_nml(57)%scale          = .false.
+obs_param_nml(57)%getinnov       = .false.
+obs_param_nml(57)%RTM_ID         = 0
+obs_param_nml(57)%bias_Npar      = 0
+obs_param_nml(57)%bias_trel      = 864000
+obs_param_nml(57)%bias_tcut      = 432000
+obs_param_nml(57)%nodata         = -9999.
+obs_param_nml(57)%varname        = 'sfds'
+obs_param_nml(57)%units          = '%'
+obs_param_nml(57)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(57)%fcstunits      = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(57)%path           = '/discover/nobackup/amfox/ASCAT_HSAF/H121_H139/metop_b/'
+obs_param_nml(57)%name           = ''
+obs_param_nml(57)%maskpath       = ''
+obs_param_nml(57)%maskname       = ''
+obs_param_nml(57)%scalepath      = ''
+obs_param_nml(57)%scalename      = ''
+obs_param_nml(57)%flistpath      = '/discover/nobackup/amfox/ASCAT_fname_lists/H121_H139/metop_b/'
+obs_param_nml(57)%flistname      = 'H121_H139_METOPB.txt'
+obs_param_nml(57)%errstd         = 9.
+obs_param_nml(57)%std_normal_max = 2.5
+obs_param_nml(57)%zeromean       = .true.
+obs_param_nml(57)%coarsen_pert   = .true.
+obs_param_nml(57)%xcorr          = 0.25
+obs_param_nml(57)%ycorr          = 0.25
+obs_param_nml(57)%adapt          = 0
+
+! --------------------------------------------------------------------
+!
+!  58 = ASCAT_HSAF_METC_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-C, 12.5 km)
+!
+! H121 CDR v8: 2019-04-01 to 2024-12-31
+! H139 ICDR:   2025-01-01 onward
+
+obs_param_nml(58)%descr          = 'ASCAT_HSAF_METC_SM'
+obs_param_nml(58)%orbit          = 3
+obs_param_nml(58)%pol            = 0
+obs_param_nml(58)%N_ang          = 0
+obs_param_nml(58)%freq           = 0
+obs_param_nml(58)%FOV            = 12.5
+obs_param_nml(58)%FOV_units      = 'km'
+obs_param_nml(58)%assim          = .false.
+obs_param_nml(58)%scale          = .false.
+obs_param_nml(58)%getinnov       = .false.
+obs_param_nml(58)%RTM_ID         = 0
+obs_param_nml(58)%bias_Npar      = 0
+obs_param_nml(58)%bias_trel      = 864000
+obs_param_nml(58)%bias_tcut      = 432000
+obs_param_nml(58)%nodata         = -9999.
+obs_param_nml(58)%varname        = 'sfds'
+obs_param_nml(58)%units          = '%'
+obs_param_nml(58)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(58)%fcstunits      = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(58)%path           = '/discover/nobackup/amfox/ASCAT_HSAF/H121_H139/metop_c/'
+obs_param_nml(58)%name           = ''
+obs_param_nml(58)%maskpath       = ''
+obs_param_nml(58)%maskname       = ''
+obs_param_nml(58)%scalepath      = ''
+obs_param_nml(58)%scalename      = ''
+obs_param_nml(58)%flistpath      = '/discover/nobackup/amfox/ASCAT_fname_lists/H121_H139/metop_c/'
+obs_param_nml(58)%flistname      = 'H121_H139_METOPC.txt'
+obs_param_nml(58)%errstd         = 9.
+obs_param_nml(58)%std_normal_max = 2.5
+obs_param_nml(58)%zeromean       = .true.
+obs_param_nml(58)%coarsen_pert   = .true.
+obs_param_nml(58)%xcorr          = 0.25
+obs_param_nml(58)%ycorr          = 0.25
+obs_param_nml(58)%adapt          = 0
+
+! --------------------------------------------------------------------
 
 
 /
