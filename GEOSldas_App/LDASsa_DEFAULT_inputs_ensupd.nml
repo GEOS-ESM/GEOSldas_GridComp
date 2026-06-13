@@ -2574,7 +2574,7 @@ obs_param_nml(56)%orbit          = 3
 obs_param_nml(56)%pol            = 0
 obs_param_nml(56)%N_ang          = 0
 obs_param_nml(56)%freq           = 0
-obs_param_nml(56)%FOV            = 12.5
+obs_param_nml(56)%FOV            = 25.
 obs_param_nml(56)%FOV_units      = 'km'
 obs_param_nml(56)%assim          = .false.
 obs_param_nml(56)%scale          = .false.
@@ -2600,8 +2600,8 @@ obs_param_nml(56)%errstd         = 9.
 obs_param_nml(56)%std_normal_max = 2.5
 obs_param_nml(56)%zeromean       = .true.
 obs_param_nml(56)%coarsen_pert   = .true.
-obs_param_nml(56)%xcorr          = 0.25
-obs_param_nml(56)%ycorr          = 0.25
+obs_param_nml(56)%xcorr          = 0.3125
+obs_param_nml(56)%ycorr          = 0.3125
 obs_param_nml(56)%adapt          = 0
 
 ! --------------------------------------------------------------------
@@ -2616,7 +2616,7 @@ obs_param_nml(57)%orbit          = 3
 obs_param_nml(57)%pol            = 0
 obs_param_nml(57)%N_ang          = 0
 obs_param_nml(57)%freq           = 0
-obs_param_nml(57)%FOV            = 12.5
+obs_param_nml(57)%FOV            = 25.
 obs_param_nml(57)%FOV_units      = 'km'
 obs_param_nml(57)%assim          = .false.
 obs_param_nml(57)%scale          = .false.
@@ -2642,8 +2642,8 @@ obs_param_nml(57)%errstd         = 9.
 obs_param_nml(57)%std_normal_max = 2.5
 obs_param_nml(57)%zeromean       = .true.
 obs_param_nml(57)%coarsen_pert   = .true.
-obs_param_nml(57)%xcorr          = 0.25
-obs_param_nml(57)%ycorr          = 0.25
+obs_param_nml(57)%xcorr          = 0.3125
+obs_param_nml(57)%ycorr          = 0.3125
 obs_param_nml(57)%adapt          = 0
 
 ! --------------------------------------------------------------------
@@ -2658,7 +2658,7 @@ obs_param_nml(58)%orbit          = 3
 obs_param_nml(58)%pol            = 0
 obs_param_nml(58)%N_ang          = 0
 obs_param_nml(58)%freq           = 0
-obs_param_nml(58)%FOV            = 12.5
+obs_param_nml(58)%FOV            = 25.
 obs_param_nml(58)%FOV_units      = 'km'
 obs_param_nml(58)%assim          = .false.
 obs_param_nml(58)%scale          = .false.
@@ -2684,8 +2684,8 @@ obs_param_nml(58)%errstd         = 9.
 obs_param_nml(58)%std_normal_max = 2.5
 obs_param_nml(58)%zeromean       = .true.
 obs_param_nml(58)%coarsen_pert   = .true.
-obs_param_nml(58)%xcorr          = 0.25
-obs_param_nml(58)%ycorr          = 0.25
+obs_param_nml(58)%xcorr          = 0.3125
+obs_param_nml(58)%ycorr          = 0.3125
 obs_param_nml(58)%adapt          = 0
 
 ! --------------------------------------------------------------------
