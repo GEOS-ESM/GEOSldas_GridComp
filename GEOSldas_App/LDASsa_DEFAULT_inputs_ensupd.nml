@@ -2561,13 +2561,6 @@ obs_param_nml(55)%adapt          = 0
 !
 ! H121 CDR v8: 2007-01-01 to 2021-11-15
 ! https://hsaf.meteoam.it/Products/Detail?prod=H121
-!
-! flistpath: directory containing Y{YYYY}/M{MM}/D{DD}/ subdirectory tree
-!            with one flist text file per day listing H121 MetOp-A filenames
-! flistname: name of the flist text file, e.g. 'H121_METOPA.txt'
-! path:      root directory of H121 MetOp-A netCDF files
-!            (read_obs_fnames will prepend Y{YYYY}/M{MM}/D{DD}/ to each entry)
-! errstd:    obs error std in % saturation (mapped to fraction in reader)
 
 obs_param_nml(56)%descr          = 'ASCAT_HSAF_META_SM'
 obs_param_nml(56)%orbit          = 3
@@ -2610,6 +2603,7 @@ obs_param_nml(56)%adapt          = 0
 !
 ! H121 CDR v8: 2013-06-01 to 2024-12-31
 ! H139 ICDR:   2025-01-01 onward (same schema, flist covers both products)
+! H121/H139 files are staged together under the path root below.
 
 obs_param_nml(57)%descr          = 'ASCAT_HSAF_METB_SM'
 obs_param_nml(57)%orbit          = 3
@@ -2630,7 +2624,7 @@ obs_param_nml(57)%varname        = 'sfds'
 obs_param_nml(57)%units          = '%'
 obs_param_nml(57)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(57)%fcstunits      = 'NULL'                                                                                            ! do not edit!
-obs_param_nml(57)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121/metop_b/'
+obs_param_nml(57)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121_H139/metop_b/'
 obs_param_nml(57)%name           = ''
 obs_param_nml(57)%maskpath       = ''
 obs_param_nml(57)%maskname       = ''
@@ -2652,6 +2646,7 @@ obs_param_nml(57)%adapt          = 0
 !
 ! H121 CDR v8: 2019-04-01 to 2024-12-31
 ! H139 ICDR:   2025-01-01 onward
+! H121/H139 files are staged together under the path root below.
 
 obs_param_nml(58)%descr          = 'ASCAT_HSAF_METC_SM'
 obs_param_nml(58)%orbit          = 3
@@ -2672,7 +2667,7 @@ obs_param_nml(58)%varname        = 'sfds'
 obs_param_nml(58)%units          = '%'
 obs_param_nml(58)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(58)%fcstunits      = 'NULL'                                                                                            ! do not edit!
-obs_param_nml(58)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121/metop_c/'
+obs_param_nml(58)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121_H139/metop_c/'
 obs_param_nml(58)%name           = ''
 obs_param_nml(58)%maskpath       = ''
 obs_param_nml(58)%maskname       = ''

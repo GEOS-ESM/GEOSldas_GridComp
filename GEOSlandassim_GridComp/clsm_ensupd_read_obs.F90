@@ -2163,9 +2163,9 @@ contains
     ! satellite per day listing the bare filenames for that day.
     !
     ! Satellite species (this_obs_param%descr):
-    !   ASCAT_HSAF_META_SM  MetOp-A  2007-01-01 – 2021-11-15  (H121 CDR)
-    !   ASCAT_HSAF_METB_SM  MetOp-B  2013-06-01 – ongoing     (H121 then H139)
-    !   ASCAT_HSAF_METC_SM  MetOp-C  2019-04-01 – ongoing     (H121 then H139)
+    !   ASCAT_HSAF_META_SM  MetOp-A  2007-01-01 - 2021-11-15  (H121 CDR)
+    !   ASCAT_HSAF_METB_SM  MetOp-B  2013-06-01 - ongoing     (H121 then H139)
+    !   ASCAT_HSAF_METC_SM  MetOp-C  2019-04-01 - ongoing     (H121 then H139)
     !
     ! QC applied (no external mask file needed):
     !   surface_flag bit 0x01 set         -> open water          -> reject
@@ -2494,8 +2494,8 @@ contains
        ! preserved; the fill value (255 -> -1 in int8) has all bits set and is
        ! rejected by every QC check.
        !
-       ! Probability variables are NC_BYTE (signed), range 0-100; fill = -128.
-       ! Checking val >= threshold (0-100) implicitly rejects fill (-128).
+       ! Probability variables are NC_BYTE or NC_UBYTE.  Valid range is 0-100;
+       ! fill values read as negative signed bytes and must be rejected.
        !
        ! SSM is NC_SHORT; fill = -32768; valid 0-10000 (= 0-100% after *0.01).
 
@@ -2518,14 +2518,14 @@ contains
           ! skip if model or sigma0 not usable (processing_flag bits 0x01 | 0x02)
           if (iand(pflag_raw(ii), 3_1) /= 0_1) cycle
 
-          ! skip if wetland fraction above threshold
-          if (int(wetland_raw(ii)) >= int(thr_wetland)) cycle
+          ! skip if wetland fraction is missing or above threshold
+          if (int(wetland_raw(ii)) < 0 .or. int(wetland_raw(ii)) >= int(thr_wetland)) cycle
 
-          ! skip if topographic complexity above threshold
-          if (int(topo_raw(ii)) >= int(thr_topo)) cycle
+          ! skip if topographic complexity is missing or above threshold
+          if (int(topo_raw(ii)) < 0 .or. int(topo_raw(ii)) >= int(thr_topo)) cycle
 
-          ! skip if subsurface scattering probability above threshold
-          if (int(subsfc_raw(ii)) >= int(thr_subsfc)) cycle
+          ! skip if subsurface scattering probability is missing or above threshold
+          if (int(subsfc_raw(ii)) < 0 .or. int(subsfc_raw(ii)) >= int(thr_subsfc)) cycle
 
           ! passed all QC
 
