@@ -2495,7 +2495,9 @@ contains
        ! rejected by every QC check.
        !
        ! Probability variables are NC_BYTE or NC_UBYTE.  Valid range is 0-100;
-       ! fill values read as negative signed bytes and must be rejected.
+       ! fill (-128) reads as a negative signed byte.  Wetland and topo fill
+       ! means no database coverage (unknown -> reject).  Subsfc fill means
+       ! no subsurface scattering in this region (safe -> accept).
        !
        ! SSM is NC_SHORT; fill = -32768; valid 0-10000 (= 0-100% after *0.01).
 
@@ -2524,8 +2526,8 @@ contains
           ! skip if topographic complexity is missing or above threshold
           if (int(topo_raw(ii)) < 0 .or. int(topo_raw(ii)) >= int(thr_topo)) cycle
 
-          ! skip if subsurface scattering probability is missing or above threshold
-          if (int(subsfc_raw(ii)) < 0 .or. int(subsfc_raw(ii)) >= int(thr_subsfc)) cycle
+          ! fill (-128) means no subsurface scattering in this region -> safe to assimilate
+          if (int(subsfc_raw(ii)) >= int(thr_subsfc)) cycle
 
           ! passed all QC
 
