@@ -2769,7 +2769,7 @@ contains
     !
     ! Product contract:
     ! - product_type = cygnss_tile_coefficient_preprocessor_netcdf
-    ! - schema_version = 0.3
+    ! - schema_version = 0.4
     ! - sp_nearest_tile_index0 is zero-based and becomes the one-based
     !   GEOSldas owner tile number.
     ! - observed_y_db is the scalar observed value in dB.
@@ -2904,7 +2904,7 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
-    if (trim(schema_version) /= '0.3') then
+    if (trim(schema_version) /= '0.4') then
        err_msg = 'unexpected CYGNSS schema_version: ' // trim(schema_version)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if

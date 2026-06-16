@@ -54,7 +54,8 @@ module cygnss_preprocessed_obs
   integer, allocatable     :: obs_tilenum(:)
   integer, allocatable     :: tile_start(:)
   integer, allocatable     :: tile_count(:)
-  integer, allocatable     :: support_tile_index0(:)
+  integer, allocatable     :: support_tile_ig(:)
+  integer, allocatable     :: support_tile_jg(:)
 
   real,    allocatable     :: coefficient(:)
   real,    allocatable     :: sp_inc_angle(:)
@@ -162,7 +163,8 @@ contains
     if (allocated(obs_tilenum))                   deallocate(obs_tilenum)
     if (allocated(tile_start))                    deallocate(tile_start)
     if (allocated(tile_count))                    deallocate(tile_count)
-    if (allocated(support_tile_index0))           deallocate(support_tile_index0)
+    if (allocated(support_tile_ig))               deallocate(support_tile_ig)
+    if (allocated(support_tile_jg))               deallocate(support_tile_jg)
     if (allocated(coefficient))                   deallocate(coefficient)
     if (allocated(sp_inc_angle))                  deallocate(sp_inc_angle)
     if (allocated(sp_nearest_tile_distance_km))   deallocate(sp_nearest_tile_distance_km)
@@ -264,8 +266,9 @@ contains
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient product_type')
           end if
 
-          if (trim(schema_version) /= '0.3') then
-             call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient schema_version')
+          if (trim(schema_version) /= '0.4') then
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                  'CYGNSS coefficient schema_version must be 0.4 - regenerate files with preprocessor >= 0.4')
           end if
 
           status = nf90_inq_dimid(ncid, 'obs', dimid)
@@ -302,7 +305,8 @@ contains
     allocate(tile_count(N_obs_file))
     allocate(sp_inc_angle(N_obs_file))
     allocate(sp_nearest_tile_distance_km(N_obs_file))
-    allocate(support_tile_index0(N_support_file))
+    allocate(support_tile_ig(N_support_file))
+    allocate(support_tile_jg(N_support_file))
     allocate(coefficient(N_support_file))
 
     obs_offset = 0
@@ -363,10 +367,15 @@ contains
           status = nf90_get_var(ncid, varid, sp_nearest_tile_distance_km(obs_offset+1:obs_offset+N_obs_this))
           call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_distance_km')
 
-          status = nf90_inq_varid(ncid, 'tile_index0', varid)
-          call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_index0')
-          status = nf90_get_var(ncid, varid, support_tile_index0(support_offset+1:support_offset+N_support_this))
-          call cygnss_preproc_nc_check(status, Iam, 'reading tile_index0')
+          status = nf90_inq_varid(ncid, 'tile_ig', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_ig')
+          status = nf90_get_var(ncid, varid, support_tile_ig(support_offset+1:support_offset+N_support_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading tile_ig')
+
+          status = nf90_inq_varid(ncid, 'tile_jg', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_jg')
+          status = nf90_get_var(ncid, varid, support_tile_jg(support_offset+1:support_offset+N_support_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading tile_jg')
 
           status = nf90_inq_varid(ncid, 'coefficient', varid)
           call cygnss_preproc_nc_check(status, Iam, 'inquiring coefficient')
@@ -428,31 +437,31 @@ contains
 
   ! *****************************************************************
 
-  integer function cygnss_preproc_find_tile(N_catlH, tile_coord_lH, tilenum)
+  integer function cygnss_preproc_find_tile_by_ig_jg(N_catlH, tile_coord_lH, ig, jg)
 
-    ! Map a one-based full-domain tile number to its local-plus-halo index.
-    ! The local-plus-halo tile coordinates keep that number in %f_num.
+    ! Map global EASE-grid (ig, jg) coordinates to the local-plus-halo index.
+    ! i_indg/j_indg are globally fixed for any M36 tile regardless of experiment.
 
     implicit none
 
-    integer,                                  intent(in) :: N_catlH
+    integer,                                   intent(in) :: N_catlH
     type(tile_coord_type), dimension(N_catlH), intent(in) :: tile_coord_lH
-    integer,                                  intent(in) :: tilenum
+    integer,                                   intent(in) :: ig, jg
 
     integer :: i
 
-    cygnss_preproc_find_tile = -1
+    cygnss_preproc_find_tile_by_ig_jg = -1
 
     do i=1,N_catlH
 
-       if (tile_coord_lH(i)%f_num == tilenum) then
-          cygnss_preproc_find_tile = i
+       if (tile_coord_lH(i)%i_indg == ig .and. tile_coord_lH(i)%j_indg == jg) then
+          cygnss_preproc_find_tile_by_ig_jg = i
           return
        end if
 
     end do
 
-  end function cygnss_preproc_find_tile
+  end function cygnss_preproc_find_tile_by_ig_jg
 
   ! *****************************************************************
 
@@ -486,7 +495,7 @@ contains
 
     integer :: obs_ind
     integer :: n_e, k, k1, k2
-    integer :: support_tilenum, ind_lH
+    integer :: ind_lH
 
     real    :: refl_lr, hx_linear
 
@@ -519,16 +528,12 @@ contains
 
        do k=k1,k2
 
-          ! Support tile indices are zero-based in the coefficient product.
-          ! Abort during development if the configured halo does not contain
-          ! an explicit support tile needed by this observation.
-
-          support_tilenum = support_tile_index0(k) + 1
-          ind_lH = cygnss_preproc_find_tile(N_catlH, tile_coord_lH, support_tilenum)
+          ind_lH = cygnss_preproc_find_tile_by_ig_jg(N_catlH, tile_coord_lH, &
+               support_tile_ig(k), support_tile_jg(k))
 
           if (ind_lH < 1) then
              write(err_msg,*) 'CYGNSS support tile not in halo, owner=', tilenum, &
-                  ' support=', support_tilenum
+                  ' ig=', support_tile_ig(k), ' jg=', support_tile_jg(k)
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
           end if
 
