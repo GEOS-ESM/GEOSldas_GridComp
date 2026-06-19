@@ -845,7 +845,7 @@ class ldas:
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
         
         if self.with_issm:
-           for pattern in ('*.bin', '*.toolkits'):
+           for pattern in ('*.bin', '*.toolkits', '*.nc*'):
               for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
                  myISSMBC = self.inpdir+'/'+os.path.basename(issmbc)
                  os.symlink(issmbc, myISSMBC)        
