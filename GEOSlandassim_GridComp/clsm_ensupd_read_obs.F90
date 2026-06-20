@@ -2863,6 +2863,17 @@ contains
     N_bad_owner    = 0
     N_outside_time = 0
 
+    ! This loop spans calendar days so a 00z-centered window can pull in the
+    ! tail of the previous UTC day. With the current CYGNSS L1 scalar
+    ! preprocessor's daily-merge convention (see the M36 best-observation
+    ! daily workflow in CYGNSS_operator), this is a no-op for the previous
+    ! day's own file: each target day's preprocessed file already has its
+    ! own window 0 built from the prior day's 22:30-24:00 tail, so every row
+    ! in the previous day's file has a timestamp at or before that day's own
+    ! last window upper bound and will always fail the time filter below.
+    ! Kept generic rather than special-cased, in case a future preprocessor
+    ! organizes daily files without pre-folding the tail this way.
+
     date_time_file = date_time_type(date_time_low%year, date_time_low%month, date_time_low%day, &
          0, 0, 0, -9999, -9999)
 
