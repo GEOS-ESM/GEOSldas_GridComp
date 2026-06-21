@@ -2174,6 +2174,7 @@ contains
     !   topographic_complexity   >= thr_topo    (10%)            -> reject
     !   subsurface_scattering_probability >= thr_subsfc (5%)     -> reject (new)
     !   surface_soil_moisture_sensitivity <= thr_sens (1 dB)     -> reject (new)
+    !   backscatter40_flag bit 4 (noise_out_of_limits)            -> reject (new)
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
@@ -2235,6 +2236,8 @@ contains
     real, parameter :: thr_subsfc  = 5.
     real, parameter :: thr_sens    = 1.0   ! reject if SSM sensitivity <= 1 dB
 
+    integer(1), parameter :: bsflag_bad_bits = 4_1   ! noise_out_of_limits
+
     ! netCDF variable scale factors (as declared in files)
     real*8, parameter :: latlon_scale = 1.0d-6   ! lat/lon stored as int * 1e-6
     real,   parameter :: ssm_scale    = 0.01      ! SSM stored as short * 0.01 -> %
@@ -2262,7 +2265,7 @@ contains
     ! netCDF handles
     integer :: ncid, ierr, obs_dimid
     integer :: lat_varid, lon_varid, time_varid, ssm_varid
-    integer :: sflag_varid, pflag_varid
+    integer :: sflag_varid, pflag_varid, bsflag_varid
     integer :: wetland_varid, topo_varid, subsfc_varid, sens_varid
 
     ! per-file arrays allocated to actual obs dimension size
@@ -2271,6 +2274,7 @@ contains
     integer(2), allocatable :: ssm_raw(:)
     integer(1), allocatable :: sflag_raw(:)    ! surface_flag    (NC_UBYTE  -> int8)
     integer(1), allocatable :: pflag_raw(:)    ! processing_flag (NC_UBYTE  -> int8)
+    integer(1), allocatable :: bsflag_raw(:)   ! backscatter40_flag (NC_UBYTE)
     integer(1), allocatable :: wetland_raw(:)  ! wetland_fraction          (NC_BYTE)
     integer(1), allocatable :: topo_raw(:)     ! topographic_complexity    (NC_BYTE)
     integer(1), allocatable :: subsfc_raw(:)   ! subsurface_scattering_probability (NC_BYTE)
@@ -2459,6 +2463,7 @@ contains
        ierr = nf90_inq_varid(ncid, 'surface_soil_moisture',           ssm_varid)
        ierr = nf90_inq_varid(ncid, 'surface_flag',                    sflag_varid)
        ierr = nf90_inq_varid(ncid, 'processing_flag',                 pflag_varid)
+       ierr = nf90_inq_varid(ncid, 'backscatter40_flag',              bsflag_varid)
        ierr = nf90_inq_varid(ncid, 'wetland_fraction',                wetland_varid)
        ierr = nf90_inq_varid(ncid, 'topographic_complexity',          topo_varid)
        ierr = nf90_inq_varid(ncid, 'subsurface_scattering_probability', subsfc_varid)
@@ -2472,6 +2477,7 @@ contains
        allocate(ssm_raw(   N_obs_file))
        allocate(sflag_raw( N_obs_file))
        allocate(pflag_raw( N_obs_file))
+       allocate(bsflag_raw(N_obs_file))
        allocate(wetland_raw(N_obs_file))
        allocate(topo_raw(  N_obs_file))
        allocate(subsfc_raw(N_obs_file))
@@ -2485,6 +2491,7 @@ contains
        ierr = nf90_get_var(ncid, ssm_varid,    ssm_raw)
        ierr = nf90_get_var(ncid, sflag_varid,  sflag_raw)
        ierr = nf90_get_var(ncid, pflag_varid,  pflag_raw)
+       ierr = nf90_get_var(ncid, bsflag_varid, bsflag_raw)
        ierr = nf90_get_var(ncid, wetland_varid,wetland_raw)
        ierr = nf90_get_var(ncid, topo_varid,   topo_raw)
        ierr = nf90_get_var(ncid, subsfc_varid, subsfc_raw)
@@ -2527,6 +2534,9 @@ contains
           ! skip if model or sigma0 not usable (processing_flag bits 0x01 | 0x02)
           if (iand(pflag_raw(ii), 3_1) /= 0_1) cycle
 
+          ! skip if backscatter at 40 deg is noisy
+          if (iand(bsflag_raw(ii), bsflag_bad_bits) /= 0_1) cycle
+
           ! skip if wetland fraction is missing or above threshold
           if (int(wetland_raw(ii)) < 0 .or. int(wetland_raw(ii)) >= int(thr_wetland)) cycle
 
@@ -2559,7 +2569,7 @@ contains
        ! deallocate per-file arrays immediately to keep memory footprint low
 
        deallocate(lat_raw, lon_raw, time_raw, ssm_raw)
-       deallocate(sflag_raw, pflag_raw)
+       deallocate(sflag_raw, pflag_raw, bsflag_raw)
        deallocate(wetland_raw, topo_raw, subsfc_raw, sens_raw)
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
