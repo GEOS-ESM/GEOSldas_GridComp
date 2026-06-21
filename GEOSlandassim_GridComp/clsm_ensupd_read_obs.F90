@@ -2172,7 +2172,8 @@ contains
     !   processing_flag bits 0x01|0x02    -> bad model/sigma0   -> reject
     !   wetland_fraction         >= thr_wetland (10%)            -> reject
     !   topographic_complexity   >= thr_topo    (10%)            -> reject
-    !   subsurface_scattering_probability >= thr_subsfc (10%)    -> reject (new)
+    !   subsurface_scattering_probability >= thr_subsfc (5%)     -> reject (new)
+    !   surface_soil_moisture_sensitivity <= thr_sens (1 dB)     -> reject (new)
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
@@ -2231,11 +2232,13 @@ contains
     ! snow and frozen soil are screened by qc_model_based_for_sat_sfmc using model state
     real, parameter :: thr_wetland = 10.
     real, parameter :: thr_topo    = 10.
-    real, parameter :: thr_subsfc  = 10.
+    real, parameter :: thr_subsfc  = 5.
+    real, parameter :: thr_sens    = 1.0   ! reject if SSM sensitivity <= 1 dB
 
     ! netCDF variable scale factors (as declared in files)
     real*8, parameter :: latlon_scale = 1.0d-6   ! lat/lon stored as int * 1e-6
     real,   parameter :: ssm_scale    = 0.01      ! SSM stored as short * 0.01 -> %
+    real*8, parameter :: sens_scale   = 1.0d-7    ! sensitivity stored as int * 1e-7 -> dB
 
     ! ---------------
 
@@ -2260,7 +2263,7 @@ contains
     integer :: ncid, ierr, obs_dimid
     integer :: lat_varid, lon_varid, time_varid, ssm_varid
     integer :: sflag_varid, pflag_varid
-    integer :: wetland_varid, topo_varid, subsfc_varid
+    integer :: wetland_varid, topo_varid, subsfc_varid, sens_varid
 
     ! per-file arrays allocated to actual obs dimension size
     integer,    allocatable :: lat_raw(:), lon_raw(:)
@@ -2271,6 +2274,7 @@ contains
     integer(1), allocatable :: wetland_raw(:)  ! wetland_fraction          (NC_BYTE)
     integer(1), allocatable :: topo_raw(:)     ! topographic_complexity    (NC_BYTE)
     integer(1), allocatable :: subsfc_raw(:)   ! subsurface_scattering_probability (NC_BYTE)
+    integer,    allocatable :: sens_raw(:)     ! surface_soil_moisture_sensitivity (NC_INT)
 
     ! valid-obs scratch arrays (max one file at a time)
     real,   allocatable :: tmp1_lat(:), tmp1_lon(:), tmp1_obs(:)
@@ -2458,6 +2462,7 @@ contains
        ierr = nf90_inq_varid(ncid, 'wetland_fraction',                wetland_varid)
        ierr = nf90_inq_varid(ncid, 'topographic_complexity',          topo_varid)
        ierr = nf90_inq_varid(ncid, 'subsurface_scattering_probability', subsfc_varid)
+       ierr = nf90_inq_varid(ncid, 'surface_soil_moisture_sensitivity', sens_varid)
 
        ! allocate per-file arrays
 
@@ -2470,6 +2475,7 @@ contains
        allocate(wetland_raw(N_obs_file))
        allocate(topo_raw(  N_obs_file))
        allocate(subsfc_raw(N_obs_file))
+       allocate(sens_raw(  N_obs_file))
 
        ! read variables (raw packed values; scale applied manually below)
 
@@ -2482,6 +2488,7 @@ contains
        ierr = nf90_get_var(ncid, wetland_varid,wetland_raw)
        ierr = nf90_get_var(ncid, topo_varid,   topo_raw)
        ierr = nf90_get_var(ncid, subsfc_varid, subsfc_raw)
+       ierr = nf90_get_var(ncid, sens_varid,   sens_raw)
 
        ierr = nf90_close(ncid)
 
@@ -2529,6 +2536,10 @@ contains
           ! fill (-128) means no subsurface scattering in this region -> safe to assimilate
           if (int(subsfc_raw(ii)) >= int(thr_subsfc)) cycle
 
+          ! skip if sensitivity too low (or fill); fill value -2^31 * sens_scale
+          ! is hugely negative and fails this test naturally
+          if (real(sens_raw(ii)) * real(sens_scale) <= thr_sens) cycle
+
           ! passed all QC
 
           N_valid = N_valid + 1
@@ -2549,7 +2560,7 @@ contains
 
        deallocate(lat_raw, lon_raw, time_raw, ssm_raw)
        deallocate(sflag_raw, pflag_raw)
-       deallocate(wetland_raw, topo_raw, subsfc_raw)
+       deallocate(wetland_raw, topo_raw, subsfc_raw, sens_raw)
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
 
