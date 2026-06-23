@@ -408,6 +408,15 @@ while ( $counter <= ${{NUM_SGMT}} )
    /bin/cp LDAS.rc  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_LDAS_rc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
    /bin/cp CAP.rc  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_CAP_rc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
 
+   # Remove existing *.nml, *obsparam*, and *lmc* files before each lenkf.j 
+   # submission in LADAS coupled runs. Each run generates these files, and 
+   # pre-existing ones will cause LDAS to crash.
+   if ( $LADAS_COUPLING > 0 ) then
+      /bin/rm  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_smapL4SMlmc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.bin
+      /bin/rm  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_*_inputs.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.nml
+      /bin/rm  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_obsparam.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
+   endif 
+   
    # Run GEOSldas.x
    # --------------
    # clean up
