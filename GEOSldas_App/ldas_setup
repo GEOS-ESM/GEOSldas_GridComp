@@ -239,7 +239,7 @@ class LDASsetup:
             self.rqdExeInp['RESTART_DOMAIN']           = self.agcm_res +'x6C_GLOBAL'
 
             # the following are not in default rqdExeInp list; hardwire for now
-            self.rqdExeInp['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/'
+            self.rqdExeInp['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v007/'
             self.rqdExeInp['LAND_ASSIM']               = "YES"
             self.rqdExeInp['MET_HINTERP']              = 0
             self.landassim_dt                          = 10800                                    # seconds
@@ -612,7 +612,7 @@ class LDASsetup:
         else :
             self.rqdRmInp['account']         = cmdLineArgs['account']
             self.rqdRmInp['walltime']        = "01:00:00" 
-            self.rqdRmInp['ntasks_model']    = 120
+            self.rqdRmInp['ntasks_model']    = 138
 
 
         # print rm inputs
