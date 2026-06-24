@@ -2769,7 +2769,7 @@ contains
     !
     ! Product contract:
     ! - product_type = cygnss_tile_coefficient_preprocessor_netcdf
-    ! - schema_version = 0.4
+    ! - schema_version = 0.5
     ! - sp_nearest_tile_ig/jg are globally-stable M36 EASE-grid column/row
     !   indices for the specular point's nearest tile; the owner tile is
     !   found by matching these against this experiment's local tile_coord,
@@ -2920,8 +2920,8 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
-    if (trim(schema_version) /= '0.4') then
-       err_msg = 'unexpected CYGNSS schema_version: ' // trim(schema_version)
+    if (trim(schema_version) /= '0.5') then
+       err_msg = 'unexpected CYGNSS schema_version: ' // trim(schema_version) // ' (expected 0.5)'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 

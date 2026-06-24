@@ -269,9 +269,9 @@ contains
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unexpected CYGNSS coefficient product_type')
           end if
 
-          if (trim(schema_version) /= '0.4') then
+          if (trim(schema_version) /= '0.5') then
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
-                  'CYGNSS coefficient schema_version must be 0.4 - regenerate files with preprocessor >= 0.4')
+                  'CYGNSS coefficient schema_version must be 0.5 - regenerate files with preprocessor >= 0.5')
           end if
 
           status = nf90_inq_dimid(ncid, 'obs', dimid)
