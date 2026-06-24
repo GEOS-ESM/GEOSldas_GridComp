@@ -1713,7 +1713,7 @@ contains
 
           call cygnss_preproc_get_obs_pred(                                      &
                obs_param(this_species), N_catlH, tile_coord_lH, N_ens,           &
-               sfmc_lH, mwp_clay_lH, mwp_poros_lH, this_tilenum,                 &
+               sfmc_lH, mwp_clay_lH, mwp_poros_lH, f2l(this_tilenum),            &
                date_time, dtstep_assim,                                          &
                Obs_pred_l(i,1:N_ens) )
 

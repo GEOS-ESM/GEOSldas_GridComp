@@ -2770,8 +2770,13 @@ contains
     ! Product contract:
     ! - product_type = cygnss_tile_coefficient_preprocessor_netcdf
     ! - schema_version = 0.4
-    ! - sp_nearest_tile_index0 is zero-based and becomes the one-based
-    !   GEOSldas owner tile number.
+    ! - sp_nearest_tile_ig/jg are globally-stable M36 EASE-grid column/row
+    !   indices for the specular point's nearest tile; the owner tile is
+    !   found by matching these against this experiment's local tile_coord,
+    !   the same approach used for support tiles in cygnss_preprocessed_obs.
+    !   (sp_nearest_tile_index0/index1 are experiment-specific -- tied to
+    !   whatever domain the preprocessor itself was run against -- and are
+    !   only valid as a direct local tile number for that same domain.)
     ! - observed_y_db is the scalar observed value in dB.
     !
     ! amfox+codex, 20 May 2026
@@ -2810,13 +2815,13 @@ contains
     character(300) :: ldas_state, mwrtm_param
     character( 16) :: product_grid
 
-    integer :: i, owner_tilenum
+    integer :: i, j, owner_tilenum
     integer :: ncid, dimid, varid
     integer :: N_obs, N_read, N_kept, N_duplicate, N_bad_owner, N_outside_time
     integer :: N_files_read
     integer :: obs_seconds
 
-    integer, allocatable :: owner_tile_index0(:)
+    integer, allocatable :: owner_tile_ig(:), owner_tile_jg(:)
     integer, allocatable :: obs_year(:), obs_day(:)
 
     logical :: file_exists
@@ -2946,7 +2951,8 @@ contains
     call read_obs_nc_check(nf90_inq_dimid(ncid, 'obs', dimid), Iam, 'inq obs dim')
     call read_obs_nc_check(nf90_inquire_dimension(ncid, dimid, len=N_obs), Iam, 'inquire obs dim')
 
-    allocate(owner_tile_index0(N_obs))
+    allocate(owner_tile_ig(N_obs))
+    allocate(owner_tile_jg(N_obs))
     allocate(obs_year(N_obs))
     allocate(obs_day(N_obs))
     allocate(obs_db(N_obs))
@@ -2955,8 +2961,11 @@ contains
     allocate(owner_distance(N_obs))
     allocate(obs_seconds_utc(N_obs))
 
-    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_index0', varid), Iam, 'inq sp_nearest_tile_index0')
-    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_index0), Iam, 'read sp_nearest_tile_index0')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_ig', varid), Iam, 'inq sp_nearest_tile_ig')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_ig), Iam, 'read sp_nearest_tile_ig')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_jg', varid), Iam, 'inq sp_nearest_tile_jg')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_jg), Iam, 'read sp_nearest_tile_jg')
 
     call read_obs_nc_check(nf90_inq_varid(ncid, 'observed_y_db', varid), Iam, 'inq observed_y_db')
     call read_obs_nc_check(nf90_get_var(ncid, varid, obs_db), Iam, 'read observed_y_db')
@@ -2990,12 +2999,22 @@ contains
 
     do i=1,N_obs
 
-       ! Product tile indices are zero-based; GEOSldas tile numbers are
-       ! one-based full-domain indices.
+       ! Match the specular point's nearest-tile (ig,jg) against this
+       ! experiment's local tile space to find the local owner tile number.
+       ! ig/jg are globally stable, so this works regardless of whether the
+       ! preprocessor was run against this same domain or a different
+       ! (eg. global) one.
 
-       owner_tilenum = owner_tile_index0(i) + 1
+       owner_tilenum = -1
+       do j = 1, N_catd
+          if (tile_coord(j)%i_indg == owner_tile_ig(i) .and. &
+              tile_coord(j)%j_indg == owner_tile_jg(i)) then
+             owner_tilenum = j
+             exit
+          end if
+       end do
 
-       if (owner_tilenum < 1 .or. owner_tilenum > N_catd) then
+       if (owner_tilenum < 1) then
           N_bad_owner = N_bad_owner + 1
           cycle
        end if
@@ -3033,7 +3052,8 @@ contains
 
     end do
 
-    deallocate(owner_tile_index0)
+    deallocate(owner_tile_ig)
+    deallocate(owner_tile_jg)
     deallocate(obs_year)
     deallocate(obs_day)
     deallocate(obs_db)

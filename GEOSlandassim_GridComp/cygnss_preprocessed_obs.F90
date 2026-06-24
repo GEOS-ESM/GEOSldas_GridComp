@@ -178,7 +178,7 @@ contains
 
   ! *****************************************************************
 
-  subroutine cygnss_preproc_load(this_obs_param, date_time, dtstep_assim)
+  subroutine cygnss_preproc_load(this_obs_param, N_catlH, tile_coord_lH, date_time, dtstep_assim)
 
     ! Load the coefficient-product metadata and sparse support arrays.
     !
@@ -188,16 +188,19 @@ contains
     implicit none
 
     type(obs_param_type), intent(in)    :: this_obs_param
+    integer,                                   intent(in) :: N_catlH
+    type(tile_coord_type), dimension(N_catlH), intent(in) :: tile_coord_lH
     type(date_time_type), intent(in)    :: date_time
     integer,             intent(in)    :: dtstep_assim
 
+    integer :: i
     integer :: ncid, dimid, varid
     integer :: status
     integer :: N_obs_this, N_support_this
     integer :: N_obs_total, N_support_total
     integer :: obs_offset, support_offset
 
-    integer, allocatable :: tmp_tilenum0(:)
+    integer, allocatable :: tmp_tile_ig(:), tmp_tile_jg(:)
     integer, allocatable :: tmp_tile_start(:)
 
     character(len=400) :: fname
@@ -337,14 +340,28 @@ contains
           status = nf90_inquire_dimension(ncid, dimid, len=N_support_this)
           call cygnss_preproc_nc_check(status, Iam, 'reading support dimension')
 
-          allocate(tmp_tilenum0(N_obs_this))
+          allocate(tmp_tile_ig(N_obs_this))
+          allocate(tmp_tile_jg(N_obs_this))
           allocate(tmp_tile_start(N_obs_this))
 
-          status = nf90_inq_varid(ncid, 'sp_nearest_tile_index0', varid)
-          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_index0')
-          status = nf90_get_var(ncid, varid, tmp_tilenum0)
-          call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_index0')
-          obs_tilenum(obs_offset+1:obs_offset+N_obs_this) = tmp_tilenum0 + 1
+          status = nf90_inq_varid(ncid, 'sp_nearest_tile_ig', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_ig')
+          status = nf90_get_var(ncid, varid, tmp_tile_ig)
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_ig')
+
+          status = nf90_inq_varid(ncid, 'sp_nearest_tile_jg', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_jg')
+          status = nf90_get_var(ncid, varid, tmp_tile_jg)
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_jg')
+
+          ! sp_nearest_tile_ig/jg are globally-stable M36 EASE-grid column/row
+          ! indices; resolve each to this experiment's local-plus-halo tile
+          ! number rather than trusting the preprocessor's own experiment-
+          ! specific sp_nearest_tile_index0/index1.
+          do i = 1, N_obs_this
+             obs_tilenum(obs_offset+i) = cygnss_preproc_find_tile_by_ig_jg( &
+                  N_catlH, tile_coord_lH, tmp_tile_ig(i), tmp_tile_jg(i))
+          end do
 
           status = nf90_inq_varid(ncid, 'tile_start', varid)
           call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_start')
@@ -385,7 +402,8 @@ contains
           status = nf90_close(ncid)
           call cygnss_preproc_nc_check(status, Iam, 'closing ' // trim(fname))
 
-          deallocate(tmp_tilenum0)
+          deallocate(tmp_tile_ig)
+          deallocate(tmp_tile_jg)
           deallocate(tmp_tile_start)
 
           obs_offset = obs_offset + N_obs_this
@@ -409,6 +427,10 @@ contains
     ! Find the cached coefficient-product observation for a GEOSldas owner
     ! tile.  If duplicates exist, use the observation whose specular point is
     ! closest to the owner tile.
+    !
+    ! tilenum (here and in obs_tilenum) is a local-plus-halo ("lH") tile
+    ! index, matching cygnss_preproc_get_obs_pred's tile_coord_lH -- not the
+    ! full-domain tile number used elsewhere in the EnKF update.
 
     implicit none
 
@@ -497,13 +519,15 @@ contains
     integer :: n_e, k, k1, k2
     integer :: ind_lH
 
+    integer, allocatable :: ind_lH_support(:)
+
     real    :: refl_lr, hx_linear
 
     character(len=400) :: err_msg
 
     character(len=*), parameter :: Iam = 'cygnss_preproc_get_obs_pred'
 
-    call cygnss_preproc_load(this_obs_param, date_time, dtstep_assim)
+    call cygnss_preproc_load(this_obs_param, N_catlH, tile_coord_lH, date_time, dtstep_assim)
 
     obs_pred = nodata_generic
 
@@ -522,20 +546,33 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
+    ! Resolve all support tiles to local-plus-halo indices up front (same
+    ! result for every ensemble member). Support tiles for observations near
+    ! the edge of a cropped domain can fall outside the halo, or outside the
+    ! domain entirely -- treat that as a no-data observation (obs_pred stays
+    ! at nodata_generic, set above) rather than aborting the whole run.
+
+    allocate(ind_lH_support(k1:k2))
+
+    do k=k1,k2
+       ind_lH_support(k) = cygnss_preproc_find_tile_by_ig_jg(N_catlH, tile_coord_lH, &
+            support_tile_ig(k), support_tile_jg(k))
+    end do
+
+    if (any(ind_lH_support < 1)) then
+       if (logit) write(logunit,*) 'CYGNSS support tile not in halo for tilenum=', tilenum, &
+            ' -- treating observation as no-data'
+       deallocate(ind_lH_support)
+       return
+    end if
+
     do n_e=1,N_ens
 
        hx_linear = 0.
 
        do k=k1,k2
 
-          ind_lH = cygnss_preproc_find_tile_by_ig_jg(N_catlH, tile_coord_lH, &
-               support_tile_ig(k), support_tile_jg(k))
-
-          if (ind_lH < 1) then
-             write(err_msg,*) 'CYGNSS support tile not in halo, owner=', tilenum, &
-                  ' ig=', support_tile_ig(k), ' jg=', support_tile_jg(k)
-             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-          end if
+          ind_lH = ind_lH_support(k)
 
           call mwRTM_get_lr_reflectivity(                                       &
                this_obs_param%freq, sp_inc_angle(obs_ind),                      &
@@ -556,6 +593,8 @@ contains
        end if
 
     end do
+
+    deallocate(ind_lH_support)
 
   end subroutine cygnss_preproc_get_obs_pred
 
