@@ -86,7 +86,7 @@ module GEOS_MetforceGridCompMod
                                                              'DRPAR      ', 'DFPAR      ', 'UU         ', &
                                                              'DZ         ', 'DRNIR      ', 'DFNIR      ', &
                                                              'DRUVR      ', 'DFUVR      ', 'PLS        ']  
-  integer :: NUM_LAND_TILE, NUM_LANDICE_TILE
+  integer :: NUM_LAND_TILE, NUM_LAKE_TILE, NUM_LANDICE_TILE
   contains
 
   !BOP
@@ -662,6 +662,7 @@ module GEOS_MetforceGridCompMod
     VERIFY_(status)
 
     NUM_LAND_TILE    = count(tiletype == MAPL_LAND)
+    NUM_LAKE_TILE    = count(tiletype == MAPL_LAKE)
     NUM_LANDICE_TILE = count(tiletype == MAPL_LANDICE)
 
     call MAPL_GetResource(MAPL, grid_type,Label="GEOSldas.GRID_TYPE:",RC=STATUS)
@@ -1353,8 +1354,8 @@ module GEOS_MetforceGridCompMod
       RETURN_(ESMF_SUCCESS)
     endif
 
-    i1 = NUM_LAND_TILE + 1
-    i2 = NUM_LAND_TILE + NUM_LANDICE_TILE
+    i1 = NUM_LAND_TILE + NUM_LAKE_TILE + 1
+    i2 = NUM_LAND_TILE + NUM_LAKE_TILE + NUM_LANDICE_TILE
   ! Get MAPL obj
     call MAPL_GetObjectFromGC(gc, MAPL, _RC)
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC)
