@@ -22,6 +22,8 @@ COLLECTIONS:
 #                'inst3_2d_lndfcstana_Nx'
 #                'const_1d_lnd_Nt'
 #                'const_2d_lnd_Nx'
+#                'tavg24_1d_lake_Nt'
+#                'tavg24_2d_lake_Nx'
 #                'tavg24_2d_glc_Nx'
 #                'tavg24_1d_glc_Nt'
 #                'tavg24_1d_route'
@@ -512,7 +514,64 @@ EASEv2_M36.LM:           1
                                      'TPSURF_ANA_ENSSTD' , 'LANDASSIM' , 'TSURF_ANA_ENSSTD'    ,
                                      'TP1_ANA_ENSSTD'    , 'LANDASSIM' , 'TSOIL1_ANA_ENSSTD' 
                         ::
-  
+  tavg24_2d_lake_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Lake Diagnostics',
+  tavg24_2d_lake_Nx.nbits:         12,
+  tavg24_2d_lake_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
+  tavg24_2d_lake_Nx.mode:          'time-averaged' ,
+  tavg24_2d_lake_Nx.frequency:      240000 ,
+  tavg24_2d_lake_Nx.ref_time:       000000 ,
+  tavg24_2d_lake_Nx.format:        'CFIO' ,
+  tavg24_2d_lake_Nx.regrid_exch:   '../input/tile.data' ,
+  tavg24_2d_lake_Nx.regrid_name:   'GRIDNAME' ,
+  tavg24_2d_lake_Nx.grid_label:     PC720x361-DC ,  # comment this line out for cube face output
+  tavg24_2d_lake_Nx.deflate:        1,
+  tavg24_2d_lake_Nx.fields:       'ALBVR'       , 'LAKE' ,  'ALBVR_LK'           ,
+                                  'ALBVF'       , 'LAKE' ,  'ALBVF_LK'           ,
+                                  'ALBNR'       , 'LAKE' ,  'ALBNR_LK'           ,
+                                  'ALBNF'       , 'LAKE' ,  'ALBNF_LK'           ,
+                                  'EMIS'        , 'LAKE' ,  'EMIS_LK'            ,
+                                  'EVAPOUT'     , 'LAKE' ,
+                                  'SUBLIM'      , 'LAKE' ,
+                                  'RUNOFF'      , 'LAKE' ,  'RUNOFF_LK'          ,
+                                  'SHOUT'       , 'LAKE' ,
+                                  'HLATN'       , 'LAKE' ,
+                                  'HLWUP'       , 'LAKE' ,  'HLWUP_LK'           ,
+                                  'LWNDSRF'     , 'LAKE' ,
+                                  'SWNDSRF'     , 'LAKE' ,
+                                  'TST'         , 'LAKE' ,  'TST_LK'             ,
+                                  'QST'         , 'LAKE' ,  'QST_LK'             ,
+                                  'DELTS'       , 'LAKE' ,
+                                  'DELQS'       , 'LAKE' ,
+                                  'CHT'         , 'LAKE' ,
+                                  'CQT'         , 'LAKE' ,
+                                  'CMT'         , 'LAKE' ,
+                                  'PS'          , 'LAKE' ,  'PS_LK'              ,
+                                   ::  
+  tavg24_1d_lake_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Lake Diagnostics',
+  tavg24_1d_lake_Nt.nbits:         12,
+  tavg24_1d_lake_Nt.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
+  tavg24_1d_lake_Nt.mode:          'time-averaged' ,
+  tavg24_1d_lake_Nt.format:        'CFIO',
+  tavg24_1d_lake_Nt.frequency:      240000 ,
+  tavg24_1d_lake_Nt.ref_time:       000000 ,
+  tavg24_1d_lake_Nt.fields:       'EVAPOUT'     , 'LAKE' ,
+                                  'SUBLIM'      , 'LAKE' ,
+                                  'RUNOFF'      , 'LAKE' ,  'RUNOFF_LK'          ,
+                                  'SHOUT'       , 'LAKE' ,
+                                  'HLATN'       , 'LAKE' ,
+                                  'HLWUP'       , 'LAKE' ,  'HLWUP_LK'           ,
+                                  'LWNDSRF'     , 'LAKE' ,
+                                  'SWNDSRF'     , 'LAKE' ,
+                                  'TST'         , 'LAKE' ,  'TST_LK'             ,
+                                  'QST'         , 'LAKE' ,  'QST_LK'             ,
+                                  'DELTS'       , 'LAKE' ,
+                                  'DELQS'       , 'LAKE' ,
+                                  'CHT'         , 'LAKE' ,
+                                  'CQT'         , 'LAKE' ,
+                                  'CMT'         , 'LAKE' ,
+                                  'PS'          , 'LAKE' ,  'PS_LK'              ,
+                                   ::                                   
+
   tavg24_2d_glc_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Land Ice Diagnostics',
   tavg24_2d_glc_Nx.nbits:         12,
   tavg24_2d_glc_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
