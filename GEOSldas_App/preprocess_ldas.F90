@@ -118,6 +118,12 @@ program main
 
      call createZoominRestart(f2g_file, orig_catch, new_catch, 100)
 
+  else if (trim(option) == "zoomin_lakerst") then
+     orig_r = trim(arg1)
+     new_r = trim(arg2)
+     f2g_file = trim(arg3)
+     call createZoominRestart(f2g_file, orig_r, new_r, 19)
+   
   else if (trim(option) == "zoomin_landicerst") then
 
      orig_r = trim(arg1)
