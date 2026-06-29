@@ -835,8 +835,9 @@ contains
     endif
 
     call MAPL_GetObjectFromGC(gcs(FORCEAVG), CHILD_MAPL, rc=status)
-    VERIFY_(status)  
-    call MAPL_Set(CHILD_MAPL, LocStream=force_locstream, rc=status)
+    VERIFY_(status) 
+    ! only land_locstream is averaged.
+    call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
     VERIFY_(status)
 
     if ( with_land) then
@@ -1041,9 +1042,8 @@ contains
           ! Use landpert's output as the input to calculate the ensemble average forcing
           ! W.J note: So far it is only for the Catchment model. 
           ! To make CatchmentCN work with assim, the export from landgrid and catchmentCN grid need to be modified.  
-          if ( LSM_CHOICE == 1 .and. .not. with_landice ) then 
-             !WJ note: The forcing ens avg would fail if there is landice. need to revisit this run
-             !         Reason: the import is from landpert(land_locstream) but the export is in force_locstream)
+          if ( LSM_CHOICE == 1 ) then 
+             !WJ note: The export only has land_locstream
              call ESMF_GridCompRun(gcs(FORCEAVG), importState=gex(igc), exportState=gex(FORCEAVG), clock=clock, userRC=status)
              VERIFY_(status)
           endif
