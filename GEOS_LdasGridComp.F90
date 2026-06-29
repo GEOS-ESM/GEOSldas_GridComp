@@ -1035,7 +1035,11 @@ contains
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDPERT(i)), clock=clock, phase=3, userRC=status)
           VERIFY_(status)
        endif
-
+       if (with_lake) then
+          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAKE(i)), &
+                                clock=clock, phase=5, userRC=status)
+          VERIFY_(status)
+       endif
        if (with_landice) then
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDICE(i)),  clock=clock, phase=4, userRC=status)
           VERIFY_(status)

@@ -168,6 +168,15 @@ module GEOS_MetforceGridCompMod
          )
     VERIFY_(status)
 
+    ! phase 5: to lake
+    call MAPL_GridCompSetEntryPoint(                                            &
+         gc,                                                                    &
+         ESMF_METHOD_RUN,                                                       &
+         DistributeForcingToLake,                                               &
+         rc=status                                                              &
+         )
+    VERIFY_(status)    
+
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_FINALIZE,                                                  &
@@ -1404,6 +1413,107 @@ module GEOS_MetforceGridCompMod
     RETURN_(ESMF_SUCCESS)
     
   end subroutine DistributeForcingToLandIce
+
+  subroutine DistributeForcingToLake(gc, export, lake_import, clock, rc)
+
+    type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
+    type(ESMF_State),    intent(inout) :: export      ! Export state
+    type(ESMF_State),    intent(inout) :: lake_import ! Import state
+    type(ESMF_Clock),    intent(inout) :: clock       ! The clock
+    integer, optional,   intent(  out) :: rc          ! Error code
+
+    integer :: i1, i2, status
+    real, pointer :: out1d(:), in1d(:), tmp(:)
+    real, allocatable :: tmpreal(:)
+    character(len=ESMF_MAXSTR) :: Iam
+
+    Iam = "metForce::DistributeForcingToLake"
+
+    if (NUM_LAKE_TILE == 0) then
+       RETURN_(ESMF_SUCCESS)
+    endif
+
+    ! Active forcing tile-space order is LAND -> LAKE -> LANDICE.
+    i1 = NUM_LAND_TILE + 1
+    i2 = NUM_LAND_TILE + NUM_LAKE_TILE
+
+    call MAPL_GetPointer(export,      out1d, 'Tair', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'TA',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'Qair', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'QA',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'Psurf', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'PS',    _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'Rainf_C', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'PCU',     _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'Snowf', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'SNO',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'LWdown',  _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'LWDNSRF', _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'PARdrct', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'DRPAR',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'PARdffs', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'DFPAR',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'Wind', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'UU',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(lake_import, in1d, 'UWINDLMTILE', _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(lake_import, in1d, 'VWINDLMTILE', _RC)
+    in1d = 0.0
+
+    call MAPL_GetPointer(export,      out1d, 'RefH', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'DZ',   _RC)
+    in1d = out1d(i1:i2)
+
+    call MAPL_GetPointer(export,      out1d, 'Rainf',   _RC)
+    call MAPL_GetPointer(export,      tmp,   'Rainf_C', _RC)
+    call MAPL_GetPointer(lake_import, in1d,  'PLS',     _RC)
+    in1d = out1d(i1:i2) - tmp(i1:i2)
+
+    ! Shortwave split, following the existing landice convention.
+    allocate(tmpreal(NUM_LAKE_TILE), stat=status)
+    VERIFY_(status)
+
+    call MAPL_GetPointer(export, out1d, 'SWdown', _RC)
+    tmpreal = 0.5 * out1d(i1:i2)
+
+    call MAPL_GetPointer(lake_import, in1d, 'DRNIR', _RC)
+    in1d = 0.5 * tmpreal
+
+    call MAPL_GetPointer(lake_import, in1d, 'DFNIR', _RC)
+    in1d = 0.5 * tmpreal
+
+    call MAPL_GetPointer(export, out1d, 'PARdrct', _RC)
+    call MAPL_GetPointer(lake_import, in1d, 'DRUVR', _RC)
+    in1d = 0.5 * tmpreal - out1d(i1:i2)
+
+    call MAPL_GetPointer(export, out1d, 'PARdffs', _RC)
+    call MAPL_GetPointer(lake_import, in1d, 'DFUVR', _RC)
+    in1d = 0.5 * tmpreal - out1d(i1:i2)
+
+    deallocate(tmpreal)
+
+    RETURN_(ESMF_SUCCESS)
+
+  end subroutine DistributeForcingToLake
 
   !BOP
 
