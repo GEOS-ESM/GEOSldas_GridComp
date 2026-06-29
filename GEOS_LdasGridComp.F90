@@ -16,6 +16,7 @@ module GEOS_LdasGridCompMod
   use GEOS_LandAssimGridCompMod, only: LandAssimSetServices => SetServices
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
   use GEOS_RouteGridCompMod,     only: RouteSetServices     => SetServices
+  use GEOS_LakeGridCompMod,      only: LakeSetServices      => SetServices
 
   use LDAS_TileCoordType,     only: tile_coord_type , T_TILECOORD_STATE, TILECOORD_WRAP
   use LDAS_TileCoordType,     only: grid_def_type, io_grid_def_type, operator (==)
@@ -51,6 +52,7 @@ module GEOS_LdasGridCompMod
 
   ! All children
   integer,allocatable :: LAND(:)
+  integer,allocatable :: LAKE(:)
   integer,allocatable :: LANDICE(:)
   integer,allocatable :: ROUTE(:)
   integer,allocatable :: LANDPERT(:)
@@ -63,6 +65,7 @@ module GEOS_LdasGridCompMod
   logical :: mwRTM
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
   logical :: with_landice       ! true if landice tiles requested by config
+  logical :: with_lake          ! true if lake    tiles requested by config
   logical :: with_land          ! true if land    tiles requested by config
   integer :: RUN_ROUTE          ! 0:, no river routing, 1: routing w/o reservoirs, 2: routing w/ reservoirs
   
@@ -173,15 +176,17 @@ contains
 
     with_landice = .false.
     with_land    = .false.
-!   with_lake    = .false.
+    with_lake    = .false.
 
     if (any(tile_types == MAPL_LANDICE)) with_landice = .true.
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
-!   if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
+    if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
 
     if (NUM_ENSEMBLE>1) then
-       _ASSERT( .not. (with_landice .or. RUN_ROUTE>0), "Landice and route not supported in ensemble mode.")
+       _ASSERT( .not. (with_lake .or. with_landice .or. RUN_ROUTE>0), &
+         "Lake, landice, and route are not supported in ensemble mode.")
     endif
+    
 
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
@@ -213,6 +218,7 @@ contains
     endif
 
     if (with_land)    allocate(LAND(   NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
+    if (with_lake)    allocate(LAKE(   NUM_ENSEMBLE))
     if (with_landice) allocate(LANDICE(NUM_ENSEMBLE))
     if (RUN_ROUTE >= 1) then
        _ASSERT( with_land, "RUNOFF must be from the export of land_gridcomp for now.")
@@ -259,6 +265,12 @@ contains
           LAND(i) = MAPL_AddChild(gc, name=childname, ss=LandSetServices, rc=status)
           VERIFY_(status)
        endif 
+
+       if (with_lake) then
+          childname = 'LAKE' // trim(ensid_string)
+          LAKE(i) = MAPL_AddChild(gc, name=childname, ss=LakeSetServices, rc=status)
+          VERIFY_(status)
+       endif
 
        if (with_landice) then
           childname='LANDICE'//trim(ensid_string)
@@ -413,6 +425,7 @@ contains
     ! MAPL variables
     type(MAPL_LocStream) :: surf_locstream
     type(MAPL_LocStream) :: land_locstream
+    type(MAPL_LocStream) :: lake_locstream
     type(MAPL_LocStream) :: landice_locstream
     type(MAPL_LocStream) :: force_locstream
     type(MAPL_MetaComp), pointer :: MAPL=>null() ! GC's MAPL obj
@@ -603,8 +616,9 @@ contains
     call MAPL_Get(MAPL, GCS=gcs, GCNAMES=gcnames, rc=status)
     VERIFY_(status)
 
-    ! Create LAND's locstreams as subset of Surface locstream
+    ! Create component locstreams as subsets of Surface locstream
     ! and add it to the children's MAPL objects
+    ! build the active forcing tile mask in tile-file order: LAND -> LAKE -> LANDICE.    
     allocate(mask(0))
     if (with_land) then
        call MAPL_LocStreamCreate(                                                  &
@@ -617,7 +631,16 @@ contains
        VERIFY_(status)
        mask =[mask,MAPL_LAND]
     endif
-
+    if (with_lake) then
+       call MAPL_LocStreamCreate(                                                &
+            lake_locstream,                                                      &
+            surf_locstream,                                                      &
+            name=gcnames(LAKE(1)),                                               &
+            mask=[MAPL_LAKE],                                                    &
+            rc=status )
+       VERIFY_(status)
+       mask = [mask, MAPL_LAKE]
+    endif
     if (with_landice) then
        call MAPL_LocStreamCreate(                                                &
           landice_locstream,                                                     &
@@ -810,7 +833,13 @@ contains
           call ESMF_UserCompSetInternalState(gcs(LANDPERT(i)), 'TILE_COORD', tcwrap, status)
           VERIFY_(status)
        endif
-
+       if (with_lake) then
+          call MAPL_GetObjectFromGC(gcs(LAKE(i)), CHILD_MAPL, rc=status)
+          VERIFY_(status)
+       
+          call MAPL_Set(CHILD_MAPL, LocStream=lake_locstream, rc=status)
+          VERIFY_(status)
+       endif
        if (with_landice) then
           call MAPL_GetObjectFromGC(gcs(LANDICE(i)), CHILD_MAPL, rc=status)
           VERIFY_(status)
