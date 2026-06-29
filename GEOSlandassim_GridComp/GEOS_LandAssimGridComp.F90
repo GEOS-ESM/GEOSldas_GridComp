@@ -1522,7 +1522,7 @@ contains
     real, pointer :: DFUVR_enavg(:)=>null()
     real, pointer :: LWDNSRF_enavg(:)=>null()
     real, pointer :: DZ_enavg(:)=>null()
-    real, pointer :: SWLAND(:)=>null()
+    !real, pointer :: SWLAND(:)=>null()
     real, pointer :: LAI(:)=>null()
 
     !! export for analysis model diagnostics 
@@ -1690,8 +1690,8 @@ contains
     _VERIFY(status)
     call MAPL_GetPointer(import, DZ_enavg,      'DZ',      rc=status)
     _VERIFY(status)
-    call MAPL_GetPointer(import, SWLAND,        'SWLAND',  rc=status)      ! not _enavg 
-    _VERIFY(status)
+    !call MAPL_GetPointer(import, SWLAND,        'SWLAND',  rc=status)      ! not _enavg 
+    !_VERIFY(status)
     call MAPL_GetPointer(import, LAI,           'LAI',     rc=status)
     _VERIFY(status)
     

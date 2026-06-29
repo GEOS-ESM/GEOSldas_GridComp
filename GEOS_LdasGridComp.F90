@@ -35,7 +35,7 @@ module GEOS_LdasGridCompMod
   use catch_constants,        only: echo_catch_constants  
   use StieglitzSnow,          only: StieglitzSnow_echo_constants
   use SurfParams,             only: SurfParams_init
-
+  use mapl_StateMerge_mod,    only: StateMerge
   implicit none
 
   private
@@ -931,8 +931,8 @@ contains
     integer :: igc, i, ens_id, FIRST_ENS_ID, ens_id_width, k
     logical :: IAmRoot
     integer :: LSM_CHOICE
-    type (ESMF_Field)                         :: field
-
+    type (ESMF_Field) :: field
+    type (ESMF_State) :: merged_import 
 
      ! Begin...
 
@@ -1129,8 +1129,10 @@ contains
        call MAPL_TimerOn(MAPL, gcnames(igc))
        ! Get EnKF increments and apply to "cat_progn" (imported from LANDAVG via "use" statement!); otherwise import state is export
        ! from LANDNSAVG
-       call ESMF_GridCompRun(gcs(igc), importState=gex(LANDAVG), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+       merged_Import = StateMerge(gex(LANDAVG), gex(FORCEAVG), _RC)
+       call ESMF_GridCompRun(gcs(igc), importState=merged_Import, exportState=gex(igc), clock=clock, phase=1, userRC=status)
        VERIFY_(status)
+       call ESMF_StateDestroy(merged_Import, noGarbage=.true., _RC)
 
        do i = 1, NUM_ENSEMBLE
           ! Extract updated exports from "cat_progn" 
