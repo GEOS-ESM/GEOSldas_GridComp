@@ -442,15 +442,15 @@ class ldas:
                  landpertRstFile=self.in_rstdir+'/'+tmpFile
                  if ( os.path.isfile(landpertRstFile)) :
                     self.has_geos_pert = True
-            if self.with_lake:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
-              lakeRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile)
+           if self.with_lake:
+             tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
+             lakeRstFile=self.in_rstdir+'/'+tmpFile
+             assert os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile)
 
-            if self.with_landice:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-              landiceRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
+           if self.with_landice:
+             tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
+             landiceRstFile=self.in_rstdir+'/'+tmpFile
+             assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
 
            if self.run_route > 0:
               tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
@@ -909,11 +909,11 @@ class ldas:
            if self.with_land:
              catch_obj = catchANDcn(config_obj = config)
              catch_obj.remap()
-            if self.with_lake or self.with_landice:
-                config['output']['surface']['remap_water'] = True
-                config['input']['surface']['zoom'] = '2'
-                other_rst_obj = other_restarts(config_obj = config)
-                other_rst_obj.remap()             
+           if self.with_lake or self.with_landice:
+               config['output']['surface']['remap_water'] = True
+               config['input']['surface']['zoom'] = '2'
+               other_rst_obj = other_restarts(config_obj = config)
+               other_rst_obj.remap()             
 
         #for ens in self.ensdirs :
         catchRstFile0  = ''
