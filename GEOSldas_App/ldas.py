@@ -780,6 +780,9 @@ class ldas:
         # if running routing, make sure domain is global
         if self.run_route>0 and self.isZoomIn:
             exit( "Must have global domain to run routing model, RUN_ROUTE=" + self.run_route )
+        # if running ISSM, make sure domain is global
+        if self.with_issm and self.isZoomIn:
+            exit( "Must have global domain to run ISSM (DO_ISSM: 1)")    
         
         # update tile domain
         if self.isZoomIn:
@@ -1002,6 +1005,10 @@ class ldas:
                       
                if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+                  if self.with_issm and RESTART_str in ['2']:
+                     exit( "Restart '2' not supported when running ISSM (DO_ISSM: 1)") 
+                  if self.with_issm and RESTART_str in ['M']:
+                     print("issm_internal_rst will be bootstrapped for Restart 'M' ")
                      
 
                if os.path.isfile(landiceRstFile) :
