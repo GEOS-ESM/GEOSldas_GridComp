@@ -1954,6 +1954,7 @@ contains
     
     if (allocated(ind_tmp))                  deallocate(ind_tmp)
     if (allocated(tmp_ndst2))                deallocate(tmp_ndst2)
+    if (allocated(tmp_wFOV))                 deallocate(tmp_wFOV)   ! fix memory leak
     if (allocated(tmp_weights))              deallocate(tmp_weights)
     if (allocated(tmp_data))                 deallocate(tmp_data)
     

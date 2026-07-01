@@ -1199,6 +1199,7 @@ contains
           if (allocated( indTiles_ana))       deallocate(indTiles_ana)
 #else
           if (associated(Obs_pred_lH))        deallocate(Obs_pred_lH)
+          if (associated(Observations_lH))    deallocate(Observations_lH)  ! fix memory leak
 
 #endif
 

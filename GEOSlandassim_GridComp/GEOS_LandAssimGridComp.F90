@@ -2965,10 +2965,23 @@ contains
              call write_pert_rseed(trim(seed_fname), Pert_rseed_r8(:,ens+1))
           enddo
        endif
-    endif ! land_assim
-    
-    ! Call Finalize for every child
-    call MAPL_GenericFinalize(gc, import, export, clock, rc=status)
+     endif ! land_assim
+
+     ! Deallocate module-level arrays allocated in Initialize() -- fix memory leaks
+     if (allocated(tb_nodata))          deallocate(tb_nodata)
+     if (allocated(Pert_rseed))         deallocate(Pert_rseed)
+     if (allocated(Pert_rseed_r8))      deallocate(Pert_rseed_r8)
+     if (associated(N_catl_vec))        deallocate(N_catl_vec)
+     if (associated(low_ind))           deallocate(low_ind)
+     if (associated(l2rf))              deallocate(l2rf)
+     if (associated(rf2f))              deallocate(rf2f)
+     if (associated(tile_coord_rf))     deallocate(tile_coord_rf)
+     if (associated(rf2g))              deallocate(rf2g)
+     if (associated(rf2l))              deallocate(rf2l)
+     if (associated(obs_param))         deallocate(obs_param)
+     
+     ! Call Finalize for every child
+     call MAPL_GenericFinalize(gc, import, export, clock, rc=status)
     _VERIFY(status)
     
     RETURN_(ESMF_SUCCESS)
