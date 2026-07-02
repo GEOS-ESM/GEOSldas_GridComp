@@ -5980,7 +5980,7 @@ contains
     N_lat        = last_ind(1) - start_ind(1) + 1
     
     start_ind(1:N_files) = (lon_min_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
-    last_ind(1:N_files)  = (lon_max_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
+    last_ind( 1:N_files) = (lon_max_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
     
     N_lon_vec(1:N_files) = last_ind(1:N_files) - start_ind(1:N_files) + 1  
     
@@ -9752,14 +9752,14 @@ contains
           ! check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(ind)==sclprm_mean_obs(ind) .and.          &
-               sclprm_mean_mod(ind)==sclprm_mean_mod(ind) .and.          &
-               sclprm_std_obs(ind) ==sclprm_std_obs(ind)  .and.          &
-               sclprm_std_mod(ind) ==sclprm_std_mod(ind)  .and.          &
-               sclprm_mean_obs(ind)>0.                       .and.          &
-               sclprm_mean_mod(ind)>0.                       .and.          &
-               sclprm_std_obs(ind)>=0.                       .and.          &
-               sclprm_std_mod(ind)>=0.                             ) then
+          if ( sclprm_mean_obs(ind) == sclprm_mean_obs(ind) .and.          &   ! false if NaN
+               sclprm_mean_mod(ind) == sclprm_mean_mod(ind) .and.          &   ! false if NaN
+               sclprm_std_obs( ind) == sclprm_std_obs( ind) .and.          &   ! false if NaN
+               sclprm_std_mod( ind) == sclprm_std_mod( ind) .and.          &   ! false if NaN
+               sclprm_mean_obs(ind) >  0.                   .and.          &
+               sclprm_mean_mod(ind) >  0.                   .and.          &
+               sclprm_std_obs( ind) >= 0.                   .and.          &
+               sclprm_std_mod( ind) >= 0.                          ) then
              
              ! scale via standard normal deviates
              
@@ -9990,14 +9990,14 @@ contains
           ! Check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(j_ind, i_ind)==sclprm_mean_obs(j_ind, i_ind) .and.  &
-               sclprm_mean_mod(j_ind, i_ind)==sclprm_mean_mod(j_ind, i_ind) .and.  &
-               sclprm_std_obs(j_ind, i_ind) ==sclprm_std_obs(j_ind, i_ind)  .and.  &
-               sclprm_std_mod(j_ind, i_ind) ==sclprm_std_mod(j_ind, i_ind)  .and.  &
-               sclprm_mean_obs(j_ind, i_ind)>0.   .and.        &
-               sclprm_mean_mod(j_ind, i_ind)>0.   .and.        &
-               sclprm_std_obs(j_ind, i_ind)>=0.   .and.        &
-               sclprm_std_mod(j_ind, i_ind)>=0.         ) then
+          if ( sclprm_mean_obs(j_ind, i_ind) == sclprm_mean_obs(j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_mean_mod(j_ind, i_ind) == sclprm_mean_mod(j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_std_obs( j_ind, i_ind) == sclprm_std_obs( j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_std_mod( j_ind, i_ind) == sclprm_std_mod( j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_mean_obs(j_ind, i_ind) >  0.                            .and.  &
+               sclprm_mean_mod(j_ind, i_ind) >  0.                            .and.  &
+               sclprm_std_obs( j_ind, i_ind) >= 0.                            .and.  &
+               sclprm_std_mod( j_ind, i_ind) >= 0.         ) then
              
              ! Scale via standard normal deviates
              
@@ -10389,14 +10389,14 @@ contains
           ! check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(ind)==sclprm_mean_obs(ind) .and.  &
-               sclprm_mean_mod(ind)==sclprm_mean_mod(ind) .and.  &
-               sclprm_std_obs( ind)==sclprm_std_obs( ind) .and.  &
-               sclprm_std_mod( ind)==sclprm_std_mod( ind) .and.  &
-               sclprm_mean_obs(ind)>0.   .and.          &
-               sclprm_mean_mod(ind)>0.   .and.          &
-               sclprm_std_obs( ind)>0.   .and.          &
-               sclprm_std_mod( ind)>0.          ) then
+          if ( sclprm_mean_obs(ind) == sclprm_mean_obs(ind) .and.  &   ! false if NaN
+               sclprm_mean_mod(ind) == sclprm_mean_mod(ind) .and.  &   ! false if NaN
+               sclprm_std_obs( ind) == sclprm_std_obs( ind) .and.  &   ! false if NaN
+               sclprm_std_mod( ind) == sclprm_std_mod( ind) .and.  &   ! false if NaN
+               sclprm_mean_obs(ind) >  0.                   .and.  &
+               sclprm_mean_mod(ind) >  0.                   .and.  &
+               sclprm_std_obs( ind) >  0.                   .and.  &
+               sclprm_std_mod( ind) >  0.          ) then
              
              
              ! sanity check (against accidental use of wrong tile space)
