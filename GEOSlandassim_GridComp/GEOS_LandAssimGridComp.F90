@@ -34,7 +34,7 @@ module GEOS_LandAssimGridCompMod
   use LDAS_ensdrv_mpi,           only: MPI_obs_param_type 
   
   use LDAS_DateTimeMod,          only: date_time_type
-  use LDAS_ensdrv_Globals,       only: logunit, LDAS_is_nodata, nodata_generic, get_ensid_string
+  use LDAS_ensdrv_Globals,       only: logunit, LDAS_is_nodata, nodata_generic, nodata_generic_int4, get_ensid_string
   
   use LDAS_ConvertMod,           only: esmf2ldas
   use LDAS_DriverTypes,          only: met_force_type
@@ -2737,39 +2737,40 @@ contains
 
     ! local variables
 
-    real, dimension(:), pointer :: VEGCLS
-    real, dimension(:), pointer :: SOILCLS
-    real, dimension(:), pointer :: SAND
-    real, dimension(:), pointer :: CLAY
-    real, dimension(:), pointer :: mw_POROS
-    real, dimension(:), pointer :: WANGWT
-    real, dimension(:), pointer :: WANGWP
-    real, dimension(:), pointer :: RGHHMIN
-    real, dimension(:), pointer :: RGHHMAX
-    real, dimension(:), pointer :: RGHWMAX
-    real, dimension(:), pointer :: RGHWMIN
-    real, dimension(:), pointer :: RGHNRH
-    real, dimension(:), pointer :: RGHNRV
-    real, dimension(:), pointer :: RGHPOLMIX
-    real, dimension(:), pointer :: OMEGA
-    real, dimension(:), pointer :: BH
-    real, dimension(:), pointer :: BV
-    real, dimension(:), pointer :: LEWT
+    real,    dimension(:), pointer :: VEGCLS
+    real,    dimension(:), pointer :: SOILCLS
+    real,    dimension(:), pointer :: SAND
+    real,    dimension(:), pointer :: CLAY
+    real,    dimension(:), pointer :: mw_POROS
+    real,    dimension(:), pointer :: WANGWT
+    real,    dimension(:), pointer :: WANGWP
+    real,    dimension(:), pointer :: RGHHMIN
+    real,    dimension(:), pointer :: RGHHMAX
+    real,    dimension(:), pointer :: RGHWMAX
+    real,    dimension(:), pointer :: RGHWMIN
+    real,    dimension(:), pointer :: RGHNRH
+    real,    dimension(:), pointer :: RGHNRV
+    real,    dimension(:), pointer :: RGHPOLMIX
+    real,    dimension(:), pointer :: OMEGA
+    real,    dimension(:), pointer :: BH
+    real,    dimension(:), pointer :: BV
+    real,    dimension(:), pointer :: LEWT
     
-    integer :: N_catl_tmp, n, mpierr, status
-    logical :: mwp_nodata, all_nodata_l
-    real,    allocatable :: tmpR(:)
-    logical, allocatable :: nodata(:)
+    integer                            :: N_catl_tmp, n, mpierr, status
+    logical                            :: mwp_nodata, all_nodata_l
+
+    real,    dimension(:), allocatable :: tmpR
+    logical, dimension(:), allocatable :: nodata
 
     if(.not. allocated(mwRTM_param)) then
 
        ! get static mwRTM parameters from MWRTM_FILE
 
-       call MAPL_GetPointer(INTERNAL, SAND     , 'MWRTM_SAND'     ,    RC=STATUS)
+       call MAPL_GetPointer(INTERNAL, VEGCLS   , 'MWRTM_VEGCLS'   ,    RC=STATUS)
        _VERIFY(STATUS)
        call MAPL_GetPointer(INTERNAL, SOILCLS  , 'MWRTM_SOILCLS'  ,    RC=STATUS)
        _VERIFY(STATUS)
-       call MAPL_GetPointer(INTERNAL, VEGCLS   , 'MWRTM_VEGCLS'   ,    RC=STATUS)
+       call MAPL_GetPointer(INTERNAL, SAND     , 'MWRTM_SAND'     ,    RC=STATUS)
        _VERIFY(STATUS)
        call MAPL_GetPointer(INTERNAL, CLAY     , 'MWRTM_CLAY'     ,    RC=STATUS)
        _VERIFY(STATUS)
@@ -2806,36 +2807,36 @@ contains
        _ASSERT(N_catl_tmp == N_catl, "sanity check: N_catl should be consistent")
        
        allocate(mwRTM_param(N_catl))
-       mwRTM_param(:)%sand      = SAND(:)
-       ! when in debug mode, nint(VEGCLS) with 1.0e15 may crash
-       allocate(tmpR(N_catl))
+
+       ! special handling of integer fields: when in debug mode, nint(VEGCLS) with 1.0e15 may crash
+       ! --> replace MAPL_UNDEF (=1.e15 as of July 2026) with int4 version of LDAS's nodata_generic (=-9999 as of July 2026)
+
+       allocate(tmpR(  N_catl))
        allocate(nodata(N_catl))
-       tmpR   = VEGCLS(:)
-       nodata = LDAS_is_nodata(tmpR)
-       ! replace MAPL_UNDEF with LDAS's nodata_generic
-       where(nodata) tmpR = nodata_generic 
-       mwRTM_param(:)%vegcls    = nint(tmpR(:))
+       
+       tmpR = VEGCLS( :);  nodata = LDAS_is_nodata(tmpR);  where(nodata) tmpR = nodata_generic_int4;  mwRTM_param(:)%vegcls  = nint(tmpR(:))
+       tmpR = SOILCLS(:);  nodata = LDAS_is_nodata(tmpR);  where(nodata) tmpR = nodata_generic_int4;  mwRTM_param(:)%soilcls = nint(tmpR(:))
 
-       tmpR   = SOILCLS(:)
-       nodata = LDAS_is_nodata(tmpR)
-       where(nodata) tmpR = nodata_generic
-       mwRTM_param(:)%soilcls   = nint(tmpR(:))
-
-       mwRTM_param(:)%clay      = CLAY(:)
-       mwRTM_param(:)%poros     = mw_POROS(:)
-       mwRTM_param(:)%wang_wt   = WANGWT(:)
-       mwRTM_param(:)%wang_wp   = WANGWP(:)
-       mwRTM_param(:)%rgh_hmin  = RGHHMIN(:)
-       mwRTM_param(:)%rgh_hmax  = RGHHMAX(:)
-       mwRTM_param(:)%rgh_wmin  = RGHWMIN(:)
-       mwRTM_param(:)%rgh_wmax  = RGHWMAX(:)
-       mwRTM_param(:)%rgh_Nrh   = RGHNRH(:)
-       mwRTM_param(:)%rgh_Nrv   = RGHNRV(:)
+       deallocate(tmpR)
+       deallocate(nodata)
+       
+       
+       mwRTM_param(:)%sand      = SAND(     :)       
+       mwRTM_param(:)%clay      = CLAY(     :)
+       mwRTM_param(:)%poros     = mw_POROS( :)
+       mwRTM_param(:)%wang_wt   = WANGWT(   :)
+       mwRTM_param(:)%wang_wp   = WANGWP(   :)
+       mwRTM_param(:)%rgh_hmin  = RGHHMIN(  :)
+       mwRTM_param(:)%rgh_hmax  = RGHHMAX(  :)
+       mwRTM_param(:)%rgh_wmin  = RGHWMIN(  :)
+       mwRTM_param(:)%rgh_wmax  = RGHWMAX(  :)
+       mwRTM_param(:)%rgh_Nrh   = RGHNRH(   :)
+       mwRTM_param(:)%rgh_Nrv   = RGHNRV(   :)
        mwRTM_param(:)%rgh_polmix= RGHPOLMIX(:)
-       mwRTM_param(:)%omega     = OMEGA(:)
-       mwRTM_param(:)%bh        = BH(:)
-       mwRTM_param(:)%bv        = bv(:)
-       mwRTM_param(:)%lewt      = LEWT(:)
+       mwRTM_param(:)%omega     = OMEGA(    :)
+       mwRTM_param(:)%bh        = BH(       :)
+       mwRTM_param(:)%bv        = BV(       :)
+       mwRTM_param(:)%lewt      = LEWT(     :)
        
     endif   ! if (.not. allocated(mwRTM_param))
     

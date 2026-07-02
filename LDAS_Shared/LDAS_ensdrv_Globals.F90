@@ -20,6 +20,7 @@ module LDAS_ensdrv_Globals
   private
 
   public :: nodata_generic
+  public :: nodata_generic_int4
   public :: nodata_tolfrac_generic
   public :: nodata_tol_generic
   public :: LDAS_is_nodata
@@ -36,12 +37,14 @@ module LDAS_ensdrv_Globals
       
   ! generic no-data-value
   
-  real, parameter :: nodata_generic         = -9999.
-  real, parameter :: nodata_tolfrac_generic = 1.e-4
+  real,    parameter :: nodata_generic         = -9999.
+  real,    parameter :: nodata_tolfrac_generic = 1.e-4
   
-  real, parameter :: nodata_tol_generic     = abs(nodata_generic*nodata_tolfrac_generic)
-  real, parameter :: MAPL_UNDEF_tol_generic = abs(MAPL_UNDEF    *nodata_tolfrac_generic) 
+  real,    parameter :: nodata_tol_generic     = abs(nodata_generic*nodata_tolfrac_generic)
+  real,    parameter :: MAPL_UNDEF_tol_generic = abs(MAPL_UNDEF    *nodata_tolfrac_generic) 
 
+  integer, parameter :: nodata_generic_int4    = nint( nodata_generic )         ! NOTE: nint() works for -9999. but not for 1.e15
+  
   ! ----------------------------------------------------------------
   !
   ! log file
