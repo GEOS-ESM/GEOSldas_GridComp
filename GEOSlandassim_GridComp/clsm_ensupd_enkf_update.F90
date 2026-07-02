@@ -1793,23 +1793,23 @@ contains
     integer :: obsparam_varname_varid,     obsparam_units_varid,     obsparam_descr_varid
     integer :: obsparam_fcstvarname_varid, obsparam_fcstunits_varid
 
-    integer,           dimension(:), allocatable :: species_assim_int, species_scale_int
-    real,              dimension(:), allocatable :: species_errstd_r4
-    character(len=40), dimension(:), allocatable :: species_varname_s,     species_units_s
-    character(len=40), dimension(:), allocatable :: species_fcstvarname_s, species_fcstunits_s
-    character(len=40), dimension(:), allocatable :: species_descr_s
-    character(len=40)                            :: attr_name
-    character(len=8)                             :: write_date_yyyymmdd
-    character(len=10)                            :: write_time_hhmmss
-    character(len=5)                             :: write_zone
-    character(len=24)                            :: write_datetime_iso
-    character(len=64)                            :: user_name
-    character(len=128)                           :: created_by
-    integer                                      :: user_len, user_status
-    integer                                      :: i
-    logical, allocatable :: mask(:)
-    integer,           dimension(N_obsf)         :: tmpvecint
-    real,              dimension(N_obsf)         :: tmpvecreal
+    integer,           dimension(:),      allocatable :: species_assim_int, species_scale_int
+    real,              dimension(:),      allocatable :: species_errstd_r4
+    character(len=40), dimension(:),      allocatable :: species_varname_s,     species_units_s
+    character(len=40), dimension(:),      allocatable :: species_fcstvarname_s, species_fcstunits_s
+    character(len=40), dimension(:),      allocatable :: species_descr_s
+    character(len=40)                                 :: attr_name
+    character(len=8)                                  :: write_date_yyyymmdd
+    character(len=10)                                 :: write_time_hhmmss
+    character(len=5)                                  :: write_zone
+    character(len=24)                                 :: write_datetime_iso
+    character(len=64)                                 :: user_name
+    character(len=128)                                :: created_by
+    integer                                           :: user_len, user_status
+    integer                                           :: i
+    logical,           dimension(:),      allocatable :: mask
+    integer,           dimension(N_obsf)              :: tmpvecint
+    real,              dimension(N_obsf)              :: tmpvecreal
     
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
     character(len=400)          :: err_msg
