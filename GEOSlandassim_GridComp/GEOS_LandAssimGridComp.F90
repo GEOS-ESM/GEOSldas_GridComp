@@ -2758,7 +2758,8 @@ contains
     
     integer :: N_catl_tmp, n, mpierr, status
     logical :: mwp_nodata, all_nodata_l
-    real, allocatable :: tmpR(:)
+    real,    allocatable :: tmpR(:)
+    logical, allocatable :: nodata(:)
 
     if(.not. allocated(mwRTM_param)) then
 
@@ -2808,11 +2809,16 @@ contains
        mwRTM_param(:)%sand      = SAND(:)
        ! when in debug mode, nint(VEGCLS) with 1.0e15 may crash
        allocate(tmpR(N_catl))
-       tmpR = VEGCLS(:)
-       where(tmpR > 1.0e10) tmpR = nodata_generic 
+       allocate(nodata(N_catl))
+       tmpR   = VEGCLS(:)
+       nodata = LDAS_is_nodata(tmpR)
+       ! replace MAPL_UNDEF with LDAS's nodata_generic
+       where(nodata) tmpR = nodata_generic 
        mwRTM_param(:)%vegcls    = nint(tmpR(:))
-       tmpR = SOILCLS(:)
-       where(tmpR > 1.0e10) tmpR = nodata_generic
+
+       tmpR   = SOILCLS(:)
+       nodata = LDAS_is_nodata(tmpR)
+       where(nodata) tmpR = nodata_generic
        mwRTM_param(:)%soilcls   = nint(tmpR(:))
 
        mwRTM_param(:)%clay      = CLAY(:)
