@@ -1335,6 +1335,10 @@ class ldas:
                    rstval.append(self.catch)
                    rstval.append('vegdyn')
 
+                if self.with_lake:
+                  rstkey.append('LAKE')
+                  rstval.append('lake')
+
                 if self.with_landice:
                   rstkey.append('LANDICE')
                   rstval.append('landice')
