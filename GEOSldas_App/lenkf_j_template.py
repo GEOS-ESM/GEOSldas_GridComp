@@ -721,7 +721,7 @@ EOF
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
    
-       set rstfs = (${LANDMODEL} 'lake' 'landice' 'route')
+       set rstfs = (${{LANDMODEL}} 'lake' 'landice' 'route')
        foreach rstf ( $rstfs )
           if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
              set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
