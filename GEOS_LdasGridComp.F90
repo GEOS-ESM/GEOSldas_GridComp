@@ -1035,13 +1035,12 @@ contains
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDPERT(i)), clock=clock, phase=3, userRC=status)
           VERIFY_(status)
        endif
-       if (with_lake) then
-          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAKE(i)), &
-                                clock=clock, phase=5, userRC=status)
-          VERIFY_(status)
-       endif
        if (with_landice) then
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDICE(i)),  clock=clock, phase=4, userRC=status)
+          VERIFY_(status)
+       endif
+       if (with_lake) then
+          call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAKE(i)),     clock=clock, phase=5, userRC=status)
           VERIFY_(status)
        endif
        call MAPL_TimerOff(MAPL, gcnames(igc))
@@ -1084,6 +1083,16 @@ contains
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land_ice
+
+       if (with_lake) then
+          igc = LAKE(i)
+          call MAPL_TimerOn(MAPL, gcnames(igc))
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          VERIFY_(status)
+          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
+          VERIFY_(status)
+          call MAPL_TimerOff(MAPL, gcnames(igc))
+       endif ! with_lake
 
        if ( RUN_ROUTE >= 1 ) then
           igc = ROUTE(i)
