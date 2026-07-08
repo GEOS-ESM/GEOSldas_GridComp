@@ -1028,15 +1028,16 @@ class ldas:
                else :
                    landiceRstFile = landiceRstFile0
 
-               if os.path.isfile(issmRstFile) :
-                  issmLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
-                  shutil.copy(issmRstFile,issmLocal)
-                  issmRstFile = issmLocal
+               if self.with_issm:
+                  if os.path.isfile(issmRstFile) :
+                     issmLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+                     shutil.copy(issmRstFile,issmLocal)
+                     issmRstFile = issmLocal
 
-                  if '0000' in ensdir :
-                     issmRstFile0 = issmRstFile
-               else :
-                   issmRstFile = issmRstFile0
+                     if '0000' in ensdir :
+                        issmRstFile0 = issmRstFile
+                  else :
+                     issmRstFile = issmRstFile0
 
             routeRstFile = ''
             if self.run_route > 0 :
