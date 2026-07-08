@@ -612,8 +612,8 @@ class LDASsetup:
         else :
             self.rqdRmInp['account']         = cmdLineArgs['account']
             self.rqdRmInp['walltime']        = "01:00:00" 
-            self.rqdRmInp['ntasks_model']    = 138
-            self.optRmInp['ntasks-per-node'] = cmdLineArgs['ntasks-per-node']
+            self.rqdRmInp['ntasks_model']    = 120
+            self.optRmInp['ntasks-per-node'] = 30
 
         # print rm inputs
         if self.verbose:
@@ -1589,7 +1589,7 @@ class LDASsetup:
 
         MY_NTASKS_PER_NODE=''
         if 'ntasks-per-node' in self.optRmInp:
-           MY_NTASKS_PER_NODE='--ntasks-per-node='+self.optRmInp['ntasks-per-node']
+           MY_NTASKS_PER_NODE='--ntasks-per-node='+str(self.optRmInp['ntasks-per-node'])
 
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
@@ -1996,11 +1996,6 @@ def parseCmdLine():
         help='number of ensemble members. Required when exeinp is dummy',          
         type=str
         ) 
-    p_setup.add_argument(
-        '--ntasks-per-node',
-        help='number of processes for each computing node. Required when exeinp is dummy',
-        type=str
-        )  
 
     # obsolete command line args
     p_setup.add_argument(
