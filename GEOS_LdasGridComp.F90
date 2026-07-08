@@ -182,10 +182,11 @@ contains
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
     if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
 
-    if (NUM_ENSEMBLE>1) then
-       _ASSERT( .not. (with_lake .or. with_landice .or. RUN_ROUTE>0), &
-         "Lake, landice, and route are not supported in ensemble mode.")
-    endif
+    if (NUM_ENSEMBLE > 1) then
+       if (with_lake .or. with_landice .or. RUN_ROUTE > 0) then
+          _ASSERT(.false., "Lake, landice, and route are not supported in ensemble mode.")
+       endif
+    endif    
     
 
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
