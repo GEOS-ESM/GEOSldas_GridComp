@@ -63,7 +63,7 @@ class LDASsetup:
         # ------
         # Optional resource manager input fields
         # ------
-        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'constraint']
+        optSlurmInpKeys = ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'constraint', 'ntasks-per-node']
 
         
         # ===============================================================================================
@@ -613,7 +613,7 @@ class LDASsetup:
             self.rqdRmInp['account']         = cmdLineArgs['account']
             self.rqdRmInp['walltime']        = "01:00:00" 
             self.rqdRmInp['ntasks_model']    = 138
-
+            self.optRmInp['ntasks-per-node'] = cmdLineArgs['ntasks-per-node']
 
         # print rm inputs
         if self.verbose:
@@ -1587,6 +1587,10 @@ class LDASsetup:
         if 'constraint' in self.optRmInp:
             constraint = self.optRmInp['constraint']
 
+        MY_NTASKS_PER_NODE=''
+        if 'ntasks-per-node' in self.optRmInp:
+           MY_NTASKS_PER_NODE='--ntasks-per-node='+self.optRmInp['ntasks-per-node']
+
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
             SBATCHQSUB = 'qsub'
@@ -1599,6 +1603,7 @@ class LDASsetup:
                   MY_ACCOUNT         = self.rqdRmInp['account'],
                   MY_WALLTIME        = self.rqdRmInp['walltime'],
                   MY_NTASKS_MODEL    = str(self.rqdRmInp['ntasks_model']),
+                  MY_NTASKS_PER_NODE = MY_NTASKS_PER_NODE
                   MY_CONSTRAINT      = constraint,
                   MY_OSERVER_NODES   = str(self.optRmInp['oserver_nodes']),
                   MY_WRITERS_NPES    = str(self.optRmInp['writers-per-node']),
@@ -1872,6 +1877,7 @@ def _printRmInputKeys(rqdRmInpKeys, optRmInpKeys):
     print ('#      IMPORTANT REQUIREMENT: total #writers = writers-per-node * oserver_nodes >= 2')
     print ('#      Jobs will hang when oserver_nodes = writers-per-node = 1.')
     print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait").')
+    print ('# - ntasks-per-node  = number of processes for each computing node.')
     print ('#')
     for key in optRmInpKeys:
         print ('#'+key + ':')
@@ -1988,6 +1994,11 @@ def parseCmdLine():
     p_setup.add_argument(
         '--nens',
         help='number of ensemble members. Required when exeinp is dummy',          
+        type=str
+        ) 
+    p_setup.add_argument(
+        '--ntasks-per-node',
+        help='number of processes for each computing node. Required when exeinp is dummy',
         type=str
         )  
 
