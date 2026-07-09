@@ -12,7 +12,7 @@ job_directive = {"NCCS": '''#!/bin/csh -f
 #SBATCH --error={MY_EXPDIR}/scratch/GEOSldas_err_txt
 #SBATCH --account={MY_ACCOUNT}
 #SBATCH --time={MY_WALLTIME}
-#SBATCH --ntasks={MY_NTASKS_MODEL}
+#SBATCH --ntasks={MY_NTASKS_MODEL} {MY_NTASKS_PER_NODE}
 #SBATCH --job-name={MY_JOB}
 #SBATCH --qos={MY_QOS}
 #SBATCH --constraint={MY_CONSTRAINT}
@@ -404,10 +404,19 @@ while ( $counter <= ${{NUM_SGMT}} )
       set old_catch_param = `/usr/bin/readlink -f $old_catch_param`
    endif
 
-
    /bin/cp LDAS.rc  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_LDAS_rc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
-   /bin/cp CAP.rc  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_CAP_rc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
+   /bin/cp CAP.rc   $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_CAP_rc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
 
+   # For LADAS coupled runs, remove existing *.nml, *obsparam*, and *lmc* files to avoid GEOSldas.x crashing after rewind. 
+   #  (These files are created at the beginning of each GEOSldas run.  To avoid overwriting existing simulations, 
+   #   GEOSldas.x intentionally stops when these files are present.) 
+
+   if ( $LADAS_COUPLING > 0 ) then
+      /bin/rm  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_smapL4SMlmc.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.bin
+      /bin/rm  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_*_inputs.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.nml
+      /bin/rm  $EXPDIR/output/$EXPDOMAIN/rc_out/Y${{bYEAR}}/M${{bMON}}/${{EXPID}}.ldas_obsparam.${{bYEAR}}${{bMON}}${{bDAY}}_${{bHour}}${{bMin}}z.txt
+   endif 
+   
    # Run GEOSldas.x
    # --------------
    # clean up
