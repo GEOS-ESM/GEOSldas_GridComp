@@ -932,6 +932,8 @@ class ldas:
         catchRstFile0  = ''
         vegdynRstFile0 = ''
         landiceRstFile0 = ''
+        issmRstFile0   = ''
+        
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
@@ -995,6 +997,7 @@ class ldas:
                    vegdynRstFile = vegdynRstFile0
 
             landiceRstFile = ''
+            issmRstFile   = ''
             if self.with_landice :
                if RESTART_str in ['1', '3'] :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
