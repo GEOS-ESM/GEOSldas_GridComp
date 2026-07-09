@@ -1603,7 +1603,7 @@ class LDASsetup:
                   MY_ACCOUNT         = self.rqdRmInp['account'],
                   MY_WALLTIME        = self.rqdRmInp['walltime'],
                   MY_NTASKS_MODEL    = str(self.rqdRmInp['ntasks_model']),
-                  MY_NTASKS_PER_NODE = MY_NTASKS_PER_NODE
+                  MY_NTASKS_PER_NODE = MY_NTASKS_PER_NODE,
                   MY_CONSTRAINT      = constraint,
                   MY_OSERVER_NODES   = str(self.optRmInp['oserver_nodes']),
                   MY_WRITERS_NPES    = str(self.optRmInp['writers-per-node']),
