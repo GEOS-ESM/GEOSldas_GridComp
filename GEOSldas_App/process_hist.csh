@@ -79,6 +79,7 @@ if($NENS > 1) then
 #   sed -i 's|TP5|'TSOIL5TILE'|g' $HISTRC
 #   sed -i 's|TP6|'TSOIL6TILE'|g' $HISTRC
 #   sed -i 's|DATAATM|'DATAATM0000'|g' $HISTRC
+   sed -i "s|'ROUTE'|'ROUTEAVG'|g" $HISTRC
 endif
 
 # fill in source 'GridComp' information for output variables
