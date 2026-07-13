@@ -101,10 +101,12 @@ class ldas:
         self.bcs_dir_land       = ''
         self.bcs_dir_geom       = ''
         self.bcs_dir_landshared = ''
+        self.bcs_dir_landiceshared = ''
         self.tile_types         = ''
         self.with_land          = False
         self.with_landice       = False
         self.run_route          = 0
+        self.with_issm          = False
         self.adas_expdir        = ''
 
         # assert necessary optional arguments in command line if exeinp file does not exsit
@@ -234,6 +236,10 @@ class ldas:
           assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
         if  "20" in self.tile_types :
           self.with_landice = True
+        
+        if self.with_landice == True:
+            if int(self.ExeInputs.get('DO_ISSM'))==1:
+                self.with_issm = True
 
         self.run_route = int(self.ExeInputs.get('RUN_ROUTE',0))
 
@@ -261,6 +267,8 @@ class ldas:
         self.bcs_dir_land       = self.ExeInputs['BCS_PATH']+ '/land/'       + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_geom       = self.ExeInputs['BCS_PATH']+ '/geometry/'   + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_landshared = self.ExeInputs['BCS_PATH']+ '/land/shared/'
+        self.bcs_dir_landiceshared = self.ExeInputs['BCS_PATH']+ '/landice/shared/'
+        
 
         # make sure MET_PATH and RESTART_PATH have trailing '/'
         if self.ExeInputs['MET_PATH'][-1] != '/':
@@ -362,6 +370,7 @@ class ldas:
            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
            self.ExeInputs['GRIDNAME']  = gridname_
 
+        # to run routing on standard EASE tile space, need EASE_PFAF_TILE_FILE
         if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
            tmp_ =  glob.glob(inpgeom_ + '*Pfafstetter.nc4' + domain_)
            if (len(tmp_) > 0) : 
@@ -447,6 +456,11 @@ class ldas:
               routeRstFile=self.in_rstdir+'/'+tmpFile
               assert os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile)
             
+           if self.with_issm:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+              issmRstFile=self.in_rstdir+'/'+tmpFile
+              assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
+
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
         # verify mwrtm file
@@ -763,6 +777,13 @@ class ldas:
            self.isZoomIn= True
         #os.remove(self.domain_def.name)
 
+        # if running routing, make sure domain is global
+        if self.run_route>0 and self.isZoomIn:
+            exit( "Must have global domain to run routing model, RUN_ROUTE=" + self.run_route )
+        # if running ISSM, make sure domain is global
+        if self.with_issm and self.isZoomIn:
+            exit( "Must have global domain to run ISSM (DO_ISSM: 1)")    
+        
         # update tile domain
         if self.isZoomIn:
             newZoominTile = tile+'.domain'
@@ -825,7 +846,13 @@ class ldas:
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
-
+        
+        if self.with_issm:
+           for pattern in ('*.bin', '*.toolkits', '*.nc*'):
+              for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
+                 myISSMBC = self.inpdir+'/'+os.path.basename(issmbc)
+                 os.symlink(issmbc, myISSMBC)        
+      
         # create and link restart
         print ("Creating and linking restart...")
         _start = self.begDates[0]
@@ -905,14 +932,17 @@ class ldas:
         catchRstFile0  = ''
         vegdynRstFile0 = ''
         landiceRstFile0 = ''
+        issmRstFile0   = ''
+        
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
             myCatchRst   = myRstDir+'/'+self.catch +ensid +'_internal_rst'
             myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
+            myIssmRst = myRstDir+'/'+ 'issm' +ensid +'_internal_rst'
             myVegRst     = myRstDir+'/'+ 'vegdyn'+ensid +'_internal_rst'
             myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
-            myRouteRst   = myRstDir+'/'+ 'route' +ensid +'_internal_rst'
+            myRouteRst   = myRstDir+'/'+ 'route'    +ensid +'_internal_rst'
 
             catchRstFile  = ''
             vegdynRstFile = ''
@@ -967,11 +997,22 @@ class ldas:
                    vegdynRstFile = vegdynRstFile0
 
             landiceRstFile = ''
+            issmRstFile   = ''
             if self.with_landice :
                if RESTART_str in ['1', '3'] :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
+                  if self.with_issm:
+                     issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+ 
+                      
+                      
                if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+                  if self.with_issm and RESTART_str in ['2']:
+                     exit( "Restart '2' not supported when running ISSM (DO_ISSM: 1)") 
+                  if self.with_issm and RESTART_str in ['M']:
+                     print("issm_internal_rst will be bootstrapped for Restart 'M' ")
+                     
 
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
@@ -989,6 +1030,17 @@ class ldas:
                      landiceRstFile0 = landiceRstFile
                else :
                    landiceRstFile = landiceRstFile0
+
+               if self.with_issm:
+                  if os.path.isfile(issmRstFile) :
+                     issmLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+                     shutil.copy(issmRstFile,issmLocal)
+                     issmRstFile = issmLocal
+
+                     if '0000' in ensdir :
+                        issmRstFile0 = issmRstFile
+                  else :
+                     issmRstFile = issmRstFile0
 
             routeRstFile = ''
             if self.run_route > 0 :
@@ -1032,6 +1084,11 @@ class ldas:
                print("link route restart: " + myRouteRst)
                os.symlink(routeRstFile, myRouteRst)
 
+            if self.with_issm:
+               if RESTART_str in ['1', '3']:
+                  print("link issm restart: " + myIssmRst)
+                  os.symlink(issmRstFile, myIssmRst)
+                     
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,    myPertRst)
 
@@ -1184,7 +1241,8 @@ class ldas:
                         + str(self.ExeInputs['LSM_CHOICE'])         + ' ' \
                         + str(self.ExeInputs['AEROSOL_DEPOSITION']) + ' ' \
                         + str(self.ExeInputs['RUN_IRRIG'])          + ' ' \
-                        + str(self.nens)
+                        + str(self.nens)                            + ' ' \
+                        + str(self.ExeInputs['DO_ISSM'])   
                     print(cmd)
                     #os.system(cmd)
                     sp.call(shlex.split(cmd))
@@ -1293,6 +1351,9 @@ class ldas:
                 if self.with_landice:
                   rstkey.append('LANDICE')
                   rstval.append('landice')
+                  if self.with_issm:
+                     rstkey.append('ISSM')
+                     rstval.append('issm')
 
                 if self.run_route > 0:
                   rstkey.append('ROUTE')
@@ -1331,6 +1392,12 @@ class ldas:
                        valn = val + tmpl_ + '_internal_checkpoint'
                        ldasrcInp[keyn] = valn
 
+                    if self.with_issm:
+                       keyn = 'ISSM_INTERNAL_CHECKPOINT_FILE'
+                       valn = 'issm'+tmpl_+'_internal_checkpoint'
+                       ldasrcInp[keyn]= valn
+                      
+                   
                 # specify LANDPERT restart file
                 if (self.perturb == 1):
                     keyn = 'LANDPERT_INTERNAL_RESTART_FILE'
