@@ -26,6 +26,7 @@ COLLECTIONS:
 #                'tavg24_2d_lake_Nx'
 #                'tavg24_2d_glc_Nx'
 #                'tavg24_1d_glc_Nt'
+#                'tavg24_1d_issm_Nt'
 #                'tavg24_1d_route'
            ::
 
@@ -590,6 +591,10 @@ EASEv2_M36.LM:           1
                                 'ALBNF'       , 'LANDICE' ,  'ALBNF_GL'           ,
                                 'ASNOW_GL'    , 'LANDICE' ,
                                 'DELTS'       , 'LANDICE' ,
+                                'ICESMB'      , 'LANDICE' ,
+>>>HIST_ISSM<<<                 'ICESURF'    ,  'LANDICE' ,
+>>>HIST_ISSM<<<                 'ICETHICK'   ,  'LANDICE' ,
+>>>HIST_ISSM<<<                 'ICEVEL'     ,  'LANDICE' ,
                                 'DNICFLX'     , 'LANDICE' ,
                                 'EVAPOUT'     , 'LANDICE' ,
                                 'QH'          , 'LANDICE' ,
@@ -656,4 +661,18 @@ EASEv2_M36.LM:           1
                                 'QINFLOW'     , 'ROUTE' ,
                                 'QRUNOFF_CAT' , 'ROUTE' ,
                                  ::                                 
+
+  tavg24_1d_issm_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,ISSM Diagnostics',
+  tavg24_1d_issm_Nt.nbits:         12,
+  tavg24_1d_issm_Nt.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
+  tavg24_1d_issm_Nt.mode:          'time-averaged' ,
+  tavg24_1d_issm_Nt.format:        'CFIO',
+  tavg24_1d_issm_Nt.frequency:      240000 ,
+  tavg24_1d_issm_Nt.ref_time:       000000 ,
+  tavg24_1d_issm_Nt.fields:      'ICESURF'    , 'ISSM' ,
+                                 'ICETHICK'   , 'ISSM' ,
+                                 'ICEVX'      , 'ISSM' ,
+                                 'ICEVY'      , 'ISSM' ,
+                                 ::
+
 # ========================== EOF ==============================================================

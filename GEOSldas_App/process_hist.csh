@@ -17,6 +17,8 @@ setenv LSM_CHOICE         $4
 setenv AEROSOL_DEPOSITION $5
 setenv RUN_IRRIG          $6
 setenv NENS               $7
+setenv DO_ISSM            $8
+
 
 # -------------------------------------------------
 
@@ -65,6 +67,12 @@ if($RUN_IRRIG == 0) then
    sed -i '/^>>>HIST_IRRIG<<</d'           $HISTRC
 else
    sed -i 's/>>>HIST_IRRIG<<</''/g'        $HISTRC
+endif
+
+if($DO_ISSM == 0) then
+   sed -i '/^>>>HIST_ISSM<<</d'            $HISTRC
+else
+   sed -i 's/>>>HIST_ISSM<<</''/g'         $HISTRC
 endif
 
 # for ensemble simulations, set 'GridComp' to ENSAVG 
