@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added ObsFcstAna postprocessing support for NetCDF4 diagnostics, with fallback to legacy binary ObsFcstAna files.
 - Added support for river routing.
 - Added optional NetCDF4 output mode for ObsFcstAna, including NetCDF metadata and runtime context. Changed namelist variable "out_ObsFcstAna" from logical to integer.
 - Added support for running ISSM (Ice-Sheet and Sea-level System Model). This includes a new collection in GEOSldas_HIST.rc (tavg24_1d_issm_Nt) as well as additions to the landice gridded collection (tavg24_2d_glac_Nx), and small additions to lenkf_j_template.py and ldas.py for handling ISSM boundary conditions and restarts.  
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `read_obs_param()` parsing for the current obsparam format by reading forecast variable names and units.
 - Fixed crashes in debug mode; including adding an extra mask to work around a compiler bug in "where(elemental)".
 - Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes.
 - Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected.
@@ -181,4 +183,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inaugural version.  0-diff vs. GEOSldas v18.0.0.
 
 -----------------------------
-

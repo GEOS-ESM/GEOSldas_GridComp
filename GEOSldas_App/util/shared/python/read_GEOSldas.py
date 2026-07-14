@@ -40,6 +40,8 @@ def read_obs_param(fname):
             param['nodata']         = float(fid.readline().strip())
             param['varname']        =       fid.readline().strip().strip('"')
             param['units']          =       fid.readline().strip().strip('"')
+            param['fcstvarname']    =       fid.readline().strip().strip('"')
+            param['fcstunits']      =       fid.readline().strip().strip('"')
             param['path']           =       fid.readline().strip().strip('"')
             param['name']           =       fid.readline().strip().strip('"')
             param['maskpath']       =       fid.readline().strip().strip('"')
