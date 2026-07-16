@@ -350,18 +350,18 @@ contains
        endif
     end if !with_land
 
-    METFORCEAVG   = MAPL_AddChild(gc, name='METFORCEAVG', ss=ForceAvgSetServices,   rc=status)
+    METFORCEAVG   = MAPL_AddChild(gc, name='METFORCEAVG', ss=MetforceAvgSetServices,   rc=status)
     VERIFY_(status)
     if (with_land) then
-       LANDAVG    = MAPL_AddChild(gc, name='LANDAVG',     ss=LandAvgSetServices,    rc=status)
+       LANDAVG    = MAPL_AddChild(gc, name='LANDAVG',     ss=LandAvgSetServices,       rc=status)
        VERIFY_(status)
     endif
     if (with_landice) then
-       LANDICEAVG = MAPL_AddChild(gc, name='LANDICEAVG',  ss=LandiceAvgSetServices, rc=status)
+       LANDICEAVG = MAPL_AddChild(gc, name='LANDICEAVG',  ss=LandiceAvgSetServices,    rc=status)
        VERIFY_(status)
     endif
     if (RUN_ROUTE>0) then
-       ROUTEAVG   = MAPL_AddChild(gc, name='ROUTEAVG',    ss=RouteAvgSetServices,   rc=status)
+       ROUTEAVG   = MAPL_AddChild(gc, name='ROUTEAVG',    ss=RouteAvgSetServices,      rc=status)
        VERIFY_(status)
     endif
 
