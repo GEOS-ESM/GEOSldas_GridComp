@@ -1,6 +1,6 @@
 #include "MAPL_Generic.h"
 
-module GEOS_ForceAvgGridCompMod
+module GEOS_MetforceAvgGridCompMod
   use ESMF
   use MAPL_Mod
 
@@ -557,4 +557,4 @@ contains
 
   end subroutine Finalize
 
-end module GEOS_ForceAvgGridCompMod
+end module GEOS_MetforceAvgGridCompMod

@@ -16,7 +16,7 @@ module GEOS_LdasGridCompMod
   use GEOS_LandiceGridCompMod,   only: LandiceSetServices   => SetServices
   use GEOS_RouteGridCompMod,     only: RouteSetServices     => SetServices
 
-  use GEOS_ForceAvgGridCompMod,  only: ForceAvgSetServices  => SetServices
+  use GEOS_MetforceAvgGridCompMod,  only: MetforceAvgSetServices  => SetServices
   use GEOS_LandAvgGridCompMod,   only: LandAvgSetServices   => SetServices
   use GEOS_LandiceAvgGridCompMod,only: LandiceAvgSetServices=> SetServices
   use GEOS_RouteAvgGridCompMod,  only: RouteAvgSetServices  => SetServices
@@ -45,7 +45,7 @@ module GEOS_LdasGridCompMod
   public SetServices
 
   ! !DESCRIPTION: This gridded component (GC) combines the GridComps:
-  !     METFORCE, LAND, LANDPERT, FORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG, and LANDASSIM
+  !     METFORCE, LAND, LANDPERT, METFORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG, and LANDASSIM
   !  into a new composite LDAS GricComp.
   !  Include later: LAKE, LANDICE(?), SALTWATER(?)
 
@@ -60,7 +60,7 @@ module GEOS_LdasGridCompMod
   integer,allocatable :: LANDPERT(:)
   integer,allocatable :: METFORCE(:)
   integer             :: LANDASSIM
-  integer             :: FORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG
+  integer             :: METFORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG
 
   ! other global variables
   integer :: NUM_ENSEMBLE       ! number of land ensemble members
@@ -350,18 +350,18 @@ contains
        endif
     end if !with_land
 
-    FORCEAVG      = MAPL_AddChild(gc, name='FORCEAVG',  ss=ForceAvgSetServices, rc=status)
+    METFORCEAVG   = MAPL_AddChild(gc, name='METFORCEAVG', ss=ForceAvgSetServices,   rc=status)
     VERIFY_(status)
     if (with_land) then
-       LANDAVG    = MAPL_AddChild(gc, name='LANDAVG',   ss=LandAvgSetServices, rc=status)
+       LANDAVG    = MAPL_AddChild(gc, name='LANDAVG',     ss=LandAvgSetServices,    rc=status)
        VERIFY_(status)
     endif
     if (with_landice) then
-       LANDICEAVG = MAPL_AddChild(gc, name='LANDICEAVG', ss=LandiceAvgSetServices, rc=status)
+       LANDICEAVG = MAPL_AddChild(gc, name='LANDICEAVG',  ss=LandiceAvgSetServices, rc=status)
        VERIFY_(status)
     endif
     if (RUN_ROUTE>0) then
-       ROUTEAVG   = MAPL_AddChild(gc, name='ROUTEAVG',   ss=RouteAvgSetServices, rc=status)
+       ROUTEAVG   = MAPL_AddChild(gc, name='ROUTEAVG',    ss=RouteAvgSetServices,   rc=status)
        VERIFY_(status)
     endif
 
@@ -834,7 +834,7 @@ contains
        VERIFY_(status)
     endif
 
-    call MAPL_GetObjectFromGC(gcs(FORCEAVG), CHILD_MAPL, rc=status)
+    call MAPL_GetObjectFromGC(gcs(METFORCEAVG), CHILD_MAPL, rc=status)
     VERIFY_(status) 
     ! only land_locstream is averaged.
     call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
@@ -1044,7 +1044,7 @@ contains
           ! To make CatchmentCN work with assim, the export from landgrid and catchmentCN grid need to be modified.  
           if ( LSM_CHOICE == 1 ) then 
              !WJ note: The export only has land_locstream
-             call ESMF_GridCompRun(gcs(FORCEAVG), importState=gex(igc), exportState=gex(FORCEAVG), clock=clock, userRC=status)
+             call ESMF_GridCompRun(gcs(METFORCEAVG), importState=gex(igc), exportState=gex(METFORCEAVG), clock=clock, userRC=status)
              VERIFY_(status)
           endif
 
@@ -1129,7 +1129,7 @@ contains
        call MAPL_TimerOn(MAPL, gcnames(igc))
        ! Get EnKF increments and apply to "cat_progn" (imported from LANDAVG via "use" statement!); otherwise import state is export
        ! from LANDAVG
-       merged_Import = StateMerge(gex(LANDAVG), gex(FORCEAVG), _RC)
+       merged_Import = StateMerge(gex(LANDAVG), gex(METFORCEAVG), _RC)
        call ESMF_GridCompRun(gcs(igc), importState=merged_Import, exportState=gex(igc), clock=clock, phase=1, userRC=status)
        VERIFY_(status)
        call ESMF_StateDestroy(merged_Import, noGarbage=.true., _RC)
