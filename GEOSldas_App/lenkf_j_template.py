@@ -158,6 +158,12 @@ cd $SCRDIR
 /bin/cp -f  $HOMDIR/*.rc .
 /bin/cp -f  $HOMDIR/*.nml .
 
+# copy ISSM input files to scratch
+/bin/find $EXPDIR/input -maxdepth 1 -name "ISSM*" -exec /bin/cp {{}} . \\;
+
+# move ISSM auxiliary mesh file to rc_out
+if (-e $EXPDIR/input/ISSM_MESH.nc) /bin/mv $EXPDIR/input/ISSM_MESH.nc $EXPDIR/output/$EXPDOMAIN/rc_out
+
 set LSMCHOICE = `grep -n -m 1 "LSM_CHOICE" $HOMDIR/LDAS.rc | cut -d':' -f3`
 
 #######################################################################
@@ -721,7 +727,7 @@ EOF
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
    
-       set rstfs = (${{LANDMODEL}} 'landice' 'route')
+       set rstfs = (${{LANDMODEL}} 'landice' 'route' 'issm')
        foreach rstf ( $rstfs )
           if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
              set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
@@ -759,8 +765,9 @@ EOF
        set rstfiles2 = `ls landpert${{ENSID}}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${{ENSID}}_checkpoint.*`
        set rstfiles4 = `ls landice${{ENSID}}_internal_checkpoint.*`
+       set rstfiles5 = `ls issm${{ENSID}}_internal_checkpoint.*`
    
-       foreach rfile ( $rstfiles1 $rstfiles4 ) 
+       foreach rfile ( $rstfiles1 $rstfiles4 $rstfiles5 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
           set TM = `echo $ThisTime | cut -c5-6`
