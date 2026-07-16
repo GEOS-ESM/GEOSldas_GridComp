@@ -1128,7 +1128,7 @@ contains
        igc = LANDASSIM
        call MAPL_TimerOn(MAPL, gcnames(igc))
        ! Get EnKF increments and apply to "cat_progn" (imported from LANDAVG via "use" statement!); otherwise import state is export
-       ! from LANDNSAVG
+       ! from LANDAVG
        merged_Import = StateMerge(gex(LANDAVG), gex(FORCEAVG), _RC)
        call ESMF_GridCompRun(gcs(igc), importState=merged_Import, exportState=gex(igc), clock=clock, phase=1, userRC=status)
        VERIFY_(status)
