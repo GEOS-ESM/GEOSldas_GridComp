@@ -17,6 +17,8 @@ setenv LSM_CHOICE         $4
 setenv AEROSOL_DEPOSITION $5
 setenv RUN_IRRIG          $6
 setenv NENS               $7
+setenv DO_ISSM            $8
+
 
 # -------------------------------------------------
 
@@ -67,18 +69,17 @@ else
    sed -i 's/>>>HIST_IRRIG<<</''/g'        $HISTRC
 endif
 
-# for ensemble simulations, set 'GridComp' to LANDAVG 
+if($DO_ISSM == 0) then
+   sed -i '/^>>>HIST_ISSM<<</d'            $HISTRC
+else
+   sed -i 's/>>>HIST_ISSM<<</''/g'         $HISTRC
+endif
+
+# for ensemble simulations, set 'GridComp' to LANDAVG etc 
 
 if($NENS > 1) then
    set GridComp = LANDAVG
    sed -i 's|VEGDYN|'VEGDYN_e0000'|g' $HISTRC
-#   sed -i 's|TP1|'TSOIL1TILE'|g' $HISTRC
-#   sed -i 's|TP2|'TSOIL2TILE'|g' $HISTRC
-#   sed -i 's|TP3|'TSOIL3TILE'|g' $HISTRC
-#   sed -i 's|TP4|'TSOIL4TILE'|g' $HISTRC
-#   sed -i 's|TP5|'TSOIL5TILE'|g' $HISTRC
-#   sed -i 's|TP6|'TSOIL6TILE'|g' $HISTRC
-#   sed -i 's|DATAATM|'DATAATM0000'|g' $HISTRC
    sed -i "s|'ROUTE'|'ROUTEAVG'|g" $HISTRC
 endif
 
