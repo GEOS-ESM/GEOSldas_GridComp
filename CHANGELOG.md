@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added support for river routing.
 - Added optional NetCDF4 output mode for ObsFcstAna, including NetCDF metadata and runtime context. Changed namelist variable "out_ObsFcstAna" from logical to integer.
+- Added support for ensemble simulations for routing; for now, landice hardwired to NensLandice=1.
 
 ### Changed
 
