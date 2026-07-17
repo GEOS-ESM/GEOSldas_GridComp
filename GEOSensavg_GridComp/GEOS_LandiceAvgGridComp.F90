@@ -1,9 +1,14 @@
 #include "MAPL_Generic.h"
 
 module GEOS_LandiceAvgGridCompMod
+
   use ESMF
   use MAPL_Mod
-  use GEOS_LandiceGridCompMod, only: NUM_SNOW_LAYERS,  NUM_ICE_LAYERS
+  
+  use GEOS_LandiceGridCompMod, only:                  &
+       NUM_SNOW_LAYERS => NUM_SNOW_LAYERS_LANDICE,    &
+       NUM_ICE_LAYERS  => NUM_ICE_LAYERS_LANDICE
+
   implicit none
 
   private
