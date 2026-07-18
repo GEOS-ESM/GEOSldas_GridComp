@@ -951,7 +951,7 @@ class ldas:
             myLakeRst    = myRstDir+'/'+ 'lake'     +ensid +'_internal_rst'
             myLandiceRst = myRstDir+'/'+ 'landice'  +ensid +'_internal_rst'
             myIssmRst    = myRstDir+'/'+ 'issm'     +ensid +'_internal_rst'
-            myVegRst     = myRstDir+'/'+ 'vegdyn'.  +ensid +'_internal_rst'
+            myVegRst     = myRstDir+'/'+ 'vegdyn'   +ensid +'_internal_rst'
             myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
             myRouteRst   = myRstDir+'/'+ 'route'    +ensid +'_internal_rst'
 
