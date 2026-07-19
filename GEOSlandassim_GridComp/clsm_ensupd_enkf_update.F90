@@ -1793,23 +1793,23 @@ contains
     integer :: obsparam_varname_varid,     obsparam_units_varid,     obsparam_descr_varid
     integer :: obsparam_fcstvarname_varid, obsparam_fcstunits_varid
 
-    integer,           dimension(:), allocatable :: species_assim_int, species_scale_int
-    real,              dimension(:), allocatable :: species_errstd_r4
-    character(len=40), dimension(:), allocatable :: species_varname_s,     species_units_s
-    character(len=40), dimension(:), allocatable :: species_fcstvarname_s, species_fcstunits_s
-    character(len=40), dimension(:), allocatable :: species_descr_s
-    character(len=40)                            :: attr_name
-    character(len=8)                             :: write_date_yyyymmdd
-    character(len=10)                            :: write_time_hhmmss
-    character(len=5)                             :: write_zone
-    character(len=24)                            :: write_datetime_iso
-    character(len=64)                            :: user_name
-    character(len=128)                           :: created_by
-    integer                                      :: user_len, user_status
-    integer                                      :: i
-
-    integer,           dimension(N_obsf)         :: tmpvecint
-    real,              dimension(N_obsf)         :: tmpvecreal
+    integer,           dimension(:),      allocatable :: species_assim_int, species_scale_int
+    real,              dimension(:),      allocatable :: species_errstd_r4
+    character(len=40), dimension(:),      allocatable :: species_varname_s,     species_units_s
+    character(len=40), dimension(:),      allocatable :: species_fcstvarname_s, species_fcstunits_s
+    character(len=40), dimension(:),      allocatable :: species_descr_s
+    character(len=40)                                 :: attr_name
+    character(len=8)                                  :: write_date_yyyymmdd
+    character(len=10)                                 :: write_time_hhmmss
+    character(len=5)                                  :: write_zone
+    character(len=24)                                 :: write_datetime_iso
+    character(len=64)                                 :: user_name
+    character(len=128)                                :: created_by
+    integer                                           :: user_len, user_status
+    integer                                           :: i
+    logical,           dimension(:),      allocatable :: mask
+    integer,           dimension(N_obsf)              :: tmpvecint
+    real,              dimension(N_obsf)              :: tmpvecreal
     
     character(len=*), parameter :: Iam = 'write_ObsFcstAna_nc4'
     character(len=400)          :: err_msg
@@ -1944,49 +1944,35 @@ contains
        
        ! for assim flag, convert logical to integer
        tmpvecint = 0
-       where (Observations_f(1:N_obsf)%assim)
-          tmpvecint = 1
-       end where
-       call nc4_check( nf90_put_var(ncid, assim_flag_varid, tmpvecint) )
-       
+       where (Observations_f(1:N_obsf)%assim) tmpvecint = 1;  call nc4_check( nf90_put_var(ncid, assim_flag_varid, tmpvecint) )
+      
        ! for data fields, replace LDAS no-data-value with MAPL_UNDEF for consistency with MAPL HISTORY output
        tmpvecreal = Observations_f(1:N_obsf)%obs
-       do i=1,N_obsf
-          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
-       end do
-       call nc4_check( nf90_put_var(ncid, obs_varid, tmpvecreal) )
+       mask = LDAS_is_nodata(tmpvecreal)
+       where (mask) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, obs_varid,     tmpvecreal))
 
        tmpvecreal = Observations_f(1:N_obsf)%obsvar
-       do i=1,N_obsf
-          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
-       end do
-       call nc4_check( nf90_put_var(ncid, obsvar_varid, tmpvecreal) )
+       mask = LDAS_is_nodata(tmpvecreal)
+       where (mask) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, obsvar_varid,  tmpvecreal))
 
        tmpvecreal = Observations_f(1:N_obsf)%fcst
-       do i=1,N_obsf
-          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
-       end do
-       call nc4_check( nf90_put_var(ncid, fcst_varid, tmpvecreal) )
-
+       mask = LDAS_is_nodata(tmpvecreal)
+       where (mask) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, fcst_varid,    tmpvecreal))
+ 
        tmpvecreal = Observations_f(1:N_obsf)%fcstvar
-       do i=1,N_obsf
-          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
-       end do
-       call nc4_check( nf90_put_var(ncid, fcstvar_varid, tmpvecreal) )
-
+       mask = LDAS_is_nodata(tmpvecreal)
+       where (mask) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, fcstvar_varid, tmpvecreal))
+  
        tmpvecreal = Observations_f(1:N_obsf)%ana
-       do i=1,N_obsf
-          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
-       end do
-       call nc4_check( nf90_put_var(ncid, ana_varid, tmpvecreal) )
+       mask = LDAS_is_nodata(tmpvecreal)
+       where (mask) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, ana_varid,     tmpvecreal))
 
        tmpvecreal = Observations_f(1:N_obsf)%anavar
-       do i=1,N_obsf
-          if (LDAS_is_nodata(tmpvecreal(i))) tmpvecreal(i) = MAPL_UNDEF
-       end do
-       call nc4_check( nf90_put_var(ncid, anavar_varid, tmpvecreal) )
-       
+       mask = LDAS_is_nodata(tmpvecreal)
+       where (mask) tmpvecreal=MAPL_UNDEF; call nc4_check( nf90_put_var(ncid, anavar_varid,  tmpvecreal))
+
     end if
+
 
     if (N_obs_param > 0) then
 
