@@ -1739,11 +1739,18 @@ contains
     pert_rseed_r8 = real(pert_rseed,kind=ESMF_KIND_R8)
     pert_iseed(:,internal%ens_id+1 - FIRST_ENS_ID) = pert_rseed            
  
-    call MAPL_TimerOff(MAPL, "GenerateRaw")
-    ! End
-    RETURN_(ESMF_SUCCESS)
+     call MAPL_TimerOff(MAPL, "GenerateRaw")
 
-  end subroutine GenerateRaw_ntrmdt
+     ! Explicitly free local allocatable before RETURN_ macro (fix memory leak)
+     if (allocated(pert_rseed)) then
+        deallocate(pert_rseed, stat=status)
+        VERIFY_(status)
+     end if
+
+     ! End
+     RETURN_(ESMF_SUCCESS)
+
+   end subroutine GenerateRaw_ntrmdt
 
   ! IROTUINE: ApplyForcePert -- Compute and apply perts to MetForcing vars
 
@@ -2759,15 +2766,17 @@ contains
        deallocate(tile_data_f, tile_data_p, tile_data_f_all, tile_data_p_all)
     endif
 
-    ! Clean up private internal state
-    if (associated(internal%ForcePert%param)) then
-       deallocate(internal%ForcePert%param, stat=status)
-       VERIFY_(status)
-    end if
-    if (associated(internal%PrognPert%param)) then
-       deallocate(internal%PrognPert%param, stat=status)
-       VERIFY_(status)
-    end if
+     ! Clean up private internal state
+     if (associated(internal%ForcePert%param)) then
+        deallocate(internal%ForcePert%param, stat=status)
+        VERIFY_(status)
+        nullify(force_pert_param)   ! fix dangling module-level pointer
+     end if
+     if (associated(internal%PrognPert%param)) then
+        deallocate(internal%PrognPert%param, stat=status)
+        VERIFY_(status)
+        nullify(progn_pert_param)   ! fix dangling module-level pointer
+     end if
     if (allocated(internal%ForcePert%DataPrv)) then
        deallocate(internal%ForcePert%DataPrv, stat=status)
        VERIFY_(status)
@@ -2800,18 +2809,30 @@ contains
        VERIFY_(status)
     end if
 
-    if (allocated(fpert_enavg)) then
-       deallocate(fpert_enavg, stat=status)
-       VERIFY_(status)
-    end if
-    if (allocated(ppert_enavg)) then
-       deallocate(ppert_enavg, stat=status)
-       VERIFY_(status)
-    end if
+     if (allocated(fpert_enavg)) then
+        deallocate(fpert_enavg, stat=status)
+        VERIFY_(status)
+     end if
+     if (allocated(ppert_enavg)) then
+        deallocate(ppert_enavg, stat=status)
+        VERIFY_(status)
+     end if
 
-    call clear_rf()
-    ! Call Finalize for every child
-    call MAPL_GenericFinalize(gc, import, export, clock, rc=status)
+     if (associated(pert_iseed)) then     ! fix memory leak: module-level pointer never freed
+        deallocate(pert_iseed, stat=status)
+        VERIFY_(status)
+        nullify(pert_iseed)
+     end if
+
+     call clear_rf()
+
+     ! Deallocate the internal state struct itself (fix memory leak)
+     deallocate(internal, stat=status)
+     VERIFY_(status)
+     wrap%ptr => null()
+
+     ! Call Finalize for every child
+     call MAPL_GenericFinalize(gc, import, export, clock, rc=status)
     VERIFY_(status)
 
     ! End
