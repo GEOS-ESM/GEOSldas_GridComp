@@ -44,6 +44,7 @@ module cygnss_preprocessed_obs
   private
 
   public :: cygnss_preproc_get_obs_pred
+  public :: cygnss_preproc_clear
 
   logical                  :: is_loaded = .false.
   character(len=2000)      :: loaded_fname = ''
