@@ -26,10 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed crashes in debug mode; including adding an extra mask to work around a compiler bug in "where(elemental)".
 - Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes.
 - Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected.
 - Fixed NAG Fortran compiler issues.
-
+- Fixed missing deallocate and nullify statements.
+  
 ### Removed
 
 - Removed 2d lfs collection from HISTORY.rc template.
