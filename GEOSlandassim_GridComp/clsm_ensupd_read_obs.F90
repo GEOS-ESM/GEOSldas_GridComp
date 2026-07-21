@@ -2158,9 +2158,8 @@ contains
     !
     ! Files are 1-hour granules on the 12.5 km Fibonacci grid, one per orbit
     ! segment, per satellite.  The creation timestamp embedded in each filename
-    ! is unpredictable so obs file names are supplied via flist files organised
-    ! in a daily directory structure Y{YYYY}/M{MM}/D{DD}/, one flist per
-    ! satellite per day listing the bare filenames for that day.
+    ! is unpredictable so obs file names are supplied via daily flist files,
+    ! one per satellite per day, listing the bare filenames for that day.
     !
     ! Satellite species (this_obs_param%descr):
     !   ASCAT_HSAF_META_SM  MetOp-A  2007-01-01 - 2021-11-15  (H121 CDR)
@@ -2370,7 +2369,7 @@ contains
     ! H SAF filename structure (bare name, without path):
     !   W_IT-HSAF-ROME,SAT,SSM-ASCAT-METOP{A|B|C}-12.5km-H{121|139}_C_LIIB_{creation14}_{start14}_{end14}____.nc
     !
-    ! read_obs_fnames prepends Y{YYYY}/M{MM}/D{DD}/ to the bare name.
+    ! read_obs_fnames prepends Y{YYYY}/M{MM}/ to the bare name.
     ! The sensing start ({start14} = YYYYMMDDHHMMSS) is always at a fixed
     ! offset from the END of the returned string, regardless of path prefix length:
     !   fname_list(kk)(n-35:n-22)  where n = len_trim(fname_list(kk))
