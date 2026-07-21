@@ -3,7 +3,7 @@ esma_set_this ()
 set (alldirs
   GEOSmetforce_GridComp
   GEOSlandpert_GridComp
-  GEOSens_GridComp
+  GEOSensavg_GridComp
   GEOSlandassim_GridComp
   )
 
