@@ -2813,7 +2813,7 @@ contains
     character(400) :: tmpfname
     character(100) :: product_type, schema_version
     character(300) :: ldas_state, mwrtm_param
-    character( 16) :: product_grid
+    character( 16) :: product_grid, grid_attr
 
     integer :: i, j, owner_tilenum
     integer :: ncid, dimid, varid
@@ -2905,9 +2905,12 @@ contains
     ldas_state     = ''
     mwrtm_param    = ''
     product_grid   = ''
+    grid_attr      = ''
 
     call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'product_type', product_type), Iam, 'read product_type')
     call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'schema_version', schema_version), Iam, 'read schema_version')
+
+    if (nf90_get_att(ncid, NF90_GLOBAL, 'grid', grid_attr) /= nf90_noerr) grid_attr = ''
 
     if (nf90_get_att(ncid, NF90_GLOBAL, 'ldas_state', ldas_state) /= nf90_noerr) ldas_state = ''
     if (nf90_get_att(ncid, NF90_GLOBAL, 'mwrtm_param', mwrtm_param) /= nf90_noerr) mwrtm_param = ''
@@ -2925,17 +2928,30 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
-    ! The selected-50 files currently encode the EASE grid in filename or
-    ! provenance attributes. Abort rather than silently mapping an M36 product
-    ! into an M09 run, or vice versa.
+    ! Schema-0.5 files declare their EASE grid explicitly via the 'grid'
+    ! global attribute - trust that over guessing. Abort rather than silently
+    ! mapping an M36 product into an M09 run, or vice versa.
+    !
+    ! Fall back to substring-matching the filename/provenance attributes only
+    ! for older files without a 'grid' attribute. Note this fallback must not
+    ! search the full path (tmpfname) - the preprocessor's Y<year>/M<month>
+    ! directory layout means any September file's path contains "M09", which
+    ! previously collided with the 9-km grid code and clobbered a correct M36
+    ! filename match.
 
-    if (index(tmpfname,   'M36') /= 0 .or. index(tmpfname,   'm36') /= 0 .or. &
-        index(ldas_state, 'M36') /= 0 .or. index(ldas_state, 'm36') /= 0 .or. &
-        index(mwrtm_param,'M36') /= 0 .or. index(mwrtm_param,'m36') /= 0) product_grid = 'M36'
+    if (trim(grid_attr) /= '') then
 
-    if (index(tmpfname,   'M09') /= 0 .or. index(tmpfname,   'm09') /= 0 .or. &
-        index(ldas_state, 'M09') /= 0 .or. index(ldas_state, 'm09') /= 0 .or. &
-        index(mwrtm_param,'M09') /= 0 .or. index(mwrtm_param,'m09') /= 0) product_grid = 'M09'
+       product_grid = trim(grid_attr)
+
+    else
+
+       if (index(ldas_state, 'M36') /= 0 .or. index(ldas_state, 'm36') /= 0 .or. &
+           index(mwrtm_param,'M36') /= 0 .or. index(mwrtm_param,'m36') /= 0) product_grid = 'M36'
+
+       if (index(ldas_state, 'M09') /= 0 .or. index(ldas_state, 'm09') /= 0 .or. &
+           index(mwrtm_param,'M09') /= 0 .or. index(mwrtm_param,'m09') /= 0) product_grid = 'M09'
+
+    end if
 
     if (trim(product_grid) == '') then
        err_msg = 'cannot determine CYGNSS coefficient product grid from filename or product metadata'
