@@ -710,7 +710,7 @@ obs_param_nml(12)%adapt          = 0
 
 ! --------------------------------------------------------------------
 !
-!  13 = ASCAT_SM_A (ASCAT soil moisture ascending)
+!  13 = ASCAT_SM_A (ASCAT soil moisture ascending)  [OUTDATED: TU Wien, WARP5.4, CONUS, ~2012]
 !
 ! ASCAT: VV-pol, incidence angle 25-65 deg
 ! for now keep N_ang=0, pol=0
@@ -753,7 +753,7 @@ obs_param_nml(13)%adapt          = 0
 
 ! -------------------
 !
-!  14 = ASCAT_SM_D (ASCAT soil moisture descending)
+!  14 = ASCAT_SM_D (ASCAT soil moisture descending)  [OUTDATED: TU Wien, WARP5.4, CONUS, ~2012]
 !
 ! TO DO: What is pol of backscatter used in retrieval? 
 ! TO DO: How deal w/ inc angle? 
@@ -2260,7 +2260,9 @@ obs_param_nml(48)%adapt          = 0
 
 ! --------------------------------------------------------------------------------------------------------------
 !
-! ASCAT_MET[X]_SM soil moisture observations from EUMETSAT
+! ASCAT_MET[X]_SM soil moisture observations from EUMETSAT (BUFR)
+!
+! Collection identity (ID) EO:EUM:DAT:METOP:SOMO25   [used in Fox et al 2025 doi:10.1175/jhm-d-24-0139.1]
 !
 ! Leave %name blank.  Provide text files that contain file names via %flistpath and %flistname.
 !
@@ -2305,7 +2307,7 @@ obs_param_nml(49)%xcorr          = 0.25
 obs_param_nml(49)%ycorr          = 0.25
 obs_param_nml(49)%adapt          = 0
 
-! --------------------------------------------------------------------
+! -------------------
 !
 !  50 = ASCAT_METB_SM (ASCAT soil moisture ascending and descending orbits)
 !
@@ -2346,7 +2348,7 @@ obs_param_nml(50)%xcorr          = 0.25
 obs_param_nml(50)%ycorr          = 0.25
 obs_param_nml(50)%adapt          = 0
 
-! --------------------------------------------------------------------
+! -------------------
 !
 !  51 = ASCAT_METC_SM (ASCAT soil moisture ascending and descending orbits)
 !
@@ -2557,7 +2559,14 @@ obs_param_nml(55)%adapt          = 0
 
 ! --------------------------------------------------------------------
 !
-!  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A, 12.5 km Fibonacci grid)
+! Next-generation Metop ASCAT surface soil moisture datasets from EUMETSAT H SAF,
+! Hahn et al 2026 doi:10.5194/essd-18-4393-2026
+!
+! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
+!
+! ------------------------
+!
+!  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A)
 !
 ! H121 CDR v8: 2007-01-01 to 2021-11-15
 ! https://hsaf.meteoam.it/Products/Detail?prod=H121
@@ -2597,9 +2606,9 @@ obs_param_nml(56)%xcorr          = 0.3125
 obs_param_nml(56)%ycorr          = 0.3125
 obs_param_nml(56)%adapt          = 0
 
-! --------------------------------------------------------------------
+! ------------------------
 !
-!  57 = ASCAT_HSAF_METB_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-B, 12.5 km)
+!  57 = ASCAT_HSAF_METB_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-B)
 !
 ! H121 CDR v8: 2013-06-01 to 2024-12-31
 ! H139 ICDR:   2025-01-01 onward (same schema, flist covers both products)
@@ -2640,9 +2649,9 @@ obs_param_nml(57)%xcorr          = 0.3125
 obs_param_nml(57)%ycorr          = 0.3125
 obs_param_nml(57)%adapt          = 0
 
-! --------------------------------------------------------------------
+! ------------------------
 !
-!  58 = ASCAT_HSAF_METC_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-C, 12.5 km)
+!  58 = ASCAT_HSAF_METC_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-C)
 !
 ! H121 CDR v8: 2019-04-01 to 2024-12-31
 ! H139 ICDR:   2025-01-01 onward
