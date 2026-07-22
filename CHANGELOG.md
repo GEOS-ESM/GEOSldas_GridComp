@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added H SAF ASCAT surface soil moisture support for H121 CDR v8 and H139 ICDR products, including MetOp-A/B/C species, NetCDF swath reader and QC, and default ensupd namelist entries.
+- Added assimilation of surface soil moisture observations from H-SAF ASCAT H121 CDR v8 and H139 ICDR netcdf products (MetOp-A/B/C).
 - Added support for river routing.
 - Added optional NetCDF4 output mode for ObsFcstAna, including NetCDF metadata and runtime context. Changed namelist variable "out_ObsFcstAna" from logical to integer.
 - Added support for ensemble simulations for routing; for now, landice hardwired to NensLandice=1.
