@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added support for river routing.
 - Added optional NetCDF4 output mode for ObsFcstAna, including NetCDF metadata and runtime context. Changed namelist variable "out_ObsFcstAna" from logical to integer.
-- Added support for running ISSM (Ice-Sheet and Sea-level System Model). This includes a new collection in GEOSldas_HIST.rc (tavg24_1d_issm_Nt) as well as additions to the landice gridded collection (tavg24_2d_glac_Nx), and small additions to lenkf_j_template.py and ldas.py for handling ISSM boundary conditions and restarts.  
+- Added support for ensemble simulations for routing; for now, landice hardwired to NensLandice=1.
+- Added support for running ISSM (Ice-Sheet and Sea-level System Model). This includes a new collection in GEOSldas_HIST.rc (tavg24_1d_issm_Nt) as well as additions to the landice gridded collection (tavg24_2d_glac_Nx), and small additions to lenkf_j_template.py and ldas.py for handling ISSM boundary conditions and restarts.
+
 
 ### Changed
 
@@ -24,10 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed crashes in debug mode; including adding an extra mask to work around a compiler bug in "where(elemental)".
 - Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes.
 - Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected.
 - Fixed NAG Fortran compiler issues.
-
+- Fixed missing deallocate and nullify statements.
+  
 ### Removed
 
 - Removed 2d lfs collection from HISTORY.rc template.
