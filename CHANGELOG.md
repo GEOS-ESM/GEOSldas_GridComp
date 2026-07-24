@@ -21,6 +21,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -----------------------------
 
+## [v3.1.0] - 2025-06-26
+
+- 0-diff vs. v3.0.0.
+
+### Added
+
+- Added python package for post-processing ObsFcstAna output into data assimilation diagnostics ([PR #87](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/87), [PR #111](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/111)). 
+- Support for 2d output from EASE tile space and 2d output on EASE grid: 
+  - Switched EASE grid handling to new MAPL EASE Grid Factory ([PR #115](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/115)).
+  - Revised pre-processing of HISTORY template ([PR #118](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/118)).
+- Support for tile space of stretched cube-sphere grids ([PR #109](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/109)).
+
+### Changed
+
+- Revised experiment setup for coupled land-atm DAS ([PR #102](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/102)).
+- Updated defaults in LDASsa_DEFAULT_inputs_*.nml files ([PR #104](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/104)).
+- Added optional SLURM "constraint" ([PR #112](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/112)).
+- Specify only "ntasks_model" in SLURM resource request ([PR #106](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/106)).
+
+### Fixed
+
+- UDUNITS error ([PR #101](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/101), [PR #123](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/123)).
+
+-----------------------------
+
+## [v3.0.0] - 2025-05-28
+
+- 0-diff vs. v2.0.0.
+
+### Added
+
+- Added functionality to simulate landice tiles ([PR #18](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/18)).
+- Added functionality to read nc4-formatted tile file ([PR #18](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/18)).
+- Added model-based QC of (MODIS) snow cover area fraction observations using layer-1 soil temperature ([PR #96](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/96)).
+- Added default settings and command line args for coupled land-atm DAS ([PR #94](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/94)).
+
+------------------------------
+
 ## [v2.0.0] - 2025-04-15
 
 - 0-diff vs. v1.1.0.

@@ -1,0 +1,193 @@
+! 
+! namelist of EnKF inputs
+!
+! CUSTOM version for coupled land-atm DAS with soil moisture analysis based on SMAP Tb obs
+!
+! --------------------------------------------------------------------
+	    				      				      	
+&ens_prop_inputs			
+
+progn_pert_dtstep = 10800  ! time step for generation of AR(1) prognostics perts [s]
+
+force_pert_dtstep = 10800  ! time step for generation of AR(1) forcing perts     [s]
+
+! ---------------------------------------------------------------------
+!
+! forcing error (or forcing perturbation) parameters
+!
+
+descr_force_pert%pcp     = 'pcp'     
+descr_force_pert%sw      = 'sw'      
+descr_force_pert%lw      = 'lw'      
+descr_force_pert%tair    = 'tair'   
+descr_force_pert%qair    = 'qair'   
+descr_force_pert%wind    = 'wind' 
+
+! specify whether forcing perturbations are additive or multiplicative
+!
+! additive:                     typ = 0.
+! multiplicative and lognormal: typ = 1.
+!
+  
+typ_force_pert%pcp   = 1.
+typ_force_pert%sw    = 1.
+typ_force_pert%lw    = 0.
+
+
+std_force_pert%pcp  = 0.5  ! units if additive: [kg/m2/s],  if multiplicative: [fraction]
+std_force_pert%sw   = 0.3  ! units if additive: [W/m^2]  ,  if multiplicative: [fraction]
+std_force_pert%lw   = 20.  ! units if additive: [W/m^2]  ,  if multiplicative: [fraction]
+
+! read error std-dev from file? (if .false., default values above apply)
+
+stdfromfile_force_pert%pcp   = .false. 
+stdfromfile_force_pert%sw    = .false. 
+stdfromfile_force_pert%lw    = .false. 
+
+! specify file name (with full path) that contains std-dev values
+
+stdfilename_force_pert   = '' 	
+
+! enforce zero (sample) mean across ensemble? 
+
+zeromean_force_pert%pcp   = .true.
+zeromean_force_pert%sw    = .true.
+zeromean_force_pert%lw    = .true.
+
+! allow perturbations to be computed on coarsened grid?
+
+coarsen_force_pert%pcp   = .true.
+coarsen_force_pert%sw    = .true.
+coarsen_force_pert%lw    = .true.
+
+! max perturbation relative to standard normal
+! (limits on range of random numbers: specify max absolute value
+!  allowed to be drawn from a standard normal distribution)
+
+std_normal_max_force_pert%pcp   = 3.
+std_normal_max_force_pert%sw    = 3.
+std_normal_max_force_pert%lw    = 2.5
+  
+! spatial correlation of forcing perturbations
+  
+xcorr_force_pert%pcp    = 0.5      ! [deg] 
+xcorr_force_pert%sw     = 0.5      ! [deg] 
+xcorr_force_pert%lw     = 0.5      ! [deg] 
+
+ycorr_force_pert%pcp    = 0.5      ! [deg] 
+ycorr_force_pert%sw     = 0.5      ! [deg] 
+ycorr_force_pert%lw     = 0.5      ! [deg] 
+
+! temporal correlation of forcing perturbations
+  
+tcorr_force_pert%pcp   = 86400.   ! [s]
+tcorr_force_pert%sw    = 86400.   ! [s]
+tcorr_force_pert%lw    = 86400.   ! [s]
+  
+! correlation coefficients -1 <= rho <= 1     
+!
+! specify only essential information, the other side of off-diagonals and
+! the diagonal will be filled in later (subroutines read_ens_prop_inputs
+! and get_force_pert_inputs)
+ 
+ccorr_force_pert%pcp%sw      = -.8
+ccorr_force_pert%pcp%lw      =  .5
+ 
+ccorr_force_pert%sw%lw       = -.5
+
+    
+! ---------------------------------------------------------------------
+!		
+! model error (or progn_pert) parameters 
+!
+! the mean is computed according to "typ" for unbiased perturbations
+!  and not specified here
+
+! string that describes the prognostics to be perturbed
+! (see subroutine apply_progn_pert() for details)
+
+descr_progn_pert%catdef   = 'catdef'  
+descr_progn_pert%srfexc   = 'srfexc'  
+
+  
+! specify whether model error is additive or multiplicative
+!
+! additive:                     typ = 0.     
+! multiplicative and lognormal: typ = 1.     
+!
+! real numbers are used so that "assemble_state()" can 
+!  be used to assemble the model error parameters
+
+typ_progn_pert%catdef   = 0.
+typ_progn_pert%srfexc   = 0.
+
+
+! The perturbation (or error) std-dev can be specified as a spatially constant
+! (default) value.  Alternatively, perturbation std-dev values can be read from 
+! a netcdf-4 input file (where they may be spatially constant or distributed).
+! See subroutines get_progn_pert_param() and get_force_pert_param().
+!
+! Turn off all perturbations by setting std-dev values to zero and 
+! "stdfromfile" to false.
+!
+! Default, spatially homogeneous perturbations std-dev
+! (used unless std-devs are read from file, see below)
+
+std_progn_pert%catdef = 0.24  ! units if additive: [kg/m2/HOUR],  if multiplicative: [fraction/HOUR]
+std_progn_pert%srfexc = 0.16  ! units if additive: [kg/m2/HOUR],  if multiplicative: [fraction/HOUR]
+
+
+! read error std-dev from file? (if .false., default values above apply)
+
+stdfromfile_progn_pert%catdef = .false. 
+stdfromfile_progn_pert%srfexc = .false. 
+
+! specify file name (with full path) that contains std-dev values
+
+stdfilename_progn_pert   = '' 	
+
+! enforce zero (sample) mean across ensemble? 
+
+zeromean_progn_pert%catdef   = .true.    
+zeromean_progn_pert%srfexc   = .true.
+
+! allow perturbations to be computed on coarsened grid?
+
+coarsen_progn_pert%catdef   = .false.    
+coarsen_progn_pert%srfexc   = .false.    
+
+! max perturbation relative to standard normal
+! (limits on range of random numbers: specify max absolute value
+!  allowed to be drawn from a standard normal distribution)
+
+std_normal_max_progn_pert%catdef   = 2.5    
+std_normal_max_progn_pert%srfexc   = 2.5    
+  
+! model error spatial correlation [deg]
+! (x runs east-west, y runs north-south)
+  
+xcorr_progn_pert%catdef   = 0.3       ! [deg]
+xcorr_progn_pert%srfexc   = 0.3       ! [deg]
+			  
+ycorr_progn_pert%catdef   = 0.3       ! [deg]
+ycorr_progn_pert%srfexc   = 0.3       ! [deg]
+
+! model error temporal correlation [s]
+  
+tcorr_progn_pert%catdef   = 10800.   ! [s]
+tcorr_progn_pert%srfexc   = 10800.   ! [s]
+
+! correlation coefficients -1 <= rho <= 1     
+!
+! specify only essential information, the other side of off-diagonals and
+! the diagonal will be filled in later (subroutines read_ens_prop_inputs
+! and get_force_pert_inputs)
+!
+! (the default input list below was put together with matlab 
+!  script create_ccorr_cat_progn_default.m)
+   
+ccorr_progn_pert%catdef%srfexc  = 0.0
+
+/
+
+! =========================== EOF =======================================

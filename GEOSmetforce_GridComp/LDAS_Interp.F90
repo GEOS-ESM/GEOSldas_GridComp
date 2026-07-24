@@ -19,8 +19,6 @@ module LDAS_InterpMod
 contains
 
   subroutine metforcing_tinterp(                                                &
-       lons,                                                                    &
-       lats,                                                                    &
        zth,                                                                     &
        zenav,                                                                   &
        force_time_prv,                                                          &
@@ -57,8 +55,6 @@ contains
 
     implicit none
 
-    real, intent(in) :: lats(:) ! tile lats
-    real, intent(in) :: lons(:) ! tile lons
     ! fix potential inconsistency between zth and zenav owing to 300s time
     ! step used in MAPL_SunGetInsolation()
     ! in ==>inout

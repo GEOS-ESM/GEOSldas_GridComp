@@ -22,7 +22,7 @@ jobs:
     if: "!contains(github.event.pull_request.labels.*.name, '0 diff trivial')"
     runs-on: ubuntu-24.04
     container:
-      image: gmao/ubuntu24-geos-env:v7.32.0-intelmpi_2021.13-ifort_2021.13
+      image: gmao/ubuntu24-geos-env:v7.33.0-intelmpi_2021.13-ifort_2021.13
 
     env:
       OMPI_ALLOW_RUN_AS_ROOT: 1
@@ -56,9 +56,11 @@ jobs:
           mepo clone --partial blobless
           mepo status
 
+      - name: Debug PR branch
+        run: echo "PR is coming from ${{ github.event.pull_request.head.ref }}"
+
       - name: Update other branches
-        if:
-          "!contains('refs/heads/main,refs/heads/develop', github.ref)"
+        if: ${{ github.event.pull_request.head.ref != 'main' && github.event.pull_request.head.ref != 'develop' }}
         run: |
           mepo checkout-if-exists ${GITHUB_HEAD_REF}
           mepo status
@@ -78,7 +80,7 @@ jobs:
     if: "!contains(github.event.pull_request.labels.*.name, '0 diff trivial')"
     runs-on: ubuntu-24.04
     container:
-      image: gmao/ubuntu24-geos-env-mkl:v7.32.0-openmpi_5.0.5-gcc_14.2.0
+      image: gmao/ubuntu24-geos-env-mkl:v7.33.0-openmpi_5.0.5-gcc_14.2.0
 
     env:
       OMPI_ALLOW_RUN_AS_ROOT: 1
@@ -112,9 +114,11 @@ jobs:
           mepo clone --partial blobless
           mepo status
 
+      - name: Debug PR branch
+        run: echo "PR is coming from ${{ github.event.pull_request.head.ref }}"
+
       - name: Update other branches
-        if:
-          "!contains('refs/heads/main,refs/heads/develop', github.ref)"
+        if: ${{ github.event.pull_request.head.ref != 'main' && github.event.pull_request.head.ref != 'develop' }}
         run: |
           mepo checkout-if-exists ${GITHUB_HEAD_REF}
           mepo status

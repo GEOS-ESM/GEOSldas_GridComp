@@ -70,7 +70,24 @@ module GEOS_MetforceGridCompMod
      type(T_METFORCE_STATE), pointer :: ptr=>null()
   end type METFORCE_WRAP
 
-contains
+  integer, parameter :: k_force   = 12
+  integer, parameter :: k_aerosol = 18
+  integer, parameter :: k_landice = 15
+  character(len=7), dimension(k_force) :: export_name = ['Tair   ', 'Qair   ', 'Psurf  ', &
+                                                         'Rainf_C', 'Snowf  ', 'LWdown ', &
+                                                         'PARdrct', 'PARdffs', 'Wind   ', &
+                                                         'RefH   ', 'Rainf  ', 'SWdown ']
+  character(len=4), dimension(k_aerosol) :: aerosol_name = [                              &
+                        'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',            &
+                        'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',            &
+                        'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
+  character(len=11), dimension(k_landice) :: landice_name = ['TA         ', 'QA         ', 'PS         ', &
+                                                             'PCU        ', 'SNO        ', 'LWDNSRF    ', &
+                                                             'DRPAR      ', 'DFPAR      ', 'UU         ', &
+                                                             'DZ         ', 'DRNIR      ', 'DFNIR      ', &
+                                                             'DRUVR      ', 'DFUVR      ', 'PLS        ']  
+  integer :: NUM_LAND_TILE, NUM_LANDICE_TILE
+  contains
 
   !BOP
 
@@ -115,6 +132,8 @@ contains
          rc=status                                                              &
          )
     VERIFY_(status)
+
+    ! phase 1 get forcing
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
@@ -122,6 +141,33 @@ contains
          rc=status                                                              &
          )
     VERIFY_(status)
+    ! phase 2: to land
+    call MAPL_GridCompSetEntryPoint(                                            &
+         gc,                                                                    &
+         ESMF_METHOD_RUN,                                                       &
+         DistributeForcingToLand,                                               &
+         rc=status                                                              &
+         )
+    VERIFY_(status)
+
+    ! phase 3: to landpert
+    call MAPL_GridCompSetEntryPoint(                                            &
+         gc,                                                                    &
+         ESMF_METHOD_RUN,                                                       &
+         DistributeForcingToLandPert,                                           &
+         rc=status                                                              &
+         )
+    VERIFY_(status)
+
+    ! phase 4: to landice
+    call MAPL_GridCompSetEntryPoint(                                            &
+         gc,                                                                    &
+         ESMF_METHOD_RUN,                                                       &
+         DistributeForcingToLandIce,                                            &
+         rc=status                                                              &
+         )
+    VERIFY_(status)
+
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_FINALIZE,                                                  &
@@ -559,12 +605,14 @@ contains
     type(tile_coord_type), pointer :: tile_coord(:)=>null()
 
     ! Misc variables
-    integer :: land_nt_local, k, NUM_ENSEMBLE
+    integer :: local_nt, k, NUM_ENSEMBLE, i1, i2, j1, j2
     integer :: ForceDtStep
     type(met_force_type) :: mf_nodata
     logical :: MERRA_file_specs, ensemble_forcing
     logical :: backward_looking_fluxes  
-
+    real, pointer :: TileLats(:)
+    real, pointer :: TileLons(:)
+    integer, pointer :: tiletype(:)
     integer :: AEROSOL_DEPOSITION
     type(MAPL_LocStream) :: locstream
     character(len=ESMF_MAXSTR) :: grid_type, ENS_FORCING_STR, ens_forcing_path
@@ -596,23 +644,25 @@ contains
     VERIFY_(status)
     internal => wrap%ptr
 
-     ! Get component's internal tile_coord variable
+    ! Get component's internal tile_coord variable
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
     VERIFY_(status)
     tile_coord => tcwrap%ptr%tile_coord
 
-    ! Number of land tiles (on local PE)
     call MAPL_Get(MAPL, LocStream=locstream)
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
          locstream,                                                             &
-         NT_LOCAL=land_nt_local,                                                &
+         NT_LOCAL=local_nt,                                                     &
+         TILELATS=TileLats,                                                     &
+         TILELONS=TileLons,                                                     &
+         TILETYPE=tiletype,                                                     &
          rc=status                                                              &
          )
     VERIFY_(status)
 
-    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
-         DEFAULT=0, RC=STATUS)
+    NUM_LAND_TILE    = count(tiletype == MAPL_LAND)
+    NUM_LANDICE_TILE = count(tiletype == MAPL_LANDICE)
 
     call MAPL_GetResource(MAPL, grid_type,Label="GEOSldas.GRID_TYPE:",RC=STATUS)
     VERIFY_(STATUS)
@@ -624,6 +674,9 @@ contains
        VERIFY_(STATUS)
        im_world_cs = dims(1)
     endif
+
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
+         DEFAULT=0, RC=STATUS)
 
     call MAPL_GetResource(MAPL, gridname,Label="GEOSldas.GRIDNAME:",RC=STATUS)
     VERIFY_(STATUS)
@@ -663,12 +716,12 @@ contains
     VERIFY_(status)
     ! -allocate-memory-for-metforcing-data-
     mf_nodata = nodata_generic
-    allocate(mf%DataPrv(land_nt_local), source=mf_nodata, stat=status)
+    allocate(mf%DataPrv(local_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
-    allocate(mf%DataNxt(land_nt_local), source=mf_nodata, stat=status)
+    allocate(mf%DataNxt(local_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
     ! -allocate-memory-for-avg-zenith-angle
-    allocate(mf%zenav(land_nt_local), source=nodata_generic, stat=status)
+    allocate(mf%zenav(local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
     call MAPL_GetResource ( MAPL, ENS_FORCING_STR, Label="ENSEMBLE_FORCING:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
@@ -710,7 +763,7 @@ contains
          ForceDtStep,                                                           &
          internal%mf%Path,                                                      &
          internal%mf%Tag,                                                       &
-         land_nt_local,                                                         &
+         local_nt,                                                              &
          tile_coord,                                                            &
          internal%mf%hinterp,                                                   &
          AEROSOL_DEPOSITION,                                                    &
@@ -782,22 +835,20 @@ contains
 
     ! Private internal state variables
     type(T_METFORCE_STATE), pointer :: internal=>null()
-    type(METFORCE_WRAP) :: wrap
+    type(METFORCE_WRAP)  :: wrap
     type(TILECOORD_WRAP) :: tcwrap ! LDAS' tile_coord variable
     type(tile_coord_type), pointer :: tile_coord(:)
 
     ! Misc variables
-    integer :: land_nt_local ! number of LAND tiles in local PE
+    integer :: local_nt ! number of tiles in local PE
     integer :: comm
     logical :: IAmRoot
     integer :: fdtstep
-    integer :: YEAR, DAY_OF_YEAR, SEC_OF_DAY,n
-    real, pointer :: LandTileLats(:)
-    real, pointer :: LandTileLons(:)
+    real, pointer :: TileLats(:)
+    real, pointer :: TileLons(:)
     real, allocatable :: zth(:), slr(:), zth_tmp(:)
     type(met_force_type), allocatable :: mfDataNtp(:)
     type(met_force_type), pointer, contiguous :: DataTmp(:)=>null()
-    real, allocatable :: tmpreal(:)
     type(met_force_type) :: mf_nodata
 
     logical :: MERRA_file_specs
@@ -869,7 +920,7 @@ contains
     VERIFY_(status)
     internal => wrap%ptr
  
-   call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
          DEFAULT=1, RC=STATUS)
 
     ! Get number of tiles, tile lats/lons from LocStream
@@ -877,9 +928,9 @@ contains
     VERIFY_(status)
     call MAPL_LocStreamGet(                                                     &
          locstream,                                                             &
-         NT_LOCAL=land_nt_local,                                                &
-         TILELATS=LandTileLats,                                                 &
-         TILELONS=LandTileLons,                                                 &
+         NT_LOCAL=local_nt,                                                     &
+         TILELATS=TileLats,                                                     &
+         TILELONS=TileLons,                                                     &
          rc=status                                                              &
          )
     VERIFY_(status)
@@ -888,11 +939,11 @@ contains
     call MAPL_Get(MAPL, orbit=orbit)
 
     ! Allocate memory for zenith angle
-    allocate(zth(land_nt_local), source=nodata_generic, stat=status)
+    allocate(zth(    local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
-    allocate(slr(land_nt_local), source=nodata_generic, stat=status)
+    allocate(slr(    local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
-    allocate(zth_tmp(land_nt_local), source=nodata_generic, stat=status)
+    allocate(zth_tmp(local_nt), source=nodata_generic, stat=status)
     VERIFY_(status)
 
     ! Convert forcing time interval to seconds
@@ -902,10 +953,11 @@ contains
     call ESMF_ClockGetAlarm(clock, 'MetForcing', MetForcingAlarm, rc=status)
     VERIFY_(status)
 
-    ! Get component's internal tile_coord variable
+   ! Get component's internal tile_coord variable
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
     VERIFY_(status)
     tile_coord => tcwrap%ptr%tile_coord
+
 
     ! Time stamp of next model step
     ! -get-model-time-step-
@@ -938,7 +990,7 @@ contains
             fdtstep,                                                            &
             internal%mf%Path,                                                   &
             internal%mf%Tag,                                                    &
-            land_nt_local,                                                      &
+            local_nt,                                                           &
             tile_coord,                                                         &
             internal%mf%hinterp,                                                &
             AEROSOL_DEPOSITION,                                                 &
@@ -956,10 +1008,10 @@ contains
 
        ! -compute-average-zenith-angle-over-daylight-part-of-forcing-interval-
        call MAPL_SunGetInsolation(                                              &
-            LandTileLons,                                                       &
-            LandTileLats,                                                       &
+            TileLons,                                                           &
+            TileLats,                                                           &
             orbit,                                                              &
-            zth_tmp,                                                                &
+            zth_tmp,                                                            &
             slr,                                                                &
             currTime=internal%mf%TimePrv,                                       &
             INTV=internal%mf%ntrvl,                                             &
@@ -973,7 +1025,7 @@ contains
       !          dayOfYear=DAY_OF_YEAR, RC=STATUS)
       ! VERIFY_(STATUS) 
 
-      ! call zenith(DAY_OF_YEAR,SEC_OF_DAY,fdtstep,ModelTimeStep,land_nt_local,tile_coord%com_lon,                                                    &
+      ! call zenith(DAY_OF_YEAR,SEC_OF_DAY,fdtstep,ModelTimeStep,local_nt,tile_coord%com_lon,                                                    &
       !         tile_coord%com_lat,internal%mf%zenav)
 
 
@@ -989,8 +1041,8 @@ contains
 
     ! Compute zenith angle at the next time step
     call MAPL_SunGetInsolation(                                                 &
-         LandTileLons,                                                          &
-         LandTileLats,                                                          &
+         TileLons,                                                              &
+         TileLats,                                                              &
          orbit,                                                                 &
          zth_tmp,                                                               &
          slr,                                                                   &
@@ -1005,7 +1057,7 @@ contains
     !call ESMF_TimeGet(ModelTimeNxt, YY=YEAR, S=SEC_OF_DAY, &
     !          dayOfYear=DAY_OF_YEAR, RC=STATUS)
     !VERIFY_(STATUS)
-    !do n=1, land_nt_local
+    !do n=1, local_nt
     !  call solar(tile_coord(n)%com_lon,tile_coord(n)%com_lat, DAY_OF_YEAR,SEC_OF_DAY,zth(n),slr(n))
     !enddo
 
@@ -1028,13 +1080,11 @@ contains
 
     ! Allocate memory for interpolated MetForcing data
     mf_nodata = nodata_generic
-    allocate(mfDataNtp(land_nt_local), source=mf_nodata, stat=status)
+    allocate(mfDataNtp(local_nt), source=mf_nodata, stat=status)
     VERIFY_(status)
 
     ! Interpolate MetForcing data to the end of model integration time step
     call LDAS_TInterpForcing(                                                   &
-         tile_coord%com_lon,                                                    &
-         tile_coord%com_lat,                                                    &
          zth,                                                                   &
          internal%mf%zenav,                                                     &
          force_time_prv,                                                        &
@@ -1224,6 +1274,133 @@ contains
 
   end subroutine Run
 
+  subroutine DistributeForcingToLand(gc, export, land_import, clock, rc)
+    
+    type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
+    type(ESMF_State),    intent(inout) :: export      ! Export state
+    type(ESMF_State),    intent(inout) :: land_import ! Import state
+    type(ESMF_Clock),    intent(inout) :: clock       ! The clock
+    integer, optional,   intent(  out) :: rc          ! Error code
+    
+    real, pointer :: out1d(:), in1d(:)
+    real, pointer :: out2d(:,:), in2d(:,:)
+    integer :: k, AEROSOL_DEPOSITION, status
+    type(MAPL_MetaComp), pointer :: MAPL
+    character(len=ESMF_MAXSTR) :: Iam
+    Iam = "metForce::DistributeForcingToLand"
+
+    call MAPL_GetObjectFromGC(gc, MAPL, _RC)
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC) 
+    if(AEROSOL_DEPOSITION /=0) then
+       do k = 1, k_aerosol
+          call MAPL_GetPointer(export,     out2d,  aerosol_name(k), _RC)
+          call MAPL_GetPointer(land_import, in2d,  aerosol_name(k), _RC)
+          in2d(:,:) = out2d(1:NUM_LAND_TILE, :)
+       enddo
+    endif
+
+    call MAPL_GetPointer(export,     out1d, 'Psurf', _RC)
+    call MAPL_GetPointer(land_import, in1d,  'PS',   _RC)
+    in1d = out1d(1:NUM_LAND_TILE)
+    call MAPL_GetPointer(export,     out1d, 'RefH',  _RC)
+    call MAPL_GetPointer(land_import, in1d,  'DZ',   _RC)
+    in1d = out1d(1:NUM_LAND_TILE)
+    RETURN_(ESMF_SUCCESS)
+    
+  end subroutine DistributeForcingToLand
+
+  subroutine DistributeForcingToLandPert(gc, export, landpert_import, clock, rc)
+    
+    type(ESMF_GridComp), intent(inout) :: gc              ! Gridded component
+    type(ESMF_State),    intent(inout) :: export          ! Export state
+    type(ESMF_State),    intent(inout) :: landpert_import ! Import state
+    type(ESMF_Clock),    intent(inout) :: clock           ! The clock
+    integer, optional,   intent(  out) :: rc              ! Error code
+
+    real, pointer :: out1d(:), in1d(:)
+    integer :: k, status
+    character(len=ESMF_MAXSTR) :: Iam
+    Iam = "metForce::DistributeForcingToLandPert"
+
+    do k = 1, k_force
+       call MAPL_GetPointer(export,          out1d, trim(export_name(k)), _RC)
+       call MAPL_GetPointer(landpert_import, in1d,  trim(export_name(k)), _RC)
+       in1d = out1d(1:NUM_LAND_TILE)
+    enddo
+    RETURN_(ESMF_SUCCESS)
+    
+  end subroutine DistributeForcingToLandPert
+
+  subroutine DistributeForcingToLandIce(gc, export, landice_import, clock, rc)
+
+    type(ESMF_GridComp), intent(inout) :: gc             ! Gridded component
+    type(ESMF_State),    intent(inout) :: export         ! Export state
+    type(ESMF_State),    intent(inout) :: landice_import ! Import state
+    type(ESMF_Clock),    intent(inout) :: clock          ! The clock
+    integer, optional,   intent(  out) :: rc             ! Error code
+    
+    integer :: k, i1, i2, AEROSOL_DEPOSITION, status
+    real, pointer :: out1d(:), in1d(:), tmp(:)
+    real, pointer :: out2d(:,:), in2d(:,:)
+    real, allocatable :: tmpreal(:)
+    type(MAPL_MetaComp), pointer :: MAPL
+    character(len=ESMF_MAXSTR) :: Iam
+    Iam = "metForce::DistributeForcingToLandice"
+
+    if (NUM_LANDICE_TILE == 0) then
+      RETURN_(ESMF_SUCCESS)
+    endif
+
+    i1 = NUM_LAND_TILE + 1
+    i2 = NUM_LAND_TILE + NUM_LANDICE_TILE
+  ! Get MAPL obj
+    call MAPL_GetObjectFromGC(gc, MAPL, _RC)
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC)
+    if(AEROSOL_DEPOSITION /=0) then
+       do k = 1, k_aerosol
+          call MAPL_GetPointer(export,         out2d, aerosol_name(k), _RC)
+          call MAPL_GetPointer(landice_import, in2d,  aerosol_name(k), _RC)
+          in2d(:,:) = out2d(i1:i2, :)
+          VERIFY_(status)
+       enddo
+    endif
+
+    do k = 1, k_force - 2
+       call MAPL_GetPointer(export,        out1d,  trim(export_name(k)),  _RC)
+       call MAPL_GetPointer(landice_import, in1d,  trim(landice_name(k)), _RC)
+       in1d = out1d(i1:i2)
+    enddo
+
+    call MAPL_GetPointer(export,        out1d,  'Wind',   _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'UWINDLMTILE',   _RC)
+    in1d = out1d(i1:i2)
+    call MAPL_GetPointer(landice_import, in1d,  'VWINDLMTILE',   _RC)
+    in1d = 0.
+
+    call MAPL_GetPointer(export,        out1d,  'Rainf',   _RC)
+    call MAPL_GetPointer(export,        tmp,    'Rainf_C', _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'PLS',     _RC)
+    in1d = out1d(i1:i2) - tmp(i1:i2)
+
+    allocate(tmpreal(NUM_LANDICE_TILE), stat=status)
+    call MAPL_GetPointer(export,        out1d,  'SWdown',  _RC)
+    tmpreal = 0.5* out1d(i1:i2)
+    call MAPL_GetPointer(landice_import, in1d,  'DRNIR',   _RC)
+    in1d = 0.5 * tmpreal
+    call MAPL_GetPointer(landice_import, in1d,  'DFNIR',   _RC)
+    in1d = 0.5 * tmpreal
+
+    call MAPL_GetPointer(export,        out1d,  'PARdrct', _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'DRUVR',   _RC)
+    in1d = 0.5* tmpreal - out1d(i1:i2)
+    call MAPL_GetPointer(export,        out1d,  'PARdffs', _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'DFUVR',   _RC)
+    in1d = 0.5* tmpreal - out1d(i1:i2)
+    deallocate(tmpreal)
+
+    RETURN_(ESMF_SUCCESS)
+    
+  end subroutine DistributeForcingToLandIce
 
   !BOP
 

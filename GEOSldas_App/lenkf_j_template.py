@@ -12,7 +12,7 @@ job_directive = {"NCCS": '''#!/bin/csh -f
 #SBATCH --error={MY_EXPDIR}/scratch/GEOSldas_err_txt
 #SBATCH --account={MY_ACCOUNT}
 #SBATCH --time={MY_WALLTIME}
-#SBATCH --nodes={MY_NODES} --ntasks-per-node={MY_NTASKS_PER_NODE}
+#SBATCH --ntasks={MY_NTASKS_MODEL}
 #SBATCH --job-name={MY_JOB}
 #SBATCH --qos={MY_QOS}
 #SBATCH --constraint={MY_CONSTRAINT}
@@ -63,6 +63,8 @@ setenv argv
 
 source $GEOSBIN/g5_modules
 
+setenv BASEBIN ${{BASEDIR}}/Linux/bin
+
 setenv MPI_STACK {DETECTED_MPI_STACK}
 
 if ( ${{MPI_STACK}} == "openmpi" ) then
@@ -103,8 +105,6 @@ setenv MKL_CBWR "AVX2"
 # reversed sequence for LADAS_COUPLING (Sep 2020)  (needed when coupling with ADAS using different BASEDIR)
 setenv LD_LIBRARY_PATH ${{BASEDIR}}/${{ARCH}}/lib:${{ESMADIR}}/lib:${{LD_LIBRARY_PATH}}
 
-module load nco
-
 setenv RUN_CMD "$GEOSBIN/esma_mpirun -np "
 
 #######################################################################
@@ -113,7 +113,7 @@ setenv RUN_CMD "$GEOSBIN/esma_mpirun -np "
 
 setenv    HOMDIR         $EXPDIR/run/
 setenv    SCRDIR         $EXPDIR/scratch
-setenv    MODEL          {MY_MODEL}
+setenv    LANDMODEL      {MY_LANDMODEL}
 setenv    MYNAME         `finger $USER | cut -d: -f3 | head -1`
 setenv    POSTPROC_HIST  {MY_POSTPROC_HIST}
 
@@ -460,7 +460,7 @@ while ( $counter <= ${{NUM_SGMT}} )
       set rc = -1
       echo GEOSldas Run Status: $rc
       echo "ERROR: GEOSldas run FAILED, exit without post-processing"
-      exit
+      exit $rc
    endif
 
 
@@ -602,9 +602,9 @@ EOF
 
              sed -i -e "s/NT/$LEN_SUB/g" timestamp.cdl
              sed -i -e "s/DATAVALUES/$tstep2/g" timestamp.cdl
-             ncgen -k4 -o timestamp.nc4 timestamp.cdl
-             ncrcat -h $EXPID.$ThisCol.${{YYYY}}${{MM}}${{DD}}_* ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
-             ncks -4 -h -v time_stamp timestamp.nc4 -A ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
+             $BASEBIN/ncgen -k4 -o timestamp.nc4 timestamp.cdl
+             $BASEBIN/ncrcat -h $EXPID.$ThisCol.${{YYYY}}${{MM}}${{DD}}_* ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
+             $BASEBIN/ncks -4 -h -v time_stamp timestamp.nc4 -A ${{EXPID}}.${{ThisCol}}.$YYYY$MM$DD.nc4
              /bin/rm timestamp.cdl
              /bin/rm timestamp.nc4
              # rudimentary check for desired nc4 file;  if ok, delete sub-daily files
@@ -646,7 +646,7 @@ EOF
           if($NAVAIL != $NDAYS) continue
 
           # create monthly-mean nc4 file
-          ncra -h $EXPID.$ThisCol.${{YYYY}}${{MM}}*.nc4 ${{EXPID}}.${{ThisCol}}.monthly.$YYYY$MM.nc4
+          $BASEBIN/ncra -h $EXPID.$ThisCol.${{YYYY}}${{MM}}*.nc4 ${{EXPID}}.${{ThisCol}}.monthly.$YYYY$MM.nc4
 
           if($POSTPROC_HIST == 2) then
              # rudimentary check for desired nc4 file;  if ok, delete daily files
@@ -721,13 +721,23 @@ EOF
        if ( $NENS == 1) set ENSID =''
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
+   
+       set rstfs = (${{LANDMODEL}} 'landice')
+       foreach rstf ( $rstfs )
+          if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
+             set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
+             /bin/mv ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
+             /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+             /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+          endif
+       end
 
-       set rstf = ${{MODEL}}
-       if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
-          /bin/mv ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
-          /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
+       set rstf = 'landassim_obspertrseed'
+       if (-f ${{rstf}}${{ENSID}}_checkpoint ) then
+         set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
+         /bin/mv ${{rstf}}${{ENSID}}_checkpoint $tmp_file
+         /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
+         /bin/ln -rs  $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
        endif
 
        set rstf = 'landpert'
@@ -735,36 +745,30 @@ EOF
           set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
 	  # copy generic restart file to final location/name but remove lat/lon variables
 	  #  (lat/lon variables are not correct when running in EASE-grid tile space)
-          ncks -4 -O -C -x -v lat,lon ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
+          $BASEBIN/ncks -4 -O -C -x -v lat,lon ${{rstf}}${{ENSID}}_internal_checkpoint $tmp_file
           /bin/rm -f ${{rstf}}${{ENSID}}_internal_checkpoint
           set old_rst = `/usr/bin/readlink -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst`
           /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
           /bin/ln -rs $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_internal_rst
           /usr/bin/gzip $old_rst &
        endif
-
-       set rstf = 'landassim_obspertrseed'
-       if (-f ${{rstf}}${{ENSID}}_checkpoint ) then
-          set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
-          /bin/mv ${{rstf}}${{ENSID}}_checkpoint $tmp_file
-          /bin/rm -f $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
-          /bin/ln -rs $tmp_file $EXPDIR/input/restart/${{rstf}}${{ENSID}}_rst
-       endif
+   
    # move intermediate check point files to  output/$EXPDOMAIN/rs/$ENSDIR/Yyyyy/Mmm/ directories
    # -------------------------------------------------------------------------------------------
-
-       set rstfiles1 = `ls ${{MODEL}}${{ENSID}}_internal_checkpoint.*`
+   
+       set rstfiles1 = `ls ${{LANDMODEL}}${{ENSID}}_internal_checkpoint.*`
        set rstfiles2 = `ls landpert${{ENSID}}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${{ENSID}}_checkpoint.*`
-
-       foreach rfile ( $rstfiles1 )
+       set rstfiles4 = `ls landice${{ENSID}}_internal_checkpoint.*`
+   
+       foreach rfile ( $rstfiles1 $rstfiles4 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
           set TM = `echo $ThisTime | cut -c5-6`
           set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{TY}}/M${{TM}}/
           if (! -e $THISDIR            ) mkdir -p $THISDIR
-          /bin/mv $rfile ${{THISDIR}}${{EXPID}}.${{MODEL}}_internal_rst.${{ThisTime}}.nc4
-          /usr/bin/gzip ${{THISDIR}}${{EXPID}}.${{MODEL}}_internal_rst.${{ThisTime}}.nc4 &
+          /bin/mv $rfile ${{THISDIR}}${{EXPID}}.${{LANDMODEL}}_internal_rst.${{ThisTime}}.nc4
+          /usr/bin/gzip ${{THISDIR}}${{EXPID}}.${{LANDMODEL}}_internal_rst.${{ThisTime}}.nc4 &
        end
 
        foreach rfile ( $rstfiles2 )
@@ -773,7 +777,7 @@ EOF
           set TM = `echo $ThisTime | cut -c5-6`
           set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{TY}}/M${{TM}}/
           if (! -e $THISDIR            ) mkdir -p $THISDIR
-             (ncks -4 -O -C -x -v lat,lon $rfile ${{THISDIR}}${{EXPID}}.landpert_internal_rst.${{ThisTime}}.nc4;\\
+             ($BASEBIN/ncks -4 -O -C -x -v lat,lon $rfile ${{THISDIR}}${{EXPID}}.landpert_internal_rst.${{ThisTime}}.nc4;\\
                /usr/bin/gzip ${{THISDIR}}${{EXPID}}.landpert_internal_rst.${{ThisTime}}.nc4; \\
                /bin/rm -f $rfile) &
        end
@@ -856,6 +860,16 @@ endif
 
 if ( $LADAS_COUPLING > 0 ) then
    if ( $rc == 0 ) then
+      ##update CAP.rc END_DATE in $HOMDIR/
+      set date  = `$GEOSBIN/tick $nymdf $nhmsf $dt`
+      set nymdend =  $date[1]
+      set nhmsend =  $date[2]
+      cd  $HOMDIR 
+      set oldstring = `cat CAP.rc | grep END_DATE:`
+      set newstring = "END_DATE: $nymdend $nhmsend"
+      /bin/mv CAP.rc CAP.tmp
+      cat CAP.tmp | sed -e "s?$oldstring?$newstring?g" > CAP.rc
+      /bin/rm -f CAP.tmp
       echo 'SUCCEEDED' > $HOMDIR/lenkf_job_completed.txt
    endif
 else
