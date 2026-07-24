@@ -2167,17 +2167,18 @@ contains
     !   ASCAT_HSAF_METC_SM  MetOp-C  2019-04-01 - ongoing     (H121 then H139)
     !
     ! QC applied (no external mask file needed):
-    !   surface_flag bit 0x01 set         -> open water          -> reject
+    !   surface_flag bit 0x01 set         -> open water         -> reject
     !   processing_flag bits 0x01|0x02    -> bad model/sigma0   -> reject
-    !   wetland_fraction         >= thr_wetland (10%)            -> reject
-    !   topographic_complexity   >= thr_topo    (10%)            -> reject
-    !   subsurface_scattering_probability >= thr_subsfc (5%)     -> reject (new)
-    !   surface_soil_moisture_sensitivity <= thr_sens (1 dB)     -> reject (new)
-    !   backscatter40_flag bit 4 (noise_out_of_limits)            -> reject (new)
+    !   wetland_fraction                  >= thr_wetland (10%)  -> reject
+    !   topographic_complexity            >= thr_topo    (10%)  -> reject
+    !   subsurface_scattering_probability >= thr_subsfc  ( 5%)  -> reject (new w.r.t. "EUMETSAT" product)
+    !   surface_soil_moisture_sensitivity <= thr_sens   (1 dB)  -> reject (new w.r.t. "EUMETSAT" product)
+    !   backscatter40_flag bit 4 (noise_out_of_limits)          -> reject (new w.r.t. "EUMETSAT" product)
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
-    ! References: Hahn et al. 2026; https://hsaf.meteoam.it/
+    ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
+    !             https://hsaf.meteoam.it/
     !
     ! A. Fox, reichle, Jun 2026
     !
@@ -2192,14 +2193,14 @@ contains
 
     integer, intent(in) :: dtstep_assim, N_catd
 
-    type(tile_coord_type), dimension(:), pointer :: tile_coord
+    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
 
     type(grid_def_type), intent(in) :: tile_grid_d
 
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
 
-    integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij
+    integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
     type(obs_param_type), intent(in) :: this_obs_param
 
@@ -2207,40 +2208,42 @@ contains
 
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: ASCAT_sm          ! degree of saturation [fraction 0-1]
-    real,    intent(out), dimension(N_catd) :: ASCAT_sm_std      ! obs error std        [fraction 0-1]
+    real,    intent(out), dimension(N_catd) :: ASCAT_sm               ! degree of saturation (sfds) [fraction 0-1]
+    real,    intent(out), dimension(N_catd) :: ASCAT_sm_std           ! sfds obs error std          [fraction 0-1]
     real,    intent(out), dimension(N_catd) :: ASCAT_lon, ASCAT_lat
-    real*8,  intent(out), dimension(N_catd) :: ASCAT_time        ! J2000 seconds
+    real*8,  intent(out), dimension(N_catd) :: ASCAT_time             ! J2000 seconds
 
     ! ---------------
 
     ! H121/H139 files are 1-hour granules.  Extra look-back catches files
     ! whose sensing start precedes the window but whose obs extend into it.
 
-    integer,      parameter :: dt_ASCAT_obsfile = 3600       ! seconds (1-hour files)
-    integer,      parameter :: N_fnames_max     = 30         ! max obs files per daily flist
-    integer,      parameter :: max_obs_per_file = 300000     ! max obs per 1-hr granule (H121 ~200k)
-    character(4), parameter :: J2000_epoch_id   = 'TT12'    ! see date_time_util.F90
+    integer,      parameter :: dt_ASCAT_obsfile = 3600                ! seconds (1-hour files)
+    integer,      parameter :: N_fnames_max     = 30                  ! max obs files per daily flist
+    integer,      parameter :: max_obs_per_file = 300000              ! max obs per 1-hr granule (H121 ~200k)
+    character(4), parameter :: J2000_epoch_id   = 'TT12'              ! see date_time_util.F90
 
-    ! Offset from the Unix epoch (1970-01-01 00:00:00 UTC) to the J2000 TT12 epoch
-    ! (2000-01-01 12:00:00 TT) in seconds.
-    ! 30 years = 10957 days (leap years 1972,76,80,84,88,92,96); +0.5 day for 12z;
-    ! TT leads UTC by ~64.184 s at J2000.
-    real*8, parameter :: unix_to_J2000_s = 10957.5d0 * 86400.0d0 + 64.184d0
+    ! Offset from Unix epoch (1970-01-01 00:00:00 UTC) to J2000 TT12 epoch (2000-01-01 12:00:00 TT) in seconds:
+    !   30 years = 10957 days (leap years 1972,76,80,84,88,92,96); +0.5 day for 12z;
+    !   TT leads UTC by ~64.184 s at J2000.
+    
+    real*8,       parameter :: unix_to_J2000_s = 10957.5d0 * 86400.0d0 + 64.184d0
 
     ! QC thresholds [percent]
     ! snow and frozen soil are screened by qc_model_based_for_sat_sfmc using model state
-    real, parameter :: thr_wetland = 10.
-    real, parameter :: thr_topo    = 10.
-    real, parameter :: thr_subsfc  = 5.
-    real, parameter :: thr_sens    = 1.0   ! reject if SSM sensitivity <= 1 dB
 
-    integer(1), parameter :: bsflag_bad_bits = 4_1   ! noise_out_of_limits
+    real,         parameter :: thr_wetland = 10.                      ! [%]
+    real,         parameter :: thr_topo    = 10.                      ! [%]
+    real,         parameter :: thr_subsfc  =  5.                      ! [%]
+    real,         parameter :: thr_sens    =  1.0                     ! [dB] reject if SSM sensitivity <= 1 dB
+
+    integer(1),   parameter :: bsflag_bad_bits = 4_1                  ! noise_out_of_limits
 
     ! netCDF variable scale factors (as declared in files)
-    real*8, parameter :: latlon_scale = 1.0d-6   ! lat/lon stored as int * 1e-6
-    real,   parameter :: ssm_scale    = 0.01      ! SSM stored as short * 0.01 -> %
-    real*8, parameter :: sens_scale   = 1.0d-7    ! sensitivity stored as int * 1e-7 -> dB
+    
+    real*8,       parameter :: latlon_scale = 1.0d-6                  ! lat/lon stored as int * 1e-6
+    real,         parameter :: ssm_scale    = 0.01                    ! SSM stored as short * 0.01 -> %
+    real*8,       parameter :: sens_scale   = 1.0d-7                  ! sensitivity stored as int * 1e-7 -> dB
 
     ! ---------------
 
@@ -2253,8 +2256,9 @@ contains
 
     integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
 
-    character(200), dimension(2*N_fnames_max) :: fname_list
-    character(300), dimension(2*N_fnames_max) :: tmpfnames
+    character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
+    character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
+
     character(300), allocatable               :: fnames(:)
 
     real*8 :: J2000_low, J2000_up, obs_j2000
@@ -2271,17 +2275,17 @@ contains
     integer,    allocatable :: lat_raw(:), lon_raw(:)
     real(8),    allocatable :: time_raw(:)
     integer(2), allocatable :: ssm_raw(:)
-    integer(1), allocatable :: sflag_raw(:)    ! surface_flag    (NC_UBYTE  -> int8)
-    integer(1), allocatable :: pflag_raw(:)    ! processing_flag (NC_UBYTE  -> int8)
-    integer(1), allocatable :: bsflag_raw(:)   ! backscatter40_flag (NC_UBYTE)
-    integer(1), allocatable :: wetland_raw(:)  ! wetland_fraction          (NC_BYTE)
-    integer(1), allocatable :: topo_raw(:)     ! topographic_complexity    (NC_BYTE)
+    integer(1), allocatable :: sflag_raw(:)    ! surface_flag                      (NC_UBYTE  -> int8)
+    integer(1), allocatable :: pflag_raw(:)    ! processing_flag                   (NC_UBYTE  -> int8)
+    integer(1), allocatable :: bsflag_raw(:)   ! backscatter40_flag                (NC_UBYTE)
+    integer(1), allocatable :: wetland_raw(:)  ! wetland_fraction                  (NC_BYTE)
+    integer(1), allocatable :: topo_raw(:)     ! topographic_complexity            (NC_BYTE)
     integer(1), allocatable :: subsfc_raw(:)   ! subsurface_scattering_probability (NC_BYTE)
     integer,    allocatable :: sens_raw(:)     ! surface_soil_moisture_sensitivity (NC_INT)
 
     ! valid-obs scratch arrays (max one file at a time)
-    real,   allocatable :: tmp1_lat(:), tmp1_lon(:), tmp1_obs(:)
-    real*8, allocatable :: tmp1_jtime(:)
+    real,       allocatable :: tmp1_lat(:), tmp1_lon(:), tmp1_obs(:)
+    real*8,     allocatable :: tmp1_jtime(:)
 
     ! pointers for get_tile_num_for_obs
     real,    dimension(:), pointer :: tmp_lat, tmp_lon
@@ -2289,10 +2293,10 @@ contains
     integer, dimension(:), pointer :: tmp_tile_num
 
     ! tile accumulation across all files
-    integer, dimension(N_catd) :: N_obs_in_tile
+    integer, dimension(N_catd)     :: N_obs_in_tile
 
-    character(len=*),  parameter :: Iam = 'read_obs_sm_ASCAT_HSAF'
-    character(len=400) :: err_msg
+    character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
+    character(len=400)             :: err_msg
 
     ! -------------------------------------------------------------------
 
@@ -2315,6 +2319,8 @@ contains
        err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
+
+    ! return if date_time falls outside operating time range
 
     if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.  &
          datetime_lt_refdatetime(date_time_obs_end, date_time)              ) return
@@ -2345,7 +2351,7 @@ contains
     fname_of_fname_list = 'dummy'   ! overridden by this_obs_param%flistname
 
     ! obs_dir_hier=1: read_obs_fnames prepends Y{YYYY}/M{MM}/ (not D{DD}/)
-    ! so data files live in monthly subdirectories, matching H SAF FTP layout
+    !                 so data files live in monthly subdirectories, matching H SAF FTP layout
 
     call read_obs_fnames( date_time_low_fname, this_obs_param,               &
          fname_of_fname_list, N_fnames_max,                                  &
@@ -2418,10 +2424,10 @@ contains
     !
     ! initialise tile accumulators
 
-    ASCAT_sm    = 0.
-    ASCAT_lon   = 0.
-    ASCAT_lat   = 0.
-    ASCAT_time  = 0.0D0
+    ASCAT_sm      = 0.
+    ASCAT_lon     = 0.
+    ASCAT_lat     = 0.
+    ASCAT_time    = 0.0D0
     N_obs_in_tile = 0
 
     ! scratch arrays for valid obs from one file at a time
@@ -2456,31 +2462,31 @@ contains
 
        ! get variable IDs
 
-       ierr = nf90_inq_varid(ncid, 'latitude',                        lat_varid)
-       ierr = nf90_inq_varid(ncid, 'longitude',                       lon_varid)
-       ierr = nf90_inq_varid(ncid, 'time',                            time_varid)
-       ierr = nf90_inq_varid(ncid, 'surface_soil_moisture',           ssm_varid)
-       ierr = nf90_inq_varid(ncid, 'surface_flag',                    sflag_varid)
-       ierr = nf90_inq_varid(ncid, 'processing_flag',                 pflag_varid)
-       ierr = nf90_inq_varid(ncid, 'backscatter40_flag',              bsflag_varid)
-       ierr = nf90_inq_varid(ncid, 'wetland_fraction',                wetland_varid)
-       ierr = nf90_inq_varid(ncid, 'topographic_complexity',          topo_varid)
+       ierr = nf90_inq_varid(ncid, 'latitude',                          lat_varid)
+       ierr = nf90_inq_varid(ncid, 'longitude',                         lon_varid)
+       ierr = nf90_inq_varid(ncid, 'time',                              time_varid)
+       ierr = nf90_inq_varid(ncid, 'surface_soil_moisture',             ssm_varid)
+       ierr = nf90_inq_varid(ncid, 'surface_flag',                      sflag_varid)
+       ierr = nf90_inq_varid(ncid, 'processing_flag',                   pflag_varid)
+       ierr = nf90_inq_varid(ncid, 'backscatter40_flag',                bsflag_varid)
+       ierr = nf90_inq_varid(ncid, 'wetland_fraction',                  wetland_varid)
+       ierr = nf90_inq_varid(ncid, 'topographic_complexity',            topo_varid)
        ierr = nf90_inq_varid(ncid, 'subsurface_scattering_probability', subsfc_varid)
        ierr = nf90_inq_varid(ncid, 'surface_soil_moisture_sensitivity', sens_varid)
 
        ! allocate per-file arrays
 
-       allocate(lat_raw(   N_obs_file))
-       allocate(lon_raw(   N_obs_file))
-       allocate(time_raw(  N_obs_file))
-       allocate(ssm_raw(   N_obs_file))
-       allocate(sflag_raw( N_obs_file))
-       allocate(pflag_raw( N_obs_file))
-       allocate(bsflag_raw(N_obs_file))
+       allocate(lat_raw(    N_obs_file))
+       allocate(lon_raw(    N_obs_file))
+       allocate(time_raw(   N_obs_file))
+       allocate(ssm_raw(    N_obs_file))
+       allocate(sflag_raw(  N_obs_file))
+       allocate(pflag_raw(  N_obs_file))
+       allocate(bsflag_raw( N_obs_file))
        allocate(wetland_raw(N_obs_file))
-       allocate(topo_raw(  N_obs_file))
-       allocate(subsfc_raw(N_obs_file))
-       allocate(sens_raw(  N_obs_file))
+       allocate(topo_raw(   N_obs_file))
+       allocate(subsfc_raw( N_obs_file))
+       allocate(sens_raw(   N_obs_file))
 
        ! read variables (raw packed values; scale applied manually below)
 
@@ -2521,7 +2527,7 @@ contains
           ! skip if SSM is fill or out of valid range
           if (ssm_raw(ii) < 0_2 .or. ssm_raw(ii) > 10000_2) cycle
 
-          ! obs time in J2000 seconds (time_raw in days since 1970-01-01 UTC)
+          ! obs time in J2000 seconds (time_raw is in days since 1970-01-01 UTC)
           obs_j2000 = time_raw(ii) * 86400.0d0 - unix_to_J2000_s
 
           ! skip if outside assimilation window (half-open: low < obs <= up)
@@ -2560,7 +2566,7 @@ contains
 
           tmp1_lat(  N_valid) = real(lat_raw(ii)) * real(latlon_scale)
           tmp1_lon(  N_valid) = real(lon_raw(ii)) * real(latlon_scale)
-          tmp1_obs(  N_valid) = real(ssm_raw(ii)) * ssm_scale / 100.  ! % -> fraction
+          tmp1_obs(  N_valid) = real(ssm_raw(ii)) * ssm_scale / 100.    ! % -> fraction
           tmp1_jtime(N_valid) = obs_j2000
 
        end do
@@ -2579,10 +2585,10 @@ contains
        !
        ! tile matching and accumulation for this file's valid obs
 
-       allocate(tmp_lat(  N_valid))
-       allocate(tmp_lon(  N_valid))
-       allocate(tmp_jtime(N_valid))
-       allocate(tmp_tile_num(N_valid))
+       allocate(tmp_lat(        N_valid))
+       allocate(tmp_lon(        N_valid))
+       allocate(tmp_jtime(      N_valid))
+       allocate(tmp_tile_num(   N_valid))
 
        tmp_lat   = tmp1_lat(  1:N_valid)
        tmp_lon   = tmp1_lon(  1:N_valid)
@@ -2635,11 +2641,11 @@ contains
 
        elseif (N_obs_in_tile(ii) == 0) then
 
-          ASCAT_sm(  ii) = this_obs_param%nodata
-          ASCAT_lon( ii) = this_obs_param%nodata
-          ASCAT_lat( ii) = this_obs_param%nodata
-          ASCAT_time(ii) = real(this_obs_param%nodata, kind(0.0D0))
-          ASCAT_sm_std(ii) = this_obs_param%nodata
+          ASCAT_sm(  ii)   =      this_obs_param%nodata
+          ASCAT_lon( ii)   =      this_obs_param%nodata
+          ASCAT_lat( ii)   =      this_obs_param%nodata
+          ASCAT_time(ii)   = real(this_obs_param%nodata, kind(0.0D0))
+          ASCAT_sm_std(ii) =      this_obs_param%nodata
 
        end if
 
