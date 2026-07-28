@@ -2219,7 +2219,7 @@ contains
     ! whose sensing start precedes the window but whose obs extend into it.
 
     integer,      parameter :: dt_ASCAT_obsfile = 3600                ! seconds (1-hour files)
-    integer,      parameter :: N_fnames_max     = 30                  ! max obs files per daily flist
+    integer,      parameter :: N_fnames_max     = 24                  ! max obs files per daily flist
     integer,      parameter :: max_obs_per_file = 300000              ! max obs per 1-hr granule (H121 ~200k)
     character(4), parameter :: J2000_epoch_id   = 'TT12'              ! see date_time_util.F90
 
