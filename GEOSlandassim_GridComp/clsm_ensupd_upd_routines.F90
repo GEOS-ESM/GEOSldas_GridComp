@@ -1046,7 +1046,7 @@ contains
     real,                   intent(in),    dimension(N_catl)       :: lai
     type(cat_param_type),   intent(in),    dimension(N_catl)       :: cat_param
     type(cat_progn_type),   intent(in),    dimension(N_catl,N_ens) :: cat_progn
-    type(mwRTM_param_type), intent(in),    dimension(N_catl)       :: mwRTM_param
+    type(mwRTM_param_type), intent(in),    dimension(:)            :: mwRTM_param
 
     integer,                intent(inout)                          :: N_obsl   ! InOut !!!
 
@@ -1067,6 +1067,9 @@ contains
     real,    parameter                      :: fac_search_FOV_km     = 2.   ! [-]
     
     real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
+    real,    parameter                      :: ASCAT_max_peat_frac   = 0.10 ! [-]
+
+    integer, parameter                      :: peat_soilcls          = 253  ! [-]
 
     integer                                 :: N_catlH, n_e, i, j, k, N_tmp, ii, jj
     integer                                 :: N_fields, N_Tbspecies, N_TbuniqFreqAngRTMid
@@ -1081,9 +1084,9 @@ contains
 
     real, dimension(numprocs)               :: xhalo, yhalo, tmplatvec, tmprx
     
-    real                                    :: tmpreal, tmp_stemp, tmp_fraccell
+    real                                    :: tmpreal, tmp_stemp, tmp_fraccell, tmp_peatfrac
 
-    logical                                 :: tmpRFI, tmpWater, use_distance_weights
+    logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
 
     real, dimension(1)                      :: tmpmean, tmpvar
         
@@ -1094,6 +1097,7 @@ contains
     logical                                 :: get_Tb_l,     get_Tb_lH
     logical                                 :: get_FT_l,     get_FT_lH
     logical                                 :: get_asnow_l,  get_asnow_lH
+    logical                                 :: get_peat_lH
     type(grid_def_type)                     :: tile_grid_lH        
     
     integer, dimension(N_obs_param)         :: ind_obsparam2Tbspecies
@@ -1143,6 +1147,8 @@ contains
     real,    dimension(:,:),   allocatable  :: FT_lH,     asnow_lH
     
     real,    dimension(:,:,:), allocatable  :: Tb_h_lH, Tb_v_lH
+
+    real,    dimension(:),     allocatable  :: peat_lH
     
     real,    dimension(:,:,:), pointer      :: tile_data_lH => null()
     
@@ -1217,6 +1223,7 @@ contains
     get_FT_lH    = .false.
     get_Tb_lH    = .false.
     get_asnow_lH = .false.
+    get_peat_lH  = .false.
 
     ! loop through obs_param b/c obs on local proc may not reflect all obs
     
@@ -1236,6 +1243,8 @@ contains
           get_sfmc_l   = .true.
           get_sfmc_lH  = .true.
           get_tsurf_l  = .true.    ! needed for model-based QC
+
+          if (trim(obs_param(i)%varname)=='sfds' .and. beforeEnKFupdate)  get_peat_lH = .true.
 
        case ('rzmc')
           
@@ -1541,13 +1550,45 @@ contains
     
     ! determine N_catlH and tile_coord_lH  
 
-    N_fields = 0  ! set to zero temporarily, not yet needed
-    ! move up the allocation. The input should be allocated in debug mode although it is not used
-    ! allocate and assemble tile_data_l
-    allocate(tile_data_l(0,0,0))  ! for debugging to pass  
-    call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
-         tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
-         N_catlH, tile_coord_lH=tile_coord_lH )
+    if (get_peat_lH) then
+
+       if (size(mwRTM_param)/=N_catl) then
+          err_msg = 'ASCAT peatland QC requires mwRTM soil class parameters'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+
+       ! communicate static peatland indicator together with tile coordinates
+
+       N_fields = 1
+
+       allocate(tile_data_l(N_catl,N_fields,1))
+
+       tile_data_l(:,1,1) = 0.
+
+       where (mwRTM_param(:)%soilcls==peat_soilcls)  tile_data_l(:,1,1) = 1.
+       where (mwRTM_param(:)%soilcls<1)              tile_data_l(:,1,1) = nodata_generic
+
+       call get_tiles_in_halo( N_catl, N_fields, 1, tile_data_l, tile_coord_l,  &
+            tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                    &
+            N_catlH, tile_data_lH=tile_data_lH, tile_coord_lH=tile_coord_lH )
+
+       allocate(peat_lH(N_catlH))
+
+       peat_lH = tile_data_lH(:,1,1)
+
+       if (associated(tile_data_lH))  deallocate(tile_data_lH)
+
+    else
+
+       N_fields = 0  ! set to zero temporarily, not yet needed
+       ! move up the allocation. The input should be allocated in debug mode although it is not used
+       ! allocate and assemble tile_data_l
+       allocate(tile_data_l(0,0,0))  ! for debugging to pass
+       call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
+            tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
+            N_catlH, tile_coord_lH=tile_coord_lH )
+
+    end if
     
     if (get_sfmc_lH)   allocate(sfmc_lH( N_catlH,                     N_ens))
     if (get_rzmc_lH)   allocate(rzmc_lH( N_catlH,                     N_ens))
@@ -1757,6 +1798,22 @@ contains
              tmp_weights(1:N_tmp) = tmp_wFOV(1:N_tmp) * tile_coord_lH(ind_tmp(1:N_tmp))%area
              
           end if
+
+          ! screen ASCAT observations if too much of the FOV is peatland
+
+          tmpPeat = .false.
+
+          if (get_peat_lH .and. trim(obs_param(this_species)%varname)=='sfds') then
+
+             tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
+
+             call tile2obs_helper(                                               &
+                  N_tmp, tmp_weights(1:N_tmp), tmp_data(1:N_tmp), tmp_peatfrac)
+
+             tmpPeat = ( abs(tmp_peatfrac-nodata_generic)<nodata_tol_generic .or. &
+                  tmp_peatfrac>=ASCAT_max_peat_frac )
+
+          end if
           
           do n_e=1,N_ens
              
@@ -1768,8 +1825,10 @@ contains
              select case (trim(obs_param(this_species)%varname))
                 
              case ('sfmc', 'sfds')
-                
-                tmp_data(1:N_tmp)    = sfmc_lH(  ind_tmp(1:N_tmp), n_e )
+
+                tmp_data(1:N_tmp) = sfmc_lH( ind_tmp(1:N_tmp), n_e )
+
+                if (tmpPeat)  tmp_data(1:N_tmp) = nodata_generic
                 
              case ('rzmc') 
                 
@@ -1957,6 +2016,8 @@ contains
     if (allocated(tmp_wFOV))                 deallocate(tmp_wFOV)   ! fix memory leak
     if (allocated(tmp_weights))              deallocate(tmp_weights)
     if (allocated(tmp_data))                 deallocate(tmp_data)
+
+    if (allocated(peat_lH))                  deallocate(peat_lH)
     
     if (associated(tile_coord_lH))           deallocate(tile_coord_lH)
     
