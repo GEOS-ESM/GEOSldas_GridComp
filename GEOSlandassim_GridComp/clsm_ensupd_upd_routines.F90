@@ -583,6 +583,15 @@ contains
              need_mwRTM_param = .true.
              
           end if
+
+          ! ASCAT peatland FOV screening needs mwRTM soil class (soilcls)
+
+          if ( (trim(obs_param(i)%varname) == 'sfds')  .and.               &
+               (     obs_param(i)%getinnov          )         )   then
+
+             need_mwRTM_param = .true.
+
+          end if
           
        end do
        
@@ -1069,6 +1078,8 @@ contains
     real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
     real,    parameter                      :: ASCAT_max_peat_frac   = 0.10 ! [-]
 
+    ! soil class 253 = peat in GEOS bcs soil parameter tables (via cat_param%soilcls30);
+    ! not the same test as PEATCLSM_POROS_THRESHOLD, which identifies PEATCLSM physics
     integer, parameter                      :: peat_soilcls          = 253  ! [-]
 
     integer                                 :: N_catlH, n_e, i, j, k, N_tmp, ii, jj
@@ -1085,6 +1096,7 @@ contains
     real, dimension(numprocs)               :: xhalo, yhalo, tmplatvec, tmprx
     
     real                                    :: tmpreal, tmp_stemp, tmp_fraccell, tmp_peatfrac
+    real                                    :: tmpsum_w
 
     logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
 
@@ -1553,7 +1565,7 @@ contains
     if (get_peat_lH) then
 
        if (size(mwRTM_param)/=N_catl) then
-          err_msg = 'ASCAT peatland QC requires mwRTM soil class parameters'
+          err_msg = 'ASCAT peatland QC needs mwRTM soilcls; set LANDASSIM_INTERNAL_RESTART_FILE'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
 
@@ -1807,11 +1819,27 @@ contains
 
              tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
 
-             call tile2obs_helper(                                               &
-                  N_tmp, tmp_weights(1:N_tmp), tmp_data(1:N_tmp), tmp_peatfrac)
+             ! FOV- and area-weighted peat fraction over tiles with a valid soil class.
+             ! mwRTM_param_nodata_check() can mark soilcls no-data when unrelated mwRTM
+             ! fields are missing, so do not let one missing tile poison the full FOV.
 
-             tmpPeat = ( abs(tmp_peatfrac-nodata_generic)<nodata_tol_generic .or. &
-                  tmp_peatfrac>=ASCAT_max_peat_frac )
+             tmpsum_w = sum( merge( tmp_weights(1:N_tmp), 0.,                    &
+                  abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )
+
+             if (tmpsum_w > 0.) then
+
+                tmp_peatfrac = sum( merge(                                       &
+                     tmp_weights(1:N_tmp)*tmp_data(1:N_tmp), 0.,                 &
+                     abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )&
+                     / tmpsum_w
+
+                tmpPeat = (tmp_peatfrac>=ASCAT_max_peat_frac)
+
+             else
+
+                tmpPeat = .true.   ! no valid soil class anywhere in FOV
+
+             end if
 
           end if
           
