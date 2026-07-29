@@ -191,7 +191,7 @@ contains
     real,                   dimension(N_catl), intent(in) :: lai
     type(cat_param_type),   dimension(N_catl), intent(in) :: cat_param
 
-    type(mwRTM_param_type), dimension(N_catl), intent(in) :: mwRTM_param
+    type(mwRTM_param_type), dimension(:), intent(in) :: mwRTM_param
 
     ! grid and tile coordinate variables
 
