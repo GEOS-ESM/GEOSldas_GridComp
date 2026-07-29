@@ -1131,6 +1131,7 @@ contains
     character(len=300)   :: fname_tpl
     character(len=ESMF_MAXSTR) :: ensid_string 
     integer              :: nymd, nhms, yy, mm, dd, h, m, s
+    logical              :: mwRTM_restart_available
 
     !! from LDASsa
     
@@ -1368,6 +1369,8 @@ contains
     do i=1,land_nt_local
        rf2l( l2rf(i) ) = i
     end do
+
+    mwRTM_restart_available = mwRTM
     
     if (root_proc) then
        call read_ens_upd_inputs(                     &
@@ -1388,6 +1391,11 @@ contains
             out_smapL4SMaup,                         &
             N_obsbias_max                            &
             )
+
+       if (mwRTM .and. .not. mwRTM_restart_available) then
+          err_msg = 'mwRTM parameters are required; set LANDASSIM_INTERNAL_RESTART_FILE'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
 
        if (out_smapL4SMaup) then
           

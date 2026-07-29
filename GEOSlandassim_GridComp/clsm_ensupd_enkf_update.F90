@@ -2089,7 +2089,7 @@ contains
     type(cat_param_type),   dimension(N_catl),        intent(in)    :: cat_param
     type(cat_progn_type),   dimension(N_catl,N_ens),  intent(in)    :: cat_progn
 
-    type(mwRTM_param_type), dimension(N_catl),        intent(in)    :: mwRTM_param
+    type(mwRTM_param_type), dimension(:),             intent(in)    :: mwRTM_param
 
 
     type(obs_type),         dimension(:),      pointer              :: Observations_l   ! inout
