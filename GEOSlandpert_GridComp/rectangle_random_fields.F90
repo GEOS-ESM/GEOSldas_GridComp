@@ -726,29 +726,6 @@ contains
   
 end module rectangle_random_fieldsMod
 
-module StringRectangleRandom_fieldsMapMod
-   use rectangle_random_fieldsMod
-
-#include "types/key_deferredLengthString.inc"
-#define _value type (rectangle_random_fields)
-#define _value_equal_defined
-
-#define _map StringRectangleRandom_fieldsMap
-#define _iterator StringRectangleRandom_fieldsMapIterator
-
-#define _alt
-
-#include "templates/map.inc"
-
-#undef _alt
-#undef _iterator
-#undef _map
-#undef _value
-#undef _key
-#undef _value_equal_defined
-end module StringRectangleRandom_fieldsMapMod
-
-
 #ifdef TEST_RFG2D
 
 !program test_rfg2d

@@ -35,3 +35,34 @@ module abstract_random_fieldsMod
     end subroutine finalize_random_field_interface
   end interface
 end module abstract_random_fieldsMod
+
+module StringAbstractRandom_fieldsMapMod
+  use abstract_random_fieldsMod
+
+#include "types/key_deferredLengthString.inc"
+#define _value class (abstract_random_fields)
+#define _value_allocatable
+#define _value_equal_defined
+
+! Work around Intel assignment handling for polymorphic map components.
+#define _ASSIGN(dest,src) allocate(dest%key,source=src%key); if(allocated(src%value)) allocate(dest%value,source=src%value)
+#define _MOVE(dest,src) call move_alloc(from=src%key,to=dest%key); if (allocated(src%value)) call move_alloc(from=src%value,to=dest%value)
+#define _FREE(x) deallocate(x%key,x%value)
+
+#define _map StringAbstractRandom_fieldsMap
+#define _iterator StringAbstractRandom_fieldsMapIterator
+#define _alt
+
+#include "templates/map.inc"
+
+#undef _alt
+#undef _iterator
+#undef _map
+#undef _value
+#undef _value_allocatable
+#undef _key
+#undef _value_equal_defined
+#undef _ASSIGN
+#undef _MOVE
+#undef _FREE
+end module StringAbstractRandom_fieldsMapMod

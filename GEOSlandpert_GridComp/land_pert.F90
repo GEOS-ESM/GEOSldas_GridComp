@@ -38,7 +38,8 @@ module land_pert_routines
        init_randseed
 
   use rectangle_random_fieldsMod
-  use StringRectangleRandom_fieldsMapMod
+  use StringAbstractRandom_fieldsMapMod
+  use abstract_random_fieldsMod, only: abstract_random_fields
 
   use nr_jacobi,                        ONLY:     &
        jacobi
@@ -68,7 +69,7 @@ module land_pert_routines
 
   ! **********************************************************************
 
-  type(StringRectangleRandom_fieldsMap) :: random_fieldsMap
+  type(StringAbstractRandom_fieldsMap) :: random_fieldsMap
 
 contains
   
@@ -467,7 +468,7 @@ contains
 
     integer :: tmpInt, xstart, xend, ystart, yend
 
-    type(rectangle_random_fields), pointer :: rf
+    class(abstract_random_fields), pointer :: rf
 
     type(ESMF_VM) :: vm
     integer :: mpicomm, status  
@@ -511,10 +512,13 @@ contains
         rf => find_rf(pert_param(m), pert_grid_f)
 #endif
 
-       xStride = rf%xStride
-       yStride = rf%yStride
-       rdlon   = rf%rdlon
-       rdlat   = rf%rdlat
+       select type (rectangle => rf)
+       class is (rectangle_random_fields)
+          xStride = rectangle%xStride
+          yStride = rectangle%yStride
+          rdlon   = rectangle%rdlon
+          rdlat   = rectangle%rdlat
+       end select
 
        ptr2rfield  => rfield( 1:pert_grid_f%N_lon:xStride,1:pert_grid_f%N_lat:yStride)
        ptr2rfield2 => rfield2(1:pert_grid_f%N_lon:xStride,1:pert_grid_f%N_lat:yStride)
@@ -1218,14 +1222,14 @@ contains
 
   function find_rf(pert_param, pert_grid_f, comm) result (rf)
 
-    type(rectangle_random_fields), pointer    :: rf
+     class(abstract_random_fields), pointer   :: rf
     type(pert_param_type),         intent(in) :: pert_param
     type(grid_def_type),           intent(in) :: pert_grid_f
     integer,             optional, intent(in) :: comm
     
     ! local variables
     
-    type(StringRectangleRandom_fieldsMapIterator) :: iter
+     type(StringAbstractRandom_fieldsMapIterator) :: iter
     character(len=:), allocatable :: id_string
     type(rectangle_random_fields) :: rf_tmp
 
@@ -1248,8 +1252,8 @@ contains
   
   subroutine clear_rf()
     
-    type(StringRectangleRandom_fieldsMapIterator)          :: iter
-    type(rectangle_random_fields),                  pointer :: rf_ptr
+    type(StringAbstractRandom_fieldsMapIterator)          :: iter
+     class(abstract_random_fields),                  pointer :: rf_ptr
     
     iter = random_fieldsMap%begin()
     do while (iter /= random_fieldsMap%end())
