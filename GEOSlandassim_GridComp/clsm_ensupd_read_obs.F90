@@ -7356,6 +7356,7 @@ contains
     real,    intent(out), dimension(N_catd) :: SMAP_lon,  SMAP_lat
     real*8,  intent(out), dimension(N_catd) :: SMAP_time                 ! J2000 seconds
 
+    real,    dimension(N_catd) :: SMAP_error
     ! --------------------------------------
 
     ! local variables
@@ -7381,6 +7382,7 @@ contains
     
     real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
     real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
+    real,      parameter :: Tb_nedt_base  = 1.2 ! max allowed Tb error
 
     real,      parameter :: max_std_tb_fore_minus_aft = 20.  ! max std-dev L1C[E] fore-minus-aft Tb diffs
 
@@ -7437,8 +7439,10 @@ contains
 
     character(100)       :: dset_name_lon,    dset_name_lat
     character(100)       :: dset_name_col,    dset_name_row
-    character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1
-    character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2
+    character(100)       :: dset_name_time_1, dset_name_tb_1
+    character(100)       :: dset_name_time_2, dset_name_tb_2
+    character(100)       :: dset_name_tb_qual_flag_1, dset_name_tb_error_1
+    character(100)       :: dset_name_tb_qual_flag_2, dset_name_tb_error_2
 
     character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
@@ -7458,6 +7462,9 @@ contains
 
     integer,        dimension(:),     allocatable  :: tmp_tb_qual_flag_1
     integer,        dimension(:),     allocatable  :: tmp_tb_qual_flag_2
+
+    real,           dimension(:),     allocatable  :: tmp_tb_error_1
+    real,           dimension(:),     allocatable  :: tmp_tb_error_2
     
     integer,        dimension(:),     allocatable  :: tmp_tile_num
 
@@ -7637,6 +7644,9 @@ contains
           dset_name_tb_qual_flag_1 = '/Global_Projection/cell_tb_qual_flag_h_fore'
           dset_name_tb_qual_flag_2 = '/Global_Projection/cell_tb_qual_flag_h_aft'
           
+          dset_name_tb_error_1     = '/Global_Projection/cell_tb_error_h_fore'
+          dset_name_tb_error_2     = '/Global_Projection/cell_tb_error_h_aft'
+          
        else
           
           dset_name_tb_1           = '/Global_Projection/cell_tb_v_fore'
@@ -7645,6 +7655,9 @@ contains
           dset_name_tb_qual_flag_1 = '/Global_Projection/cell_tb_qual_flag_v_fore'
           dset_name_tb_qual_flag_2 = '/Global_Projection/cell_tb_qual_flag_v_aft'
           
+          dset_name_tb_error_1     = '/Global_Projection/cell_tb_error_v_fore'
+          dset_name_tb_error_2     = '/Global_Projection/cell_tb_error_v_aft'
+ 
        end if
        
     else  
@@ -7812,6 +7825,8 @@ contains
        SMAP_lat  = 0.
        SMAP_time = 0.0D0
 
+       SMAP_error = 0.
+
        N_obs_in_tile  = 0  ! for normalization after mapping to tile and super-obs
        
        ! loop through files
@@ -7941,6 +7956,20 @@ contains
 
           call h5r%readDataset(tmp_tb_qual_flag_1)
 
+          ! TB_ERROR_1: query dataset, check size, allocate space, read data
+
+          if (tmp_debug .and. logit) write(logunit,*) trim(dset_name_tb_error_1)
+
+          call h5r%queryDataset(dset_name_tb_error_1, dset_rank, dset_size)
+
+          if (N_obs_tmp/=dset_size(1)) then
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, tmp_err_msg)
+          end if
+          
+          allocate(tmp_tb_error_1(N_obs_tmp))
+
+          call h5r%readDataset(tmp_tb_error_1)
+
           ! for L1C_TB or L1C_TB_E files also read "aft"
 
           if (L1C_files .or. L1CE_files) then
@@ -7989,6 +8018,20 @@ contains
              allocate(tmp_tb_qual_flag_2(N_obs_tmp))
              
              call h5r%readDataset(tmp_tb_qual_flag_2)
+
+             ! TB_ERROR_2: query dataset, check size, allocate space, read data
+
+             if (tmp_debug .and. logit) write(logunit,*) trim(dset_name_tb_error_2)
+
+             call h5r%queryDataset(dset_name_tb_error_2, dset_rank, dset_size)
+
+             if (N_obs_tmp/=dset_size(1)) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, tmp_err_msg)
+             end if
+
+             allocate(tmp_tb_error_2(N_obs_tmp))
+
+             call h5r%readDataset(tmp_tb_error_2)
 
           end if
           
@@ -8073,12 +8116,16 @@ contains
                    tmp_tb_1(  nn) = 0.5  *( tmp_tb_1(  nn) + tmp_tb_2(  nn) )
                    tmp_time_1(nn) = 0.5D0*( tmp_time_1(nn) + tmp_time_2(nn) ) 
                    
+                   tmp_tb_error_1(  nn) = max( tmp_tb_error_1(  nn), tmp_tb_error_2(  nn) )
+
                 elseif (keep_data_2)                   then
 
                    ! put "aft" data into "tb_1", "tmp_time_1"
                    
                    tmp_tb_1(  nn) = tmp_tb_2(  nn)
                    tmp_time_1(nn) = tmp_time_2(nn)
+
+                   tmp_tb_error_1(  nn) = tmp_tb_error_2(  nn)
 
                 else
 
@@ -8102,6 +8149,7 @@ contains
                    tmp_tb_1(  jj) = tmp_tb_1(  nn)
                    tmp_time_1(jj) = tmp_time_1(nn)
                    
+                   tmp_tb_error_1(  jj) = tmp_tb_error_1(  nn)
                 end if
                 
              end do
@@ -8272,6 +8320,8 @@ contains
                    SMAP_lat( ind_tile) = SMAP_lat( ind_tile) + tmp_lat(   ii)
                    SMAP_time(ind_tile) = SMAP_time(ind_tile) + tmp_time_1(ii)
                    
+                   SMAP_error(ind_tile) = SMAP_error(ind_tile) + tmp_tb_error_1(  ii)
+
                    N_obs_in_tile(ind_tile) = N_obs_in_tile(ind_tile) + 1
                    
                 end if
@@ -8294,6 +8344,8 @@ contains
           if (allocated(tmp_tb_2          )) deallocate(tmp_tb_2          )
           if (allocated(tmp_tb_qual_flag_1)) deallocate(tmp_tb_qual_flag_1)
           if (allocated(tmp_tb_qual_flag_2)) deallocate(tmp_tb_qual_flag_2)
+          if (allocated(tmp_tb_error_1)) deallocate(tmp_tb_error_1)
+          if (allocated(tmp_tb_error_2)) deallocate(tmp_tb_error_2)
           
        end do  ! kk=1,N_fnames
           
@@ -8310,6 +8362,7 @@ contains
              SMAP_lat( ii) = SMAP_lat( ii)/     tmpreal
              SMAP_time(ii) = SMAP_time(ii)/real(tmpreal,kind(0.0D0))
              
+             SMAP_error(ii) = SMAP_error(ii)/     tmpreal
           elseif (N_obs_in_tile(ii)==0) then
              
              SMAP_data(ii) =      this_obs_param%nodata
@@ -8317,6 +8370,7 @@ contains
              SMAP_lat( ii) =      this_obs_param%nodata
              SMAP_time(ii) = real(this_obs_param%nodata,kind(0.0D0))
              
+             SMAP_error(ii) =      this_obs_param%nodata
           end if
           
        end do
@@ -8326,7 +8380,7 @@ contains
        ! set observation error standard deviation
        
        do ii=1,N_catd
-          std_SMAP_data(ii) = this_obs_param%errstd
+          std_SMAP_data(ii) = this_obs_param%errstd * min(20.,max(1.,exp(20.*(SMAP_error(ii)-tb_nedt_base))))
        end do
        
        ! --------------------------------
