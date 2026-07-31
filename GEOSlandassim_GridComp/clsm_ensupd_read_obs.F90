@@ -11109,7 +11109,7 @@ contains
     !    m_max( x, y)          [dB]  model cygl1scal maximum
     !
     !  required global attributes:
-    !    gridtype, schema_version, species_id, species_description,
+    !    gridtype, schema_version, species_description,
     !    source_ind_base, source_i_offg, source_j_offg, ndata_min,
     !    std_epsilon
     !
@@ -11152,7 +11152,6 @@ contains
     integer :: o_mean_varid, o_std_varid, m_mean_varid, m_std_varid
     integer :: n_data_varid, m_min_varid, m_max_varid
     integer :: N_pentad, N_x, N_y
-    integer :: species_id
     integer :: source_ind_base, source_i_offg, source_j_offg
     integer, dimension(3) :: start, icount
     integer, dimension(3) :: xyp_dimids
@@ -11203,8 +11202,6 @@ contains
          Iam, 'read schema_version')
     call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'gridtype', gridtype), &
          Iam, 'read gridtype')
-    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'species_id', species_id), &
-         Iam, 'read species_id')
     call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'species_description', species_description), &
          Iam, 'read species_description')
     call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'source_ind_base', source_ind_base), &
@@ -11234,14 +11231,9 @@ contains
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
-    if (species_id /= this_obs_param%species) then
-       err_msg = 'CYGNSS L1 scaling species_id does not match obs species'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
-
     if (trim(species_description) /= trim(this_obs_param%descr)) then
        err_msg = 'CYGNSS L1 scaling species_description does not match obs species descriptor'
-       call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
     call read_obs_nc_check(nf90_inq_dimid(ncid, 'pentad', pentad_dimid), Iam, 'inq pentad dim')
