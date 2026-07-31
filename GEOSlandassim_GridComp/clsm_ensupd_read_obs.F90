@@ -111,6 +111,43 @@ contains
 
   ! *****************************************************************
 
+  subroutine read_obs_nc_check_var_dims(ncid, varid, expected_dimids, caller, varname)
+
+    use netcdf
+    implicit none
+
+    integer,                  intent(in) :: ncid, varid
+    integer, dimension(:),    intent(in) :: expected_dimids
+    character(*),             intent(in) :: caller
+    character(*),             intent(in) :: varname
+
+    integer :: i, ndims
+    integer, dimension(NF90_MAX_VAR_DIMS) :: dimids
+
+    character(len=400) :: err_msg
+
+    call read_obs_nc_check(nf90_inquire_variable(ncid, varid, ndims=ndims, dimids=dimids), &
+         caller, 'inquire ' // trim(varname))
+
+    if (ndims /= size(expected_dimids)) then
+       err_msg = trim(varname) // ' has unexpected number of dimensions'
+       call ldas_abort(LDAS_GENERIC_ERROR, caller, err_msg)
+    end if
+
+    do i=1,ndims
+
+       if (dimids(i) /= expected_dimids(i)) then
+          err_msg = trim(varname) // ' has unexpected dimension order'
+          call ldas_abort(LDAS_GENERIC_ERROR, caller, err_msg)
+       end if
+
+    end do
+
+  end subroutine read_obs_nc_check_var_dims
+
+
+  ! *****************************************************************
+
   subroutine read_ae_l2_sm_hdf( &
        N_files, fnames, N_data, lon, lat, ae_l2_sm, ease_col, ease_row )
  
@@ -10159,6 +10196,18 @@ contains
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
             tmp_time)
+
+       ! scale observations to model climatology
+
+       if (this_obs_param%scale .and. found_obs) then
+
+          scaled_obs = .true.
+
+          call scale_obs_cygl1scal_zscore( N_catd, tile_coord,        &
+               tile_grid_d, date_time, this_obs_param,                &
+               tmp_obs, tmp_std_obs )
+
+       end if
        
     case ('isccp_tskin_gswp2_v1')
        
@@ -11032,6 +11081,357 @@ contains
     deallocate(sclprm_max_mod)    
     
   end subroutine scale_obs_sfmc_zscore
+
+  ! *****************************************************************
+
+  subroutine scale_obs_cygl1scal_zscore( N_catd, tile_coord, tile_grid_d, &
+       date_time, this_obs_param, tmp_obs, tmp_std_obs )
+
+    ! scale CYGNSS L1 scalar observations to model cygl1scal climatology via
+    ! standard-normal-deviate (zscore) scaling using owner-tile pentad stats
+    !
+    ! Scaling parameters are read from a NetCDF file with schema_version = 1.0.
+    ! The file is a dense global EASEv2_M36 owner grid, even for cropped
+    ! experiments:
+    !
+    !  dimensions:
+    !    pentad = 73
+    !    x      = 964
+    !    y      = 406
+    !
+    !  variables, shown here in Fortran NetCDF dimension order:
+    !    o_mean(x, y, pentad)  [dB]  raw observed_y_db mean
+    !    o_std( x, y, pentad)  [dB]  raw observed_y_db std-dev
+    !    m_mean(x, y, pentad)  [dB]  model cygl1scal forecast-equivalent mean
+    !    m_std( x, y, pentad)  [dB]  model cygl1scal forecast-equivalent std-dev
+    !    n_data(x, y, pentad)  [-]   number of paired O/F samples
+    !    m_min( x, y)          [dB]  model cygl1scal minimum
+    !    m_max( x, y)          [dB]  model cygl1scal maximum
+    !
+    !  required global attributes:
+    !    gridtype, schema_version, species_id, species_description,
+    !    source_ind_base, source_i_offg, source_j_offg, ndata_min,
+    !    std_epsilon
+    !
+    ! Runtime lookup uses tile_coord(i)%i_indg/j_indg.  For current M36 files,
+    ! source_ind_base = source_i_offg = source_j_offg = 0, so the Fortran array
+    ! subscripts are ii = tile_coord(i)%i_indg + 1 and jj = tile_coord(i)%j_indg + 1.
+
+    use netcdf
+    implicit none
+
+    integer, intent(in) :: N_catd
+
+    type(tile_coord_type), dimension(:), pointer :: tile_coord    ! input
+    type(grid_def_type), intent(in)              :: tile_grid_d
+
+    type(date_time_type), intent(in) :: date_time
+
+    type(obs_param_type), intent(in) :: this_obs_param
+
+    ! inout
+
+    real, intent(inout), dimension(N_catd) :: tmp_obs
+    real, intent(inout), dimension(N_catd) :: tmp_std_obs
+
+    ! -------------------
+
+    integer, parameter :: CYGNSS_L1_N_pentad_M36 = 73
+    integer, parameter :: CYGNSS_L1_N_x_M36      = 964
+    integer, parameter :: CYGNSS_L1_N_y_M36      = 406
+
+    real,    parameter :: no_data_stats = -9999.
+    real,    parameter :: tol           = 1e-2
+
+    character(300) :: fname
+    character(100) :: schema_version, gridtype, species_description
+
+    integer :: i, pp, ii, jj, i0, j0
+    integer :: ncid
+    integer :: pentad_dimid, x_dimid, y_dimid
+    integer :: o_mean_varid, o_std_varid, m_mean_varid, m_std_varid
+    integer :: n_data_varid, m_min_varid, m_max_varid
+    integer :: N_pentad, N_x, N_y
+    integer :: species_id
+    integer :: source_ind_base, source_i_offg, source_j_offg
+    integer, dimension(3) :: start, icount
+    integer, dimension(3) :: xyp_dimids
+    integer, dimension(2) :: xy_dimids
+    integer :: N_scale_in, N_scaled
+    integer :: N_reject_bounds, N_reject_NaN, N_reject_nodata
+    integer :: N_reject_std, N_reject_N_data, N_reject_minmax
+
+    logical :: file_exists
+
+    real :: tmpreal, obs_tol, std_epsilon, ndata_min
+
+    real, dimension(:,:), allocatable :: sclprm_mean_obs, sclprm_std_obs
+    real, dimension(:,:), allocatable :: sclprm_mean_mod, sclprm_std_mod
+    real, dimension(:,:), allocatable :: sclprm_N_data
+    real, dimension(:,:), allocatable :: sclprm_min_mod,  sclprm_max_mod
+
+    character(len=*), parameter :: Iam = ' scale_obs_cygl1scal_zscore'
+    character(len=400) :: err_msg
+
+    ! ------------------------------------------------------------------
+
+    ! Read scaling parameters from file
+
+    fname = trim(this_obs_param%scalepath) // '/' // &
+         trim(this_obs_param%scalename) // '.nc4'
+
+    if (logit) write (logunit,*)        'scaling obs species ', this_obs_param%species, ':'
+    if (logit) write (logunit,'(400A)') '  reading ', trim(fname)
+
+    inquire(file=fname, exist=file_exists)
+
+    if (.not. file_exists) then
+       err_msg = 'CYGNSS L1 scaling parameter file not found'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    pp = date_time%pentad
+    obs_tol = abs(this_obs_param%nodata*nodata_tolfrac_generic)
+
+    call read_obs_nc_check(nf90_open(fname, nf90_nowrite, ncid), Iam, 'open CYGNSS L1 scaling file')
+
+    schema_version     = ''
+    gridtype           = ''
+    species_description = ''
+
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'schema_version', schema_version), &
+         Iam, 'read schema_version')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'gridtype', gridtype), &
+         Iam, 'read gridtype')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'species_id', species_id), &
+         Iam, 'read species_id')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'species_description', species_description), &
+         Iam, 'read species_description')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'source_ind_base', source_ind_base), &
+         Iam, 'read source_ind_base')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'source_i_offg', source_i_offg), &
+         Iam, 'read source_i_offg')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'source_j_offg', source_j_offg), &
+         Iam, 'read source_j_offg')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'ndata_min', ndata_min), &
+         Iam, 'read ndata_min')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'std_epsilon', std_epsilon), &
+         Iam, 'read std_epsilon')
+
+    if (trim(schema_version) /= '1.0') then
+       err_msg = 'unexpected CYGNSS L1 scaling schema_version: ' // trim(schema_version)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (trim(gridtype) /= 'EASEv2_M36') then
+       err_msg = 'unexpected CYGNSS L1 scaling gridtype: ' // trim(gridtype)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (index(tile_grid_d%gridtype, 'EASEv2_M36') == 0) then
+       err_msg = 'CYGNSS L1 scaling gridtype does not match model tile grid ' // &
+            trim(tile_grid_d%gridtype)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (species_id /= this_obs_param%species) then
+       err_msg = 'CYGNSS L1 scaling species_id does not match obs species'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (trim(species_description) /= trim(this_obs_param%descr)) then
+       err_msg = 'CYGNSS L1 scaling species_description does not match obs species descriptor'
+       call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
+    end if
+
+    call read_obs_nc_check(nf90_inq_dimid(ncid, 'pentad', pentad_dimid), Iam, 'inq pentad dim')
+    call read_obs_nc_check(nf90_inq_dimid(ncid, 'x',      x_dimid),      Iam, 'inq x dim')
+    call read_obs_nc_check(nf90_inq_dimid(ncid, 'y',      y_dimid),      Iam, 'inq y dim')
+
+    call read_obs_nc_check(nf90_inquire_dimension(ncid, pentad_dimid, len=N_pentad), &
+         Iam, 'inquire pentad dim')
+    call read_obs_nc_check(nf90_inquire_dimension(ncid, x_dimid,      len=N_x), &
+         Iam, 'inquire x dim')
+    call read_obs_nc_check(nf90_inquire_dimension(ncid, y_dimid,      len=N_y), &
+         Iam, 'inquire y dim')
+
+    if (N_pentad /= CYGNSS_L1_N_pentad_M36 .or. &
+         N_x      /= CYGNSS_L1_N_x_M36      .or. &
+         N_y      /= CYGNSS_L1_N_y_M36) then
+       err_msg = 'unexpected CYGNSS L1 scaling dimensions for EASEv2_M36'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (pp < 1 .or. pp > N_pentad) then
+       err_msg = 'date_time%pentad out of range for CYGNSS L1 scaling file'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'o_mean', o_mean_varid), Iam, 'inq o_mean')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'o_std',  o_std_varid),  Iam, 'inq o_std')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'm_mean', m_mean_varid), Iam, 'inq m_mean')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'm_std',  m_std_varid),  Iam, 'inq m_std')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'n_data', n_data_varid), Iam, 'inq n_data')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'm_min',  m_min_varid),  Iam, 'inq m_min')
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'm_max',  m_max_varid),  Iam, 'inq m_max')
+
+    xyp_dimids = (/ x_dimid, y_dimid, pentad_dimid /)
+    xy_dimids  = (/ x_dimid, y_dimid /)
+
+    call read_obs_nc_check_var_dims(ncid, o_mean_varid, xyp_dimids, Iam, 'o_mean')
+    call read_obs_nc_check_var_dims(ncid, o_std_varid,  xyp_dimids, Iam, 'o_std')
+    call read_obs_nc_check_var_dims(ncid, m_mean_varid, xyp_dimids, Iam, 'm_mean')
+    call read_obs_nc_check_var_dims(ncid, m_std_varid,  xyp_dimids, Iam, 'm_std')
+    call read_obs_nc_check_var_dims(ncid, n_data_varid, xyp_dimids, Iam, 'n_data')
+    call read_obs_nc_check_var_dims(ncid, m_min_varid,  xy_dimids,  Iam, 'm_min')
+    call read_obs_nc_check_var_dims(ncid, m_max_varid,  xy_dimids,  Iam, 'm_max')
+
+    start  = (/ 1,   1,   pp /)
+    icount = (/ N_x, N_y, 1  /)
+
+    allocate(sclprm_mean_obs(N_x, N_y), sclprm_std_obs(N_x, N_y))
+    allocate(sclprm_mean_mod(N_x, N_y), sclprm_std_mod(N_x, N_y))
+    allocate(sclprm_N_data(  N_x, N_y))
+    allocate(sclprm_min_mod( N_x, N_y), sclprm_max_mod(N_x, N_y))
+
+    call read_obs_nc_check(nf90_get_var(ncid, o_mean_varid, sclprm_mean_obs, start, icount), &
+         Iam, 'read o_mean')
+    call read_obs_nc_check(nf90_get_var(ncid, o_std_varid,  sclprm_std_obs,  start, icount), &
+         Iam, 'read o_std')
+    call read_obs_nc_check(nf90_get_var(ncid, m_mean_varid, sclprm_mean_mod, start, icount), &
+         Iam, 'read m_mean')
+    call read_obs_nc_check(nf90_get_var(ncid, m_std_varid,  sclprm_std_mod,  start, icount), &
+         Iam, 'read m_std')
+    call read_obs_nc_check(nf90_get_var(ncid, n_data_varid, sclprm_N_data,   start, icount), &
+         Iam, 'read n_data')
+    call read_obs_nc_check(nf90_get_var(ncid, m_min_varid,  sclprm_min_mod), Iam, 'read m_min')
+    call read_obs_nc_check(nf90_get_var(ncid, m_max_varid,  sclprm_max_mod), Iam, 'read m_max')
+
+    call read_obs_nc_check(nf90_close(ncid), Iam, 'close CYGNSS L1 scaling file')
+
+    ! --------------------------------------------------------------
+
+    ! Scale observations by owner tile.  Negative values are valid dB values;
+    ! fail closed only for nodata/NaN obs or invalid climatological stats.
+
+    N_scale_in        = 0
+    N_scaled          = 0
+    N_reject_bounds   = 0
+    N_reject_NaN      = 0
+    N_reject_nodata   = 0
+    N_reject_std      = 0
+    N_reject_N_data   = 0
+    N_reject_minmax   = 0
+
+    do i=1,N_catd
+
+       if (tmp_obs(i) == tmp_obs(i) .and. &
+            abs(tmp_obs(i)-this_obs_param%nodata) > obs_tol) then
+
+          N_scale_in = N_scale_in + 1
+
+          ! Convert from global owner-tile coordinates to the file's
+          ! zero-based x/y coordinate variables, then to Fortran subscripts.
+
+          i0 = tile_coord(i)%i_indg - source_i_offg - source_ind_base
+          j0 = tile_coord(i)%j_indg - source_j_offg - source_ind_base
+
+          ii = i0 + 1
+          jj = j0 + 1
+
+          if (ii < 1 .or. ii > N_x .or. jj < 1 .or. jj > N_y) then
+
+             tmp_obs(i) = this_obs_param%nodata
+             tmp_std_obs(i) = this_obs_param%nodata
+             N_reject_bounds = N_reject_bounds + 1
+
+          elseif ( sclprm_mean_obs(ii, jj) /= sclprm_mean_obs(ii, jj) .or. &   ! true if NaN
+                   sclprm_mean_mod(ii, jj) /= sclprm_mean_mod(ii, jj) .or. &   ! true if NaN
+                   sclprm_std_obs( ii, jj) /= sclprm_std_obs( ii, jj) .or. &   ! true if NaN
+                   sclprm_std_mod( ii, jj) /= sclprm_std_mod( ii, jj) .or. &   ! true if NaN
+                   sclprm_N_data(  ii, jj) /= sclprm_N_data(  ii, jj) .or. &   ! true if NaN
+                   sclprm_min_mod( ii, jj) /= sclprm_min_mod( ii, jj) .or. &   ! true if NaN
+                   sclprm_max_mod( ii, jj) /= sclprm_max_mod( ii, jj) ) then
+
+             tmp_obs(i) = this_obs_param%nodata
+             tmp_std_obs(i) = this_obs_param%nodata
+             N_reject_NaN = N_reject_NaN + 1
+
+          elseif ( abs(sclprm_mean_obs(ii, jj)-no_data_stats) <= tol .or. &
+                   abs(sclprm_mean_mod(ii, jj)-no_data_stats) <= tol .or. &
+                   abs(sclprm_std_obs( ii, jj)-no_data_stats) <= tol .or. &
+                   abs(sclprm_std_mod( ii, jj)-no_data_stats) <= tol .or. &
+                   abs(sclprm_N_data(  ii, jj)-no_data_stats) <= tol .or. &
+                   abs(sclprm_min_mod( ii, jj)-no_data_stats) <= tol .or. &
+                   abs(sclprm_max_mod( ii, jj)-no_data_stats) <= tol ) then
+
+             tmp_obs(i) = this_obs_param%nodata
+             tmp_std_obs(i) = this_obs_param%nodata
+             N_reject_nodata = N_reject_nodata + 1
+
+          elseif ( sclprm_std_obs(ii, jj) <= std_epsilon .or. &
+                   sclprm_std_mod(ii, jj) <= std_epsilon ) then
+
+             tmp_obs(i) = this_obs_param%nodata
+             tmp_std_obs(i) = this_obs_param%nodata
+             N_reject_std = N_reject_std + 1
+
+          elseif (sclprm_N_data(ii, jj) < ndata_min) then
+
+             tmp_obs(i) = this_obs_param%nodata
+             tmp_std_obs(i) = this_obs_param%nodata
+             N_reject_N_data = N_reject_N_data + 1
+
+          elseif (sclprm_min_mod(ii, jj) > sclprm_max_mod(ii, jj)) then
+
+             tmp_obs(i) = this_obs_param%nodata
+             tmp_std_obs(i) = this_obs_param%nodata
+             N_reject_minmax = N_reject_minmax + 1
+
+          else
+
+             tmpreal = sclprm_std_mod(ii, jj)/sclprm_std_obs(ii, jj)
+
+             tmp_obs(i) = sclprm_mean_mod(ii, jj)                         &
+                  + tmpreal*(tmp_obs(i)-sclprm_mean_obs(ii, jj))
+
+             tmp_obs(i) = max(sclprm_min_mod(ii, jj),                     &
+                  min(sclprm_max_mod(ii, jj), tmp_obs(i)))
+
+             tmp_std_obs(i) = tmpreal*tmp_std_obs(i)
+             N_scaled = N_scaled + 1
+
+          end if
+
+       else
+
+          tmp_obs(i) = this_obs_param%nodata
+          tmp_std_obs(i) = this_obs_param%nodata
+
+       end if
+
+    end do
+
+    if (logit) then
+       write (logunit,*) 'CYGNSS L1 scaling obs input: ', N_scale_in
+       write (logunit,*) 'CYGNSS L1 scaling obs scaled: ', N_scaled
+       write (logunit,*) 'CYGNSS L1 scaling obs rejected out-of-grid: ', N_reject_bounds
+       write (logunit,*) 'CYGNSS L1 scaling obs rejected NaN stats: ', N_reject_NaN
+       write (logunit,*) 'CYGNSS L1 scaling obs rejected nodata stats: ', N_reject_nodata
+       write (logunit,*) 'CYGNSS L1 scaling obs rejected std threshold: ', N_reject_std
+       write (logunit,*) 'CYGNSS L1 scaling obs rejected n_data threshold: ', N_reject_N_data
+       write (logunit,*) 'CYGNSS L1 scaling obs rejected min/max: ', N_reject_minmax
+    end if
+
+    deallocate(sclprm_mean_obs)
+    deallocate(sclprm_std_obs)
+    deallocate(sclprm_mean_mod)
+    deallocate(sclprm_std_mod)
+    deallocate(sclprm_N_data)
+    deallocate(sclprm_min_mod)
+    deallocate(sclprm_max_mod)
+
+  end subroutine scale_obs_cygl1scal_zscore
   
   ! ********************************************************************************
   
