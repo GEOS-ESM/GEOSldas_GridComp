@@ -60,7 +60,7 @@ module rectangle_random_fieldsMod
    public :: rectangle_random_fields_id
 
    real, parameter :: TWO_PI = 2.*3.14159265
-  real, parameter :: SQRT2 = sqrt(2.0)
+   real, parameter :: SQRT2 = sqrt(2.0)
   
    type, public, extends(abstract_random_fields) :: rectangle_random_fields
      private

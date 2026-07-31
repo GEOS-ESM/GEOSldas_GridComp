@@ -38,6 +38,7 @@ module land_pert_routines
        init_randseed
 
   use rectangle_random_fieldsMod
+  use sphere_random_fields_mod, only: sphere_random_fields, sphere_random_fields_id
   use StringAbstractRandom_fieldsMapMod
   use abstract_random_fieldsMod, only: abstract_random_fields
 
@@ -507,18 +508,26 @@ contains
 
        ! initialize instance rf and get its grid parameters
 #ifdef MKL_AVAILABLE
-        rf => find_rf(pert_param(m), pert_grid_f, comm=mpicomm)
+       rf => find_rf(pert_param(m), pert_grid_f, comm=mpicomm)
 #else
-        rf => find_rf(pert_param(m), pert_grid_f)
+       rf => find_rf(pert_param(m), pert_grid_f)
 #endif
 
-       select type (rectangle => rf)
-       class is (rectangle_random_fields)
-          xStride = rectangle%xStride
-          yStride = rectangle%yStride
-          rdlon   = rectangle%rdlon
-          rdlat   = rectangle%rdlat
-       end select
+       if (pert_param(m)%use_sphere_pert) then
+          ! Sphere fields are generated directly on the fine lat-lon grid.
+          xStride = 1
+          yStride = 1
+          rdlon   = pert_grid_f%dlon
+          rdlat   = pert_grid_f%dlat
+       else
+          select type (rectangle => rf)
+          class is (rectangle_random_fields)
+             xStride = rectangle%xStride
+             yStride = rectangle%yStride
+             rdlon   = rectangle%rdlon
+             rdlat   = rectangle%rdlat
+          end select
+       end if
 
        ptr2rfield  => rfield( 1:pert_grid_f%N_lon:xStride,1:pert_grid_f%N_lat:yStride)
        ptr2rfield2 => rfield2(1:pert_grid_f%N_lon:xStride,1:pert_grid_f%N_lat:yStride)
@@ -1222,27 +1231,41 @@ contains
 
   function find_rf(pert_param, pert_grid_f, comm) result (rf)
 
-     class(abstract_random_fields), pointer   :: rf
+    class(abstract_random_fields), pointer   :: rf
     type(pert_param_type),         intent(in) :: pert_param
     type(grid_def_type),           intent(in) :: pert_grid_f
     integer,             optional, intent(in) :: comm
     
     ! local variables
     
-     type(StringAbstractRandom_fieldsMapIterator) :: iter
+    type(StringAbstractRandom_fieldsMapIterator) :: iter
     character(len=:), allocatable :: id_string
     type(rectangle_random_fields) :: rf_tmp
+    type(sphere_random_fields) :: sf_tmp
 
-    id_string = rectangle_random_fields_id(pert_param, pert_grid_f)
+    if (pert_param%use_sphere_pert) then
+       id_string = sphere_random_fields_id(pert_param, pert_grid_f)
+    else
+       id_string = rectangle_random_fields_id(pert_param, pert_grid_f)
+    end if
     iter = random_fieldsMap%find(id_string)
     if (iter == random_fieldsMap%end() ) then
-       if (present(comm)) then
-          rf_tmp = rectangle_random_fields(pert_param, pert_grid_f, comm=comm)
+       if (pert_param%use_sphere_pert) then
+          if (present(comm)) then
+             sf_tmp = sphere_random_fields(pert_param, pert_grid_f, comm=comm)
+          else
+             sf_tmp = sphere_random_fields(pert_param, pert_grid_f)
+          end if
+          call random_fieldsMap%insert(id_string, sf_tmp)
        else
-          rf_tmp = rectangle_random_fields(pert_param, pert_grid_f)
+          if (present(comm)) then
+             rf_tmp = rectangle_random_fields(pert_param, pert_grid_f, comm=comm)
+          else
+             rf_tmp = rectangle_random_fields(pert_param, pert_grid_f)
+          end if
+          call random_fieldsMap%insert(id_string, rf_tmp)
        end if
-       call random_fieldsMap%insert(id_string, rf_tmp)
-       iter = random_fieldsMap%find(id_string) 
+       iter = random_fieldsMap%find(id_string)
     endif
     rf => iter%value()
     
@@ -1253,7 +1276,7 @@ contains
   subroutine clear_rf()
     
     type(StringAbstractRandom_fieldsMapIterator)          :: iter
-     class(abstract_random_fields),                  pointer :: rf_ptr
+    class(abstract_random_fields),                  pointer :: rf_ptr
     
     iter = random_fieldsMap%begin()
     do while (iter /= random_fieldsMap%end())
