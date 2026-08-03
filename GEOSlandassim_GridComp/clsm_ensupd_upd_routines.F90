@@ -1069,7 +1069,7 @@ contains
     real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
     real,    parameter                      :: ASCAT_max_peat_frac   = 0.10 ! [-]
 
-    ! soil class 253 = peat in GEOS bcs soil parameter tables (via cat_param%soilcls30);
+    ! soil class 253 = peat in GEOS bcs soil parameter tables (via cat_param%soilcls100);
     ! not the same test as PEATCLSM_POROS_THRESHOLD, which identifies PEATCLSM physics
     integer, parameter                      :: peat_soilcls          = 253  ! [-]
 
@@ -1560,8 +1560,8 @@ contains
 
        peat_l = 0.
 
-       where (cat_param(:)%soilcls30==peat_soilcls)  peat_l = 1.
-       where (cat_param(:)%soilcls30<1)              peat_l = nodata_generic
+       where (cat_param(:)%soilcls100==peat_soilcls)  peat_l = 1.
+       where (cat_param(:)%soilcls100<1)              peat_l = nodata_generic
 
     end if
 
