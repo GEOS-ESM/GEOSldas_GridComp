@@ -584,15 +584,6 @@ contains
              
           end if
 
-          ! ASCAT peatland FOV screening needs mwRTM soil class (soilcls)
-
-          if ( (trim(obs_param(i)%varname) == 'sfds')  .and.               &
-               (     obs_param(i)%getinnov          )         )   then
-
-             need_mwRTM_param = .true.
-
-          end if
-          
        end do
        
     end if
@@ -1565,17 +1556,12 @@ contains
 
     if (get_peat_lH) then
 
-       if (size(mwRTM_param)/=N_catl) then
-          err_msg = 'ASCAT peatland QC needs mwRTM soilcls; set LANDASSIM_INTERNAL_RESTART_FILE'
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       end if
-
        ! build local static peatland indicator
 
        peat_l = 0.
 
-       where (mwRTM_param(:)%soilcls==peat_soilcls)  peat_l = 1.
-       where (mwRTM_param(:)%soilcls<1)              peat_l = nodata_generic
+       where (cat_param(:)%soilcls30==peat_soilcls)  peat_l = 1.
+       where (cat_param(:)%soilcls30<1)              peat_l = nodata_generic
 
     end if
 
@@ -1810,8 +1796,6 @@ contains
              tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
 
              ! FOV- and area-weighted peat fraction over tiles with a valid soil class.
-             ! mwRTM_param_nodata_check() can mark soilcls no-data when unrelated mwRTM
-             ! fields are missing, so do not let one missing tile poison the full FOV.
 
              tmpsum_w = sum( merge( tmp_weights(1:N_tmp), 0.,                    &
                   abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )
