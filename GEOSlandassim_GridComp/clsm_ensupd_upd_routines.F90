@@ -1129,6 +1129,7 @@ contains
                                                      !  for consistency w/ calc_tp
 
     real,    dimension(N_catl)              :: Tb_h_vec, Tb_v_vec
+    real,    dimension(N_catl)              :: peat_l
     
     real,    dimension(N_catl)              :: precip, SWE, smoist
 
@@ -1569,38 +1570,22 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
 
-       ! communicate static peatland indicator together with tile coordinates
+       ! build local static peatland indicator
 
-       N_fields = 1
+       peat_l = 0.
 
-       allocate(tile_data_l(N_catl,N_fields,1))
-
-       tile_data_l(:,1,1) = 0.
-
-       where (mwRTM_param(:)%soilcls==peat_soilcls)  tile_data_l(:,1,1) = 1.
-       where (mwRTM_param(:)%soilcls<1)              tile_data_l(:,1,1) = nodata_generic
-
-       call get_tiles_in_halo( N_catl, N_fields, 1, tile_data_l, tile_coord_l,  &
-            tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                    &
-            N_catlH, tile_data_lH=tile_data_lH, tile_coord_lH=tile_coord_lH )
-
-       allocate(peat_lH(N_catlH))
-
-       peat_lH = tile_data_lH(:,1,1)
-
-       if (associated(tile_data_lH))  deallocate(tile_data_lH)
-
-    else
-
-       N_fields = 0  ! set to zero temporarily, not yet needed
-       ! move up the allocation. The input should be allocated in debug mode although it is not used
-       ! allocate and assemble tile_data_l
-       allocate(tile_data_l(0,0,0))  ! for debugging to pass
-       call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
-            tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
-            N_catlH, tile_coord_lH=tile_coord_lH )
+       where (mwRTM_param(:)%soilcls==peat_soilcls)  peat_l = 1.
+       where (mwRTM_param(:)%soilcls<1)              peat_l = nodata_generic
 
     end if
+
+    N_fields = 0  ! set to zero temporarily, not yet needed
+    ! move up the allocation. The input should be allocated in debug mode although it is not used
+    ! allocate and assemble tile_data_l
+    allocate(tile_data_l(0,0,0))  ! for debugging to pass
+    call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
+         tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
+         N_catlH, tile_coord_lH=tile_coord_lH )
     
     if (get_sfmc_lH)   allocate(sfmc_lH( N_catlH,                     N_ens))
     if (get_rzmc_lH)   allocate(rzmc_lH( N_catlH,                     N_ens))
@@ -1610,23 +1595,26 @@ contains
     if (get_Tb_lH)     allocate(stemp_lH(N_catlH,                     N_ens))
     if (get_Tb_lH)     allocate(Tb_h_lH( N_catlH,N_TbuniqFreqAngRTMid,N_ens))
     if (get_Tb_lH)     allocate(Tb_v_lH( N_catlH,N_TbuniqFreqAngRTMid,N_ens))
+    if (get_peat_lH)   allocate(peat_lH( N_catlH                            ))
     
 #ifdef LDAS_MPI
     
     ! count number of fields that need to be communicated (N_fields), allocate as needed
 
     call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields)
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_peat_lH, N_fields)
     
     ! allocate and assemble tile_data_l
 
     if (allocated(tile_data_l))  deallocate(tile_data_l)
     allocate(tile_data_l(N_catl,N_fields,N_ens))
     call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields, &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_peat_lH, N_fields,                                                   &
          option=1, tile_data=tile_data_l,                                        &
          sfmc=sfmc_l, rzmc=rzmc_l, tsurf=tsurf_l, FT=FT_l, stemp=stemp_l,        &
-         Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l )
+         Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l, peat=peat_l )
     
     ! communicate tile_data_l as needed and get tile_data_lH
 
@@ -1637,10 +1625,11 @@ contains
     ! read out sfmc, rzmc, etc. from tile_data_lH    
 
     call get_obs_pred_comm_helper( N_catlH, N_ens, N_TbuniqFreqAngRTMid,         &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields, &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_peat_lH, N_fields,                                                   &
          option=2, tile_data=tile_data_lH,                                       &
          sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_l, stemp=stemp_lH,    &
-         Tb_h=Tb_h_lH, Tb_v=Tb_v_lH )
+         Tb_h=Tb_h_lH, Tb_v=Tb_v_lH, peat=peat_lH )
     
     ! clean up
     
@@ -1656,6 +1645,7 @@ contains
     if (get_Tb_lH)     stemp_lH = stemp_l
     if (get_Tb_lH)     Tb_h_lH  = Tb_h_l
     if (get_Tb_lH)     Tb_v_lH  = Tb_v_l
+    if (get_peat_lH)   peat_lH  = peat_l
     
 #endif
     if (allocated(tile_data_l))  deallocate(tile_data_l)
@@ -2160,7 +2150,8 @@ contains
 
   subroutine get_obs_pred_comm_helper(                                                  &
        N_cat, N_ens, N_Tb, get_sfmc, get_rzmc, get_tsurf, get_FT, get_asnow, get_Tb,    &
-       N_fields, option, tile_data, sfmc, rzmc, tsurf, FT, asnow, stemp, Tb_h, Tb_v )
+       get_peat, N_fields, option, tile_data, sfmc, rzmc, tsurf, FT, asnow, stemp,      &
+       Tb_h, Tb_v, peat )
     
     ! bundle/unbundle individual fields into/from single array for more 
     ! efficient communication across processors
@@ -2178,7 +2169,8 @@ contains
 
     integer, intent(in)    :: N_cat, N_ens, N_Tb
     
-    logical, intent(in)    :: get_sfmc, get_rzmc, get_tsurf, get_FT, get_Tb, get_asnow 
+    logical, intent(in)    :: get_sfmc, get_rzmc, get_tsurf, get_FT, get_Tb, get_asnow
+    logical, intent(in)    :: get_peat
     
     integer, intent(inout) :: N_fields
     
@@ -2189,6 +2181,7 @@ contains
     real, dimension(N_cat,         N_ens), intent(inout), optional :: sfmc, rzmc
     real, dimension(N_cat,         N_ens), intent(inout), optional :: tsurf, FT, asnow, stemp
     real, dimension(N_cat,N_Tb,    N_ens), intent(inout), optional :: Tb_h, Tb_v
+    real, dimension(N_cat),                intent(inout), optional :: peat
     
     ! -----------------------------------
 
@@ -2221,11 +2214,13 @@ contains
             ((get_FT)    .and. (.not. present(FT   )))    .or.            &
             ((get_Tb)    .and. (.not. present(stemp)))    .or.            &
             ((get_Tb)    .and. (.not. present(Tb_h )))    .or.            &
-            ((get_Tb)    .and. (.not. present(Tb_v )))             ) then
+            ((get_Tb)    .and. (.not. present(Tb_v )))    .or.            &
+            ((get_peat)  .and. (.not. present(peat )))             ) then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error 1')
        end if
        
-       if ( (get_sfmc .or. get_rzmc .or. get_tsurf .or. get_FT .or. get_Tb .or. get_asnow) .and.   &
+       if ( (get_sfmc .or. get_rzmc .or. get_tsurf .or. get_FT .or. get_Tb .or.  &
+             get_asnow .or. get_peat)                                      .and. &
             (.not. present(tile_data))                                              &
             )  then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error 2')
@@ -2317,6 +2312,16 @@ contains
        
        if (opt==2)  Tb_v = tile_data(1:N_cat,ks:k,1:N_ens)
               
+    end if
+
+    if (get_peat)   then
+
+       k = k+1
+
+       if (opt==1)  tile_data(1:N_cat,k,1:N_ens) = spread(peat,2,N_ens)
+
+       if (opt==2)  peat = tile_data(1:N_cat,k,1)
+
     end if
     
     N_fields = k
