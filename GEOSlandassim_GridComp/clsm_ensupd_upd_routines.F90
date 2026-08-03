@@ -1069,10 +1069,6 @@ contains
     real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
     real,    parameter                      :: ASCAT_max_peat_frac   = 0.10 ! [-]
 
-    ! soil class 253 = peat in GEOS bcs soil parameter tables (via cat_param%soilcls100);
-    ! not the same test as PEATCLSM_POROS_THRESHOLD, which identifies PEATCLSM physics
-    integer, parameter                      :: peat_soilcls          = 253  ! [-]
-
     integer                                 :: N_catlH, n_e, i, j, k, N_tmp, ii, jj
     integer                                 :: N_fields, N_Tbspecies, N_TbuniqFreqAngRTMid
     integer                                 :: this_species, this_tilenum, this_pol
@@ -1556,12 +1552,15 @@ contains
 
     if (get_peat_lH) then
 
-       ! build local static peatland indicator
+       ! build local static PEATCLSM tile indicator
 
        peat_l = 0.
 
-       where (cat_param(:)%soilcls100==peat_soilcls)  peat_l = 1.
-       where (cat_param(:)%soilcls100<1)              peat_l = nodata_generic
+       where (abs(cat_param(:)%poros-nodata_generic)<nodata_tol_generic)
+          peat_l = nodata_generic
+       elsewhere (cat_param(:)%poros>=PEATCLSM_POROS_THRESHOLD)
+          peat_l = 1.
+       end where
 
     end if
 
