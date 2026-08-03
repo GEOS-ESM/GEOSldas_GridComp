@@ -1046,7 +1046,7 @@ contains
     real,                   intent(in),    dimension(N_catl)       :: lai
     type(cat_param_type),   intent(in),    dimension(N_catl)       :: cat_param
     type(cat_progn_type),   intent(in),    dimension(N_catl,N_ens) :: cat_progn
-    type(mwRTM_param_type), intent(in),    dimension(:)            :: mwRTM_param
+    type(mwRTM_param_type), intent(in),    dimension(N_catl)       :: mwRTM_param
 
     integer,                intent(inout)                          :: N_obsl   ! InOut !!!
 
@@ -1553,6 +1553,10 @@ contains
     if (get_peat_lH) then
 
        ! build local static PEATCLSM tile indicator
+       !
+       ! peatland is identified via porosity (as in PEATCLSM and elsewhere in
+       ! this module), *not* via a soil class, so that the indicator is available
+       ! without mwRTM parameters
 
        peat_l = 0.
 
@@ -1794,7 +1798,7 @@ contains
 
              tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
 
-             ! FOV- and area-weighted peat fraction over tiles with a valid soil class.
+             ! FOV- and area-weighted peat fraction over tiles with valid porosity
 
              tmpsum_w = sum( merge( tmp_weights(1:N_tmp), 0.,                    &
                   abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )
@@ -1810,7 +1814,7 @@ contains
 
              else
 
-                tmpPeat = .true.   ! no valid soil class anywhere in FOV
+                tmpPeat = .true.   ! no valid porosity anywhere in FOV
 
              end if
 
