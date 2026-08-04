@@ -7382,7 +7382,7 @@ contains
     
     real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
     real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
-    real,      parameter :: Tb_nedt_base  = 1.2 ! max allowed Tb error
+    real,      parameter :: Tb_nedt_base  = 1.3 !  Tb error floor for inflation
 
     real,      parameter :: max_std_tb_fore_minus_aft = 20.  ! max std-dev L1C[E] fore-minus-aft Tb diffs
 
@@ -8380,7 +8380,7 @@ contains
        ! set observation error standard deviation
        
        do ii=1,N_catd
-          std_SMAP_data(ii) = this_obs_param%errstd * min(20.,max(1.,exp(20.*(SMAP_error(ii)-tb_nedt_base))))
+          std_SMAP_data(ii) = this_obs_param%errstd * min(20.,max(1.,exp(20.*(SMAP_error(ii)-Tb_nedt_base))))
        end do
        
        ! --------------------------------
