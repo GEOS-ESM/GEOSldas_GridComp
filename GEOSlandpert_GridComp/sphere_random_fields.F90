@@ -65,7 +65,12 @@ module sphere_random_fields_mod
   public :: sphere_random_fields
   public :: sphere_random_fields_id
 
-  integer, parameter :: MORD_SPHERE = 2
+  ! Threshold for switching to the direct Legendre covariance path (Mord=1).
+  ! When sqrt(c0/c2) > LEGENDRE_THRESH the SMERFS Mord=2 covariance matrix
+  ! is ill-conditioned (condition number ~ (c0/c2)^2) and hyp_llp1 takes
+  ! O(sqrt(c0/c2)) series terms to converge.  At threshold=100 this covers
+  ! all xcorr < ~5 degrees for typical 0.25-deg grids.
+  real(c_double), parameter :: LEGENDRE_THRESH = 100.0d0
 
 
   ! -----------------------------------------------------------------------
@@ -84,17 +89,26 @@ module sphere_random_fields_mod
     integer :: nphi     = 0   ! phi points per ring
     integer :: n_m      = 0   ! nphi/2 + 1  (half-spectrum width)
     integer :: uhalf    = 0   ! nz/2 + 1    (upper hemisphere ring count)
-    integer :: Mord     = MORD_SPHERE
+    integer :: Mord     = 0   ! filter order: 2 (hypergeometric) or 1 (Legendre)
 
     ! Power-spectrum coefficients:  C_l = 1 / (c0 + c2*(l*(l+1))^2)
     real(c_double) :: c0 = 1.0d0
     real(c_double) :: c2 = 0.0d0
 
-    ! Pre-computed state-space filter arrays (full set, all m-modes):
+    ! Pre-computed state-space filter arrays for Mord=2 path (all m-modes):
     !   all_innov(Mord, Mord, uhalf,   n_m)
     !   all_trans(Mord, Mord, uhalf-1, n_m)
+    ! (allocated as (sf%Mord, sf%Mord, ...) — only populated when sf%Mord == 2)
     real(c_double), allocatable :: all_innov(:,:,:,:)
     real(c_double), allocatable :: all_trans(:,:,:,:)
+
+    ! --- Mord=1 (direct Legendre) filter arrays -------------------------
+    ! Used when sqrt(c0/c2) > LEGENDRE_THRESH (short correlation lengths).
+    ! The scalar Kalman walk is: x_{i+1} = trans1(i)*x_i + innov1(i+1)*w_i
+    !   innov1(n_m, uhalf)    scalar innovation (sqrt of residual variance)
+    !   trans1(n_m, uhalf-1)  scalar transition
+    real(c_double), allocatable :: innov1(:,:)   ! (n_m, uhalf)
+    real(c_double), allocatable :: trans1(:,:)   ! (n_m, uhalf-1)
 
     ! cos(theta) at each upper-hemisphere ring (uhalf values, equator first)
     real(c_double), allocatable :: z_pts(:)
@@ -131,6 +145,7 @@ module sphere_random_fields_mod
     type(sphere_filter_type) :: filter
     real(c_double), public :: c0 = 1.0d0
     real(c_double), public :: c2 = 0.0d0
+    integer, public :: Mord = 2   ! filter order passed to build_sphere_filter: 2 (hypergeometric) or 1 (Legendre)
     integer :: output_nlon = 0
     integer :: output_nlat = 0
     integer, public :: nz_sphere = 0
@@ -177,6 +192,7 @@ contains
     real(c_double) :: xcorr_deg
     real(c_double) :: c2_use
     character(len=:), allocatable :: id_string
+    integer :: comm_rank, mpierr
 
     xcorr_deg = real(pert_param%xcorr, c_double)
     ! Sphere perturbations always use the fine grid; no coarsening is applied.
@@ -189,17 +205,36 @@ contains
     c2_use = -1.0d0
     if (present(c2)) c2_use = c2
     if (c2_use <= 0.0d0) then
-      if (xcorr_deg > 0.0d0) then
-        call xcorr_deg_to_c2(xcorr_deg, rf%nz_sphere, c2_use)
+      if (present(comm)) then
+        call MPI_Comm_rank(comm, comm_rank, mpierr)
       else
+        comm_rank = 0
+      end if
+      if (comm_rank == 0 .and. xcorr_deg > 0.0d0) then
+        call xcorr_deg_to_c2(xcorr_deg, rf%nz_sphere, c2_use)
+      else if (comm_rank == 0) then
+        c2_use = 1.0d-12
+      end if
+      if (present(comm)) then
+        call MPI_Bcast(c2_use, 1, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+      end if
+      if (comm_rank /= 0 .and. c2_use <= 0.0d0) then
         c2_use = 1.0d-12
       end if
     end if
     rf%c2 = c2_use
+
+    ! Choose filter order: switch to Mord=1 (direct Legendre) when the
+    ! Mord=2 hypergeometric path is ill-conditioned (short correlation lengths).
+    if (rf%Mord == 2 .and. c2_use > 0.0d0 .and. &
+        sqrt(rf%c0 / c2_use) > LEGENDRE_THRESH) then
+      rf%Mord = 1
+    end if
+
     if (present(comm)) then
-      call build_sphere_filter(rf%filter, rf%nz_sphere, rf%nphi_sphere, rf%c0, rf%c2, comm)
+      call build_sphere_filter(rf%filter, rf%nz_sphere, rf%nphi_sphere, rf%c0, rf%c2, rf%Mord, comm)
     else
-      call build_sphere_filter(rf%filter, rf%nz_sphere, rf%nphi_sphere, rf%c0, rf%c2)
+      call build_sphere_filter(rf%filter, rf%nz_sphere, rf%nphi_sphere, rf%c0, rf%c2, rf%Mord)
     end if
   end function new_sphere_random_fields
 
@@ -231,7 +266,6 @@ contains
     deallocate(output_field, output_field2)
     deallocate(field_d, field2_d)
   end subroutine generate_2d_Random_field
-
   subroutine generate_white_field(this, rseed, rfield)
     class(sphere_random_fields), intent(inout) :: this
     integer, intent(inout) :: rseed(NRANDSEED)
@@ -329,47 +363,50 @@ contains
   !   nphi  (in)           : number of phi points per ring (even)
   !   c0    (in)           : constant term of power spectrum denominator
   !   c2    (in)           : quartic term of power spectrum denominator
+  !   Mord  (in)           : filter order (1 = Legendre, 2 = hypergeometric)
   !   comm  (in, optional) : MPI communicator (global, e.g. mpicomm)
 
-  subroutine build_sphere_filter(sf, nz, nphi, c0, c2, comm)
+  subroutine build_sphere_filter(sf, nz, nphi, c0, c2, Mord, comm)
 
     type(sphere_filter_type), intent(out) :: sf
     integer,        intent(in) :: nz, nphi
     real(c_double), intent(in) :: c0, c2
+    integer,        intent(in) :: Mord
     integer, optional, intent(in) :: comm
 
     ! --- local variables ------------------------------------------------
 
     integer :: uhalf, n_m, m_max
     integer :: i, iroot, imode, im_hyp, rc
-    integer :: global_rank, mpierr
+    integer :: global_rank, global_npes, mpierr
+    integer :: build_j_lo, build_j_hi
     integer :: innov_size, trans_size
 
-    ! Partial fraction decomposition (Mord=2 poles)
-    complex(c_double_complex) :: roots_llp1(MORD_SPHERE)
-    complex(c_double_complex) :: norms_pf(MORD_SPHERE)
+    ! Partial fraction decomposition (Mord poles)
+    complex(c_double_complex) :: roots_llp1(Mord)
+    complex(c_double_complex) :: norms_pf(Mord)
     complex(c_double_complex) :: norm, llp1_val, lam_val, sin_pi_lam
     real(c_double)            :: llp1_re, llp1_im
     real(c_double)            :: disc_re, tmp
 
     ! z-points and twiddle factors
-    real(c_double), allocatable :: tau_p(:,:)     ! (uhalf, 2*MORD_SPHERE-1)
+    real(c_double), allocatable :: tau_p(:,:)     ! (uhalf, 2*Mord-1)
     real(c_double), allocatable :: eta_ratio(:)   ! (uhalf-1)
     real(c_double), allocatable :: xvals(:)       ! (uhalf)
     real(c_double), allocatable :: yvals(:)       ! (uhalf)
     real(c_double)              :: theta_val
 
     ! Hypergeometric tables
-    complex(c_double_complex), allocatable :: Fmat(:,:)  ! (uhalf, m_max+MORD_SPHERE+1)
-    complex(c_double_complex), allocatable :: Hmat(:,:)  ! (uhalf, m_max+MORD_SPHERE+1)
+    complex(c_double_complex), allocatable :: Fmat(:,:)  ! (uhalf, m_max+Mord+1)
+    complex(c_double_complex), allocatable :: Hmat(:,:)  ! (uhalf, m_max+Mord+1)
 
     ! Covariance arrays
-    real(c_double), allocatable :: cov(:,:,:,:)        ! (MORD_SPHERE,MORD_SPHERE,uhalf,0:m_max)
-    real(c_double), allocatable :: cross_cov(:,:,:,:)  ! (MORD_SPHERE,MORD_SPHERE,uhalf-1,0:m_max)
+    real(c_double), allocatable :: cov(:,:,:,:)        ! (Mord,Mord,uhalf,0:m_max)
+    real(c_double), allocatable :: cross_cov(:,:,:,:)  ! (Mord,Mord,uhalf-1,0:m_max)
 
     ! Temporary per-mode state-space arrays
-    real(c_double), allocatable :: innov_m(:,:,:)   ! (MORD_SPHERE,MORD_SPHERE,uhalf)
-    real(c_double), allocatable :: trans_m(:,:,:)   ! (MORD_SPHERE,MORD_SPHERE,uhalf-1)
+    real(c_double), allocatable :: innov_m(:,:,:)   ! (Mord,Mord,uhalf)
+    real(c_double), allocatable :: trans_m(:,:,:)   ! (Mord,Mord,uhalf-1)
 
     ! --------------------------------------------------------------------
 
@@ -382,9 +419,9 @@ contains
     sf%nphi  = nphi
     sf%n_m   = n_m
     sf%uhalf = uhalf
-    sf%Mord  = MORD_SPHERE
     sf%c0    = c0
     sf%c2    = c2
+    sf%Mord  = Mord
 
     ! --- MPI context ----------------------------------------------------
     ! Split the supplied communicator into node-local communicators.
@@ -398,19 +435,27 @@ contains
       call MPI_Comm_size(sf%node_comm, sf%node_npes, mpierr)
       ! Also get global rank to decide who does the filter computation
       call MPI_Comm_rank(comm, global_rank, mpierr)
+      call MPI_Comm_size(comm, global_npes, mpierr)
     else
       sf%node_comm = MPI_COMM_NULL
       sf%node_rank = 0
       sf%node_npes = 1
       global_rank  = 0
+      global_npes  = 1
     end if
 
     ! m-mode strip: distribute n_m modes as evenly as possible
     call compute_strip(n_m, sf%node_npes, sf%node_rank, sf%j_lo, sf%j_hi)
 
     ! --- Allocate filter arrays (every rank needs the full tables) ------
-    allocate(sf%all_innov(MORD_SPHERE, MORD_SPHERE, uhalf,   n_m))
-    allocate(sf%all_trans(MORD_SPHERE, MORD_SPHERE, uhalf-1, n_m))
+    if (sf%Mord == 1) then
+      ! Mord=1: allocate 2D (n_m, uhalf/uhalf-1) scalar filter arrays
+      allocate(sf%innov1(n_m, uhalf))
+      allocate(sf%trans1(n_m, uhalf-1))
+    else
+      allocate(sf%all_innov(Mord, Mord, uhalf,   n_m))
+      allocate(sf%all_trans(Mord, Mord, uhalf-1, n_m))
+    end if
 
     ! --- z-points -------------------------------------------------------
     allocate(sf%z_pts(uhalf))
@@ -425,94 +470,173 @@ contains
 
     if (global_rank == 0) then
 
-      ! Twiddle factors
-      allocate(tau_p   (uhalf,   2*MORD_SPHERE-1))
-      allocate(eta_ratio(uhalf-1))
-      tau_p(:, MORD_SPHERE)   = 1.0d0
-      tau_p(:, MORD_SPHERE+1) = sqrt((1.0d0 - sf%z_pts) / (1.0d0 + sf%z_pts))
-      tau_p(:, MORD_SPHERE-1) = 1.0d0 / tau_p(:, MORD_SPHERE+1)
-      do i = 2, MORD_SPHERE-1
-        tau_p(:, MORD_SPHERE+i) = tau_p(:, MORD_SPHERE+i-1) * tau_p(:, MORD_SPHERE+1)
-        tau_p(:, MORD_SPHERE-i) = tau_p(:, MORD_SPHERE-i+1) * tau_p(:, MORD_SPHERE-1)
-      end do
-      do i = 1, uhalf-1
-        eta_ratio(i) = tau_p(i+1, MORD_SPHERE+1) * tau_p(i, MORD_SPHERE-1)
-      end do
+      if (sf%Mord == 1) then
+        ! ----------------------------------------------------------------
+        ! Legendre path (Mord=1):
+        ! Compute cov and cross_cov via direct Legendre series, then
+        ! build scalar Kalman filter with state_space_1_f.
+        ! ----------------------------------------------------------------
+        block
+          integer, parameter :: lmax_mult = 3
+          integer :: lmax_leg
+          ! cov1   (0:m_max, uhalf)    scalar covariances per m
+          ! cross1 (0:m_max, uhalf-1)  scalar cross-covariances per m
+          real(c_double), allocatable :: cov1(:), cross1(:)
+          real(c_double), allocatable :: innov_tmp(:), trans_tmp(:)
 
-      allocate(xvals(uhalf))
-      allocate(yvals(uhalf))
-      xvals = 0.5d0 * (1.0d0 - sf%z_pts)
-      yvals = 0.5d0 * (1.0d0 + sf%z_pts)
+          lmax_leg = lmax_mult * nz
+          allocate(cov1  ((m_max+1) * uhalf))
+          allocate(cross1((m_max+1) * (uhalf-1)))
+          allocate(innov_tmp(uhalf))
+          allocate(trans_tmp(uhalf-1))
 
-      ! Partial fraction decomposition of 1/(c0 + c2*k^2), c1=0
-      disc_re = -4.0d0 * c0 * c2
-      if (disc_re >= 0.0d0) then
-        roots_llp1(1) = cmplx( sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
-        roots_llp1(2) = cmplx(-sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
+          call cov_legendre_f(m_max, uhalf, lmax_leg, c0, c2, sf%z_pts, &
+                              cov1, cross1, rc)
+          if (rc /= 0) then
+            write(*,'(a,i0)') 'build_sphere_filter: cov_legendre_f failed, rc=', rc
+            stop 1
+          end if
+
+          if (global_rank == 0) &
+            write(*,'(a,f8.1,a)') &
+              'build_sphere_filter: |Im(root)|=', sqrt(c0/c2), &
+              ' > threshold; using direct Legendre covariance (Mord=1, stable)'
+
+          ! Build Mord=1 Kalman filter per m-mode
+          do imode = 0, n_m-1
+            call state_space_1_f(uhalf,                          &
+                                 cross1(imode*(uhalf-1)+1 : (imode+1)*(uhalf-1)), &
+                                 cov1(imode*uhalf+1 : (imode+1)*uhalf),           &
+                                 innov_tmp, trans_tmp, rc)
+            if (rc /= 0) then
+              write(*,'(a,i0,a,i0)') &
+                'build_sphere_filter: state_space_1_f failed at imode=', imode, ', rc=', rc
+              stop 1
+            end if
+            sf%innov1(imode+1, :) = innov_tmp
+            sf%trans1(imode+1, :) = trans_tmp
+          end do
+
+          deallocate(cov1, cross1, innov_tmp, trans_tmp)
+        end block
+
       else
-        tmp = sqrt(-disc_re) / (2.0d0*c2)
-        roots_llp1(1) = cmplx(0.0d0,  tmp, c_double_complex)
-        roots_llp1(2) = cmplx(0.0d0, -tmp, c_double_complex)
-      end if
-      do iroot = 1, MORD_SPHERE
-        norms_pf(iroot) = 1.0d0 / &
-          (2.0d0 * cmplx(c2, 0.0d0, c_double_complex) * roots_llp1(iroot))
-      end do
-
-      ! Covariance accumulators
-      allocate(cov      (MORD_SPHERE, MORD_SPHERE, uhalf,   0:m_max))
-      allocate(cross_cov(MORD_SPHERE, MORD_SPHERE, uhalf-1, 0:m_max))
-      allocate(Fmat(uhalf, m_max+MORD_SPHERE+1))
-      allocate(Hmat(uhalf, m_max+MORD_SPHERE+1))
-      allocate(innov_m(MORD_SPHERE, MORD_SPHERE, uhalf))
-      allocate(trans_m(MORD_SPHERE, MORD_SPHERE, uhalf-1))
-      cov       = 0.0d0
-      cross_cov = 0.0d0
-
-      ! Hypergeometric evaluation + covariance accumulation
-      do iroot = 1, MORD_SPHERE
-        llp1_val = roots_llp1(iroot)
-        llp1_re  = real(llp1_val, c_double)
-        llp1_im  = aimag(llp1_val)
-        norm     = norms_pf(iroot)
-
-        if (llp1_re < -0.25d0) then
-          lam_val = cmplx(-0.5d0, 0.0d0, c_double_complex) + &
-                    cmplx(0.0d0,  1.0d0, c_double_complex) * sqrt(-0.25d0 - llp1_val)
-        else
-          lam_val = cmplx(-0.5d0, 0.0d0, c_double_complex) - &
-                    sqrt(cmplx(0.25d0, 0.0d0, c_double_complex) + llp1_val)
-        end if
-        sin_pi_lam = sin(PI * lam_val)
-        norm = -(0.25d0 / PI) * norm * PI / sin_pi_lam
-
-        do im_hyp = 0, m_max + MORD_SPHERE
-          call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, xvals, Fmat(:,im_hyp+1), rc)
-          if (rc /= 0) then
-            write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f F failed at im_hyp=', im_hyp
-            stop 1
-          end if
-          call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, yvals, Hmat(:,im_hyp+1), rc)
-          if (rc /= 0) then
-            write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f H failed at im_hyp=', im_hyp
-            stop 1
-          end if
+        ! ----------------------------------------------------------------
+        ! Original hypergeometric path (Mord=2)
+        ! ----------------------------------------------------------------
+        ! Twiddle factors — tau_p has 2*Mord-1 columns
+        allocate(tau_p   (uhalf,   2*Mord-1))
+        allocate(eta_ratio(uhalf-1))
+        tau_p(:, Mord)   = 1.0d0
+        tau_p(:, Mord+1) = sqrt((1.0d0 - sf%z_pts) / (1.0d0 + sf%z_pts))
+        tau_p(:, Mord-1) = 1.0d0 / tau_p(:, Mord+1)
+        do i = 1, uhalf-1
+          eta_ratio(i) = tau_p(i+1, Mord+1) * tau_p(i, Mord-1)
         end do
 
-        call update_cov_f(m_max, uhalf, MORD_SPHERE,        &
-                          real(norm,c_double), aimag(norm),  &
-                          llp1_re, llp1_im,                  &
-                          Fmat, Hmat, tau_p, eta_ratio,      &
-                          cov, cross_cov, rc)
-        if (rc /= 0) then
-          write(*,'(a,i0)') 'build_sphere_filter: update_cov_f failed, rc=', rc
-          stop 1
-        end if
-      end do  ! iroot
+        allocate(xvals(uhalf))
+        allocate(yvals(uhalf))
+        xvals = 0.5d0 * (1.0d0 - sf%z_pts)
+        yvals = 0.5d0 * (1.0d0 + sf%z_pts)
 
-      ! State-space decomposition for each m-mode
-      do imode = 0, n_m-1
-        call state_space_f(uhalf, MORD_SPHERE,              &
+        ! Partial fraction decomposition of 1/(c0 + c2*k^2), c1=0
+        disc_re = -4.0d0 * c0 * c2
+        if (disc_re >= 0.0d0) then
+          roots_llp1(1) = cmplx( sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
+          roots_llp1(2) = cmplx(-sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
+        else
+          tmp = sqrt(-disc_re) / (2.0d0*c2)
+          roots_llp1(1) = cmplx(0.0d0,  tmp, c_double_complex)
+          roots_llp1(2) = cmplx(0.0d0, -tmp, c_double_complex)
+        end if
+        do iroot = 1, Mord
+          norms_pf(iroot) = 1.0d0 / &
+            (2.0d0 * cmplx(c2, 0.0d0, c_double_complex) * roots_llp1(iroot))
+        end do
+
+        ! Covariance accumulators. Rank 0 fills these, then all ranks receive
+        ! them and split the independent state-space decomposition over m-modes.
+        allocate(cov      (Mord, Mord, uhalf,   0:m_max))
+        allocate(cross_cov(Mord, Mord, uhalf-1, 0:m_max))
+        allocate(Fmat(uhalf, m_max+Mord+1))
+        allocate(Hmat(uhalf, m_max+Mord+1))
+        allocate(innov_m(Mord, Mord, uhalf))
+        allocate(trans_m(Mord, Mord, uhalf-1))
+        cov       = 0.0d0
+        cross_cov = 0.0d0
+
+        ! Hypergeometric evaluation + covariance accumulation
+        do iroot = 1, Mord
+          llp1_val = roots_llp1(iroot)
+          llp1_re  = real(llp1_val, c_double)
+          llp1_im  = aimag(llp1_val)
+          norm     = norms_pf(iroot)
+
+          if (llp1_re < -0.25d0) then
+            lam_val = cmplx(-0.5d0, 0.0d0, c_double_complex) + &
+                      cmplx(0.0d0,  1.0d0, c_double_complex) * sqrt(-0.25d0 - llp1_val)
+          else
+            lam_val = cmplx(-0.5d0, 0.0d0, c_double_complex) - &
+                      sqrt(cmplx(0.25d0, 0.0d0, c_double_complex) + llp1_val)
+          end if
+          sin_pi_lam = sin(PI * lam_val)
+          norm = -(0.25d0 / PI) * norm * PI / sin_pi_lam
+
+          do im_hyp = 0, m_max + Mord
+            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, xvals, Fmat(:,im_hyp+1), rc)
+            if (rc /= 0) then
+              write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f F failed at im_hyp=', im_hyp
+              stop 1
+            end if
+            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, yvals, Hmat(:,im_hyp+1), rc)
+            if (rc /= 0) then
+              write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f H failed at im_hyp=', im_hyp
+              stop 1
+            end if
+          end do
+
+          call update_cov_f(m_max, uhalf, Mord,               &
+                            real(norm,c_double), aimag(norm),  &
+                            llp1_re, llp1_im,                  &
+                            Fmat, Hmat, tau_p, eta_ratio,      &
+                            cov, cross_cov, rc)
+          if (rc /= 0) then
+            write(*,'(a,i0)') 'build_sphere_filter: update_cov_f failed, rc=', rc
+            stop 1
+          end if
+        end do  ! iroot
+
+        deallocate(tau_p, eta_ratio, xvals, yvals, Fmat, Hmat)
+
+      end if  ! Mord == 1
+
+    end if  ! global_rank == 0
+
+    ! --- Parallel state-space decomposition for Mord=2 ------------------
+    ! Rank 0 still builds the covariance tables, but the independent
+    ! per-m-mode state-space decompositions are split across MPI ranks.
+    if (sf%Mord /= 1) then
+      innov_size = Mord * Mord * uhalf * n_m
+      trans_size = Mord * Mord * (uhalf-1) * n_m
+
+      if (.not. allocated(cov)) then
+        allocate(cov      (Mord, Mord, uhalf,   0:m_max))
+        allocate(cross_cov(Mord, Mord, uhalf-1, 0:m_max))
+        allocate(innov_m(Mord, Mord, uhalf))
+        allocate(trans_m(Mord, Mord, uhalf-1))
+      end if
+
+      if (present(comm)) then
+        call MPI_Bcast(cov,       innov_size, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+        call MPI_Bcast(cross_cov, trans_size, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+      end if
+
+      sf%all_innov = 0.0d0
+      sf%all_trans = 0.0d0
+
+      call compute_strip(n_m, global_npes, global_rank, build_j_lo, build_j_hi)
+      do imode = build_j_lo - 1, build_j_hi - 1
+        call state_space_f(uhalf, Mord,                     &
                            cross_cov(:,:,:,imode),          &
                            cov(:,:,:,imode),                &
                            innov_m, trans_m, rc)
@@ -525,20 +649,25 @@ contains
         sf%all_trans(:,:,:,imode+1) = trans_m
       end do
 
-      deallocate(tau_p, eta_ratio, xvals, yvals)
-      deallocate(Fmat, Hmat, cov, cross_cov, innov_m, trans_m)
+      if (present(comm)) then
+        call MPI_Allreduce(MPI_IN_PLACE, sf%all_innov, innov_size, &
+                           MPI_DOUBLE_PRECISION, MPI_SUM, comm, mpierr)
+        call MPI_Allreduce(MPI_IN_PLACE, sf%all_trans, trans_size, &
+                           MPI_DOUBLE_PRECISION, MPI_SUM, comm, mpierr)
+      end if
 
-    end if  ! global_rank == 0
+      deallocate(cov, cross_cov, innov_m, trans_m)
+    end if
 
     ! --- Broadcast filter tables to all ranks ---------------------------
     ! Use the global communicator (comm if present, else no-op since
     ! global_rank == 0 is the only rank).
     if (present(comm)) then
-      innov_size = MORD_SPHERE * MORD_SPHERE * uhalf   * n_m
-      trans_size = MORD_SPHERE * MORD_SPHERE * (uhalf-1) * n_m
-      call MPI_Bcast(sf%all_innov, innov_size, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
-      call MPI_Bcast(sf%all_trans, trans_size, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
-      call MPI_Bcast(sf%z_pts,     uhalf,      MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+      if (sf%Mord == 1) then
+        call MPI_Bcast(sf%innov1, n_m*uhalf,      MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+        call MPI_Bcast(sf%trans1, n_m*(uhalf-1),  MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+      end if
+      call MPI_Bcast(sf%z_pts, uhalf, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
 
     ! --- Pre-compute the ring strip owned by this rank for IRFFT --------
@@ -763,63 +892,103 @@ contains
       ! --- 3. Kalman walk for local m-modes j_lo:j_hi -------------------
       ! Upward walk: equator (ring 1 in sf%z_pts) -> pole (ring uhalf)
 
-      ! Initialise at ring 1
-      do j = 1, n_m_local
+      if (sf%Mord == 1) then
+        ! ----------------------------------------------------------------
+        ! Mord=1 scalar walk: x_{i+1} = trans1(j,i)*x_i + innov1(j,i+1)*w_i
+        ! fp_f(1,:) holds the scalar state; fp_fstart holds it at equator.
+        ! ----------------------------------------------------------------
+
+        ! Initialise at ring 1
+        do j = 1, n_m_local
+          fp_f(1, j) = real(sf%innov1(j_lo+j-1, 1), c_float) * noise(1, j, 1)
+        end do
+        fp_fstart(1,:) = fp_f(1,:)
+        fp_fprev(1,:)  = fp_f(1,:)
+        res_cplx(j_lo:j_hi, uhalf) = fp_f(1, :)
+
+        do i = 1, uhalf-1
+          do j = 1, n_m_local
+            fp_f(1, j) = real(sf%trans1(j_lo+j-1, i),   c_float) * fp_fprev(1, j) &
+                       + real(sf%innov1(j_lo+j-1, i+1),  c_float) * noise(1, j, i+1)
+          end do
+          fp_fprev(1,:) = fp_f(1,:)
+          res_cplx(j_lo:j_hi, uhalf - i) = fp_f(1, :)
+        end do
+
+        ! Reflect: Mord=1 state has even symmetry (p=0, even)
+        fp_f(1,:)    = fp_fstart(1,:)
+        fp_fprev(1,:)= fp_f(1,:)
+        skip = 1 - mod(nz, 2)
+
+        do i = 0, nz - uhalf - 1
+          do j = 1, n_m_local
+            fp_f(1, j) = real(sf%trans1(j_lo+j-1, i+skip+1),  c_float) * fp_fprev(1, j) &
+                       + real(sf%innov1(j_lo+j-1, i+skip+2),   c_float) * noise(1, j, uhalf+i+1)
+          end do
+          fp_fprev(1,:) = fp_f(1,:)
+          res_cplx(j_lo:j_hi, uhalf + i + 1) = fp_f(1, :)
+        end do
+
+      else
+        ! ----------------------------------------------------------------
+        ! Original Mord=2 walk
+        ! ----------------------------------------------------------------
+        ! Initialise at ring 1
+        do j = 1, n_m_local
+          do ip = 1, Mord
+            fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
+            do iq = 1, Mord
+              fp_f(ip, j) = fp_f(ip, j) &
+                 + real(sf%all_innov(iq, ip, 1, j_lo+j-1), c_float) * noise(iq, j, 1)
+            end do
+          end do
+        end do
+        fp_fstart = fp_f
+        fp_fprev = fp_f
+        res_cplx(j_lo:j_hi, uhalf) = fp_f(1, :)
+
+        do i = 1, uhalf-1
+          do j = 1, n_m_local
+            do ip = 1, Mord
+              fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
+              do iq = 1, Mord
+                fp_f(ip, j) = fp_f(ip, j) &
+                   + real(sf%all_trans(iq, ip, i,   j_lo+j-1), c_float) * fp_fprev(iq, j) &
+                   + real(sf%all_innov(iq, ip, i+1, j_lo+j-1), c_float) * noise(iq, j, i+1)
+              end do
+            end do
+          end do
+          fp_fprev = fp_f
+          res_cplx(j_lo:j_hi, uhalf - i) = fp_f(1, :)
+        end do
+
+        ! Reflect across the equator
         do ip = 1, Mord
-          fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
-          do iq = 1, Mord
-            fp_f(ip, j) = fp_f(ip, j) &
-               + real(sf%all_innov(iq, ip, 1, j_lo+j-1), c_float) * noise(iq, j, 1)
-          end do
+          if (mod(ip-1, 2) == 0) then
+            fp_f(ip, :) = fp_fstart(ip, :)
+          else
+            fp_f(ip, :) = -fp_fstart(ip, :)
+          end if
         end do
-      end do
-      fp_fstart = fp_f
-      fp_fprev = fp_f
-      res_cplx(j_lo:j_hi, uhalf) = fp_f(1, :)
+        fp_fprev = fp_f
+        skip = 1 - mod(nz, 2)
 
-      do i = 1, uhalf-1
-        do j = 1, n_m_local
-          do ip = 1, Mord
-            fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
-            do iq = 1, Mord
-              fp_f(ip, j) = fp_f(ip, j) &
-                 + real(sf%all_trans(iq, ip, i,   j_lo+j-1), c_float) * fp_fprev(iq, j) &
-                 + real(sf%all_innov(iq, ip, i+1, j_lo+j-1), c_float) * noise(iq, j, i+1)
+        do i = 0, nz - uhalf - 1
+          do j = 1, n_m_local
+            do ip = 1, Mord
+              fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
+              do iq = 1, Mord
+                fp_f(ip, j) = fp_f(ip, j) &
+                    + real(sf%all_trans(iq, ip, i+skip+1, j_lo+j-1), c_float) * fp_fprev(iq, j) &
+                    + real(sf%all_innov(iq, ip, i+skip+2, j_lo+j-1), c_float) * noise(iq, j, uhalf+i+1)
+              end do
             end do
           end do
+          fp_fprev = fp_f
+          res_cplx(j_lo:j_hi, uhalf + i + 1) = fp_f(1, :)
         end do
-         fp_fprev = fp_f
-        res_cplx(j_lo:j_hi, uhalf - i) = fp_f(1, :)
-      end do
 
-      ! Reflect across the equator
-      do ip = 1, Mord
-        if (mod(ip-1, 2) == 0) then
-             fp_f(ip, :) = fp_fstart(ip, :)
-        else
-          fp_f(ip, :) = -fp_fstart(ip, :)
-        end if
-      end do
-       fp_fprev = fp_f
-
-       ! For even nz, the equatorial transition was already represented by
-       ! the northern walk, so skip that transition on the southward walk.
-       skip = 1 - mod(nz, 2)
-
-      do i = 0, nz - uhalf - 1
-        do j = 1, n_m_local
-          do ip = 1, Mord
-            fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
-            do iq = 1, Mord
-              fp_f(ip, j) = fp_f(ip, j) &
-                  + real(sf%all_trans(iq, ip, i+skip+1, j_lo+j-1), c_float) * fp_fprev(iq, j) &
-                  + real(sf%all_innov(iq, ip, i+skip+2, j_lo+j-1), c_float) * noise(iq, j, uhalf+i+1)
-            end do
-          end do
-        end do
-         fp_fprev = fp_f
-        res_cplx(j_lo:j_hi, uhalf + i + 1) = fp_f(1, :)
-      end do
+      end if  ! Mord == 1
 
       ! Scale DC mode (m=0, j_lo=1 only on the rank that owns mode 0)
       if (j_lo == 1) then
@@ -970,6 +1139,8 @@ contains
 
     if (allocated(sf%all_innov)) deallocate(sf%all_innov)
     if (allocated(sf%all_trans)) deallocate(sf%all_trans)
+    if (allocated(sf%innov1))    deallocate(sf%innov1)
+    if (allocated(sf%trans1))    deallocate(sf%trans1)
     if (allocated(sf%z_pts))     deallocate(sf%z_pts)
 #ifdef MKL_AVAILABLE
     if (associated(sf%dfti_irfft)) then
@@ -1056,6 +1227,13 @@ contains
   ! The true e-folding distance (where C = C(0)/e) is xcorr_deg * sqrt(2).
   !
   ! Uses bisection on the analytic Legendre-series covariance.
+  !
+  ! IMPORTANT – angular scan resolution:
+  !   The covariance C(theta) is evaluated by scanning theta uniformly from
+  !   0 to pi so that every angular scale, including sub-degree correlation
+  !   lengths, can be resolved.  Scanning uniformly in cos(theta) = z instead
+  !   would produce steps of arccos(1 - 2/nz_scan) near the pole, which equals
+  !   ~5 deg for nz_scan=500 and is far too coarse for xcorr < 5 deg.
 
   subroutine xcorr_deg_to_c2(xcorr_deg, nz, c2_out)
 
@@ -1064,7 +1242,7 @@ contains
     real(c_double), intent(out) :: c2_out
 
     integer,        parameter :: lmax_mult = 3
-    real(c_double), parameter :: tol_deg = 0.05d0
+    real(c_double), parameter :: tol_deg = 0.01d0
     integer,        parameter :: max_iter = 80
 
     integer        :: iter, lmax
@@ -1075,14 +1253,15 @@ contains
 
     ! Bracket: larger c2 -> smoother spectrum (more low-l power) -> LONGER
     ! correlation.  So c2_lo gives SHORT correlation, c2_hi gives LONG.
-    ! c2_lo = 1e-10 -> Gaussian sigma ~ 3.5 deg  (very short)
+    !
+    ! c2_lo = 1e-12 -> Gaussian sigma ~ 0.1 deg  (very short; set by ntheta_scan)
     ! c2_hi = 1e+2  -> Gaussian sigma ~ 127 deg  (nearly uniform)
-    c2_lo = 1.0d-10
+    c2_lo = 1.0d-12
     c2_hi = 1.0d2
 
     if (xcorr_rad < compute_efold_theta(c2_lo, lmax)) then
       write(*,'(a,f8.3,a)') 'xcorr_deg_to_c2: xcorr=', xcorr_deg, &
-        ' deg is very small (< 5 deg); using c2_lo'
+        ' deg is very small; using c2_lo'
       c2_out = c2_lo ; return
     end if
     if (xcorr_rad > compute_efold_theta(c2_hi, lmax)) then
@@ -1112,31 +1291,29 @@ contains
       real(c_double), intent(in) :: c2_val
       integer,        intent(in) :: lmax_in
 
-      real(c_double) :: C0_z1, C_z, z, dz, C_l_val, llp1, P0, P1, P2
-      integer        :: l, iz, nz_scan
-      real(c_double), parameter :: inv4pi = 0.25d0 / PI
+      ! Scan uniformly in theta (not cos(theta)) so that the angular
+      ! resolution is constant across all scales, including sub-degree
+      ! correlation lengths.  ntheta_scan=36000 gives a 0.005-deg step.
+      integer,        parameter  :: ntheta_scan = 36000
+      real(c_double), parameter  :: inv4pi = 0.25d0 / PI
 
-      nz_scan = 500
-      dz = 2.0d0 / real(nz_scan, c_double)
+      real(c_double) :: C0_z1, C_z, z, theta, dtheta, C_l_val, llp1, P0, P1, P2
+      integer        :: l, ith
 
-      C0_z1 = 0.0d0 ; P0 = 1.0d0 ; P1 = 1.0d0
+      dtheta = PI / real(ntheta_scan, c_double)
+
+      ! C(0): all P_l(1)=1, so this is just the spectral sum
+      C0_z1 = 0.0d0
       do l = 0, lmax_in
         llp1    = real(l,c_double) * real(l+1,c_double)
         C_l_val = 1.0d0 / (1.0d0 + c2_val * llp1**2)
-        if (l == 0) then
-          C0_z1 = C0_z1 + C_l_val * inv4pi
-        else if (l == 1) then
-          C0_z1 = C0_z1 + C_l_val * 3.0d0 * inv4pi
-        else
-          P2 = (real(2*l-1,c_double)*P1 - real(l-1,c_double)*P0) / real(l,c_double)
-          C0_z1 = C0_z1 + C_l_val * real(2*l+1,c_double) * inv4pi
-          P0 = P1 ; P1 = P2
-        end if
+        C0_z1   = C0_z1 + real(2*l+1,c_double) * C_l_val * inv4pi
       end do
 
       compute_efold_theta = PI
-      do iz = 0, nz_scan
-        z = 1.0d0 - real(iz,c_double) * dz
+      do ith = 1, ntheta_scan
+        theta = real(ith,c_double) * dtheta
+        z     = cos(theta)
         C_z = 0.0d0 ; P0 = 1.0d0 ; P1 = z
         do l = 0, lmax_in
           llp1    = real(l,c_double) * real(l+1,c_double)
@@ -1155,7 +1332,7 @@ contains
         ! (C(sigma) = C(0)*exp(-0.5)), matching the flat-FFT definition where
         ! the covariance is exp(-r^2/(2*xcorr^2)).
         if (C_z <= exp(-0.5d0) * C0_z1) then
-          compute_efold_theta = acos(max(-1.0d0, min(1.0d0, z)))
+          compute_efold_theta = theta
           return
         end if
       end do

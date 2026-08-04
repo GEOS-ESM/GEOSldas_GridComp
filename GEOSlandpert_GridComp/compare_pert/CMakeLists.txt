@@ -22,9 +22,21 @@ ecbuild_add_executable(
   SOURCES compare_pert.F90
   LIBS    GEOSlandpert_GridComp MAPL)
 
+ecbuild_add_executable(
+  TARGET  test_pert.x
+  SOURCES test_pert.F90
+  LIBS    GEOSlandpert_GridComp MAPL)
+
+#ecbuild_add_executable(
+#  TARGET  compare_timing.x
+#  SOURCES compare_timing.F90
+#  LIBS    GEOSlandpert_GridComp MAPL)
+
 # ---- MKL compile definition (matches parent library treatment) ---------
 if (MKL_FOUND AND NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
   target_compile_definitions(compare_pert.x PRIVATE MKL_AVAILABLE)
+  target_compile_definitions(test_pert.x PRIVATE MKL_AVAILABLE)
+#  target_compile_definitions(compare_timing.x PRIVATE MKL_AVAILABLE)
 endif ()
 
 # ---- Install Python comparison script ----------------------------------

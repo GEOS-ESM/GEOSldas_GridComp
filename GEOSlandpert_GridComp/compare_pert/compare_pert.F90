@@ -39,7 +39,7 @@ contains
     integer :: mpierr, unit
     integer :: rseed(NRANDSEED)
     real :: rfield(N_LON,N_LAT), rfield2(N_LON,N_LAT)
-    real :: t0, t_init, t_draw
+    real(c_double) :: t0, t_init, t_draw
     type(rectangle_random_fields) :: rf
     type(pert_param_type) :: pp
     type(grid_def_type) :: grid
@@ -77,7 +77,7 @@ contains
     integer :: mpierr, unit
     integer :: rseed(NRANDSEED)
     real :: rfield(N_LON,N_LAT), rfield2(N_LON,N_LAT)
-    real :: t0, t_build, t_draw
+    real(c_double) :: t0, t_build, t_draw
     type(sphere_random_fields) :: sf
     type(pert_param_type) :: pp
     type(grid_def_type) :: grid
