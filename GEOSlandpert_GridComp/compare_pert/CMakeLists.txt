@@ -23,8 +23,8 @@ ecbuild_add_executable(
   LIBS    GEOSlandpert_GridComp MAPL)
 
 ecbuild_add_executable(
-  TARGET  test_pert.x
-  SOURCES test_pert.F90
+  TARGET  pert_statistics.x
+  SOURCES pert_statistics.F90
   LIBS    GEOSlandpert_GridComp MAPL)
 
 #ecbuild_add_executable(
@@ -35,7 +35,7 @@ ecbuild_add_executable(
 # ---- MKL compile definition (matches parent library treatment) ---------
 if (MKL_FOUND AND NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
   target_compile_definitions(compare_pert.x PRIVATE MKL_AVAILABLE)
-  target_compile_definitions(test_pert.x PRIVATE MKL_AVAILABLE)
+  target_compile_definitions(pert_statistics.x PRIVATE MKL_AVAILABLE)
 #  target_compile_definitions(compare_timing.x PRIVATE MKL_AVAILABLE)
 endif ()
 
