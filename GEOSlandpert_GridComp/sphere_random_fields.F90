@@ -56,7 +56,8 @@ module sphere_random_fields_mod
   use nr_ran2_gasdev, only: NRANDSEED, init_randseed, nr_ran2_2d, nr_gasdev
   use smerfs_interface, only: update_cov_f, update_cov_range_f, inverse_f, cholesky_f, &
                               state_space_f, hyp_llp1_f, hyp_lmz_f, zigg_f, &
-                              cov_legendre_f, state_space_1_f
+                              cov_legendre_f, cov_legendre_full_f, &
+                              state_space_1_f
 #ifdef MKL_AVAILABLE
   use MKL_DFTI
 #endif
@@ -107,12 +108,8 @@ module sphere_random_fields_mod
     integer :: win_all_trans = MPI_WIN_NULL
 
     ! --- Mord=1 (direct Legendre) filter arrays -------------------------
-    ! Used when sqrt(c0/c2) > LEGENDRE_THRESH (short correlation lengths).
-    ! The scalar Kalman walk is: x_{i+1} = trans1(i)*x_i + innov1(i+1)*w_i
-    !   innov1(n_m, nz)    scalar innovation (sqrt of residual variance)
-    !   trans1(n_m, nz-1)  scalar transition
-    real(c_double), allocatable :: innov1(:,:)   ! (n_m, uhalf)
-    real(c_double), allocatable :: trans1(:,:)   ! (n_m, uhalf-1)
+    ! Full covariance Cholesky factors for each longitudinal mode.
+    real(c_double), allocatable :: chol1(:,:,:)  ! (n_m, nz, nz)
 
     ! cos(theta) at each upper-hemisphere ring (uhalf values, equator first)
     real(c_double), allocatable :: z_pts(:)
@@ -451,8 +448,7 @@ contains
     ! --- Allocate filter arrays (every rank needs the full tables) ------
     if (sf%Mord == 1) then
       ! Mord=1: allocate full north-to-south scalar filter arrays.
-      allocate(sf%innov1(n_m, nz))
-      allocate(sf%trans1(n_m, nz-1))
+      allocate(sf%chol1(n_m, nz, nz))
     else
       if (sf%node_comm /= MPI_COMM_NULL) then
         disp_unit = int(c_sizeof(dummy_real))
@@ -504,11 +500,9 @@ contains
         block
           integer, parameter :: lmax_mult = 3
           integer :: lmax_leg
-          ! cov1   (0:m_max, nz)    scalar covariances per m
-          ! cross1 (0:m_max, nz-1)  scalar cross-covariances per m
           real(c_double), allocatable :: z_full(:)
-          real(c_double), allocatable :: cov1(:), cross1(:)
-          real(c_double), allocatable :: innov_tmp(:), trans_tmp(:)
+          real(c_double), allocatable :: cov_full(:)
+          real(c_double), allocatable :: chol_tmp(:,:)
           integer :: k
 
           lmax_leg = lmax_mult * nz
@@ -516,13 +510,10 @@ contains
           do k = 1, nz
             z_full(k) = ring_z(k, sf)
           end do
-          allocate(cov1  ((m_max+1) * nz))
-          allocate(cross1((m_max+1) * (nz-1)))
-          allocate(innov_tmp(nz))
-          allocate(trans_tmp(nz-1))
+          allocate(cov_full((m_max+1) * nz * nz))
+          allocate(chol_tmp(nz,nz))
 
-          call cov_legendre_f(m_max, nz, lmax_leg, c0, c2, z_full, &
-                              cov1, cross1, rc)
+          call cov_legendre_full_f(m_max, nz, lmax_leg, c0, c2, z_full, cov_full, rc)
           if (rc /= 0) then
             write(*,'(a,i0)') 'build_sphere_filter: cov_legendre_f failed, rc=', rc
             stop 1
@@ -533,22 +524,18 @@ contains
               'build_sphere_filter: |Im(root)|=', sqrt(c0/c2), &
               ' > threshold; using direct Legendre covariance (Mord=1, stable)'
 
-          ! Build Mord=1 Kalman filter per m-mode
+          ! Build a full Cholesky factor for each m-mode covariance matrix.
           do imode = 0, n_m-1
-            call state_space_1_f(nz,                             &
-                                 cross1(imode*(nz-1)+1 : (imode+1)*(nz-1)), &
-                                 cov1(imode*nz+1 : (imode+1)*nz),           &
-                                 innov_tmp, trans_tmp, rc)
+            call cholesky_lower(nz, cov_full(imode*nz*nz+1:), chol_tmp, rc)
             if (rc /= 0) then
               write(*,'(a,i0,a,i0)') &
-                'build_sphere_filter: state_space_1_f failed at imode=', imode, ', rc=', rc
+                'build_sphere_filter: full Legendre Cholesky failed at imode=', imode, ', rc=', rc
               stop 1
             end if
-            sf%innov1(imode+1, :) = innov_tmp
-            sf%trans1(imode+1, :) = trans_tmp
+            sf%chol1(imode+1,:,:) = chol_tmp
           end do
 
-          deallocate(z_full, cov1, cross1, innov_tmp, trans_tmp)
+          deallocate(z_full, cov_full, chol_tmp)
         end block
 
       end if  ! Mord == 1
@@ -685,8 +672,7 @@ contains
     ! global_rank == 0 is the only rank).
     if (present(comm)) then
       if (sf%Mord == 1) then
-        call MPI_Bcast(sf%innov1, n_m*nz,      MPI_DOUBLE_PRECISION, 0, comm, mpierr)
-        call MPI_Bcast(sf%trans1, n_m*(nz-1),  MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+        call MPI_Bcast(sf%chol1, n_m*nz*nz, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
       end if
       call MPI_Bcast(sf%z_pts, uhalf, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
@@ -915,25 +901,19 @@ contains
 
       if (sf%Mord == 1) then
         ! ----------------------------------------------------------------
-        ! Mord=1 scalar walk: x_{i+1} = trans1(j,i)*x_i + innov1(j,i+1)*w_i
+        ! Mord=1 full per-m covariance draw.
         ! fp_f(1,:) holds the scalar state; fp_fstart holds it at equator.
         ! ----------------------------------------------------------------
 
-        ! Full north-to-south scalar walk. Do not reflect the scalar field
-        ! across the equator; that creates artificial meridional coherence.
+        ! Full per-m covariance draw from the lower Cholesky factor.
         do j = 1, n_m_local
-          fp_f(1, j) = real(sf%innov1(j_lo+j-1, 1), c_float) * noise(1, j, 1)
-        end do
-        fp_fprev(1,:)  = fp_f(1,:)
-        res_cplx(j_lo:j_hi, 1) = fp_f(1, :)
-
-        do i = 1, nz-1
-          do j = 1, n_m_local
-            fp_f(1, j) = real(sf%trans1(j_lo+j-1, i),   c_float) * fp_fprev(1, j) &
-                        + real(sf%innov1(j_lo+j-1, i+1),  c_float) * noise(1, j, i+1)
+          do i = 1, nz
+            fp_f(1,j) = cmplx(0.0, 0.0, c_float)
+            do ip = 1, i
+              fp_f(1,j) = fp_f(1,j) + real(sf%chol1(j_lo+j-1,i,ip), c_float) * noise(1,j,ip)
+            end do
+            res_cplx(j_lo+j-1,i) = fp_f(1,j)
           end do
-          fp_fprev(1,:) = fp_f(1,:)
-          res_cplx(j_lo:j_hi, i+1) = fp_f(1, :)
         end do
 
       else
@@ -1158,8 +1138,7 @@ contains
     else if (associated(sf%all_trans)) then
       deallocate(sf%all_trans)
     end if
-    if (allocated(sf%innov1))    deallocate(sf%innov1)
-    if (allocated(sf%trans1))    deallocate(sf%trans1)
+    if (allocated(sf%chol1))     deallocate(sf%chol1)
     if (allocated(sf%z_pts))     deallocate(sf%z_pts)
 #ifdef MKL_AVAILABLE
     if (associated(sf%dfti_irfft)) then
@@ -1497,6 +1476,38 @@ contains
       hi = lo + base - 1
     end if
   end subroutine compute_strip
+
+  subroutine cholesky_lower(n, a, l, rc)
+    integer, intent(in) :: n
+    real(c_double), intent(in) :: a(n,n)
+    real(c_double), intent(out) :: l(n,n)
+    integer, intent(out) :: rc
+    integer :: i, j, k
+    real(c_double) :: value, max_diag, jitter
+
+    l = 0.0d0
+    rc = 0
+    max_diag = maxval([(a(i,i), i=1,n)])
+    jitter = max_diag * 1.0d-10
+    do i = 1, n
+      do j = 1, i
+        value = a(i,j)
+        if (i == j) value = value + jitter
+        do k = 1, j-1
+          value = value - l(i,k) * l(j,k)
+        end do
+        if (i == j) then
+          if (value <= 0.0d0) then
+            rc = i
+            return
+          end if
+          l(i,j) = sqrt(value)
+        else
+          l(i,j) = value / l(j,j)
+        end if
+      end do
+    end do
+  end subroutine cholesky_lower
 
   ! ======================================================================
   ! Private: native ring z coordinate
