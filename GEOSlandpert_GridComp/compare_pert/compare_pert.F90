@@ -10,7 +10,7 @@ program compare_pert
 
   integer, parameter :: N_LON = 720, N_LAT = 360
   real, parameter :: DLON = 360.0 / real(N_LON), DLAT = 180.0 / real(N_LAT)
-  real, parameter :: XCORR = 10.0, YCORR = 10.0
+  real, parameter :: XCORR = 2.0, YCORR = 2.0
   integer, parameter :: RSEED0 = -777
   integer :: mpierr, rank, npes
   integer :: seed_template(NRANDSEED)

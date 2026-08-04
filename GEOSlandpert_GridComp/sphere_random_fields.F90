@@ -109,8 +109,8 @@ module sphere_random_fields_mod
     ! --- Mord=1 (direct Legendre) filter arrays -------------------------
     ! Used when sqrt(c0/c2) > LEGENDRE_THRESH (short correlation lengths).
     ! The scalar Kalman walk is: x_{i+1} = trans1(i)*x_i + innov1(i+1)*w_i
-    !   innov1(n_m, uhalf)    scalar innovation (sqrt of residual variance)
-    !   trans1(n_m, uhalf-1)  scalar transition
+    !   innov1(n_m, nz)    scalar innovation (sqrt of residual variance)
+    !   trans1(n_m, nz-1)  scalar transition
     real(c_double), allocatable :: innov1(:,:)   ! (n_m, uhalf)
     real(c_double), allocatable :: trans1(:,:)   ! (n_m, uhalf-1)
 
@@ -327,7 +327,7 @@ contains
     integer :: n_needed, n_got, i
     integer(c_int32_t) :: state
 
-    n_needed = sf%nz * sf%Mord * (sf%j_hi - sf%j_lo + 1) * 2
+    n_needed = sf%nz * sf%Mord * sf%n_m * 2
     n_got = n_needed + n_needed/32 + 64
     allocate(rand_ints(n_got))
     state = seed
@@ -450,9 +450,9 @@ contains
 
     ! --- Allocate filter arrays (every rank needs the full tables) ------
     if (sf%Mord == 1) then
-      ! Mord=1: allocate 2D (n_m, uhalf/uhalf-1) scalar filter arrays
-      allocate(sf%innov1(n_m, uhalf))
-      allocate(sf%trans1(n_m, uhalf-1))
+      ! Mord=1: allocate full north-to-south scalar filter arrays.
+      allocate(sf%innov1(n_m, nz))
+      allocate(sf%trans1(n_m, nz-1))
     else
       if (sf%node_comm /= MPI_COMM_NULL) then
         disp_unit = int(c_sizeof(dummy_real))
@@ -504,18 +504,24 @@ contains
         block
           integer, parameter :: lmax_mult = 3
           integer :: lmax_leg
-          ! cov1   (0:m_max, uhalf)    scalar covariances per m
-          ! cross1 (0:m_max, uhalf-1)  scalar cross-covariances per m
+          ! cov1   (0:m_max, nz)    scalar covariances per m
+          ! cross1 (0:m_max, nz-1)  scalar cross-covariances per m
+          real(c_double), allocatable :: z_full(:)
           real(c_double), allocatable :: cov1(:), cross1(:)
           real(c_double), allocatable :: innov_tmp(:), trans_tmp(:)
+          integer :: k
 
           lmax_leg = lmax_mult * nz
-          allocate(cov1  ((m_max+1) * uhalf))
-          allocate(cross1((m_max+1) * (uhalf-1)))
-          allocate(innov_tmp(uhalf))
-          allocate(trans_tmp(uhalf-1))
+          allocate(z_full(nz))
+          do k = 1, nz
+            z_full(k) = ring_z(k, sf)
+          end do
+          allocate(cov1  ((m_max+1) * nz))
+          allocate(cross1((m_max+1) * (nz-1)))
+          allocate(innov_tmp(nz))
+          allocate(trans_tmp(nz-1))
 
-          call cov_legendre_f(m_max, uhalf, lmax_leg, c0, c2, sf%z_pts, &
+          call cov_legendre_f(m_max, nz, lmax_leg, c0, c2, z_full, &
                               cov1, cross1, rc)
           if (rc /= 0) then
             write(*,'(a,i0)') 'build_sphere_filter: cov_legendre_f failed, rc=', rc
@@ -529,9 +535,9 @@ contains
 
           ! Build Mord=1 Kalman filter per m-mode
           do imode = 0, n_m-1
-            call state_space_1_f(uhalf,                          &
-                                 cross1(imode*(uhalf-1)+1 : (imode+1)*(uhalf-1)), &
-                                 cov1(imode*uhalf+1 : (imode+1)*uhalf),           &
+            call state_space_1_f(nz,                             &
+                                 cross1(imode*(nz-1)+1 : (imode+1)*(nz-1)), &
+                                 cov1(imode*nz+1 : (imode+1)*nz),           &
                                  innov_tmp, trans_tmp, rc)
             if (rc /= 0) then
               write(*,'(a,i0,a,i0)') &
@@ -542,7 +548,7 @@ contains
             sf%trans1(imode+1, :) = trans_tmp
           end do
 
-          deallocate(cov1, cross1, innov_tmp, trans_tmp)
+          deallocate(z_full, cov1, cross1, innov_tmp, trans_tmp)
         end block
 
       end if  ! Mord == 1
@@ -679,8 +685,8 @@ contains
     ! global_rank == 0 is the only rank).
     if (present(comm)) then
       if (sf%Mord == 1) then
-        call MPI_Bcast(sf%innov1, n_m*uhalf,      MPI_DOUBLE_PRECISION, 0, comm, mpierr)
-        call MPI_Bcast(sf%trans1, n_m*(uhalf-1),  MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+        call MPI_Bcast(sf%innov1, n_m*nz,      MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+        call MPI_Bcast(sf%trans1, n_m*(nz-1),  MPI_DOUBLE_PRECISION, 0, comm, mpierr)
       end if
       call MPI_Bcast(sf%z_pts, uhalf, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
@@ -785,7 +791,7 @@ contains
     integer :: uhalf, n_m, nz, nphi, Mord
     integer :: j_lo, j_hi, n_m_local          ! m-mode strip for this rank
     integer :: row_lo, row_hi, n_row_local     ! ring strip for IRFFT (from sf)
-    integer :: n_rand_needed_local
+    integer :: n_rand_needed_local, n_rand_needed_global
      integer :: i, j, ip, iq, nn, rc
      integer :: skip
     logical :: parallel
@@ -876,15 +882,16 @@ contains
     ! The south-hemisphere walk reuses noise at indices uhalf+1..nz, so
     ! the full nz rings of noise are required (not just uhalf).
     n_rand_needed_local = nz * Mord * n_m_local * 2
+    n_rand_needed_global = nz * Mord * n_m * 2
 
-    allocate(noise_real(n_rand_needed_local))
+    allocate(noise_real(n_rand_needed_global))
     allocate(noise    (Mord, n_m_local, nz))
      allocate(fp_f     (Mord, n_m_local))
      allocate(fp_fstart(Mord, n_m_local))
      allocate(fp_fprev (Mord, n_m_local))
 
     if (n_m_local > 0) then
-      call zigg_f(n_rand_needed_local, n_rand_got, rand_ints, noise_real, rc)
+      call zigg_f(n_rand_needed_global, n_rand_got, rand_ints, noise_real, rc)
       if (rc /= 0) then
         write(*,'(a,i0,a)') &
           'WARNING draw_sphere_realisation: zigg exhausted, ', rc, ' samples missing'
@@ -893,13 +900,12 @@ contains
       ! Pack into complex noise: noise(ip, jlocal, i) = (re + i*im) / sqrt(2)
       ! Loop over all nz rings so south-hemisphere indices (uhalf+1..nz)
       ! are filled from the same noise stream as the reference Python code.
-      nn = 0
       do i = 1, nz
         do ip = 1, Mord
           do j = 1, n_m_local
-            nn = nn + 1
+            nn = (i - 1) * Mord * n_m + (ip - 1) * n_m + (j_lo + j - 2) + 1
             noise(ip, j, i) = cmplx(noise_real(2*nn-1), noise_real(2*nn), c_float) &
-                              * real(0.5d0**0.5d0, c_float)
+                               * real(0.5d0**0.5d0, c_float)
           end do
         end do
       end do
@@ -913,35 +919,21 @@ contains
         ! fp_f(1,:) holds the scalar state; fp_fstart holds it at equator.
         ! ----------------------------------------------------------------
 
-        ! Initialise at ring 1
+        ! Full north-to-south scalar walk. Do not reflect the scalar field
+        ! across the equator; that creates artificial meridional coherence.
         do j = 1, n_m_local
           fp_f(1, j) = real(sf%innov1(j_lo+j-1, 1), c_float) * noise(1, j, 1)
         end do
-        fp_fstart(1,:) = fp_f(1,:)
         fp_fprev(1,:)  = fp_f(1,:)
-        res_cplx(j_lo:j_hi, uhalf) = fp_f(1, :)
+        res_cplx(j_lo:j_hi, 1) = fp_f(1, :)
 
-        do i = 1, uhalf-1
+        do i = 1, nz-1
           do j = 1, n_m_local
             fp_f(1, j) = real(sf%trans1(j_lo+j-1, i),   c_float) * fp_fprev(1, j) &
-                       + real(sf%innov1(j_lo+j-1, i+1),  c_float) * noise(1, j, i+1)
+                        + real(sf%innov1(j_lo+j-1, i+1),  c_float) * noise(1, j, i+1)
           end do
           fp_fprev(1,:) = fp_f(1,:)
-          res_cplx(j_lo:j_hi, uhalf - i) = fp_f(1, :)
-        end do
-
-        ! Reflect: Mord=1 state has even symmetry (p=0, even)
-        fp_f(1,:)    = fp_fstart(1,:)
-        fp_fprev(1,:)= fp_f(1,:)
-        skip = 1 - mod(nz, 2)
-
-        do i = 0, nz - uhalf - 1
-          do j = 1, n_m_local
-            fp_f(1, j) = real(sf%trans1(j_lo+j-1, i+skip+1),  c_float) * fp_fprev(1, j) &
-                       + real(sf%innov1(j_lo+j-1, i+skip+2),   c_float) * noise(1, j, uhalf+i+1)
-          end do
-          fp_fprev(1,:) = fp_f(1,:)
-          res_cplx(j_lo:j_hi, uhalf + i + 1) = fp_f(1, :)
+          res_cplx(j_lo:j_hi, i+1) = fp_f(1, :)
         end do
 
       else
@@ -1350,7 +1342,7 @@ contains
     real, allocatable :: uniforms(:)
     integer :: n_needed, n_got
 
-    n_needed = this%nz * this%Mord * (this%j_hi - this%j_lo + 1) * 2
+    n_needed = this%nz * this%Mord * this%n_m * 2
     n_got = n_needed + n_needed/32 + 64
     allocate(ints(n_got), uniforms(n_got))
     call nr_ran2_2d(1, n_got, rseed, uniforms)
@@ -1377,8 +1369,7 @@ contains
     real(c_double), allocatable :: field_d(:,:), field2_d(:,:)
     real :: field_mean, field_norm
 
-    n_needed = this%filter%nz * this%filter%Mord * &
-               (this%filter%j_hi - this%filter%j_lo + 1) * 2
+    n_needed = this%filter%nz * this%filter%Mord * this%filter%n_m * 2
     n_got = n_needed + n_needed / 32 + 64
     allocate(ints(n_got))
     allocate(field_d(this%filter%nphi, this%filter%nz))
