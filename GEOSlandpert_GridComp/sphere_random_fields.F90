@@ -54,7 +54,9 @@ module sphere_random_fields_mod
                                           c_sizeof
   use mpi
   use nr_ran2_gasdev, only: NRANDSEED, init_randseed, nr_ran2_2d, nr_gasdev
-  use smerfs_interface
+  use smerfs_interface, only: update_cov_f, update_cov_range_f, inverse_f, cholesky_f, &
+                              state_space_f, hyp_llp1_f, hyp_lmz_f, zigg_f, &
+                              cov_legendre_f, state_space_1_f
 #ifdef MKL_AVAILABLE
   use MKL_DFTI
 #endif
@@ -99,8 +101,10 @@ module sphere_random_fields_mod
     !   all_innov(Mord, Mord, uhalf,   n_m)
     !   all_trans(Mord, Mord, uhalf-1, n_m)
     ! (allocated as (sf%Mord, sf%Mord, ...) — only populated when sf%Mord == 2)
-    real(c_double), allocatable :: all_innov(:,:,:,:)
-    real(c_double), allocatable :: all_trans(:,:,:,:)
+    real(c_double), pointer :: all_innov(:,:,:,:) => null()
+    real(c_double), pointer :: all_trans(:,:,:,:) => null()
+    integer :: win_all_innov = MPI_WIN_NULL
+    integer :: win_all_trans = MPI_WIN_NULL
 
     ! --- Mord=1 (direct Legendre) filter arrays -------------------------
     ! Used when sqrt(c0/c2) > LEGENDRE_THRESH (short correlation lengths).
@@ -182,13 +186,12 @@ contains
     id_string = trim(id)
   end function sphere_random_fields_id
 
-  function new_sphere_random_fields(pert_param, pert_grid_f, comm, rc, c2) result(rf)
+  function new_sphere_random_fields(pert_param, pert_grid_f, comm, rc) result(rf)
     type(sphere_random_fields) :: rf
     type(pert_param_type), intent(in) :: pert_param
     type(grid_def_type), intent(in) :: pert_grid_f
     integer, optional, intent(in) :: comm
     integer, optional, intent(out) :: rc
-    real(c_double), optional, intent(in) :: c2
     real(c_double) :: xcorr_deg
     real(c_double) :: c2_use
     character(len=:), allocatable :: id_string
@@ -202,32 +205,26 @@ contains
     rf%output_nlat = pert_grid_f%N_lat
     id_string = sphere_random_fields_id(pert_param, pert_grid_f)
     rf%ID_string = id_string
-    c2_use = -1.0d0
-    if (present(c2)) c2_use = c2
-    if (c2_use <= 0.0d0) then
-      if (present(comm)) then
-        call MPI_Comm_rank(comm, comm_rank, mpierr)
-      else
-        comm_rank = 0
-      end if
-      if (comm_rank == 0 .and. xcorr_deg > 0.0d0) then
-        call xcorr_deg_to_c2(xcorr_deg, rf%nz_sphere, c2_use)
-      else if (comm_rank == 0) then
-        c2_use = 1.0d-12
-      end if
-      if (present(comm)) then
-        call MPI_Bcast(c2_use, 1, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
-      end if
-      if (comm_rank /= 0 .and. c2_use <= 0.0d0) then
-        c2_use = 1.0d-12
-      end if
+
+    if (present(comm)) then
+      call MPI_Comm_rank(comm, comm_rank, mpierr)
+    else
+      comm_rank = 0
+    end if
+    if (comm_rank == 0 .and. xcorr_deg > 0.0d0) then
+      call xcorr_deg_to_c2(xcorr_deg, rf%nz_sphere, c2_use)
+    else if (comm_rank == 0) then
+      c2_use = 1.0d-12
+    end if
+    if (present(comm)) then
+      call MPI_Bcast(c2_use, 1, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
     rf%c2 = c2_use
 
     ! Choose filter order: switch to Mord=1 (direct Legendre) when the
     ! Mord=2 hypergeometric path is ill-conditioned (short correlation lengths).
     if (rf%Mord == 2 .and. c2_use > 0.0d0 .and. &
-        sqrt(rf%c0 / c2_use) > LEGENDRE_THRESH) then
+        sqrt(rf%c0 / c2_use) > LEGENDRE_THRESH * (1.0d0 + 1.0d-6)) then
       rf%Mord = 1
     end if
 
@@ -379,8 +376,12 @@ contains
     integer :: uhalf, n_m, m_max
     integer :: i, iroot, imode, im_hyp, rc
     integer :: global_rank, global_npes, mpierr
-    integer :: build_j_lo, build_j_hi
+    integer :: build_j_lo, build_j_hi, n_m_build
     integer :: innov_size, trans_size
+    integer :: disp_unit
+    integer(MPI_ADDRESS_KIND) :: win_size
+    type(c_ptr) :: base_innov, base_trans
+    real(c_double) :: dummy_real
 
     ! Partial fraction decomposition (Mord poles)
     complex(c_double_complex) :: roots_llp1(Mord)
@@ -453,8 +454,32 @@ contains
       allocate(sf%innov1(n_m, uhalf))
       allocate(sf%trans1(n_m, uhalf-1))
     else
-      allocate(sf%all_innov(Mord, Mord, uhalf,   n_m))
-      allocate(sf%all_trans(Mord, Mord, uhalf-1, n_m))
+      if (sf%node_comm /= MPI_COMM_NULL) then
+        disp_unit = int(c_sizeof(dummy_real))
+
+        win_size = 0_MPI_ADDRESS_KIND
+        if (sf%node_rank == 0) win_size = int(Mord, MPI_ADDRESS_KIND) * &
+             int(Mord, MPI_ADDRESS_KIND) * int(uhalf, MPI_ADDRESS_KIND) * &
+             int(n_m, MPI_ADDRESS_KIND) * int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
+        call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
+                                     sf%node_comm, base_innov, sf%win_all_innov, mpierr)
+        if (sf%node_rank /= 0) &
+          call MPI_Win_shared_query(sf%win_all_innov, 0, win_size, disp_unit, base_innov, mpierr)
+        call c_f_pointer(base_innov, sf%all_innov, [Mord, Mord, uhalf, n_m])
+
+        win_size = 0_MPI_ADDRESS_KIND
+        if (sf%node_rank == 0) win_size = int(Mord, MPI_ADDRESS_KIND) * &
+             int(Mord, MPI_ADDRESS_KIND) * int(uhalf-1, MPI_ADDRESS_KIND) * &
+             int(n_m, MPI_ADDRESS_KIND) * int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
+        call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
+                                     sf%node_comm, base_trans, sf%win_all_trans, mpierr)
+        if (sf%node_rank /= 0) &
+          call MPI_Win_shared_query(sf%win_all_trans, 0, win_size, disp_unit, base_trans, mpierr)
+        call c_f_pointer(base_trans, sf%all_trans, [Mord, Mord, uhalf-1, n_m])
+      else
+        allocate(sf%all_innov(Mord, Mord, uhalf,   n_m))
+        allocate(sf%all_trans(Mord, Mord, uhalf-1, n_m))
+      end if
     end if
 
     ! --- z-points -------------------------------------------------------
@@ -520,11 +545,32 @@ contains
           deallocate(cov1, cross1, innov_tmp, trans_tmp)
         end block
 
+      end if  ! Mord == 1
+
+    end if  ! global_rank == 0
+
+    ! --- Parallel filter construction for Mord=2 ------------------------
+    ! Each rank builds the full covariance/state-space chain only for its
+    ! assigned m-mode range, then all ranks sum sparse filter slices.
+    if (sf%Mord /= 1) then
+      innov_size = Mord * Mord * uhalf * n_m
+      trans_size = Mord * Mord * (uhalf-1) * n_m
+      if (sf%node_comm /= MPI_COMM_NULL) then
+        if (sf%node_rank == 0) then
+          sf%all_innov = 0.0d0
+          sf%all_trans = 0.0d0
+        end if
+        call MPI_Win_fence(0, sf%win_all_innov, mpierr)
+        call MPI_Win_fence(0, sf%win_all_trans, mpierr)
       else
-        ! ----------------------------------------------------------------
-        ! Original hypergeometric path (Mord=2)
-        ! ----------------------------------------------------------------
-        ! Twiddle factors — tau_p has 2*Mord-1 columns
+        sf%all_innov = 0.0d0
+        sf%all_trans = 0.0d0
+      end if
+
+      call compute_strip(n_m, sf%node_npes, sf%node_rank, build_j_lo, build_j_hi)
+      n_m_build = max(0, build_j_hi - build_j_lo + 1)
+
+      if (n_m_build > 0) then
         allocate(tau_p   (uhalf,   2*Mord-1))
         allocate(eta_ratio(uhalf-1))
         tau_p(:, Mord)   = 1.0d0
@@ -539,7 +585,6 @@ contains
         xvals = 0.5d0 * (1.0d0 - sf%z_pts)
         yvals = 0.5d0 * (1.0d0 + sf%z_pts)
 
-        ! Partial fraction decomposition of 1/(c0 + c2*k^2), c1=0
         disc_re = -4.0d0 * c0 * c2
         if (disc_re >= 0.0d0) then
           roots_llp1(1) = cmplx( sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
@@ -554,18 +599,15 @@ contains
             (2.0d0 * cmplx(c2, 0.0d0, c_double_complex) * roots_llp1(iroot))
         end do
 
-        ! Covariance accumulators. Rank 0 fills these, then all ranks receive
-        ! them and split the independent state-space decomposition over m-modes.
-        allocate(cov      (Mord, Mord, uhalf,   0:m_max))
-        allocate(cross_cov(Mord, Mord, uhalf-1, 0:m_max))
-        allocate(Fmat(uhalf, m_max+Mord+1))
-        allocate(Hmat(uhalf, m_max+Mord+1))
+        allocate(cov      (Mord, Mord, uhalf,   n_m_build))
+        allocate(cross_cov(Mord, Mord, uhalf-1, n_m_build))
+        allocate(Fmat(uhalf, n_m_build+Mord))
+        allocate(Hmat(uhalf, n_m_build+Mord))
         allocate(innov_m(Mord, Mord, uhalf))
         allocate(trans_m(Mord, Mord, uhalf-1))
         cov       = 0.0d0
         cross_cov = 0.0d0
 
-        ! Hypergeometric evaluation + covariance accumulation
         do iroot = 1, Mord
           llp1_val = roots_llp1(iroot)
           llp1_re  = real(llp1_val, c_double)
@@ -582,81 +624,54 @@ contains
           sin_pi_lam = sin(PI * lam_val)
           norm = -(0.25d0 / PI) * norm * PI / sin_pi_lam
 
-          do im_hyp = 0, m_max + Mord
-            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, xvals, Fmat(:,im_hyp+1), rc)
+          do im_hyp = build_j_lo - 1, build_j_hi - 1 + Mord
+            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, &
+                            xvals, Fmat(:,im_hyp - (build_j_lo - 1) + 1), rc)
             if (rc /= 0) then
               write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f F failed at im_hyp=', im_hyp
               stop 1
             end if
-            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, yvals, Hmat(:,im_hyp+1), rc)
+            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, &
+                            yvals, Hmat(:,im_hyp - (build_j_lo - 1) + 1), rc)
             if (rc /= 0) then
               write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f H failed at im_hyp=', im_hyp
               stop 1
             end if
           end do
 
-          call update_cov_f(m_max, uhalf, Mord,               &
-                            real(norm,c_double), aimag(norm),  &
-                            llp1_re, llp1_im,                  &
-                            Fmat, Hmat, tau_p, eta_ratio,      &
-                            cov, cross_cov, rc)
+          call update_cov_range_f(build_j_lo - 1, build_j_hi - 1, uhalf, Mord, &
+                                  real(norm,c_double), aimag(norm),            &
+                                  llp1_re, llp1_im,                            &
+                                  Fmat, Hmat, tau_p, eta_ratio,                &
+                                  cov, cross_cov, rc)
           if (rc /= 0) then
-            write(*,'(a,i0)') 'build_sphere_filter: update_cov_f failed, rc=', rc
+            write(*,'(a,i0)') 'build_sphere_filter: update_cov_range_f failed, rc=', rc
             stop 1
           end if
-        end do  ! iroot
+        end do
 
-        deallocate(tau_p, eta_ratio, xvals, yvals, Fmat, Hmat)
+        do imode = build_j_lo - 1, build_j_hi - 1
+          call state_space_f(uhalf, Mord,                     &
+                             cross_cov(:,:,:,imode - (build_j_lo - 1) + 1), &
+                             cov(:,:,:,imode - (build_j_lo - 1) + 1),       &
+                             innov_m, trans_m, rc)
+          if (rc /= 0) then
+            write(*,'(a,i0,a,i0)') &
+              'build_sphere_filter: state_space_f failed at imode=', imode, ', rc=', rc
+            stop 1
+          end if
+          sf%all_innov(:,:,:,imode+1) = innov_m
+          sf%all_trans(:,:,:,imode+1) = trans_m
+        end do
 
-      end if  ! Mord == 1
-
-    end if  ! global_rank == 0
-
-    ! --- Parallel state-space decomposition for Mord=2 ------------------
-    ! Rank 0 still builds the covariance tables, but the independent
-    ! per-m-mode state-space decompositions are split across MPI ranks.
-    if (sf%Mord /= 1) then
-      innov_size = Mord * Mord * uhalf * n_m
-      trans_size = Mord * Mord * (uhalf-1) * n_m
-
-      if (.not. allocated(cov)) then
-        allocate(cov      (Mord, Mord, uhalf,   0:m_max))
-        allocate(cross_cov(Mord, Mord, uhalf-1, 0:m_max))
-        allocate(innov_m(Mord, Mord, uhalf))
-        allocate(trans_m(Mord, Mord, uhalf-1))
+        deallocate(tau_p, eta_ratio, xvals, yvals)
+        deallocate(Fmat, Hmat, cov, cross_cov, innov_m, trans_m)
       end if
 
-      if (present(comm)) then
-        call MPI_Bcast(cov,       innov_size, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
-        call MPI_Bcast(cross_cov, trans_size, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+      if (sf%node_comm /= MPI_COMM_NULL) then
+        call MPI_Win_fence(0, sf%win_all_innov, mpierr)
+        call MPI_Win_fence(0, sf%win_all_trans, mpierr)
       end if
-
-      sf%all_innov = 0.0d0
-      sf%all_trans = 0.0d0
-
-      call compute_strip(n_m, global_npes, global_rank, build_j_lo, build_j_hi)
-      do imode = build_j_lo - 1, build_j_hi - 1
-        call state_space_f(uhalf, Mord,                     &
-                           cross_cov(:,:,:,imode),          &
-                           cov(:,:,:,imode),                &
-                           innov_m, trans_m, rc)
-        if (rc /= 0) then
-          write(*,'(a,i0,a,i0)') &
-            'build_sphere_filter: state_space_f failed at imode=', imode, ', rc=', rc
-          stop 1
-        end if
-        sf%all_innov(:,:,:,imode+1) = innov_m
-        sf%all_trans(:,:,:,imode+1) = trans_m
-      end do
-
-      if (present(comm)) then
-        call MPI_Allreduce(MPI_IN_PLACE, sf%all_innov, innov_size, &
-                           MPI_DOUBLE_PRECISION, MPI_SUM, comm, mpierr)
-        call MPI_Allreduce(MPI_IN_PLACE, sf%all_trans, trans_size, &
-                           MPI_DOUBLE_PRECISION, MPI_SUM, comm, mpierr)
-      end if
-
-      deallocate(cov, cross_cov, innov_m, trans_m)
     end if
 
     ! --- Broadcast filter tables to all ranks ---------------------------
@@ -1137,8 +1152,20 @@ contains
     type(sphere_filter_type), intent(inout) :: sf
     integer :: mpierr
 
-    if (allocated(sf%all_innov)) deallocate(sf%all_innov)
-    if (allocated(sf%all_trans)) deallocate(sf%all_trans)
+    if (sf%win_all_innov /= MPI_WIN_NULL) then
+      call MPI_Win_free(sf%win_all_innov, mpierr)
+      sf%win_all_innov = MPI_WIN_NULL
+      nullify(sf%all_innov)
+    else if (associated(sf%all_innov)) then
+      deallocate(sf%all_innov)
+    end if
+    if (sf%win_all_trans /= MPI_WIN_NULL) then
+      call MPI_Win_free(sf%win_all_trans, mpierr)
+      sf%win_all_trans = MPI_WIN_NULL
+      nullify(sf%all_trans)
+    else if (associated(sf%all_trans)) then
+      deallocate(sf%all_trans)
+    end if
     if (allocated(sf%innov1))    deallocate(sf%innov1)
     if (allocated(sf%trans1))    deallocate(sf%trans1)
     if (allocated(sf%z_pts))     deallocate(sf%z_pts)
@@ -1226,14 +1253,9 @@ contains
   !
   ! The true e-folding distance (where C = C(0)/e) is xcorr_deg * sqrt(2).
   !
-  ! Uses bisection on the analytic Legendre-series covariance.
-  !
-  ! IMPORTANT – angular scan resolution:
-  !   The covariance C(theta) is evaluated by scanning theta uniformly from
-  !   0 to pi so that every angular scale, including sub-degree correlation
-  !   lengths, can be resolved.  Scanning uniformly in cos(theta) = z instead
-  !   would produce steps of arccos(1 - 2/nz_scan) near the pole, which equals
-  !   ~5 deg for nz_scan=500 and is far too coarse for xcorr < 5 deg.
+  ! Uses bisection on the analytic Legendre-series covariance evaluated
+  ! directly at theta=xcorr_rad.  This is much faster than scanning all
+  ! theta values for every bisection step.
 
   subroutine xcorr_deg_to_c2(xcorr_deg, nz, c2_out)
 
@@ -1242,13 +1264,14 @@ contains
     real(c_double), intent(out) :: c2_out
 
     integer,        parameter :: lmax_mult = 3
-    real(c_double), parameter :: tol_deg = 0.01d0
+    real(c_double), parameter :: tol_ratio = 1.0d-12
     integer,        parameter :: max_iter = 80
 
     integer        :: iter, lmax
-    real(c_double) :: c2_lo, c2_hi, c2_mid, theta_mid, xcorr_rad
+    real(c_double) :: c2_lo, c2_hi, c2_mid, ratio_mid, xcorr_rad, z_target
 
     xcorr_rad = xcorr_deg * MAPL_DEGREES_TO_RADIANS_R8
+    z_target  = cos(xcorr_rad)
     lmax      = lmax_mult * nz
 
     ! Bracket: larger c2 -> smoother spectrum (more low-l power) -> LONGER
@@ -1259,25 +1282,25 @@ contains
     c2_lo = 1.0d-12
     c2_hi = 1.0d2
 
-    if (xcorr_rad < compute_efold_theta(c2_lo, lmax)) then
+    if (compute_corr_ratio(c2_lo, lmax, z_target) > exp(-0.5d0)) then
       write(*,'(a,f8.3,a)') 'xcorr_deg_to_c2: xcorr=', xcorr_deg, &
         ' deg is very small; using c2_lo'
       c2_out = c2_lo ; return
     end if
-    if (xcorr_rad > compute_efold_theta(c2_hi, lmax)) then
+    if (compute_corr_ratio(c2_hi, lmax, z_target) < exp(-0.5d0)) then
       write(*,'(a,f8.3,a)') 'xcorr_deg_to_c2: xcorr=', xcorr_deg, &
         ' deg is very large; using c2_hi'
       c2_out = c2_hi ; return
     end if
 
-    ! Bisection: theta_mid > xcorr_rad means c2_mid gives too long a scale,
+    ! Bisection: ratio_mid > exp(-0.5) means c2_mid gives too long a scale,
     ! so move the upper bracket down.
     c2_mid = c2_lo
     do iter = 1, max_iter
       c2_mid    = 0.5d0 * (c2_lo + c2_hi)
-      theta_mid = compute_efold_theta(c2_mid, lmax)
-      if (abs(theta_mid - xcorr_rad) < tol_deg * MAPL_DEGREES_TO_RADIANS_R8) exit
-      if (theta_mid > xcorr_rad) then
+      ratio_mid = compute_corr_ratio(c2_mid, lmax, z_target)
+      if (abs(ratio_mid - exp(-0.5d0)) < tol_ratio) exit
+      if (ratio_mid > exp(-0.5d0)) then
         c2_hi = c2_mid   ! c2_mid gives too long a scale; reduce c2
       else
         c2_lo = c2_mid   ! c2_mid gives too short a scale; increase c2
@@ -1287,56 +1310,33 @@ contains
 
   contains
 
-    real(c_double) function compute_efold_theta(c2_val, lmax_in)
+    real(c_double) function compute_corr_ratio(c2_val, lmax_in, z)
       real(c_double), intent(in) :: c2_val
       integer,        intent(in) :: lmax_in
-
-      ! Scan uniformly in theta (not cos(theta)) so that the angular
-      ! resolution is constant across all scales, including sub-degree
-      ! correlation lengths.  ntheta_scan=36000 gives a 0.005-deg step.
-      integer,        parameter  :: ntheta_scan = 36000
+      real(c_double), intent(in) :: z
       real(c_double), parameter  :: inv4pi = 0.25d0 / PI
 
-      real(c_double) :: C0_z1, C_z, z, theta, dtheta, C_l_val, llp1, P0, P1, P2
-      integer        :: l, ith
+      real(c_double) :: C0_z1, C_z, C_l_val, llp1, P0, P1, P2
+      integer        :: l
 
-      dtheta = PI / real(ntheta_scan, c_double)
-
-      ! C(0): all P_l(1)=1, so this is just the spectral sum
       C0_z1 = 0.0d0
+      C_z = 0.0d0 ; P0 = 1.0d0 ; P1 = z
       do l = 0, lmax_in
         llp1    = real(l,c_double) * real(l+1,c_double)
         C_l_val = 1.0d0 / (1.0d0 + c2_val * llp1**2)
         C0_z1   = C0_z1 + real(2*l+1,c_double) * C_l_val * inv4pi
-      end do
-
-      compute_efold_theta = PI
-      do ith = 1, ntheta_scan
-        theta = real(ith,c_double) * dtheta
-        z     = cos(theta)
-        C_z = 0.0d0 ; P0 = 1.0d0 ; P1 = z
-        do l = 0, lmax_in
-          llp1    = real(l,c_double) * real(l+1,c_double)
-          C_l_val = 1.0d0 / (1.0d0 + c2_val * llp1**2)
-          if (l == 0) then
-            C_z = C_z + C_l_val * inv4pi
-          else if (l == 1) then
-            C_z = C_z + C_l_val * 3.0d0 * z * inv4pi
-          else
-            P2 = (real(2*l-1,c_double)*z*P1 - real(l-1,c_double)*P0) / real(l,c_double)
-            C_z = C_z + C_l_val * real(2*l+1,c_double) * P2 * inv4pi
-            P0 = P1 ; P1 = P2
-          end if
-        end do
-        ! Use exp(-0.5) as the target so that xcorr_deg is the Gaussian sigma
-        ! (C(sigma) = C(0)*exp(-0.5)), matching the flat-FFT definition where
-        ! the covariance is exp(-r^2/(2*xcorr^2)).
-        if (C_z <= exp(-0.5d0) * C0_z1) then
-          compute_efold_theta = theta
-          return
+        if (l == 0) then
+          C_z = C_z + C_l_val * inv4pi
+        else if (l == 1) then
+          C_z = C_z + C_l_val * 3.0d0 * z * inv4pi
+        else
+          P2 = (real(2*l-1,c_double)*z*P1 - real(l-1,c_double)*P0) / real(l,c_double)
+          C_z = C_z + C_l_val * real(2*l+1,c_double) * P2 * inv4pi
+          P0 = P1 ; P1 = P2
         end if
       end do
-    end function compute_efold_theta
+      compute_corr_ratio = C_z / C0_z1
+    end function compute_corr_ratio
 
   end subroutine xcorr_deg_to_c2
 
