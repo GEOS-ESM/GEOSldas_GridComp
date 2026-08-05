@@ -40,6 +40,8 @@ def read_obs_param(fname):
             param['nodata']         = float(fid.readline().strip())
             param['varname']        =       fid.readline().strip().strip('"')
             param['units']          =       fid.readline().strip().strip('"')
+            param['fcstvarname']    =       fid.readline().strip().strip('"')
+            param['fcstunits']      =       fid.readline().strip().strip('"')
             param['path']           =       fid.readline().strip().strip('"')
             param['name']           =       fid.readline().strip().strip('"')
             param['maskpath']       =       fid.readline().strip().strip('"')
@@ -290,6 +292,111 @@ def read_ObsFcstAna(fname, isLDASsa=False):
             'obs_fcst'   : obs_fcst, 
             'obs_fcstvar': obs_fcstvar, 
             'obs_ana'    : obs_ana, 
+            'obs_anavar' : obs_anavar}
+
+# ----------------------------------------------------------------------------
+#
+# reader for GEOSldas ObsFcstAna file (NetCDF-4)
+
+def read_ObsFcstAna_nc4(fname):
+
+    from datetime import datetime
+    from netCDF4 import Dataset
+
+    nodata = -9999
+
+    date_time = {
+        'year'  : nodata,
+        'month' : nodata,
+        'day'   : nodata,
+        'hour'  : nodata,
+        'min'   : nodata,
+        'sec'   : nodata,
+        'dofyr' : nodata,
+        'pentad': nodata
+    }
+
+    obs_assim   = []
+    obs_species = []
+    obs_tilenum = []
+    obs_lon     = []
+    obs_lat     = []
+    obs_obs     = []
+    obs_obsvar  = []
+    obs_fcst    = []
+    obs_fcstvar = []
+    obs_ana     = []
+    obs_anavar  = []
+
+    if os.path.exists(fname):
+        print(f"reading from {fname}")
+
+        date_string = os.path.basename(fname).split('.')[-2].rstrip('z')
+        dt = datetime.strptime(date_string, '%Y%m%d_%H%M')
+        dofyr = int(dt.strftime('%j'))
+        is_leap_year = (dt.year % 4 == 0 and (dt.year % 100 != 0 or dt.year % 400 == 0))
+        pentad = (dofyr-1)//5 + 1
+        if is_leap_year and dofyr >= 59:
+            pentad = (dofyr-2)//5 + 1
+
+        date_time = {
+            'year'  : dt.year,
+            'month' : dt.month,
+            'day'   : dt.day,
+            'hour'  : dt.hour,
+            'min'   : dt.minute,
+            'sec'   : dt.second,
+            'dofyr' : dofyr,
+            'pentad': pentad
+        }
+
+        with Dataset(fname, 'r') as ncid:
+            def get_int(name):
+                return np.array(ncid.variables[name][:], dtype=int)
+
+            def get_float(name, mask_nodata=True):
+                var = ncid.variables[name]
+                data = var[:]
+                if np.ma.isMaskedArray(data):
+                    if mask_nodata:
+                        data = data.filled(np.nan)
+                    else:
+                        data = data.filled(getattr(var, '_FillValue', np.nan))
+                data = np.array(data, dtype=np.float32)
+
+                if mask_nodata:
+                    fill_value = getattr(var, '_FillValue', None)
+                    if fill_value is not None:
+                        data[data == fill_value] = np.nan
+
+                return data
+
+            obs_assim   = get_int('assim_flag')
+            obs_species = get_int('species')
+            obs_tilenum = get_int('tilenum')
+            obs_lon     = get_float('lon', mask_nodata=False)
+            obs_lat     = get_float('lat', mask_nodata=False)
+            obs_obs     = get_float('obs', mask_nodata=False)
+            obs_obsvar  = get_float('obsvar')
+            obs_fcst    = get_float('fcst')
+            obs_fcstvar = get_float('fcstvar')
+            obs_ana     = get_float('ana')
+            obs_anavar  = get_float('anavar')
+
+    else:
+        print(f"file does not exist: {fname}")
+
+    return {'date_time'  : date_time,
+            'obs_assim'  : obs_assim,
+            'obs_species': obs_species,
+            'obs_tilenum': obs_tilenum,
+            'obs_lon'    : obs_lon,
+            'obs_lat'    : obs_lat,
+            'obs_obs'    : obs_obs,
+            'obs_obsvar' : obs_obsvar,
+            'obs_fcst'   : obs_fcst,
+            'obs_fcstvar': obs_fcstvar,
+            'obs_ana'    : obs_ana,
             'obs_anavar' : obs_anavar}
 
 # ================ EOF =================================================
