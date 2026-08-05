@@ -168,6 +168,10 @@ module clsm_ensupd_upd_routines
   ! threshold below which FOV is considered zero (regardless of units)
   
   real, parameter, public :: FOV_threshold = 1e-4  
+
+  ! communication halo for CYGNSS L1 preprocessed support tiles [km]
+
+  real, parameter :: CYGNSS_L1_support_halo_km = 100.
   
   type, public :: halo_type
      real :: minlon, minlat, maxlon, maxlat
@@ -406,7 +410,7 @@ contains
        err_msg = 'Unknown integer value of "out_ObsFcstAna": "' // trim(tmpstring6) // '". Use 0=OFF, 1=BIN, 2=NC4, 3=BIN and NC4.'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
-    
+
     if (update_type==0) then
        err_msg = 'executable was built for assimilation but update_type=0'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -518,8 +522,12 @@ contains
     
     do i=1,N_obs_param
        
-       ! check xcorr, ycorr (spatial correlation scale of obs error) 
-       !  against some measure of FOV
+       ! check xcorr, ycorr (spatial correlation scale of obs error)
+       !  against some measure of FOV.  CYGNSS L1 preprocessed coefficients
+       !  define their own support footprint, so their FOV is not used as an
+       !  obs-error correlation lower bound.
+
+       if (trim(obs_param(i)%varname) == 'cygl1scal') cycle
        
        ! get FOV in units of [deg] 
        
@@ -1356,7 +1364,20 @@ contains
     
     do ii=1,N_obs_param
        
-       if     ( trim(obs_param(ii)%FOV_units)=='deg' ) then
+       if (trim(obs_param(ii)%varname) == 'cygl1scal') then
+
+          ! CYGNSS L1 preprocessed observations bypass the generic FOV
+          ! averaging below.  Their support-tile coefficients define the
+          ! operator footprint, so use a communication-only halo here.
+
+          call dist_km2deg( CYGNSS_L1_support_halo_km, numprocs, tmplatvec, tmprx, r_y )
+
+          ! for now, ignore what happens to xhalo for processors without tiles (fixed below)
+
+          xhalo = max( xhalo, tmprx )
+          yhalo = max( yhalo, r_y   )
+
+       elseif ( trim(obs_param(ii)%FOV_units)=='deg' ) then
           
           xhalo = max( xhalo, obs_param(ii)%FOV )
           yhalo = max( yhalo, obs_param(ii)%FOV )
