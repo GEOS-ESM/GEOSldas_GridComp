@@ -45,7 +45,7 @@ module mwRTM_routines
 
   private
 
-  public :: mwRTM_get_Tb, catch2mwRTM_vars
+  public :: mwRTM_get_Tb, catch2mwRTM_vars, mwRTM_get_lr_reflectivity
 
   ! ---------------------------------------------------------
 
@@ -248,6 +248,52 @@ contains
     tsoil_mwRTM = tp1
 
   end subroutine catch2mwRTM_vars
+
+  ! ****************************************************************
+
+  subroutine mwRTM_get_lr_reflectivity( freq, inc_angle, clay, poros, soilmoist, refl_lr )
+
+    ! LR Fresnel reflectivity for CYGNSS coefficient-operator observations.
+    !
+    ! This intentionally follows the first Python CYGNSS simulator target:
+    ! clip SFMC to MWRTM porosity, use Mironov dielectric, and do not apply
+    ! roughness or vegetation corrections.
+
+    implicit none
+
+    real, intent(in)  :: freq       ! [Hz]
+    real, intent(in)  :: inc_angle  ! [deg]
+    real, intent(in)  :: clay       ! [0-1]
+    real, intent(in)  :: poros      ! [m3/m3]
+    real, intent(in)  :: soilmoist  ! [m3/m3]
+    real, intent(out) :: refl_lr
+
+    real    :: inc, sin_inc, cos_inc
+    real    :: soilmoist_clipped
+
+    complex :: c_er, r_ep, r_vv, r_hh
+
+    refl_lr = nodata_generic
+
+    if (LDAS_is_nodata(clay) .or. LDAS_is_nodata(poros) .or. LDAS_is_nodata(soilmoist)) return
+
+    soilmoist_clipped = min(max(soilmoist, 1.e-4), poros)
+
+    call MIRONOV(freq, soilmoist_clipped, clay, c_er)
+
+    inc = inc_angle * MAPL_PI/180.0
+
+    sin_inc = sin(inc)
+    cos_inc = cos(inc)
+
+    r_ep = sqrt(c_er - sin_inc**2)
+
+    r_vv = (r_ep - c_er*cos_inc) / (c_er*cos_inc + r_ep)
+    r_hh = (cos_inc - r_ep)     / (cos_inc      + r_ep)
+
+    refl_lr = abs(0.5 * (r_vv + r_hh))**2
+
+  end subroutine mwRTM_get_lr_reflectivity
 
   ! ****************************************************************
 
@@ -1064,4 +1110,3 @@ end program test_mwRTM_types
 #endif
 
 ! ========================== EOF ==================================
-

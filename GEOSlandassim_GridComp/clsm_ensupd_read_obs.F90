@@ -88,7 +88,28 @@ module clsm_ensupd_read_obs
 
 contains
  
-  ! ***************************************************************** 
+  ! *****************************************************************
+
+  subroutine read_obs_nc_check(status, caller, context)
+
+    use netcdf
+    implicit none
+
+    integer,      intent(in) :: status
+    character(*), intent(in) :: caller
+    character(*), intent(in) :: context
+
+    character(len=400) :: err_msg
+
+    if (status /= nf90_noerr) then
+       err_msg = trim(context) // ': ' // trim(nf90_strerror(status))
+       call ldas_abort(LDAS_GENERIC_ERROR, caller, err_msg)
+    end if
+
+  end subroutine read_obs_nc_check
+
+
+  ! *****************************************************************
 
   subroutine read_ae_l2_sm_hdf( &
        N_files, fnames, N_data, lon, lat, ae_l2_sm, ease_col, ease_row )
@@ -2659,6 +2680,429 @@ contains
    if (associated(tmp_jtime))    deallocate(tmp_jtime)
 
   end subroutine read_obs_sm_CYGNSS
+
+  ! ***************************************************************************
+
+  subroutine read_obs_cygnss_l1_replace_token(string, token, value)
+
+    ! Replace all occurrences of a fixed-width date token in string.
+    ! Keep synchronized with cygnss_preproc_replace_token().
+
+    implicit none
+
+    character(len=*), intent(inout) :: string
+    character(len=*), intent(in)    :: token
+    character(len=*), intent(in)    :: value
+
+    integer :: ind
+
+    ind = index(string, token)
+
+    do while (ind > 0)
+       string = string(:ind-1) // value // string(ind+len(token):)
+       ind = index(string, token)
+    end do
+
+  end subroutine read_obs_cygnss_l1_replace_token
+
+  ! ***************************************************************************
+
+  subroutine read_obs_cygnss_l1_make_fname(this_obs_param, date_time_file, fname)
+
+    ! Build the daily CYGNSS L1 scalar filename from a root path and a
+    ! date-tokenized filename template.
+
+    implicit none
+
+    type(obs_param_type), intent(in)  :: this_obs_param
+    type(date_time_type), intent(in)  :: date_time_file
+    character(len=400),   intent(out) :: fname
+
+    integer :: lpath
+
+    character(len=4)   :: yyyy
+    character(len=2)   :: mm, dd
+    character(len=400) :: filename
+
+    character(len=*), parameter :: Iam = 'read_obs_cygnss_l1_make_fname'
+
+    fname = ''
+
+    if ((len_trim(this_obs_param%path) == 0) .or. (len_trim(this_obs_param%name) == 0)) then
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'empty CYGNSS L1 scalar path/name')
+    end if
+
+    lpath = len_trim(this_obs_param%path)
+
+    write(yyyy,'(I4.4)') date_time_file%year
+    write(mm,  '(I2.2)') date_time_file%month
+    write(dd,  '(I2.2)') date_time_file%day
+
+    filename = trim(this_obs_param%name)
+    call read_obs_cygnss_l1_replace_token(filename, 'yyyymmdd', yyyy//mm//dd)
+
+    if (this_obs_param%path(lpath:lpath) == '/') then
+       fname = trim(this_obs_param%path) // 'Y' // yyyy // '/M' // mm // '/' // trim(filename)
+    else
+       fname = trim(this_obs_param%path) // '/Y' // yyyy // '/M' // mm // '/' // trim(filename)
+    end if
+
+  end subroutine read_obs_cygnss_l1_make_fname
+
+  ! ***************************************************************************
+
+  subroutine read_obs_cygnss_l1_scalar(                                         &
+       date_time, dtstep_assim, N_catd, tile_coord, tile_grid_d,                &
+       this_obs_param,                                                          &
+       found_obs, CYGNSS_obs, CYGNSS_obs_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
+
+    !---------------------------------------------------------------------
+    !
+    ! Read the preprocessed CYGNSS Level-1 local DDM-crop scalar coefficient
+    ! product. The GEOSldas observation collection path currently supports at
+    ! most one observation per tile and species, so this first bridge assigns
+    ! each scalar observation to its nearest specular-point owner tile.
+    !
+    ! The coefficient/support arrays are read later by cygnss_preprocessed_obs;
+    ! this reader only creates the observed-value arrays that the standard
+    ! EnKF observation collection code expects.
+    !
+    ! Product contract:
+    ! - product_type = cygnss_tile_coefficient_preprocessor_netcdf
+    ! - schema_version = 0.5
+    ! - sp_nearest_tile_ig/jg are globally-stable M36 EASE-grid column/row
+    !   indices for the specular point's nearest tile; the owner tile is
+    !   found by matching these against this experiment's local tile_coord,
+    !   the same approach used for support tiles in cygnss_preprocessed_obs.
+    !   (sp_nearest_tile_index0/index1 are experiment-specific -- tied to
+    !   whatever domain the preprocessor itself was run against -- and are
+    !   only valid as a direct local tile number for that same domain.)
+    ! - observed_y_db is the scalar observed value in dB.
+    !
+    ! amfox+codex, 20 May 2026
+    !
+    ! --------------------------------------------------------------------
+
+    use netcdf
+    implicit none
+
+    type(date_time_type), intent(in) :: date_time
+
+    integer, intent(in) :: dtstep_assim, N_catd
+
+    type(tile_coord_type), dimension(:), pointer :: tile_coord
+
+    type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(obs_param_type), intent(in) :: this_obs_param
+
+    logical, intent(out)                    :: found_obs
+
+    real,    intent(out), dimension(N_catd) :: CYGNSS_obs
+    real,    intent(out), dimension(N_catd) :: CYGNSS_obs_std
+    real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
+    real*8,  intent(out), dimension(N_catd) :: CYGNSS_time
+
+    character(4),      parameter :: J2000_epoch_id = 'TT12'
+    character(len=*),  parameter :: Iam = 'read_obs_cygnss_l1_scalar'
+    real,              parameter :: huge_distance = 1.0e30
+
+    type(date_time_type) :: date_time_low, date_time_up, date_time_file, date_time_obs
+
+    character(400) :: err_msg
+    character(400) :: tmpfname
+    character(100) :: product_type, schema_version
+    character(300) :: ldas_state, mwrtm_param
+    character( 16) :: product_grid, grid_attr
+
+    integer :: i, j, owner_tilenum
+    integer :: ncid, dimid, varid
+    integer :: N_obs, N_read, N_kept, N_duplicate, N_bad_owner, N_outside_time
+    integer :: N_files_read
+    integer :: obs_seconds
+
+    integer, allocatable :: owner_tile_ig(:), owner_tile_jg(:)
+    integer, allocatable :: obs_year(:), obs_day(:)
+
+    logical :: file_exists
+
+    real :: tol
+    real, allocatable :: obs_db(:)
+    real, allocatable :: obs_lon(:), obs_lat(:)
+    real, allocatable :: owner_distance(:)
+    real, allocatable :: best_owner_distance(:)
+
+    real*8 :: J2000_seconds_low, J2000_seconds_up, J2000_seconds_obs
+    real*8, allocatable :: obs_seconds_utc(:)
+
+    found_obs = .false.
+
+    CYGNSS_obs     = this_obs_param%nodata
+    CYGNSS_obs_std = this_obs_param%errstd
+    CYGNSS_lon     = tile_coord%com_lon
+    CYGNSS_lat     = tile_coord%com_lat
+    CYGNSS_time    = datetime_to_J2000seconds(date_time, J2000_epoch_id)
+
+    ! ----------------------------------------------------------------
+    !
+    ! The default namelist entry is disabled. Avoid requiring a product file
+    ! until diagnostics or assimilation are explicitly requested.
+
+    if (.not. this_obs_param%assim .and. .not. this_obs_param%getinnov) return
+
+    date_time_low = date_time
+    call augment_date_time( -(dtstep_assim/2), date_time_low )
+    date_time_up = date_time
+    call augment_date_time(  (dtstep_assim/2), date_time_up )
+
+    J2000_seconds_low = datetime_to_J2000seconds(date_time_low, J2000_epoch_id)
+    J2000_seconds_up  = datetime_to_J2000seconds(date_time_up,  J2000_epoch_id)
+
+    allocate(best_owner_distance(N_catd))
+    best_owner_distance = huge_distance
+    tol = abs(this_obs_param%nodata*nodata_tolfrac_generic)
+
+    N_files_read   = 0
+    N_read         = 0
+    N_duplicate    = 0
+    N_bad_owner    = 0
+    N_outside_time = 0
+
+    ! This loop spans calendar days so a 00z-centered window can pull in the
+    ! tail of the previous UTC day. With the current CYGNSS L1 scalar
+    ! preprocessor's daily-merge convention (see the M36 best-observation
+    ! daily workflow in CYGNSS_operator), this is a no-op for the previous
+    ! day's own file: each target day's preprocessed file already has its
+    ! own window 0 built from the prior day's 22:30-24:00 tail, so every row
+    ! in the previous day's file has a timestamp at or before that day's own
+    ! last window upper bound and will always fail the time filter below.
+    ! Kept generic rather than special-cased, in case a future preprocessor
+    ! organizes daily files without pre-folding the tail this way.
+
+    date_time_file = date_time_type(date_time_low%year, date_time_low%month, date_time_low%day, &
+         0, 0, 0, -9999, -9999)
+
+    do while (datetime_le_refdatetime(date_time_file, date_time_up))
+
+    call read_obs_cygnss_l1_make_fname(this_obs_param, date_time_file, tmpfname)
+
+    inquire(file=trim(tmpfname), exist=file_exists)
+
+    if (.not. file_exists) then
+       if (logit) write (logunit, '(400A)') 'Skipping missing CYGNSS L1 scalar data file: ', trim(tmpfname)
+       call augment_date_time(86400, date_time_file)
+       cycle
+    end if
+
+    if (logit) write (logunit, '(400A)') 'Reading CYGNSS L1 scalar data from file: ', trim(tmpfname)
+
+    N_files_read = N_files_read + 1
+
+    call read_obs_nc_check(nf90_open(trim(tmpfname), nf90_nowrite, ncid), Iam, 'open CYGNSS L1 scalar file')
+
+    product_type   = ''
+    schema_version = ''
+    ldas_state     = ''
+    mwrtm_param    = ''
+    product_grid   = ''
+    grid_attr      = ''
+
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'product_type', product_type), Iam, 'read product_type')
+    call read_obs_nc_check(nf90_get_att(ncid, NF90_GLOBAL, 'schema_version', schema_version), Iam, 'read schema_version')
+
+    if (nf90_get_att(ncid, NF90_GLOBAL, 'grid', grid_attr) /= nf90_noerr) grid_attr = ''
+
+    if (nf90_get_att(ncid, NF90_GLOBAL, 'ldas_state', ldas_state) /= nf90_noerr) ldas_state = ''
+    if (nf90_get_att(ncid, NF90_GLOBAL, 'mwrtm_param', mwrtm_param) /= nf90_noerr) mwrtm_param = ''
+
+    ! Fail fast if the file is not the preprocessed scalar coefficient product
+    ! expected by both this reader and cygnss_preprocessed_obs.
+
+    if (trim(product_type) /= 'cygnss_tile_coefficient_preprocessor_netcdf') then
+       err_msg = 'unexpected CYGNSS product_type: ' // trim(product_type)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (trim(schema_version) /= '0.5') then
+       err_msg = 'unexpected CYGNSS schema_version: ' // trim(schema_version) // ' (expected 0.5)'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! Schema-0.5 files declare their EASE grid explicitly via the 'grid'
+    ! global attribute - trust that over guessing. Abort rather than silently
+    ! mapping an M36 product into an M09 run, or vice versa.
+    !
+    ! Fall back to substring-matching the filename/provenance attributes only
+    ! for older files without a 'grid' attribute. Note this fallback must not
+    ! search the full path (tmpfname) - the preprocessor's Y<year>/M<month>
+    ! directory layout means any September file's path contains "M09", which
+    ! previously collided with the 9-km grid code and clobbered a correct M36
+    ! filename match.
+
+    if (trim(grid_attr) /= '') then
+
+       product_grid = trim(grid_attr)
+
+    else
+
+       if (index(ldas_state, 'M36') /= 0 .or. index(ldas_state, 'm36') /= 0 .or. &
+           index(mwrtm_param,'M36') /= 0 .or. index(mwrtm_param,'m36') /= 0) product_grid = 'M36'
+
+       if (index(ldas_state, 'M09') /= 0 .or. index(ldas_state, 'm09') /= 0 .or. &
+           index(mwrtm_param,'M09') /= 0 .or. index(mwrtm_param,'m09') /= 0) product_grid = 'M09'
+
+    end if
+
+    if (trim(product_grid) == '') then
+       err_msg = 'cannot determine CYGNSS coefficient product grid from filename or product metadata'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    if (index(tile_grid_d%gridtype, trim(product_grid)) == 0) then
+       err_msg = 'CYGNSS coefficient product grid ' // trim(product_grid) // &
+            ' does not match model tile grid ' // trim(tile_grid_d%gridtype)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    call read_obs_nc_check(nf90_inq_dimid(ncid, 'obs', dimid), Iam, 'inq obs dim')
+    call read_obs_nc_check(nf90_inquire_dimension(ncid, dimid, len=N_obs), Iam, 'inquire obs dim')
+
+    allocate(owner_tile_ig(N_obs))
+    allocate(owner_tile_jg(N_obs))
+    allocate(obs_year(N_obs))
+    allocate(obs_day(N_obs))
+    allocate(obs_db(N_obs))
+    allocate(obs_lon(N_obs))
+    allocate(obs_lat(N_obs))
+    allocate(owner_distance(N_obs))
+    allocate(obs_seconds_utc(N_obs))
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_ig', varid), Iam, 'inq sp_nearest_tile_ig')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_ig), Iam, 'read sp_nearest_tile_ig')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_jg', varid), Iam, 'inq sp_nearest_tile_jg')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_tile_jg), Iam, 'read sp_nearest_tile_jg')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'observed_y_db', varid), Iam, 'inq observed_y_db')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_db), Iam, 'read observed_y_db')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_lon', varid), Iam, 'inq sp_lon')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_lon), Iam, 'read sp_lon')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_lat', varid), Iam, 'inq sp_lat')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_lat), Iam, 'read sp_lat')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'sp_nearest_tile_distance_km', varid), Iam, 'inq sp_nearest_tile_distance_km')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, owner_distance), Iam, 'read sp_nearest_tile_distance_km')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'year', varid), Iam, 'inq year')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_year), Iam, 'read year')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'day', varid), Iam, 'inq day')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_day), Iam, 'read day')
+
+    call read_obs_nc_check(nf90_inq_varid(ncid, 'ddm_timestamp_utc_sec', varid), Iam, 'inq ddm_timestamp_utc_sec')
+    call read_obs_nc_check(nf90_get_var(ncid, varid, obs_seconds_utc), Iam, 'read ddm_timestamp_utc_sec')
+
+    call read_obs_nc_check(nf90_close(ncid), Iam, 'close CYGNSS L1 scalar file')
+
+    ! Keep observations in the same half-open assimilation window used by
+    ! the rest of the EnKF readers:
+    !
+    !     (date_time - dtstep_assim/2, date_time + dtstep_assim/2]
+
+    N_read = N_read + N_obs
+
+    do i=1,N_obs
+
+       ! Match the specular point's nearest-tile (ig,jg) against this
+       ! experiment's local tile space to find the local owner tile number.
+       ! ig/jg are globally stable, so this works regardless of whether the
+       ! preprocessor was run against this same domain or a different
+       ! (eg. global) one.
+
+       owner_tilenum = -1
+       do j = 1, N_catd
+          if (tile_coord(j)%i_indg == owner_tile_ig(i) .and. &
+              tile_coord(j)%j_indg == owner_tile_jg(i)) then
+             owner_tilenum = j
+             exit
+          end if
+       end do
+
+       if (owner_tilenum < 1) then
+          N_bad_owner = N_bad_owner + 1
+          cycle
+       end if
+
+       if (abs(obs_db(i)-this_obs_param%nodata) <= tol) cycle
+
+       obs_seconds = nint(obs_seconds_utc(i))
+       date_time_obs = date_time_type(obs_year(i), 1, 1, 0, 0, 0, -9999, -9999)
+       call augment_date_time( (obs_day(i)-1)*86400 + obs_seconds, date_time_obs )
+       J2000_seconds_obs = datetime_to_J2000seconds(date_time_obs, J2000_epoch_id)
+
+       if (J2000_seconds_obs <= J2000_seconds_low .or. J2000_seconds_obs > J2000_seconds_up) then
+          N_outside_time = N_outside_time + 1
+          cycle
+       end if
+
+       ! If more than one scalar observation maps to the same owner tile,
+       ! retain the one whose specular point is closest to that tile. This
+       ! keeps the first implementation consistent with the one-observation-
+       ! per-tile collection machinery.
+
+       if (owner_distance(i) < best_owner_distance(owner_tilenum)) then
+          if (best_owner_distance(owner_tilenum) < huge_distance) N_duplicate = N_duplicate + 1
+
+          CYGNSS_obs(owner_tilenum)     = obs_db(i)
+          CYGNSS_obs_std(owner_tilenum) = this_obs_param%errstd
+          CYGNSS_lon(owner_tilenum)     = obs_lon(i)
+          CYGNSS_lat(owner_tilenum)     = obs_lat(i)
+          CYGNSS_time(owner_tilenum)    = J2000_seconds_obs
+
+          best_owner_distance(owner_tilenum) = owner_distance(i)
+       else
+          N_duplicate = N_duplicate + 1
+       end if
+
+    end do
+
+    deallocate(owner_tile_ig)
+    deallocate(owner_tile_jg)
+    deallocate(obs_year)
+    deallocate(obs_day)
+    deallocate(obs_db)
+    deallocate(obs_lon)
+    deallocate(obs_lat)
+    deallocate(owner_distance)
+    deallocate(obs_seconds_utc)
+
+    call augment_date_time(86400, date_time_file)
+
+    end do
+
+    if (N_files_read == 0) then
+       err_msg = 'no CYGNSS L1 scalar obs files found for assimilation window'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    N_kept = count(best_owner_distance < huge_distance)
+    found_obs = N_kept > 0
+
+    if (logit) then
+       write (logunit,*) 'CYGNSS preprocessed obs daily files read: ', N_files_read
+       write (logunit,*) 'CYGNSS preprocessed obs read: ', N_read
+       write (logunit,*) 'CYGNSS preprocessed obs kept one-per-owner-tile: ', N_kept
+       write (logunit,*) 'CYGNSS preprocessed obs dropped duplicate-owner-tile: ', N_duplicate
+       write (logunit,*) 'CYGNSS preprocessed obs dropped bad owner tile: ', N_bad_owner
+       write (logunit,*) 'CYGNSS preprocessed obs outside assimilation window: ', N_outside_time
+    end if
+
+    deallocate(best_owner_distance)
+
+  end subroutine read_obs_cygnss_l1_scalar
+
 
   ! ***************************************************************************
 
@@ -9167,6 +9611,14 @@ contains
                tmp_obs, tmp_std_obs )
           
        end if
+
+    case ('CYGNSS_L1_DDM3X5_CROP_SCALAR')
+
+       call read_obs_cygnss_l1_scalar(                                &
+            date_time, dtstep_assim, N_catd, tile_coord, tile_grid_d, &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
        
     case ('isccp_tskin_gswp2_v1')
        

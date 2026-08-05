@@ -69,6 +69,7 @@ module GEOS_LandAssimGridCompMod
   use clsm_ensdrv_drv_routines,  only: recompute_diagS
 
   use mwRTM_routines,            only: mwRTM_get_Tb, catch2mwRTM_vars
+  use cygnss_preprocessed_obs,   only: cygnss_preproc_clear
 
   use, intrinsic :: ieee_arithmetic    
 
@@ -2993,7 +2994,8 @@ contains
      if (associated(rf2g))              deallocate(rf2g)
      if (associated(rf2l))              deallocate(rf2l)
      if (associated(obs_param))         deallocate(obs_param)
-     
+     call cygnss_preproc_clear()
+
      ! Call Finalize for every child
      call MAPL_GenericFinalize(gc, import, export, clock, rc=status)
     _VERIFY(status)
