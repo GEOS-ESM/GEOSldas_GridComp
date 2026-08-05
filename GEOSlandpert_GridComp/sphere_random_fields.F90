@@ -109,7 +109,8 @@ module sphere_random_fields_mod
 
     ! --- Mord=1 (direct Legendre) filter arrays -------------------------
     ! Full covariance Cholesky factors for each longitudinal mode.
-    real(c_double), allocatable :: chol1(:,:,:)  ! (n_m, nz, nz)
+    real(c_double), pointer :: chol1(:,:,:) => null()  ! (n_m, nz, nz)
+    integer :: win_chol1 = MPI_WIN_NULL
 
     ! cos(theta) at each upper-hemisphere ring (uhalf values, equator first)
     real(c_double), allocatable :: z_pts(:)
@@ -448,7 +449,20 @@ contains
     ! --- Allocate filter arrays (every rank needs the full tables) ------
     if (sf%Mord == 1) then
       ! Mord=1: allocate full north-to-south scalar filter arrays.
-      allocate(sf%chol1(n_m, nz, nz))
+      if (sf%node_comm /= MPI_COMM_NULL) then
+        disp_unit = int(c_sizeof(dummy_real))
+        win_size = 0_MPI_ADDRESS_KIND
+        if (sf%node_rank == 0) win_size = int(n_m, MPI_ADDRESS_KIND) * &
+             int(nz, MPI_ADDRESS_KIND) * int(nz, MPI_ADDRESS_KIND) * &
+             int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
+        call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
+                                     sf%node_comm, base_innov, sf%win_chol1, mpierr)
+        if (sf%node_rank /= 0) &
+          call MPI_Win_shared_query(sf%win_chol1, 0, win_size, disp_unit, base_innov, mpierr)
+        call c_f_pointer(base_innov, sf%chol1, [n_m, nz, nz])
+      else
+        allocate(sf%chol1(n_m, nz, nz))
+      end if
     else
       if (sf%node_comm /= MPI_COMM_NULL) then
         disp_unit = int(c_sizeof(dummy_real))
@@ -489,7 +503,7 @@ contains
     ! --- Only rank 0 (globally) performs the expensive computation ------
     ! All other ranks wait for the MPI_Bcast below.
 
-    if (global_rank == 0) then
+    if (global_rank == 0 .or. sf%Mord == 1) then
 
       if (sf%Mord == 1) then
         ! ----------------------------------------------------------------
@@ -500,20 +514,23 @@ contains
         block
           integer, parameter :: lmax_mult = 3
           integer :: lmax_leg
+          integer :: local_m, local_lo, local_hi
           real(c_double), allocatable :: z_full(:)
           real(c_double), allocatable :: cov_full(:)
           real(c_double), allocatable :: chol_tmp(:,:)
           integer :: k
 
           lmax_leg = lmax_mult * nz
+          call compute_strip(n_m, sf%node_npes, sf%node_rank, local_lo, local_hi)
+          local_m = max(0, local_hi - local_lo + 1)
           allocate(z_full(nz))
           do k = 1, nz
             z_full(k) = ring_z(k, sf)
           end do
-          allocate(cov_full((m_max+1) * nz * nz))
+          allocate(cov_full(local_m * nz * nz))
           allocate(chol_tmp(nz,nz))
 
-          call cov_legendre_full_f(m_max, nz, lmax_leg, c0, c2, z_full, cov_full, rc)
+          call cov_legendre_full_f(local_lo-1, local_hi-1, nz, lmax_leg, c0, c2, z_full, cov_full, rc)
           if (rc /= 0) then
             write(*,'(a,i0)') 'build_sphere_filter: cov_legendre_f failed, rc=', rc
             stop 1
@@ -525,8 +542,8 @@ contains
               ' > threshold; using direct Legendre covariance (Mord=1, stable)'
 
           ! Build a full Cholesky factor for each m-mode covariance matrix.
-          do imode = 0, n_m-1
-            call cholesky_lower(nz, cov_full(imode*nz*nz+1:), chol_tmp, rc)
+          do imode = local_lo-1, local_hi-1
+            call cholesky_lower(nz, cov_full((imode-local_lo+2)*nz*nz- nz*nz + 1:), chol_tmp, rc)
             if (rc /= 0) then
               write(*,'(a,i0,a,i0)') &
                 'build_sphere_filter: full Legendre Cholesky failed at imode=', imode, ', rc=', rc
@@ -672,7 +689,7 @@ contains
     ! global_rank == 0 is the only rank).
     if (present(comm)) then
       if (sf%Mord == 1) then
-        call MPI_Bcast(sf%chol1, n_m*nz*nz, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
+        call MPI_Win_fence(0, sf%win_chol1, mpierr)
       end if
       call MPI_Bcast(sf%z_pts, uhalf, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
@@ -1138,7 +1155,13 @@ contains
     else if (associated(sf%all_trans)) then
       deallocate(sf%all_trans)
     end if
-    if (allocated(sf%chol1))     deallocate(sf%chol1)
+    if (sf%win_chol1 /= MPI_WIN_NULL) then
+      call MPI_Win_free(sf%win_chol1, mpierr)
+      sf%win_chol1 = MPI_WIN_NULL
+      nullify(sf%chol1)
+    else if (associated(sf%chol1)) then
+      deallocate(sf%chol1)
+    end if
     if (allocated(sf%z_pts))     deallocate(sf%z_pts)
 #ifdef MKL_AVAILABLE
     if (associated(sf%dfti_irfft)) then
