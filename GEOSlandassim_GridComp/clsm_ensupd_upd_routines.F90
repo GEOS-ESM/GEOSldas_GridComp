@@ -1067,7 +1067,7 @@ contains
     real,    parameter                      :: fac_search_FOV_km     = 2.   ! [-]
     
     real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
-    real,    parameter                      :: ASCAT_max_peat_frac   = 0.10 ! [-]
+    real,    parameter                      :: SM_max_peat_frac      = 0.10 ! [-]
 
     integer                                 :: N_catlH, n_e, i, j, k, N_tmp, ii, jj
     integer                                 :: N_fields, N_Tbspecies, N_TbuniqFreqAngRTMid
@@ -1244,7 +1244,7 @@ contains
           get_sfmc_lH  = .true.
           get_tsurf_l  = .true.    ! needed for model-based QC
 
-          if (trim(obs_param(i)%varname)=='sfds' .and. beforeEnKFupdate)  get_peat_lH = .true.
+          if (beforeEnKFupdate)  get_peat_lH = .true.
 
        case ('rzmc')
           
@@ -1790,11 +1790,13 @@ contains
              
           end if
 
-          ! screen ASCAT observations if too much of the FOV is peatland
+          ! screen surface soil moisture observations if too much of the FOV is peatland
 
           tmpPeat = .false.
 
-          if (get_peat_lH .and. trim(obs_param(this_species)%varname)=='sfds') then
+          if (get_peat_lH .and.                                                &
+               (trim(obs_param(this_species)%varname)=='sfmc' .or.             &
+                trim(obs_param(this_species)%varname)=='sfds')) then
 
              tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
 
@@ -1810,7 +1812,7 @@ contains
                      abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )&
                      / tmpsum_w
 
-                tmpPeat = (tmp_peatfrac>=ASCAT_max_peat_frac)
+                tmpPeat = (tmp_peatfrac>=SM_max_peat_frac)
 
              else
 
