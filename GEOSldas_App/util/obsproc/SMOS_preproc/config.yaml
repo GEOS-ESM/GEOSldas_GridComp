@@ -1,0 +1,5 @@
+paths:
+   ee_to_nc_script: /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/smos-ee-to-netcdf/smos-ee-to-nc.sh
+   smos_base_path:  /discover/nobackup/dao_ops/SMOS/AOSMOS.4662/SCLF1C/
+   tmp_nc_path:     /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/netcdf/
+   out_reg_path:    /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/EASEv2/ESA/SMOS_M36_SCLF1C_reg_nosky_noatm_v724_ESA_v102/

@@ -1,0 +1,60 @@
+<Earth_Explorer_Header xmlns="http://213.170.46.150/smos/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://213.170.46.150/smos/schemas HDR_SM_XXXX_AUX_GAL_SM_0300.xsd">
+   <Fixed_Header>
+      <File_Name>SM_OPER_AUX_GAL_SM_20050101T000000_20500101T000000_001_003_3</File_Name>
+      <File_Description>AUX_GALAXY Map convolved with the Mean Weighting Function AUX_MN_WEF</File_Description>
+      <Notes>Following L1 updates the DBL is now equivalent, in content, to GAL_OS 01_012. </Notes>
+      <Mission>SMOS</Mission>
+      <File_Class>OPER</File_Class>
+      <File_Type>AUX_GAL_SM</File_Type>
+      <Validity_Period>
+         <Validity_Start>UTC=2005-01-01T00:00:00</Validity_Start>
+         <Validity_Stop>UTC=2050-01-01T00:00:00</Validity_Stop>
+      </Validity_Period>
+      <File_Version>0003</File_Version>
+      <Source>
+         <System>DPGS</System>
+         <Creator>CEC </Creator>
+         <Creator_Version>001</Creator_Version>
+         <Creation_Date>UTC=2014-03-06T00:00:00</Creation_Date>
+      </Source>
+   </Fixed_Header>
+   <Variable_Header>
+      <Specific_Product_Header>
+	<Main_SPH>
+         <SPH_Descriptor>AUX_GAL_SM_SPH</SPH_Descriptor>
+         <Ref_Doc>SO-TN-IDR-GS-0006</Ref_Doc>
+         <Precise_Validity_Start>UTC=2005-01-01T00:00:00.000000</Precise_Validity_Start>
+         <Precise_Validity_Stop>UTC=2050-01-01T00:00:00.000000</Precise_Validity_Stop>
+	 <Checksum>1334894346</Checksum>
+	 <Header_Schema>HDR_SM_XXXX_AUX_GAL_SM_0300.xsd</Header_Schema>
+         <Datablock_Schema>DBL_SM_XXXX_AUX_GAL_SM_0300.binXschema.xml</Datablock_Schema>
+	 <Header_Size>002719</Header_Size> 
+	 <Datablock_Size>00008311688</Datablock_Size>
+         <HW_Identifier>xxxx</HW_Identifier>
+	</Main_SPH>
+        <Coordinates_Info>
+            <Min_RA>000.000</Min_RA>
+            <Max_RA>360.000</Max_RA>
+            <Min_DEC>-90.000</Min_DEC>
+            <Max_DEC>090.000</Max_DEC>
+            <DELTA_RA>000.250</DELTA_RA>
+            <DELTA_DEC>000.250</DELTA_DEC>
+	</Coordinates_Info>
+	<Reference_epoch>
+            <Epoch>B1950</Epoch>
+	</Reference_epoch>
+         <List_of_Data_Sets count="1">
+            <Data_Set>
+               <DS_Name>Galaxy_Map_Data</DS_Name>
+               <DS_Type>M</DS_Type>
+               <DS_Size>0008311688</DS_Size>
+               <DS_Offset>0000000000</DS_Offset>
+	       <Ref_Filename>                                                            </Ref_Filename>
+               <Num_DSR>0000000001</Num_DSR>
+               <DSR_Size>08311688</DSR_Size>
+               <Byte_Order>0123</Byte_Order>
+            </Data_Set>
+         </List_of_Data_Sets>
+      </Specific_Product_Header>
+   </Variable_Header>
+</Earth_Explorer_Header>
