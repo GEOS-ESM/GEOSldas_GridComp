@@ -2148,6 +2148,525 @@ contains
 
   ! ****************************************************************************
 
+  subroutine read_obs_sm_ASCAT_HSAF(                                          &
+       date_time, dtstep_assim, N_catd, tile_coord,                           &
+       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
+       this_obs_param,                                                        &
+       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
+
+    ! Read H SAF ASCAT SSM CDR (H121) and ICDR (H139) from netCDF swath files.
+    !
+    ! Files are 1-hour granules on the 12.5 km Fibonacci grid, one per orbit
+    ! segment, per satellite.  The creation timestamp embedded in each filename
+    ! is unpredictable so obs file names are supplied via daily flist files,
+    ! one per satellite per day, listing the bare filenames for that day.
+    !
+    ! Satellite species (this_obs_param%descr):
+    !   ASCAT_HSAF_META_SM  MetOp-A  2007-01-01 - 2021-11-15  (H121 CDR)
+    !   ASCAT_HSAF_METB_SM  MetOp-B  2013-06-01 - ongoing     (H121 then H139)
+    !   ASCAT_HSAF_METC_SM  MetOp-C  2019-04-01 - ongoing     (H121 then H139)
+    !
+    ! QC applied (no external mask file needed):
+    !   surface_flag bit 0x01 set         -> open water         -> reject
+    !   processing_flag bits 0x01|0x02    -> bad model/sigma0   -> reject
+    !   wetland_fraction                  >= thr_wetland (10%)  -> reject
+    !   topographic_complexity            >= thr_topo    (10%)  -> reject
+    !   subsurface_scattering_probability >= thr_subsfc  ( 5%)  -> reject (new w.r.t. "EUMETSAT" product)
+    !   surface_soil_moisture_sensitivity <= thr_sens   (1 dB)  -> reject (new w.r.t. "EUMETSAT" product)
+    !   backscatter40_flag bit 4 (noise_out_of_limits)          -> reject (new w.r.t. "EUMETSAT" product)
+    !
+    ! SM output is degree of saturation as a fraction [0,1].
+    !
+    ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
+    !             https://hsaf.meteoam.it/
+    !
+    ! A. Fox, reichle, Jun 2026
+    !
+    ! --------------------------------------------------------------------
+
+    use netcdf
+    implicit none
+
+    ! inputs:
+
+    type(date_time_type), intent(in) :: date_time
+
+    integer, intent(in) :: dtstep_assim, N_catd
+
+    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+
+    type(grid_def_type), intent(in) :: tile_grid_d
+
+    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+         N_tile_in_cell_ij
+
+    integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
+
+    type(obs_param_type), intent(in) :: this_obs_param
+
+    ! outputs:
+
+    logical, intent(out)                    :: found_obs
+
+    real,    intent(out), dimension(N_catd) :: ASCAT_sm               ! degree of saturation (sfds) [fraction 0-1]
+    real,    intent(out), dimension(N_catd) :: ASCAT_sm_std           ! sfds obs error std          [fraction 0-1]
+    real,    intent(out), dimension(N_catd) :: ASCAT_lon, ASCAT_lat
+    real*8,  intent(out), dimension(N_catd) :: ASCAT_time             ! J2000 seconds
+
+    ! ---------------
+
+    ! H121/H139 files are 1-hour granules.  Extra look-back catches files
+    ! whose sensing start precedes the window but whose obs extend into it.
+
+    integer,      parameter :: dt_ASCAT_obsfile = 3600                ! seconds (1-hour files)
+    integer,      parameter :: N_fnames_max     = 24                  ! max obs files per daily flist
+    integer,      parameter :: max_obs_per_file = 300000              ! max obs per 1-hr granule (H121 ~200k)
+    character(4), parameter :: J2000_epoch_id   = 'TT12'              ! see date_time_util.F90
+
+    ! Offset from Unix epoch (1970-01-01 00:00:00 UTC) to J2000 TT12 epoch (2000-01-01 12:00:00 TT) in seconds:
+    !   30 years = 10957 days (leap years 1972,76,80,84,88,92,96); +0.5 day for 12z;
+    !   TT leads UTC by ~64.184 s at J2000.
+    
+    real*8,       parameter :: unix_to_J2000_s = 10957.5d0 * 86400.0d0 + 64.184d0
+
+    ! QC thresholds [percent]
+    ! snow and frozen soil are screened by qc_model_based_for_sat_sfmc using model state
+
+    real,         parameter :: thr_wetland = 10.                      ! [%]
+    real,         parameter :: thr_topo    = 10.                      ! [%]
+    real,         parameter :: thr_subsfc  =  5.                      ! [%]
+    real,         parameter :: thr_sens    =  1.0                     ! [dB] reject if SSM sensitivity <= 1 dB
+
+    integer(1),   parameter :: bsflag_bad_bits = 4_1                  ! noise_out_of_limits
+
+    ! netCDF variable scale factors (as declared in files)
+    
+    real*8,       parameter :: latlon_scale = 1.0d-6                  ! lat/lon stored as int * 1e-6
+    real,         parameter :: ssm_scale    = 0.01                    ! SSM stored as short * 0.01 -> %
+    real*8,       parameter :: sens_scale   = 1.0d-7                  ! sensitivity stored as int * 1e-7 -> dB
+
+    ! ---------------
+
+    type(date_time_type) :: date_time_obs_beg, date_time_obs_end
+    type(date_time_type) :: date_time_low, date_time_up, date_time_low_fname
+
+    character( 14) :: str_start_time
+    character( 80) :: fname_of_fname_list
+    character(300) :: tmpfname
+
+    integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
+
+    character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
+    character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
+
+    character(300), allocatable               :: fnames(:)
+
+    real*8 :: J2000_low, J2000_up, obs_j2000
+
+    logical :: file_exists
+
+    ! netCDF handles
+    integer :: ncid, ierr, obs_dimid
+    integer :: lat_varid, lon_varid, time_varid, ssm_varid
+    integer :: sflag_varid, pflag_varid, bsflag_varid
+    integer :: wetland_varid, topo_varid, subsfc_varid, sens_varid
+
+    ! per-file arrays allocated to actual obs dimension size
+    integer,    allocatable :: lat_raw(:), lon_raw(:)
+    real(8),    allocatable :: time_raw(:)
+    integer(2), allocatable :: ssm_raw(:)
+    integer(1), allocatable :: sflag_raw(:)    ! surface_flag                      (NC_UBYTE  -> int8)
+    integer(1), allocatable :: pflag_raw(:)    ! processing_flag                   (NC_UBYTE  -> int8)
+    integer(1), allocatable :: bsflag_raw(:)   ! backscatter40_flag                (NC_UBYTE)
+    integer(1), allocatable :: wetland_raw(:)  ! wetland_fraction                  (NC_BYTE)
+    integer(1), allocatable :: topo_raw(:)     ! topographic_complexity            (NC_BYTE)
+    integer(1), allocatable :: subsfc_raw(:)   ! subsurface_scattering_probability (NC_BYTE)
+    integer,    allocatable :: sens_raw(:)     ! surface_soil_moisture_sensitivity (NC_INT)
+
+    ! valid-obs scratch arrays (max one file at a time)
+    real,       allocatable :: tmp1_lat(:), tmp1_lon(:), tmp1_obs(:)
+    real*8,     allocatable :: tmp1_jtime(:)
+
+    ! pointers for get_tile_num_for_obs
+    real,    dimension(:), pointer :: tmp_lat, tmp_lon
+    real*8,  dimension(:), pointer :: tmp_jtime
+    integer, dimension(:), pointer :: tmp_tile_num
+
+    ! tile accumulation across all files
+    integer, dimension(N_catd)     :: N_obs_in_tile
+
+    character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
+    character(len=400)             :: err_msg
+
+    ! -------------------------------------------------------------------
+
+    nullify( tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num )
+
+    found_obs = .false.
+
+    ! satellite operating periods (Hahn et al. 2026, Table 2)
+
+    if     (trim(this_obs_param%descr) == 'ASCAT_HSAF_META_SM') then
+       date_time_obs_beg = date_time_type(2007, 1, 1, 0, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2021,11,15,23,59,59,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_HSAF_METB_SM') then
+       date_time_obs_beg = date_time_type(2013, 6, 1, 0, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    elseif (trim(this_obs_param%descr) == 'ASCAT_HSAF_METC_SM') then
+       date_time_obs_beg = date_time_type(2019, 4, 1, 0, 0, 0,-9999,-9999)
+       date_time_obs_end = date_time_type(2100, 1, 1, 0, 0, 0,-9999,-9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! return if date_time falls outside operating time range
+
+    if ( datetime_lt_refdatetime(date_time,         date_time_obs_beg) .or.  &
+         datetime_lt_refdatetime(date_time_obs_end, date_time)              ) return
+
+    ! ----------------------------------------------------------------
+
+    ! assimilation window half-open interval (date_time_low, date_time_up]
+
+    date_time_low = date_time
+    call augment_date_time( -(dtstep_assim/2), date_time_low)
+    date_time_up  = date_time
+    call augment_date_time(  (dtstep_assim/2), date_time_up)
+
+    ! extended look-back to catch files whose sensing start precedes the window
+
+    date_time_low_fname = date_time_low
+    call augment_date_time( -dt_ASCAT_obsfile, date_time_low_fname)
+
+    ! window bounds in J2000 for per-obs time filtering
+
+    J2000_low = datetime_to_J2000seconds(date_time_low, J2000_epoch_id)
+    J2000_up  = datetime_to_J2000seconds(date_time_up,  J2000_epoch_id)
+
+    ! ----------------------------------------------------------------
+    !
+    ! read flist for current day (and previous day if window straddles midnight)
+
+    fname_of_fname_list = 'dummy'   ! overridden by this_obs_param%flistname
+
+    ! obs_dir_hier=1: read_obs_fnames prepends Y{YYYY}/M{MM}/ (not D{DD}/)
+    !                 so data files live in monthly subdirectories, matching H SAF FTP layout
+
+    call read_obs_fnames( date_time_low_fname, this_obs_param,               &
+         fname_of_fname_list, N_fnames_max,                                  &
+         N_fnames, fname_list(1:N_fnames_max), obs_dir_hier=1 )
+
+    if (date_time_low_fname%day /= date_time_up%day) then
+
+       call read_obs_fnames( date_time_up, this_obs_param,                   &
+            fname_of_fname_list, N_fnames_max,                               &
+            N_fnames_tmp, fname_list((N_fnames+1):(N_fnames+N_fnames_max)),  &
+            obs_dir_hier=1 )
+
+       N_fnames = N_fnames + N_fnames_tmp
+
+    end if
+
+    ! ----------------------------------------------------------------
+    !
+    ! filter flist to files whose sensing start falls within the look-back window.
+    !
+    ! H SAF filename structure (bare name, without path):
+    !   W_IT-HSAF-ROME,SAT,SSM-ASCAT-METOP{A|B|C}-12.5km-H{121|139}_C_LIIB_{creation14}_{start14}_{end14}____.nc
+    !
+    ! read_obs_fnames prepends Y{YYYY}/M{MM}/ to the bare name.
+    ! The sensing start ({start14} = YYYYMMDDHHMMSS) is always at a fixed
+    ! offset from the END of the returned string, regardless of path prefix length:
+    !   fname_list(kk)(n-35:n-22)  where n = len_trim(fname_list(kk))
+
+    N_tmp = 0
+
+    do kk = 1, N_fnames
+
+       tmpfname = fname_list(kk)
+       n_fn     = len_trim(tmpfname)
+
+       str_start_time = tmpfname(n_fn-35:n_fn-22)
+
+       ! sanity check: all numeric
+       do ii = 1, 14
+          if (ichar(str_start_time(ii:ii)) < ichar('0') .or. &
+              ichar(str_start_time(ii:ii)) > ichar('9')      ) then
+             err_msg = 'Non-numeric sensing start parsed from H SAF filename: ' // trim(tmpfname)
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          end if
+       end do
+
+       ! parse sensing start into date_time_type for window comparison
+
+       read(str_start_time( 1: 4), *) date_time_obs_beg%year
+       read(str_start_time( 5: 6), *) date_time_obs_beg%month
+       read(str_start_time( 7: 8), *) date_time_obs_beg%day
+       read(str_start_time( 9:10), *) date_time_obs_beg%hour
+       read(str_start_time(11:12), *) date_time_obs_beg%min
+       read(str_start_time(13:14), *) date_time_obs_beg%sec
+
+       if ( datetime_lt_refdatetime( date_time_low_fname, date_time_obs_beg ) .and. &
+            datetime_le_refdatetime( date_time_obs_beg,   date_time_up      )       ) then
+
+          N_tmp = N_tmp + 1
+          tmpfnames(N_tmp) = trim(this_obs_param%path) // '/' // trim(tmpfname)
+
+       end if
+
+    end do
+
+    fnames  = tmpfnames(1:N_tmp)
+    N_files = N_tmp
+
+    ! ----------------------------------------------------------------
+    !
+    ! initialise tile accumulators
+
+    ASCAT_sm      = 0.
+    ASCAT_lon     = 0.
+    ASCAT_lat     = 0.
+    ASCAT_time    = 0.0D0
+    N_obs_in_tile = 0
+
+    ! scratch arrays for valid obs from one file at a time
+
+    allocate(tmp1_lat(  max_obs_per_file))
+    allocate(tmp1_lon(  max_obs_per_file))
+    allocate(tmp1_obs(  max_obs_per_file))
+    allocate(tmp1_jtime(max_obs_per_file))
+
+    ! ----------------------------------------------------------------
+    !
+    ! loop over files
+
+    do kk = 1, N_files
+
+       inquire(file=trim(fnames(kk)), exist=file_exists)
+       if (.not. file_exists) then
+          err_msg = 'H SAF ASCAT obs file not found: ' // trim(fnames(kk))
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+
+       if (logit) write(logunit,'(400A)') 'Reading H SAF ASCAT SM data from file: ', trim(fnames(kk))
+
+       ! open netCDF file (CYGNSS-style)
+
+       ierr = nf90_open(trim(fnames(kk)), nf90_nowrite, ncid)
+
+       ! get obs dimension size
+
+       ierr = nf90_inq_dimid(ncid, 'obs', obs_dimid)
+       ierr = nf90_inquire_dimension(ncid, obs_dimid, len=N_obs_file)
+
+       ! get variable IDs
+
+       ierr = nf90_inq_varid(ncid, 'latitude',                          lat_varid)
+       ierr = nf90_inq_varid(ncid, 'longitude',                         lon_varid)
+       ierr = nf90_inq_varid(ncid, 'time',                              time_varid)
+       ierr = nf90_inq_varid(ncid, 'surface_soil_moisture',             ssm_varid)
+       ierr = nf90_inq_varid(ncid, 'surface_flag',                      sflag_varid)
+       ierr = nf90_inq_varid(ncid, 'processing_flag',                   pflag_varid)
+       ierr = nf90_inq_varid(ncid, 'backscatter40_flag',                bsflag_varid)
+       ierr = nf90_inq_varid(ncid, 'wetland_fraction',                  wetland_varid)
+       ierr = nf90_inq_varid(ncid, 'topographic_complexity',            topo_varid)
+       ierr = nf90_inq_varid(ncid, 'subsurface_scattering_probability', subsfc_varid)
+       ierr = nf90_inq_varid(ncid, 'surface_soil_moisture_sensitivity', sens_varid)
+
+       ! allocate per-file arrays
+
+       allocate(lat_raw(    N_obs_file))
+       allocate(lon_raw(    N_obs_file))
+       allocate(time_raw(   N_obs_file))
+       allocate(ssm_raw(    N_obs_file))
+       allocate(sflag_raw(  N_obs_file))
+       allocate(pflag_raw(  N_obs_file))
+       allocate(bsflag_raw( N_obs_file))
+       allocate(wetland_raw(N_obs_file))
+       allocate(topo_raw(   N_obs_file))
+       allocate(subsfc_raw( N_obs_file))
+       allocate(sens_raw(   N_obs_file))
+
+       ! read variables (raw packed values; scale applied manually below)
+
+       ierr = nf90_get_var(ncid, lat_varid,    lat_raw)
+       ierr = nf90_get_var(ncid, lon_varid,    lon_raw)
+       ierr = nf90_get_var(ncid, time_varid,   time_raw)
+       ierr = nf90_get_var(ncid, ssm_varid,    ssm_raw)
+       ierr = nf90_get_var(ncid, sflag_varid,  sflag_raw)
+       ierr = nf90_get_var(ncid, pflag_varid,  pflag_raw)
+       ierr = nf90_get_var(ncid, bsflag_varid, bsflag_raw)
+       ierr = nf90_get_var(ncid, wetland_varid,wetland_raw)
+       ierr = nf90_get_var(ncid, topo_varid,   topo_raw)
+       ierr = nf90_get_var(ncid, subsfc_varid, subsfc_raw)
+       ierr = nf90_get_var(ncid, sens_varid,   sens_raw)
+
+       ierr = nf90_close(ncid)
+
+       ! ----------------------------------------------------------------
+       !
+       ! filter obs: time window + QC
+       !
+       ! Flag variables are NC_UBYTE stored as int8 in Fortran.  Using IAND on
+       ! int8 operands gives correct bitmask results because the bit patterns are
+       ! preserved; the fill value (255 -> -1 in int8) has all bits set and is
+       ! rejected by every QC check.
+       !
+       ! Probability variables are NC_BYTE or NC_UBYTE.  Valid range is 0-100;
+       ! fill (-128) reads as a negative signed byte.  Wetland and topo fill
+       ! means no database coverage (unknown -> reject).  Subsfc fill means
+       ! no subsurface scattering in this region (safe -> accept).
+       !
+       ! SSM is NC_SHORT; fill = -32768; valid 0-10000 (= 0-100% after *0.01).
+
+       N_valid = 0
+
+       do ii = 1, N_obs_file
+
+          ! skip if SSM is fill or out of valid range
+          if (ssm_raw(ii) < 0_2 .or. ssm_raw(ii) > 10000_2) cycle
+
+          ! obs time in J2000 seconds (time_raw is in days since 1970-01-01 UTC)
+          obs_j2000 = time_raw(ii) * 86400.0d0 - unix_to_J2000_s
+
+          ! skip if outside assimilation window (half-open: low < obs <= up)
+          if (obs_j2000 <= J2000_low .or. obs_j2000 > J2000_up) cycle
+
+          ! skip if open water (surface_flag bit 0x01)
+          if (iand(sflag_raw(ii), 1_1) /= 0_1) cycle
+
+          ! skip if model or sigma0 not usable (processing_flag bits 0x01 | 0x02)
+          if (iand(pflag_raw(ii), 3_1) /= 0_1) cycle
+
+          ! skip if backscatter at 40 deg is noisy
+          if (iand(bsflag_raw(ii), bsflag_bad_bits) /= 0_1) cycle
+
+          ! skip if wetland fraction is missing or above threshold
+          if (int(wetland_raw(ii)) < 0 .or. int(wetland_raw(ii)) >= int(thr_wetland)) cycle
+
+          ! skip if topographic complexity is missing or above threshold
+          if (int(topo_raw(ii)) < 0 .or. int(topo_raw(ii)) >= int(thr_topo)) cycle
+
+          ! fill (-128) means no subsurface scattering in this region -> safe to assimilate
+          if (int(subsfc_raw(ii)) >= int(thr_subsfc)) cycle
+
+          ! skip if sensitivity too low (or fill); fill value -2^31 * sens_scale
+          ! is hugely negative and fails this test naturally
+          if (real(sens_raw(ii)) * real(sens_scale) <= thr_sens) cycle
+
+          ! passed all QC
+
+          N_valid = N_valid + 1
+
+          if (N_valid > max_obs_per_file) then
+             err_msg = 'Too many obs in one H SAF file - increase max_obs_per_file'
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          end if
+
+          tmp1_lat(  N_valid) = real(lat_raw(ii)) * real(latlon_scale)
+          tmp1_lon(  N_valid) = real(lon_raw(ii)) * real(latlon_scale)
+          tmp1_obs(  N_valid) = real(ssm_raw(ii)) * ssm_scale / 100.    ! % -> fraction
+          tmp1_jtime(N_valid) = obs_j2000
+
+       end do
+
+       ! deallocate per-file arrays immediately to keep memory footprint low
+
+       deallocate(lat_raw, lon_raw, time_raw, ssm_raw)
+       deallocate(sflag_raw, pflag_raw, bsflag_raw)
+       deallocate(wetland_raw, topo_raw, subsfc_raw, sens_raw)
+
+       if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
+
+       if (N_valid == 0) cycle
+
+       ! ----------------------------------------------------------------
+       !
+       ! tile matching and accumulation for this file's valid obs
+
+       allocate(tmp_lat(        N_valid))
+       allocate(tmp_lon(        N_valid))
+       allocate(tmp_jtime(      N_valid))
+       allocate(tmp_tile_num(   N_valid))
+
+       tmp_lat   = tmp1_lat(  1:N_valid)
+       tmp_lon   = tmp1_lon(  1:N_valid)
+       tmp_jtime = tmp1_jtime(1:N_valid)
+
+       call get_tile_num_for_obs(N_catd, tile_coord,                      &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
+            N_valid, tmp_lat, tmp_lon,                                    &
+            this_obs_param,                                               &
+            tmp_tile_num )
+
+       do ii = 1, N_valid
+
+          ind = tmp_tile_num(ii)
+
+          if (ind > 0) then
+
+             ASCAT_sm(  ind) = ASCAT_sm(  ind) + tmp1_obs(  ii)
+             ASCAT_lon( ind) = ASCAT_lon( ind) + tmp_lon(   ii)
+             ASCAT_lat( ind) = ASCAT_lat( ind) + tmp_lat(   ii)
+             ASCAT_time(ind) = ASCAT_time(ind) + tmp_jtime( ii)
+
+             N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
+
+          end if
+
+       end do
+
+       deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
+
+    end do  ! file loop
+
+    deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
+    deallocate(fnames)
+
+    ! ----------------------------------------------------------------
+    !
+    ! normalise tile super-obs and set obs error std-dev
+
+    do ii = 1, N_catd
+
+       ASCAT_sm_std(ii) = this_obs_param%errstd / 100.   ! % -> fraction
+
+       if (N_obs_in_tile(ii) > 1) then
+
+          ASCAT_sm(  ii) = ASCAT_sm(  ii) / real(N_obs_in_tile(ii))
+          ASCAT_lon( ii) = ASCAT_lon( ii) / real(N_obs_in_tile(ii))
+          ASCAT_lat( ii) = ASCAT_lat( ii) / real(N_obs_in_tile(ii))
+          ASCAT_time(ii) = ASCAT_time(ii) / real(N_obs_in_tile(ii), kind(0.0D0))
+
+       elseif (N_obs_in_tile(ii) == 0) then
+
+          ASCAT_sm(  ii)   =      this_obs_param%nodata
+          ASCAT_lon( ii)   =      this_obs_param%nodata
+          ASCAT_lat( ii)   =      this_obs_param%nodata
+          ASCAT_time(ii)   = real(this_obs_param%nodata, kind(0.0D0))
+          ASCAT_sm_std(ii) =      this_obs_param%nodata
+
+       end if
+
+    end do
+
+    if (any(N_obs_in_tile > 0)) found_obs = .true.
+
+    if (logit) then
+       write(logunit,*) trim(Iam)//': date_time = ', date_time
+       if (found_obs) then
+          write(logunit,*) '  max(obs)=', maxval(ASCAT_sm,  mask=(N_obs_in_tile>0)), &
+               ',  min(obs)=', minval(ASCAT_sm,  mask=(N_obs_in_tile>0))
+       else
+          write(logunit,*) '  no obs found'
+       end if
+    end if
+
+  end subroutine read_obs_sm_ASCAT_HSAF
+
+  ! ****************************************************************************
+
   subroutine read_obs_sm_CYGNSS(                                              &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
@@ -5979,10 +6498,10 @@ contains
         
     N_lat        = last_ind(1) - start_ind(1) + 1
     
-    start_ind    = (lon_min_vec - CMG_ll_lon)/CMG_dlon
-    last_ind     = (lon_max_vec - CMG_ll_lon)/CMG_dlon
+    start_ind(1:N_files) = (lon_min_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
+    last_ind( 1:N_files) = (lon_max_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
     
-    N_lon_vec    = last_ind - start_ind  + 1  
+    N_lon_vec(1:N_files) = last_ind(1:N_files) - start_ind(1:N_files) + 1  
     
     N_lon        = sum( N_lon_vec(1:N_files) )
     
@@ -9181,24 +9700,45 @@ contains
        end if
        
     case ('ASCAT_META_SM','ASCAT_METB_SM','ASCAT_METC_SM' )
-       
+
        call read_obs_sm_ASCAT_EUMET(                                  &
             date_time, dtstep_assim, N_catd, tile_coord,              &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
             tmp_time)
-       
+
        ! scale observations to model climatology
-       
+
        if (this_obs_param%scale .and. found_obs) then
-          
+
           scaled_obs = .true.
-          
+
           call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
                tmp_obs, tmp_std_obs )
-          
+
+       end if
+
+    case ('ASCAT_HSAF_META_SM','ASCAT_HSAF_METB_SM','ASCAT_HSAF_METC_SM' )
+
+       call read_obs_sm_ASCAT_HSAF(                                   &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
+            tmp_time)
+
+       ! scale observations to model climatology
+
+       if (this_obs_param%scale .and. found_obs) then
+
+          scaled_obs = .true.
+
+          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+               date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
+               tmp_obs, tmp_std_obs )
+
        end if
        
     case ('CYGNSS_SM_6hr','CYGNSS_SM_daily')
@@ -9806,10 +10346,14 @@ contains
           ! check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(ind)>0.                       .and.          &
-               sclprm_mean_mod(ind)>0.                       .and.          &
-               sclprm_std_obs(ind)>=0.                       .and.          &
-               sclprm_std_mod(ind)>=0.                             ) then
+          if ( sclprm_mean_obs(ind) == sclprm_mean_obs(ind) .and.          &   ! false if NaN
+               sclprm_mean_mod(ind) == sclprm_mean_mod(ind) .and.          &   ! false if NaN
+               sclprm_std_obs( ind) == sclprm_std_obs( ind) .and.          &   ! false if NaN
+               sclprm_std_mod( ind) == sclprm_std_mod( ind) .and.          &   ! false if NaN
+               sclprm_mean_obs(ind) >  0.                   .and.          &
+               sclprm_mean_mod(ind) >  0.                   .and.          &
+               sclprm_std_obs( ind) >= 0.                   .and.          &
+               sclprm_std_mod( ind) >= 0.                          ) then
              
              ! scale via standard normal deviates
              
@@ -10040,10 +10584,14 @@ contains
           ! Check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(j_ind, i_ind)>0.   .and.        &
-               sclprm_mean_mod(j_ind, i_ind)>0.   .and.        &
-               sclprm_std_obs(j_ind, i_ind)>=0.   .and.        &
-               sclprm_std_mod(j_ind, i_ind)>=0.         ) then
+          if ( sclprm_mean_obs(j_ind, i_ind) == sclprm_mean_obs(j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_mean_mod(j_ind, i_ind) == sclprm_mean_mod(j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_std_obs( j_ind, i_ind) == sclprm_std_obs( j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_std_mod( j_ind, i_ind) == sclprm_std_mod( j_ind, i_ind) .and.  &   ! false if NaN
+               sclprm_mean_obs(j_ind, i_ind) >  0.                            .and.  &
+               sclprm_mean_mod(j_ind, i_ind) >  0.                            .and.  &
+               sclprm_std_obs( j_ind, i_ind) >= 0.                            .and.  &
+               sclprm_std_mod( j_ind, i_ind) >= 0.         ) then
              
              ! Scale via standard normal deviates
              
@@ -10435,10 +10983,14 @@ contains
           ! check for no-data-values in observation and fit parameters
           ! (any negative number could be no-data-value for observations)
           
-          if ( sclprm_mean_obs(ind)>0.   .and.          &
-               sclprm_mean_mod(ind)>0.   .and.          &
-               sclprm_std_obs( ind)>0.   .and.          &
-               sclprm_std_mod( ind)>0.          ) then
+          if ( sclprm_mean_obs(ind) == sclprm_mean_obs(ind) .and.  &   ! false if NaN
+               sclprm_mean_mod(ind) == sclprm_mean_mod(ind) .and.  &   ! false if NaN
+               sclprm_std_obs( ind) == sclprm_std_obs( ind) .and.  &   ! false if NaN
+               sclprm_std_mod( ind) == sclprm_std_mod( ind) .and.  &   ! false if NaN
+               sclprm_mean_obs(ind) >  0.                   .and.  &
+               sclprm_mean_mod(ind) >  0.                   .and.  &
+               sclprm_std_obs( ind) >  0.                   .and.  &
+               sclprm_std_mod( ind) >  0.          ) then
              
              
              ! sanity check (against accidental use of wrong tile space)
