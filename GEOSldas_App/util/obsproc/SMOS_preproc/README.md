@@ -19,9 +19,9 @@ data. It also supports on-demand backfill of a single day or a date range.
   currently maintained under `/discover/nobackup/projects/gmao/smap/...` —
   **not part of this repo**, 
 - Static input: `data/GEOSIT_to_EASEv2_M36.mat` — pre-generated EASEv2
-  regridding weights, checked into this repo. Do not delete/move.
-- Static Aux files: `data/SM_OPER_AUX_GAL_SM_20050101T000000_20500101T000000_001_003_3`,
-  Do not delete/move. 
+  regridding weights, link to the actual location on Discover
+- Static Aux files: `data/SM_OPER_AUX_GAL_SM_20050101T000000_20500101T000000_001_003_3`
+  link to the actual location on Discover. 
 
 ## 3. Configuration (`config.yaml`)
 | Key | Meaning |
