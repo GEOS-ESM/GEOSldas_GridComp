@@ -1,5 +1,12 @@
 
 # collection of readers for GEOSldas output files
+#
+#   - read_obs_param()
+#   - read_tilecoord()
+#   - read_tilegrids()
+#   - read_ObsFcstAna()
+#   - read_ObsFcstAna_nc4()
+#   - read_catparam()
 
 import struct
 import os
@@ -102,7 +109,7 @@ def read_tilecoord(fname):
 
 # ----------------------------------------------------------------------------
 #
-# reader for GEOSldas tilecoord file (binary)
+# reader for GEOSldas tilegrids file (binary)
 
 def read_tilegrids(fname):
     """
@@ -398,5 +405,337 @@ def read_ObsFcstAna_nc4(fname):
             'obs_fcstvar': obs_fcstvar,
             'obs_ana'    : obs_ana,
             'obs_anavar' : obs_anavar}
+
+
+# ----------------------------------------------------------------------------
+#
+# reader for GEOSldas catparam file (binary)
+
+def read_catparam(fname, N_tile, isLDASsa=0):
+    """
+    Python reader for binary files with Catchment model parameters.
+    
+    Parameters:
+    -----------
+    fname : str
+        Path to binary Catchment parameter file
+    N_tile : int
+        Number of tiles; obtain from tilecoord file using read_tilecoord()
+    isLDASsa : int, optional
+        Flag for LDASsa (1) vs GEOSldas (0) format (default: 0)
+        
+    Returns:
+    --------
+    cat_param : dict
+        Dictionary containing catchment parameters
+    cat_param_units : dict
+        Dictionary containing units for each parameter
+        
+    Notes:
+    ------
+    Parameter "vegcls" is land cover type:
+      vegcls = 1:  broadleaf evergreen trees
+      vegcls = 2:  broadleaf deciduous trees
+      vegcls = 3:  needleleaf trees
+      vegcls = 4:  grassland
+      vegcls = 5:  broadleaf shrubs
+      vegcls = 6:  dwarf trees
+      vegcls = 7:  bare soil
+      vegcls = 8:  desert soil
+    
+    Parameters "soilcls30" and "soilcls100" are 0-30 cm and 0-100 cm soil class.
+    
+    reichle,  2 Jun 2006
+    reichle, 16 Jul 2010 - added vegcls lookup table
+    reichle, 28 Oct 2010 - added soilcls*
+                         - changed cat_param structure from "vector of
+                           structures" to "structure of vectors"
+    reichle,  1 Apr 2015 - added new soil parameter fields (file_format==3)
+                         - added cat_param_units
+    reichle, 28 Jul 2022 - cleaned up LDASsa/GEOSldas switch for commit into GEOSldas repo
+
+    Translated into python from matlab (24 Aug 2026)
+
+    """
+    
+    # For backward compatibility, back out number of parameters in file
+    # from file size:
+    # file size = N_param * (N_tile + 2) * bytes_per_datapoint
+    
+    file_size = os.path.getsize(fname)
+    
+    if isLDASsa != 0:
+        machfmt = '>'  # big-endian, LDASsa
+    else:
+        machfmt = '<'  # little-endian, GEOSldas
+    
+    N_param = file_size // ((N_tile + 2) * 4)
+    
+    if N_param == 40:
+        file_format = 1
+        if isLDASsa != 0:
+            int_columns = [18]  # vegcls (1-indexed in MATLAB, 0-indexed in Python: 17)
+        else:
+            int_columns = []  # GEOSldas files contain only real*4 numbers
+    
+    elif N_param in [42, 51, 52]:
+        file_format = 2
+        if isLDASsa != 0:
+            int_columns = [18, 19, 20]  # vegcls, soilcls30, soilcls100
+        else:
+            int_columns = []  # GEOSldas files contain only real*4 numbers
+    
+    else:
+        raise ValueError('read_catparam: something wrong with file size or format')
+    
+    print(f'read_catparam: expecting {N_param} parameters in file with file_format {file_format}')
+    
+    # ----------------------------------------------------------------
+    
+    int_dtype = np.int32      # precision of fortran tag
+    float_dtype = np.float32  # precision of data in input file
+    
+    print(f'read_catparam: reading from {fname}')
+    
+    # Adjust int_columns to 0-indexed for Python
+    int_columns_py = [i - 1 for i in int_columns]
+    
+    tmp_data = np.zeros((N_param, N_tile), dtype=np.float32)
+    
+    with open(fname, 'rb') as ifp:
+        
+        for i in range(N_param):
+            
+            # Read fortran tag
+            fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+            
+            # Read data
+            if i in int_columns_py:
+                tmp = np.fromfile(ifp, dtype=f'{machfmt}i4', count=N_tile)
+            else:
+                tmp = np.fromfile(ifp, dtype=f'{machfmt}f4', count=N_tile)
+            
+            # Read trailing fortran tag
+            fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
+            
+            tmp_data[i, :] = tmp
+    
+    print('read_catparam: assembling structure array')
+    
+    cat_param = {}
+    cat_param_units = {}
+    
+    if file_format == 1:
+        
+        cat_param['dpth'] = tmp_data[0, :]
+        cat_param_units['dpth'] = '[mm]'
+        
+        cat_param['dzsf'] = tmp_data[1, :]
+        cat_param_units['dzsf'] = '[mm]'
+        cat_param['dzrz'] = tmp_data[2, :]
+        cat_param_units['dzrz'] = '[mm]'
+        cat_param['dzpr'] = tmp_data[3, :]
+        cat_param_units['dzpr'] = '[mm]'
+        
+        cat_param['dzgt'] = np.column_stack([
+            tmp_data[4, :],
+            tmp_data[5, :],
+            tmp_data[6, :],
+            tmp_data[7, :],
+            tmp_data[8, :],
+            tmp_data[9, :]
+        ])
+        cat_param_units['dzgt'] = '[m]'
+        
+        cat_param['poros'] = tmp_data[10, :]
+        cat_param_units['poros'] = '[m3 m-3]'
+        cat_param['cond'] = tmp_data[11, :]
+        cat_param_units['cond'] = '[m s-1]'
+        cat_param['psis'] = tmp_data[12, :]
+        cat_param_units['psis'] = '[m H2O]'
+        cat_param['bee'] = tmp_data[13, :]
+        cat_param_units['bee'] = '[-]'
+        
+        cat_param['wpwet'] = tmp_data[14, :]
+        cat_param_units['wpwet'] = '[-]'
+        
+        cat_param['gnu'] = tmp_data[15, :]
+        cat_param_units['gnu'] = '[m-1]'
+        
+        cat_param['vgwmax'] = tmp_data[16, :]
+        cat_param_units['vgwmax'] = '[kg m-2]'
+        
+        cat_param['vegcls'] = tmp_data[17, :]
+        cat_param_units['vegcls'] = '[-]'
+        
+        cat_param['bf1'] = tmp_data[18, :]
+        cat_param_units['bf1'] = '[kg m-4]'
+        cat_param['bf2'] = tmp_data[19, :]
+        cat_param_units['bf2'] = '[m]'
+        cat_param['bf3'] = tmp_data[20, :]
+        cat_param_units['bf3'] = '[log(m)]'
+        cat_param['cdcr1'] = tmp_data[21, :]
+        cat_param_units['cdcr1'] = '[kg m-2]'
+        cat_param['cdcr2'] = tmp_data[22, :]
+        cat_param_units['cdcr2'] = '[kg m-2]'
+        cat_param['ars1'] = tmp_data[23, :]
+        cat_param_units['ars1'] = '[m2 kg-1]'
+        cat_param['ars2'] = tmp_data[24, :]
+        cat_param_units['ars2'] = '[m2 kg-1]'
+        cat_param['ars3'] = tmp_data[25, :]
+        cat_param_units['ars3'] = '[m4 kg-2]'
+        cat_param['ara1'] = tmp_data[26, :]
+        cat_param_units['ara1'] = '[m2 kg-1]'
+        cat_param['ara2'] = tmp_data[27, :]
+        cat_param_units['ara2'] = '[-]'
+        cat_param['ara3'] = tmp_data[28, :]
+        cat_param_units['ara3'] = '[m2 kg-1]'
+        cat_param['ara4'] = tmp_data[29, :]
+        cat_param_units['ara4'] = '[-]'
+        cat_param['arw1'] = tmp_data[30, :]
+        cat_param_units['arw1'] = '[m2 kg-1]'
+        cat_param['arw2'] = tmp_data[31, :]
+        cat_param_units['arw2'] = '[m2 kg-1]'
+        cat_param['arw3'] = tmp_data[32, :]
+        cat_param_units['arw3'] = '[m4 kg-2]'
+        cat_param['arw4'] = tmp_data[33, :]
+        cat_param_units['arw4'] = '[-]'
+        cat_param['tsa1'] = tmp_data[34, :]
+        cat_param_units['tsa1'] = '[-]'
+        cat_param['tsa2'] = tmp_data[35, :]
+        cat_param_units['tsa2'] = '[-]'
+        cat_param['tsb1'] = tmp_data[36, :]
+        cat_param_units['tsb1'] = '[-]'
+        cat_param['tsb2'] = tmp_data[37, :]
+        cat_param_units['tsb2'] = '[-]'
+        cat_param['atau'] = tmp_data[38, :]
+        cat_param_units['atau'] = '[-]'
+        cat_param['btau'] = tmp_data[39, :]
+        cat_param_units['btau'] = '[-]'
+    
+    elif file_format == 2:
+        
+        cat_param['dpth'] = tmp_data[0, :]
+        cat_param_units['dpth'] = '[mm]'
+        
+        cat_param['dzsf'] = tmp_data[1, :]
+        cat_param_units['dzsf'] = '[mm]'
+        cat_param['dzrz'] = tmp_data[2, :]
+        cat_param_units['dzrz'] = '[mm]'
+        cat_param['dzpr'] = tmp_data[3, :]
+        cat_param_units['dzpr'] = '[mm]'
+        
+        cat_param['dzgt'] = np.column_stack([
+            tmp_data[4, :],
+            tmp_data[5, :],
+            tmp_data[6, :],
+            tmp_data[7, :],
+            tmp_data[8, :],
+            tmp_data[9, :]
+        ])
+        cat_param_units['dzgt'] = '[m]'
+        
+        cat_param['poros'] = tmp_data[10, :]
+        cat_param_units['poros'] = '[m3 m-3]'
+        cat_param['cond'] = tmp_data[11, :]
+        cat_param_units['cond'] = '[m s-1]'
+        cat_param['psis'] = tmp_data[12, :]
+        cat_param_units['psis'] = '[m H2O]'
+        cat_param['bee'] = tmp_data[13, :]
+        cat_param_units['bee'] = '[-]'
+        
+        cat_param['wpwet'] = tmp_data[14, :]
+        cat_param_units['wpwet'] = '[-]'
+        
+        cat_param['gnu'] = tmp_data[15, :]
+        cat_param_units['gnu'] = '[m-1]'
+        
+        cat_param['vgwmax'] = tmp_data[16, :]
+        cat_param_units['vgwmax'] = '[kg m-2]'
+        
+        cat_param['vegcls'] = tmp_data[17, :]
+        cat_param_units['vegcls'] = '[-]'
+        cat_param['soilcls30'] = tmp_data[18, :]
+        cat_param_units['soilcls30'] = '[-]'
+        cat_param['soilcls100'] = tmp_data[19, :]
+        cat_param_units['soilcls100'] = '[-]'
+        
+        cat_param['bf1'] = tmp_data[20, :]
+        cat_param_units['bf1'] = '[kg m-4]'
+        cat_param['bf2'] = tmp_data[21, :]
+        cat_param_units['bf2'] = '[m]'
+        cat_param['bf3'] = tmp_data[22, :]
+        cat_param_units['bf3'] = '[log(m)]'
+        cat_param['cdcr1'] = tmp_data[23, :]
+        cat_param_units['cdcr1'] = '[kg m-2]'
+        cat_param['cdcr2'] = tmp_data[24, :]
+        cat_param_units['cdcr2'] = '[kg m-2]'
+        cat_param['ars1'] = tmp_data[25, :]
+        cat_param_units['ars1'] = '[m2 kg-1]'
+        cat_param['ars2'] = tmp_data[26, :]
+        cat_param_units['ars2'] = '[m2 kg-1]'
+        cat_param['ars3'] = tmp_data[27, :]
+        cat_param_units['ars3'] = '[m4 kg-2]'
+        cat_param['ara1'] = tmp_data[28, :]
+        cat_param_units['ara1'] = '[m2 kg-1]'
+        cat_param['ara2'] = tmp_data[29, :]
+        cat_param_units['ara2'] = '[-]'
+        cat_param['ara3'] = tmp_data[30, :]
+        cat_param_units['ara3'] = '[m2 kg-1]'
+        cat_param['ara4'] = tmp_data[31, :]
+        cat_param_units['ara4'] = '[-]'
+        cat_param['arw1'] = tmp_data[32, :]
+        cat_param_units['arw1'] = '[m2 kg-1]'
+        cat_param['arw2'] = tmp_data[33, :]
+        cat_param_units['arw2'] = '[m2 kg-1]'
+        cat_param['arw3'] = tmp_data[34, :]
+        cat_param_units['arw3'] = '[m4 kg-2]'
+        cat_param['arw4'] = tmp_data[35, :]
+        cat_param_units['arw4'] = '[-]'
+        cat_param['tsa1'] = tmp_data[36, :]
+        cat_param_units['tsa1'] = '[-]'
+        cat_param['tsa2'] = tmp_data[37, :]
+        cat_param_units['tsa2'] = '[-]'
+        cat_param['tsb1'] = tmp_data[38, :]
+        cat_param_units['tsb1'] = '[-]'
+        cat_param['tsb2'] = tmp_data[39, :]
+        cat_param_units['tsb2'] = '[-]'
+        cat_param['atau'] = tmp_data[40, :]
+        cat_param_units['atau'] = '[-]'
+        cat_param['btau'] = tmp_data[41, :]
+        cat_param_units['btau'] = '[-]'
+        
+        if N_param in [51, 52]:
+            
+            cat_param['gravel30'] = tmp_data[42, :]
+            cat_param_units['gravel30'] = '[%vol]'
+            cat_param['orgC30'] = tmp_data[43, :]
+            cat_param_units['orgC30'] = '[%weight]'
+            cat_param['orgC'] = tmp_data[44, :]
+            cat_param_units['orgC'] = '[%weight]'
+            cat_param['sand30'] = tmp_data[45, :]
+            cat_param_units['sand30'] = '[%weight]'
+            cat_param['clay30'] = tmp_data[46, :]
+            cat_param_units['clay30'] = '[%weight]'
+            cat_param['sand'] = tmp_data[47, :]
+            cat_param_units['sand'] = '[%weight]'
+            cat_param['clay'] = tmp_data[48, :]
+            cat_param_units['clay'] = '[%weight]'
+            cat_param['wpwet30'] = tmp_data[49, :]
+            cat_param_units['wpwet30'] = '[-]'
+            cat_param['poros30'] = tmp_data[50, :]
+            cat_param_units['poros30'] = '[m3 m-3]'
+        
+        if N_param == 52:
+            
+            cat_param['veghght'] = tmp_data[51, :]
+            cat_param_units['veghght'] = '[m]'
+    
+    else:
+        raise ValueError('read_catparam: something wrong with file size or format')
+    
+    return cat_param, cat_param_units
+
+
 
 # ================ EOF =================================================
