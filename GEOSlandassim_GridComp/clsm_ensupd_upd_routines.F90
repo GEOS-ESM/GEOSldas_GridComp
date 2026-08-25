@@ -3707,6 +3707,12 @@ contains
     
     real, parameter :: tp1_threshold = -HUGE(1.) ! = 0.2             ! [CELSIUS]
 
+    ! Experimental CYGNSS L1 hard gate for update_type=12.
+    ! Keep xcompact/ycompact unchanged for EnKF compact support, but admit
+    ! CYGNSS L1 obs only if they are close to the tile center.
+    real, parameter :: CYGNSS_L1_XSEARCH = 0.20  ! [deg] longitude
+    real, parameter :: CYGNSS_L1_YSEARCH = 0.16  ! [deg] latitude
+
     integer :: n, n_e, kk, ii, jj
     
     integer :: N_state_max, N_state, N_selected_obs, N_select_varnames
@@ -5219,6 +5225,26 @@ contains
                      halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,                   &
                      N_select_species_smTb, select_species_smTb(1:N_select_species_smTb),  &
                      N_selected_obs,   ind_obs )
+
+                ! Hard-gate CYGNSS L1 obs to an EASE36-scale box, while
+                ! leaving all other Tb/sfmc/sfds species on the normal
+                ! xcompact/ycompact search box.
+                jj = 0
+                do ii = 1, N_selected_obs
+                   this_obs_param = obs_param(Observations(ind_obs(ii))%species)
+                   if ( (index(this_obs_param%descr, 'CYGNSS') > 0) .and. &
+                        (index(this_obs_param%descr, 'L1'    ) > 0)       ) then
+                      if ( (abs(Observations(ind_obs(ii))%lon - tile_coord(kk)%com_lon) <= CYGNSS_L1_XSEARCH) .and. &
+                           (abs(Observations(ind_obs(ii))%lat - tile_coord(kk)%com_lat) <= CYGNSS_L1_YSEARCH)       ) then
+                         jj = jj + 1
+                         ind_obs(jj) = ind_obs(ii)
+                      end if
+                   else
+                      jj = jj + 1
+                      ind_obs(jj) = ind_obs(ii)
+                   end if
+                end do
+                N_selected_obs = jj
                 
                 if (N_selected_obs>0) then
                    
