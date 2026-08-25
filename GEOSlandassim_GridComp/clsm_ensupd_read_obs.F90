@@ -7875,7 +7875,6 @@ contains
     real,    intent(out), dimension(N_catd) :: SMAP_lon,  SMAP_lat
     real*8,  intent(out), dimension(N_catd) :: SMAP_time                 ! J2000 seconds
 
-    real,    dimension(N_catd) :: SMAP_error
     ! --------------------------------------
 
     ! local variables
@@ -7901,7 +7900,7 @@ contains
     
     real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
     real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
-    real,      parameter :: Tb_nedt_base  = 1.3 !  Tb error floor for inflation
+    real,      parameter :: Tb_error_max  = 1.3   ! max allowed Tb error [K] 
 
     real,      parameter :: max_std_tb_fore_minus_aft = 20.  ! max std-dev L1C[E] fore-minus-aft Tb diffs
 
@@ -8344,8 +8343,6 @@ contains
        SMAP_lat  = 0.
        SMAP_time = 0.0D0
 
-       SMAP_error = 0.
-
        N_obs_in_tile  = 0  ! for normalization after mapping to tile and super-obs
        
        ! loop through files
@@ -8591,11 +8588,13 @@ contains
 
                 keep_data_1 =                                    &
                      (mod(tmp_tb_qual_flag_1(nn),2)==0)    .and. & ! lowest bit must be 0
+                     (tmp_tb_error_1(nn) <= Tb_error_max)  .and. & ! elim data w. large tb_error  
                      (tmp_tb_1(nn)   >  Tb_min)            .and. & ! elim neg nodata
                      (tmp_tb_1(nn)   <  Tb_max)                    ! elim huge pos nodata
                 
                 keep_data_2 =                                    &
                      (mod(tmp_tb_qual_flag_2(nn),2)==0)    .and. & ! lowest bit must be 0
+                     (tmp_tb_error_2(nn) <= Tb_error_max)  .and. & ! elim data w. large tb_error 
                      (tmp_tb_2(nn)   >  Tb_min)            .and. & ! elim neg nodata
                      (tmp_tb_2(nn)   <  Tb_max)                    ! elim huge pos nodata
 
@@ -8635,16 +8634,12 @@ contains
                    tmp_tb_1(  nn) = 0.5  *( tmp_tb_1(  nn) + tmp_tb_2(  nn) )
                    tmp_time_1(nn) = 0.5D0*( tmp_time_1(nn) + tmp_time_2(nn) ) 
                    
-                   tmp_tb_error_1(  nn) = max( tmp_tb_error_1(  nn), tmp_tb_error_2(  nn) )
-
                 elseif (keep_data_2)                   then
 
                    ! put "aft" data into "tb_1", "tmp_time_1"
                    
                    tmp_tb_1(  nn) = tmp_tb_2(  nn)
                    tmp_time_1(nn) = tmp_time_2(nn)
-
-                   tmp_tb_error_1(  nn) = tmp_tb_error_2(  nn)
 
                 else
 
@@ -8668,7 +8663,6 @@ contains
                    tmp_tb_1(  jj) = tmp_tb_1(  nn)
                    tmp_time_1(jj) = tmp_time_1(nn)
                    
-                   tmp_tb_error_1(  jj) = tmp_tb_error_1(  nn)
                 end if
                 
              end do
@@ -8839,8 +8833,6 @@ contains
                    SMAP_lat( ind_tile) = SMAP_lat( ind_tile) + tmp_lat(   ii)
                    SMAP_time(ind_tile) = SMAP_time(ind_tile) + tmp_time_1(ii)
                    
-                   SMAP_error(ind_tile) = SMAP_error(ind_tile) + tmp_tb_error_1(  ii)
-
                    N_obs_in_tile(ind_tile) = N_obs_in_tile(ind_tile) + 1
                    
                 end if
@@ -8881,7 +8873,6 @@ contains
              SMAP_lat( ii) = SMAP_lat( ii)/     tmpreal
              SMAP_time(ii) = SMAP_time(ii)/real(tmpreal,kind(0.0D0))
              
-             SMAP_error(ii) = SMAP_error(ii)/     tmpreal
           elseif (N_obs_in_tile(ii)==0) then
              
              SMAP_data(ii) =      this_obs_param%nodata
@@ -8889,7 +8880,6 @@ contains
              SMAP_lat( ii) =      this_obs_param%nodata
              SMAP_time(ii) = real(this_obs_param%nodata,kind(0.0D0))
              
-             SMAP_error(ii) =      this_obs_param%nodata
           end if
           
        end do
@@ -8899,7 +8889,7 @@ contains
        ! set observation error standard deviation
        
        do ii=1,N_catd
-          std_SMAP_data(ii) = this_obs_param%errstd * min(20.,max(1.,exp(20.*(SMAP_error(ii)-Tb_nedt_base))))
+          std_SMAP_data(ii) = this_obs_param%errstd
        end do
        
        ! --------------------------------
