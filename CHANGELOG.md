@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -----------------------------
 
+## [v1.1.1] - 2026-08-26
+
+### Added
+
+- QC of SMAP L1C_TB using max value for Tb_error ([PR #193](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/193)).
+
+-----------------------------
+
 ## [v1.1.0] - 2024-11-05
 
 - 0-diff vs. v1.0.2 except for data assimilation in cube-sphere tile space ([PR #41](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/41)).
