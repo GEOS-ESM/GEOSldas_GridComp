@@ -24,8 +24,8 @@ COLLECTIONS:
 #                'const_2d_lnd_Nx'
 #                'tavg24_1d_lake_Nt'
 #                'tavg24_2d_lake_Nx'
-#                'tavg24_2d_glc_Nx'
 #                'tavg24_1d_glc_Nt'
+#                'tavg24_2d_glc_Nx'
 #                'tavg24_1d_issm_Nt'
 #                'tavg24_1d_route'
            ::
@@ -515,6 +515,7 @@ EASEv2_M36.LM:           1
                                      'TPSURF_ANA_ENSSTD' , 'LANDASSIM' , 'TSURF_ANA_ENSSTD'    ,
                                      'TP1_ANA_ENSSTD'    , 'LANDASSIM' , 'TSOIL1_ANA_ENSSTD' 
                         ::
+			
   tavg24_2d_lake_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Lake Diagnostics',
   tavg24_2d_lake_Nx.nbits:         12,
   tavg24_2d_lake_Nx.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
@@ -526,28 +527,31 @@ EASEv2_M36.LM:           1
   tavg24_2d_lake_Nx.regrid_name:   'GRIDNAME' ,
   tavg24_2d_lake_Nx.grid_label:     PC720x361-DC ,  # comment this line out for cube face output
   tavg24_2d_lake_Nx.deflate:        1,
-  tavg24_2d_lake_Nx.fields:       'ALBVR'       , 'LAKE' ,  'ALBVR_LK'           ,
-                                  'ALBVF'       , 'LAKE' ,  'ALBVF_LK'           ,
-                                  'ALBNR'       , 'LAKE' ,  'ALBNR_LK'           ,
-                                  'ALBNF'       , 'LAKE' ,  'ALBNF_LK'           ,
-                                  'EMIS'        , 'LAKE' ,  'EMIS_LK'            ,
-                                  'EVAPOUT'     , 'LAKE' ,
-                                  'SUBLIM'      , 'LAKE' ,
-                                  'RUNOFF'      , 'LAKE' ,  'RUNOFF_LK'          ,
-                                  'SHOUT'       , 'LAKE' ,
-                                  'HLATN'       , 'LAKE' ,
-                                  'HLWUP'       , 'LAKE' ,  'HLWUP_LK'           ,
-                                  'LWNDSRF'     , 'LAKE' ,
-                                  'SWNDSRF'     , 'LAKE' ,
-                                  'TST'         , 'LAKE' ,  'TST_LK'             ,
-                                  'QST'         , 'LAKE' ,  'QST_LK'             ,
-                                  'DELTS'       , 'LAKE' ,
-                                  'DELQS'       , 'LAKE' ,
-                                  'CHT'         , 'LAKE' ,
-                                  'CQT'         , 'LAKE' ,
-                                  'CMT'         , 'LAKE' ,
-                                  'PS'          , 'LAKE' ,  'PS_LK'              ,
-                                   ::  
+  tavg24_2d_lake_Nx.fields:        'EVAPOUT'     , 'LAKE' ,  'EVAPLAKE'               ,
+                                   'RUNOFF'      , 'LAKE' ,  'RUNOFFTOTLAKE'          ,
+                                   'SHOUT'       , 'LAKE' ,  'SHLAKE'                 ,
+                                   'HLATN'       , 'LAKE' ,  'LHLAKE'                 ,
+                                   'LWNDSRF'     , 'LAKE' ,  'LWNDLAKE'               ,
+                                   'SWNDSRF'     , 'LAKE' ,  'SWNDLAKE'               ,
+                                   'TST'         , 'LAKE' ,  'TSURFLAKE'              ,
+                                   'QST'         , 'LAKE' ,  'QSURFLAKE'              ,
+#				  
+# DROPPED                        'SUBLIM'      , 'LAKE' ,
+# DROPPED                        'ALBVR'       , 'LAKE' ,  'ALBVR_LK'           ,
+# DROPPED                        'ALBVF'       , 'LAKE' ,  'ALBVF_LK'           ,
+# DROPPED                        'ALBNR'       , 'LAKE' ,  'ALBNR_LK'           ,
+# DROPPED                        'ALBNF'       , 'LAKE' ,  'ALBNF_LK'           ,
+# DROPPED                        'EMIS'        , 'LAKE' ,  'EMIS_LK'            ,
+# DROPPED                        'HLWUP'       , 'LAKE' ,  'HLWUP_LK'           ,
+# DROPPED                        'DELTS'       , 'LAKE' ,                                   # need for balance calcs?
+# DROPPED                        'DELQS'       , 'LAKE' ,                                   # need for balance calcs? 
+# DROPPED                        'CHT'         , 'LAKE' ,
+# DROPPED                        'CQT'         , 'LAKE' ,
+# DROPPED                        'CMT'         , 'LAKE' ,
+# DROPPED                        'PS'          , 'LAKE' ,  'PS_LK'              ,
+#				  
+                                   ::
+				   
   tavg24_1d_lake_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Lake Diagnostics',
   tavg24_1d_lake_Nt.nbits:         12,
   tavg24_1d_lake_Nt.template:      '%y4%m2%d2_%h2%n2z.nc4' ,
@@ -555,22 +559,24 @@ EASEv2_M36.LM:           1
   tavg24_1d_lake_Nt.format:        'CFIO',
   tavg24_1d_lake_Nt.frequency:      240000 ,
   tavg24_1d_lake_Nt.ref_time:       000000 ,
-  tavg24_1d_lake_Nt.fields:       'EVAPOUT'     , 'LAKE' ,
-                                  'SUBLIM'      , 'LAKE' ,
-                                  'RUNOFF'      , 'LAKE' ,  'RUNOFF_LK'          ,
-                                  'SHOUT'       , 'LAKE' ,
-                                  'HLATN'       , 'LAKE' ,
-                                  'HLWUP'       , 'LAKE' ,  'HLWUP_LK'           ,
-                                  'LWNDSRF'     , 'LAKE' ,
-                                  'SWNDSRF'     , 'LAKE' ,
-                                  'TST'         , 'LAKE' ,  'TST_LK'             ,
-                                  'QST'         , 'LAKE' ,  'QST_LK'             ,
-                                  'DELTS'       , 'LAKE' ,
-                                  'DELQS'       , 'LAKE' ,
-                                  'CHT'         , 'LAKE' ,
-                                  'CQT'         , 'LAKE' ,
-                                  'CMT'         , 'LAKE' ,
-                                  'PS'          , 'LAKE' ,  'PS_LK'              ,
+  tavg24_1d_lake_Nt.fields:        'EVAPOUT'     , 'LAKE' ,  'EVAPLAKE'               ,
+                                   'RUNOFF'      , 'LAKE' ,  'RUNOFFTOTLAKE'          ,
+                                   'SHOUT'       , 'LAKE' ,  'SHLAKE'                 ,
+                                   'HLATN'       , 'LAKE' ,  'LHLAKE'                 ,
+                                   'LWNDSRF'     , 'LAKE' ,  'LWNDLAKE'               ,
+                                   'SWNDSRF'     , 'LAKE' ,  'SWNDLAKE'               ,
+                                   'TST'         , 'LAKE' ,  'TSURFLAKE'              ,
+                                   'QST'         , 'LAKE' ,  'QSURFLAKE'              ,
+#
+# DROPPED                        'SUBLIM'      , 'LAKE' ,
+# DROPPED                        'HLWUP'       , 'LAKE' ,  'HLWUP_LK'           ,
+# DROPPED                        'DELTS'       , 'LAKE' ,                                   # need for balance calcs?
+# DROPPED                        'DELQS'       , 'LAKE' ,                                   # need for balance calcs?
+# DROPPED                        'CHT'         , 'LAKE' ,
+# DROPPED                        'CQT'         , 'LAKE' ,
+# DROPPED                        'CMT'         , 'LAKE' ,
+# DROPPED                        'PS'          , 'LAKE' ,  'PS_LK'              ,
+#				  
                                    ::                                   
 
   tavg24_2d_glc_Nx.descr:         '2d,Daily,Time-Averaged,Single-Level,Land Ice Diagnostics',
@@ -584,41 +590,47 @@ EASEv2_M36.LM:           1
   tavg24_2d_glc_Nx.regrid_name:   'GRIDNAME' ,
   tavg24_2d_glc_Nx.grid_label:     PC720x361-DC ,  #comment this line out for cube face output
   tavg24_2d_glc_Nx.deflate:        1,
-  tavg24_2d_glc_Nx.fields:      'ACCUM'       , 'LANDICE' ,
-                                'ALBVR'       , 'LANDICE' ,  'ALBVR_GL'           ,
-                                'ALBVF'       , 'LANDICE' ,  'ALBVF_GL'           ,
-                                'ALBNR'       , 'LANDICE' ,  'ALBNR_GL'           ,
-                                'ALBNF'       , 'LANDICE' ,  'ALBNF_GL'           ,
-                                'ASNOW_GL'    , 'LANDICE' ,
-                                'DELTS'       , 'LANDICE' ,
-                                'ICESMB'      , 'LANDICE' ,
->>>HIST_ISSM<<<                 'ICESURF'    ,  'LANDICE' ,
->>>HIST_ISSM<<<                 'ICETHICK'   ,  'LANDICE' ,
->>>HIST_ISSM<<<                 'ICEVEL'     ,  'LANDICE' ,
-                                'DNICFLX'     , 'LANDICE' ,
-                                'EVAPOUT'     , 'LANDICE' ,
-                                'QH'          , 'LANDICE' ,
-                                'GHTSKIN'     , 'LANDICE' ,  'GHTSKIN_GL'           ,
-                                'HLATN'       , 'LANDICE' ,
-                                'HLWUP'       , 'LANDICE' ,  'HLWUP_GL'           ,
-                                'IMELT'       , 'LANDICE' ,
-                                'LWNDSRF'     , 'LANDICE' ,
-                                'MELTWTR'     , 'LANDICE' ,
-                                'MELTWTRCONT' , 'LANDICE' ,
-                                'RUNOFF'      , 'LANDICE' ,  'RUNOFF_GL'           ,
-                                'SHOUT'       , 'LANDICE' ,
-                                'SMELT'       , 'LANDICE' ,
-                                'SNICEALB'    , 'LANDICE' ,
-                                'SNOMAS_GL'   , 'LANDICE' ,
-                                'SNOWALB'     , 'LANDICE' ,
-                                'SNOWDP_GL'   , 'LANDICE' ,
-                                'SWNDSRF'     , 'LANDICE' ,
-                                'TST'         , 'LANDICE' ,
-                                'WESNBOT'     , 'LANDICE' ,
-                                'WESNEXT'     , 'LANDICE' ,
-                                'WESNPERC'    , 'LANDICE' ,
-                                'WESNPREC'    , 'LANDICE' ,
-                                 ::
+  tavg24_2d_glc_Nx.fields:         'SNOWDP_GL'    , 'LANDICE'  , 'SNOWDPGLC'     ,
+                                   'SNOMAS_GL'    , 'LANDICE'  , 'SNOMASGLC'     ,
+                                   'ASNOW_GL'     , 'LANDICE'  , 'ASNOWGLC'      ,
+                                   'RUNOFF'       , 'LANDICE'  , 'RUNOFFTOTGLC'  ,
+                                   'WESNSC'       , 'LANDICE'  ,                                # added
+                                   'WESNEXT'      , 'LANDICE'  ,
+                                   'SNICEALB'     , 'LANDICE'  ,
+# Additional variables
+                                   'ALBNF'        , 'LANDICE'  , 'REFLNIRDFGLC'  ,
+                                   'ALBVF'        , 'LANDICE'  , 'REFLVISDFGLC'  ,
+                                   'EMIS'         , 'LANDICE'  , 'EMISGLC'       ,              # added
+                                   'EVAPOUT'      , 'LANDICE'  , 'EVAPGLC'       ,
+                                   'GHTSKIN'      , 'LANDICE'  , 'GHTFLUXGLC'    ,
+                                   'IMELT'        , 'LANDICE'  ,
+                                   'MELTWTR'      , 'LANDICE'  ,
+                                   'MELTWTRCONT'  , 'LANDICE'  ,
+                                   'RAINRFZ'      , 'LANDICE'  ,                                # added
+                                   'SMELT'        , 'LANDICE'  ,
+                                   'SNOWALB'      , 'LANDICE'  ,
+                                   'WESNBOT'      , 'LANDICE'  ,
+                                   'TST'          , 'LANDICE'  , 'TSKINGLC'      ,
+                                   'HLATN'        , 'LANDICE'  , 'LHGLC'         ,
+                                   'SHOUT'        , 'LANDICE'  , 'SHGLC'         ,
+                                   'LWNDSRF'      , 'LANDICE'  , 'LWNDGLC'       ,
+                                   'SWNDSRF'      , 'LANDICE'  , 'SWNDGLC'       ,
+                                   'ICESMB'       , 'LANDICE'  ,                                # added
+>>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  ,
+>>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  ,
+>>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  ,
+#				    
+# DROPPED                        'DNICFLX'     , 'LANDICE' ,        
+# DROPPED                        'ACCUM'       , 'LANDICE' ,
+# DROPPED                        'ALBVR'       , 'LANDICE' ,  'ALBVR_GL'           ,
+# DROPPED                        'ALBNR'       , 'LANDICE' ,  'ALBNR_GL'           ,
+# DROPPED                        'DELTS'       , 'LANDICE' ,
+# DROPPED                        'QH'          , 'LANDICE' ,
+# DROPPED                        'HLWUP'       , 'LANDICE' ,  'HLWUP_GL'           ,
+# DROPPED                        'WESNPERC'    , 'LANDICE' ,
+# DROPPED                        'WESNPREC'    , 'LANDICE' ,
+#
+                                    ::
 
   tavg24_1d_glc_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Land Ice Diagnostics',
   tavg24_1d_glc_Nt.nbits:         12,
@@ -627,24 +639,40 @@ EASEv2_M36.LM:           1
   tavg24_1d_glc_Nt.format:        'CFIO',
   tavg24_1d_glc_Nt.frequency:      240000 ,
   tavg24_1d_glc_Nt.ref_time:       000000 ,
-  tavg24_1d_glc_Nt.fields:      'ASNOW_GL'    , 'LANDICE' ,
-                                'DELTS'       , 'LANDICE' ,
-                                'EVAPOUT'     , 'LANDICE' ,
-                                'GHTSKIN'     , 'LANDICE' ,  'GHTSKIN_GL'           ,
-                                'HLATN'       , 'LANDICE' ,
-                                'HLWUP'       , 'LANDICE' ,  'HLWUP_GL'           ,
-                                'LWNDSRF'     , 'LANDICE' ,
-                                'MELTWTR'     , 'LANDICE' ,
-                                'MELTWTRCONT' , 'LANDICE' ,
-                                'RUNOFF'      , 'LANDICE' ,  'RUNOFF_GL'           ,
-                                'SHOUT'       , 'LANDICE' ,
-                                'SNOMAS_GL'   , 'LANDICE' ,
-                                'SNOWDP_GL'   , 'LANDICE' ,
-                                'SWNDSRF'     , 'LANDICE' ,
-                                'TST'         , 'LANDICE' ,
-                                'WESNBOT'     , 'LANDICE' ,
-                                'WESNEXT'     , 'LANDICE' ,
-                                 ::
+  tavg24_1d_glc_Nt.fields:         'SNOWDP_GL'    , 'LANDICE'  , 'SNOWDPGLC'     ,
+                                   'SNOMAS_GL'    , 'LANDICE'  , 'SNOMASGLC'     ,
+                                   'ASNOW_GL'     , 'LANDICE'  , 'ASNOWGLC'      ,
+                                   'RUNOFF'       , 'LANDICE'  , 'RUNOFFTOTGLC'  ,
+                                   'WESNSC'       , 'LANDICE'  ,                                # added
+                                   'WESNEXT'      , 'LANDICE'  ,
+                                   'SNICEALB'     , 'LANDICE'  ,                                # added
+# Additional variables
+                                   'ALBNF'        , 'LANDICE'  , 'REFLNIRDFGLC'  ,              # added
+                                   'ALBVF'        , 'LANDICE'  , 'REFLVISDFGLC'  ,              # added
+                                   'EMIS'         , 'LANDICE'  , 'EMISGLC'       ,              # added
+                                   'EVAPOUT'      , 'LANDICE'  , 'EVAPGLC'       ,
+                                   'GHTSKIN'      , 'LANDICE'  , 'GHTFLUXGLC'    ,
+                                   'IMELT'        , 'LANDICE'  ,                                # added
+                                   'MELTWTR'      , 'LANDICE'  ,
+                                   'MELTWTRCONT'  , 'LANDICE'  ,
+                                   'RAINRFZ'      , 'LANDICE'  ,                                # added
+                                   'SMELT'        , 'LANDICE'  ,                                # added
+                                   'SNOWALB'      , 'LANDICE'  ,                                # added
+                                   'WESNBOT'      , 'LANDICE'  ,
+                                   'TST'          , 'LANDICE'  , 'TSKINGLC'      ,
+                                   'HLATN'        , 'LANDICE'  , 'LHGLC'         ,
+                                   'SHOUT'        , 'LANDICE'  , 'SHGLC'         ,
+                                   'LWNDSRF'      , 'LANDICE'  , 'LWNDGLC'       ,
+                                   'SWNDSRF'      , 'LANDICE'  , 'SWNDGLC'       ,
+                                   'ICESMB'       , 'LANDICE'  ,                                # added
+>>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  ,                                # added
+>>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  ,                                # added
+>>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  ,                                # added
+#
+# DROPPED                        'DELTS'       , 'LANDICE' ,
+# DROPPED                        'HLWUP'       , 'LANDICE' ,  'HLWUP_GL'           ,
+#
+                                    ::
 
   tavg24_1d_route.descr:          'Catchment-space,Daily,Time-Averaged,Single-level,Runoff Routing Diagnostics',
   tavg24_1d_route.nbits:          12,
