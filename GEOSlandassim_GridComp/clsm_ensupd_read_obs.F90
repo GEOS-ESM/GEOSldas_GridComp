@@ -4391,7 +4391,6 @@ contains
 
     real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
     real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
-    real,      parameter :: Tb_error_max  = 1.3   ! max allowed Tb error [K] 
  
     real,      parameter :: reg_Tb_std_max = 7.0  ! max Tb std-dev  in one M36 grid cell
                                                   ! (across contributing 15 km DGG cells)
@@ -6782,6 +6781,7 @@ contains
     
     real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
     real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
+    real,      parameter :: Tb_error_max  = 1.3   ! max allowed Tb error [K] 
 
     real,      parameter :: max_std_tb_fore_minus_aft = 20.  ! max std-dev L1C[E] fore-minus-aft Tb diffs
 
