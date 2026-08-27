@@ -64,7 +64,7 @@ module GEOS_LdasGridCompMod
   integer             :: METFORCEAVG, LANDAVG, ROUTEAVG, LAKEAVG, LANDICEAVG
 
   ! other global variables
-  integer :: NUM_ENSEMBLE       ! number of land ensemble members
+  integer :: NUM_ENSEMBLE       ! number of land,landpert, and route ensemble members (lake & landice have only 1 member for now)
   logical :: land_assim
   logical :: mwRTM
   logical :: ensemble_forcing   ! switch between deterministic and ensemble forcing
@@ -186,10 +186,6 @@ contains
     if (any(tile_types == MAPL_LAND   )) with_land    = .true.
     if (any(tile_types == MAPL_LAKE   )) with_lake    = .true.
    
-    if (NUM_ENSEMBLE > 1 .and. with_lake) then
-          _ASSERT(.false., "Lake is not supported in ensemble mode.")
-    endif
-
     call MAPL_GetResource ( MAPL, LAND_ASSIM_STR, Label="LAND_ASSIM:", DEFAULT="NO", RC=STATUS)
     VERIFY_(STATUS)
     LAND_ASSIM_STR =  ESMF_UtilStringUpperCase(LAND_ASSIM_STR, rc=STATUS)
@@ -1017,7 +1013,7 @@ contains
        VERIFY_(status)
     end if
 
-    !phase2 initialization ( executed once)
+    !phase 2: initialization ( executed once)
     !adjust mean of perturbed forcing or Progn
     if (with_land) then
        do i  = 1,NUM_ENSEMBLE
@@ -1027,7 +1023,7 @@ contains
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        enddo
-
+       
        ! Run children GridComps (in order)
        ! Generate raw perturbed force and progn
        do i  = 1,NUM_ENSEMBLE
@@ -1038,19 +1034,19 @@ contains
           call MAPL_TimerOff(MAPL, gcnames(igc))
        enddo
     endif ! with_land
-
+    
     do i = 1, NUM_ENSEMBLE
        igc = METFORCE(i)
-       call MAPL_TimerOn(MAPL, gcnames(igc))
-       call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+       call MAPL_TimerOn(   MAPL, gcnames(igc))
+       call ESMF_GridCompRun(   gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
        VERIFY_(status)
-       call MAPL_TimerOff(MAPL, gcnames(igc))
+       call MAPL_TimerOff(   MAPL, gcnames(igc))
        ! exit after i=1 if using deterministic forcing
        if (.not. ensemble_forcing) exit
     enddo
 
     ! distribute surface met forcing (export forcing to imports of land, landpert, and landice)
-    do i = 1, NUM_ENSEMBLE
+    do i = 1,NUM_ENSEMBLE
        k = 1
        if (ensemble_forcing) k = i
        igc = METFORCE(k)
@@ -1191,7 +1187,7 @@ contains
        VERIFY_(status)
        call ESMF_StateDestroy(merged_Import, noGarbage=.true., _RC)
 
-       do i = 1, NUM_ENSEMBLE
+       do i = 1,NUM_ENSEMBLE
           ! Extract updated exports from "cat_progn" 
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(LAND(i)), clock=clock, phase=2, userRC=status)
           VERIFY_(status)
