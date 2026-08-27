@@ -46,9 +46,8 @@ module GEOS_LdasGridCompMod
   public SetServices
 
   ! !DESCRIPTION: This gridded component (GC) combines the GridComps:
-  !     METFORCE, LAND, LANDPERT, METFORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG, and LANDASSIM
+  !     METFORCE, LAND, LANDPERT, METFORCEAVG, LANDAVG, ROUTEAVG, LAKEAVG, LANDICEAVG, and LANDASSIM
   !  into a new composite LDAS GricComp.
-  !  Include later: LAKE, LANDICE(?), SALTWATER(?)
 
   !EOP
 
@@ -62,7 +61,7 @@ module GEOS_LdasGridCompMod
   integer,allocatable :: LANDPERT(:)
   integer,allocatable :: METFORCE(:)
   integer             :: LANDASSIM
-  integer             :: METFORCEAVG, LANDAVG, ROUTEAVG, LANDICEAVG
+  integer             :: METFORCEAVG, LANDAVG, ROUTEAVG, LAKEAVG, LANDICEAVG
 
   ! other global variables
   integer :: NUM_ENSEMBLE       ! number of land ensemble members
@@ -220,11 +219,11 @@ contains
        allocate(METFORCE(1))
     endif
 
-    if (with_land)    allocate(LAND(   NUM_ENSEMBLE),LANDPERT(NUM_ENSEMBLE))
-    if (with_lake)    allocate(LAKE(   NUM_ENSEMBLE))
-    if (with_landice) allocate(LANDICE(NUM_ENSEMBLE))
+    if (with_land)    allocate(LAND(   NUM_ENSEMBLE), LANDPERT(NUM_ENSEMBLE))
+    if (with_lake)    allocate(LAKE(   1           )                        )     ! for now, only 1 ens member of landice
+    if (with_landice) allocate(LANDICE(1           )                        )     ! for now, only 1 ens member of lake 
     if (RUN_ROUTE >= 1) then
-       _ASSERT( with_land, "RUNOFF must be from the export of land_gridcomp for now.")
+       _ASSERT( with_land, "RUNOFF requires exports from land_gridcomp (but not yet from lake or landice, for now).")
        allocate(ROUTE(NUM_ENSEMBLE))
     endif
     ! ens_id_with = 2 + number of digits = total number of chars in ensid_string ("_eXXXX")
@@ -260,32 +259,32 @@ contains
        call get_ensid_string(ensid_string, ens_id, ens_id_width, NUM_ENSEMBLE)
 
        if (with_land) then
-          childname='LANDPERT'//trim(ensid_string)
+          childname   = 'LANDPERT'//trim(ensid_string)
           LANDPERT(i) = MAPL_AddChild(gc, name=childname, ss=LandPertSetServices, rc=status)
           VERIFY_(status)
-
-          childname='LAND'//trim(ensid_string)
-          LAND(i) = MAPL_AddChild(gc, name=childname, ss=LandSetServices, rc=status)
+          
+          childname   = 'LAND'    //trim(ensid_string)
+          LAND(i)     = MAPL_AddChild(gc, name=childname, ss=LandSetServices,     rc=status)
           VERIFY_(status)
-       endif 
-
-       if (with_lake) then
-          childname = 'LAKE' // trim(ensid_string)
-          LAKE(i) = MAPL_AddChild(gc, name=childname, ss=LakeSetServices, rc=status)
+       endif
+       
+       if (with_lake    .and. i==1) then                                                      ! for now, only 1 ens member of lake
+          childname   = 'LAKE'    //trim(ensid_string)
+          LAKE(i)     = MAPL_AddChild(gc, name=childname, ss=LakeSetServices,     rc=status)
           VERIFY_(status)
        endif
 
-       if (with_landice .and. i == 1) then
-          childname='LANDICE'//trim(ensid_string)
-          LANDICE(i) = MAPL_AddChild(gc, name=childname, ss=LandiceSetServices, rc=status)
+       if (with_landice .and. i==1) then                                                      ! for now, only 1 ens member of landice
+          childname   = 'LANDICE' //trim(ensid_string)
+          LANDICE(i)  = MAPL_AddChild(gc, name=childname, ss=LandiceSetServices,  rc=status)
           VERIFY_(status)
        endif
 
       if (RUN_ROUTE >= 1) then
-          childname='ROUTE'//trim(ensid_string)
-          ROUTE(i) = MAPL_AddChild(gc, name=childname, ss=RouteSetServices, rc=status)
-          VERIFY_(status)
-      endif
+         childname    = 'ROUTE'   //trim(ensid_string)
+         ROUTE(i)     = MAPL_AddChild(gc, name=childname, ss=RouteSetServices,    rc=status)
+         VERIFY_(status)
+       endif
     enddo
 
     if (with_land) then
@@ -368,6 +367,10 @@ contains
     VERIFY_(status)
     if (with_land) then
        LANDAVG    = MAPL_AddChild(gc, name='LANDAVG',     ss=LandAvgSetServices,       rc=status)
+       VERIFY_(status)
+    endif
+    if (with_lake) then
+       LAKEAVG    = MAPL_AddChild(gc, name='LAKEAVG',     ss=LakeAvgSetServices,       rc=status)
        VERIFY_(status)
     endif
     if (with_landice) then
@@ -623,59 +626,59 @@ contains
 
     ! Create component locstreams as subsets of Surface locstream
     ! and add it to the children's MAPL objects
-    ! build the active forcing tile mask in tile-file order: LAND -> LAKE -> LANDICE.    
+    ! build the active forcing tile mask in tile-file order: LAND -> LAKE -> LANDICE    
     allocate(mask(0))
     if (with_land) then
-       call MAPL_LocStreamCreate(                                                  &
-          land_locstream,                                                        &
-          surf_locstream,                                                        &
-          name=gcnames(LAND(1)),                                                 &
-          mask=[MAPL_LAND],                                                      &
-          rc=status                                                              &
+       call MAPL_LocStreamCreate(                                               &
+          land_locstream,                                                       &
+          surf_locstream,                                                       &
+          name=gcnames(LAND(1)),                                                &
+          mask=[MAPL_LAND],                                                     &
+          rc=status                                                             &
           )
        VERIFY_(status)
        mask =[mask,MAPL_LAND]
     endif
     if (with_lake) then
-       call MAPL_LocStreamCreate(                                                &
-            lake_locstream,                                                      &
-            surf_locstream,                                                      &
-            name=gcnames(LAKE(1)),                                               &
-            mask=[MAPL_LAKE],                                                    &
+       call MAPL_LocStreamCreate(                                               &
+            lake_locstream,                                                     &
+            surf_locstream,                                                     &
+            name=gcnames(LAKE(1)),                                              &
+            mask=[MAPL_LAKE],                                                   &
             rc=status )
        VERIFY_(status)
        mask = [mask, MAPL_LAKE]
     endif
     if (with_landice) then
-       call MAPL_LocStreamCreate(                                                &
-          landice_locstream,                                                     &
-          surf_locstream,                                                        &
-          name=gcnames(LANDICE(1)),                                              &
-          mask=[MAPL_LANDICE],                                                   &
-          rc=status                                                              &
-         )
+       call MAPL_LocStreamCreate(                                               &
+            landice_locstream,                                                  &
+            surf_locstream,                                                     &
+            name=gcnames(LANDICE(1)),                                           &
+            mask=[MAPL_LANDICE],                                                &
+            rc=status                                                           &
+            )
        VERIFY_(status)
        mask = [mask, MAPL_LANDICE]
     endif
-
-    call MAPL_LocStreamCreate(                                                &
-         force_locstream,                                                     &
-         surf_locstream,                                                      &
-         name=gcnames(METFORCE(1)),                                           &
-         mask=mask,                                                           &
-         rc=status                                                            &
-        )
+    
+    call MAPL_LocStreamCreate(                                                  &
+         force_locstream,                                                       &
+         surf_locstream,                                                        &
+         name=gcnames(METFORCE(1)),                                             &
+         mask=mask,                                                             &
+         rc=status                                                              &
+         )
     VERIFY_(status)
 
     call MAPL_TimerOff(MAPL, "-LocStreamCreate")
     ! Convert LAND's LocStream to LDAS' tile_coord and save it in the GridComp
     ! -get-tile-information-from-land's-locstream-
-    call MAPL_LocStreamGet(                                                   &
-        force_locstream,                                                      &
-        NT_LOCAL=local_nt,                                                    &
-        LOCAL_ID=local_id,                                                    &
-        rc=status                                                             &
-        )
+    call MAPL_LocStreamGet(                                                     &
+         force_locstream,                                                       &
+         NT_LOCAL=local_nt,                                                     &
+         LOCAL_ID=local_id,                                                     &
+         rc=status                                                              &
+         )
     VERIFY_(status)
     
     ! -get-component's-internal-state-
@@ -814,76 +817,83 @@ contains
     enddo
 
     do i = 1,NUM_ENSEMBLE
+       
        if (with_land) then 
-          call MAPL_GetObjectFromGC(gcs(LAND(i)), CHILD_MAPL, rc=status)
+          call MAPL_GetObjectFromGC(gcs(LAND(i)),     CHILD_MAPL, rc=status)
           VERIFY_(status)
-          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream,     rc=status)
           VERIFY_(status)
 
           call MAPL_GetObjectFromGC(gcs(LANDPERT(i)), CHILD_MAPL, rc=status)
           VERIFY_(status) ! CHILD = LANDPERT
-          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream,     rc=status)
           VERIFY_(status)
-
+          
           ! Add LAND's tile_coord to children's GridComps
-          call ESMF_UserCompSetInternalState(gcs(LAND(i)), 'TILE_COORD', tcwrap, status)
+          call ESMF_UserCompSetInternalState(gcs(LAND(i)),     'TILE_COORD', tcwrap, status)
           VERIFY_(status)
           call ESMF_UserCompSetInternalState(gcs(LANDPERT(i)), 'TILE_COORD', tcwrap, status)
           VERIFY_(status)
        endif
-       if (with_lake) then
-          call MAPL_GetObjectFromGC(gcs(LAKE(i)), CHILD_MAPL, rc=status)
+
+       if (with_lake    .and. i==1) then                                                      ! for now, only 1 ens member of lake
+          call MAPL_GetObjectFromGC(gcs(LAKE(i)),     CHILD_MAPL, rc=status)
           VERIFY_(status)
-       
-          call MAPL_Set(CHILD_MAPL, LocStream=lake_locstream, rc=status)
+          call MAPL_Set(CHILD_MAPL, LocStream=lake_locstream,     rc=status)
           VERIFY_(status)
-       endif
-       if (with_landice .and. i == 1) then
-          call MAPL_GetObjectFromGC(gcs(LANDICE(i)), CHILD_MAPL, rc=status)
-          VERIFY_(status)
-          call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
-          VERIFY_(status)
-          
        endif
 
+       if (with_landice .and. i==1) then                                                      ! for now, only 1 ens member of landice
+          call MAPL_GetObjectFromGC(gcs(LANDICE(i)),  CHILD_MAPL, rc=status)
+          VERIFY_(status)
+          call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream,  rc=status)
+          VERIFY_(status)
+       endif
+       
        if (RUN_ROUTE >= 1) then
-          call MAPL_GetObjectFromGC(gcs(ROUTE(i)), CHILD_MAPL, rc=status)
+          call MAPL_GetObjectFromGC(gcs(ROUTE(i)),    CHILD_MAPL, rc=status)
           VERIFY_(status) 
-          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+          call MAPL_Set(CHILD_MAPL, LocStream=land_locstream,     rc=status)
           VERIFY_(status)
        endif
        
     enddo
 
     if (land_assim .or. mwRTM ) then
-       call MAPL_GetObjectFromGC(gcs(LANDASSIM), CHILD_MAPL, rc=status)
+       call MAPL_GetObjectFromGC(   gcs(LANDASSIM),   CHILD_MAPL, rc=status)
        VERIFY_(status) 
-       call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+       call MAPL_Set(   CHILD_MAPL, LocStream=land_locstream,     rc=status)
        VERIFY_(status)
 
        call ESMF_UserCompSetInternalState(gcs(LANDASSIM), 'TILE_COORD', tcwrap, status)
        VERIFY_(status)
     endif
-
-    call MAPL_GetObjectFromGC(gcs(METFORCEAVG), CHILD_MAPL, rc=status)
+    
+    call MAPL_GetObjectFromGC(      gcs(METFORCEAVG), CHILD_MAPL, rc=status)
     VERIFY_(status) 
     ! only land_locstream is averaged.
-    call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+    call MAPL_Set(      CHILD_MAPL, LocStream=land_locstream,     rc=status)
     VERIFY_(status)
-
+    
     if ( with_land) then
-       call MAPL_GetObjectFromGC(gcs(LANDAVG), CHILD_MAPL, rc=status)
+       call MAPL_GetObjectFromGC(   gcs(LANDAVG),     CHILD_MAPL, rc=status)
        VERIFY_(status) ! CHILD = ens_avg
-       call MAPL_Set(CHILD_MAPL, LocStream=land_locstream, rc=status)
+       call MAPL_Set(   CHILD_MAPL, LocStream=land_locstream,     rc=status)
+       VERIFY_(status)
+    endif
+    if ( with_lake) then
+       call MAPL_GetObjectFromGC(   gcs(LAKEAVG),     CHILD_MAPL, rc=status)
+       VERIFY_(status) ! CHILD = ens_avg
+       call MAPL_Set(   CHILD_MAPL, LocStream=lake_locstream,     rc=status)
        VERIFY_(status)
     endif
     if ( with_landice) then
-       call MAPL_GetObjectFromGC(gcs(LANDICEAVG), CHILD_MAPL, rc=status)
+       call MAPL_GetObjectFromGC(   gcs(LANDICEAVG),  CHILD_MAPL, rc=status)
        VERIFY_(status) ! CHILD = ens_avg
-       call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream, rc=status)
+       call MAPL_Set(   CHILD_MAPL, LocStream=landice_locstream,  rc=status)
        VERIFY_(status)
     endif
-
+    
     !if ( RUN_ROUTE >= 1) then
     !   ! not necessary. Route Avg has its own pfaf_locstream
     !   call MAPL_GetObjectFromGC(gcs(ROUTEAVG), CHILD_MAPL, rc=status)
@@ -1053,11 +1063,11 @@ contains
           VERIFY_(status)
        endif
 
-       if (with_landice .and. i==1 ) then
+       if (with_landice .and. i==1) then                                                      ! for now, only 1 ens member of lake
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDICE(i)),  clock=clock, phase=4, userRC=status)
           VERIFY_(status)
        endif
-       if (with_lake) then
+       if (with_lake    .and. i==1) then                                                      ! for now, only 1 ens member of landice
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LAKE(i)),     clock=clock, phase=5, userRC=status)
           VERIFY_(status)
        endif
@@ -1086,31 +1096,33 @@ contains
           ! Run the land model
           igc = LAND(i)
           call MAPL_TimerOn(MAPL, gcnames(igc))
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=1, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=2, userRC=status)
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land
 
-       if (with_landice .and. i ==1 ) then
+       if (with_landice .and. i==1) then                                                      ! for now, only 1 ens member of landice
           igc = LANDICE(i)
           call MAPL_TimerOn(MAPL, gcnames(igc))
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=1, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=2, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(LANDICEAVG), importState=gex(igc), exportState=gex(LANDICEAVG), clock=clock, userRC=status)
+          call ESMF_GridCompRun(gcs(LANDICEAVG), importState=gex(igc), exportState=gex(LANDICEAVG), clock=clock,          userRC=status)
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_land_ice
 
-       if (with_lake) then
+       if (with_lake    .and. i==1) then                                                      ! for now, only 1 ens member of lake
           igc = LAKE(i)
           call MAPL_TimerOn(MAPL, gcnames(igc))
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=1, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=2, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=2, userRC=status)
+          VERIFY_(status)
+          call ESMF_GridCompRun(gcs(LAKEAVG),    importState=gex(igc), exportState=gex(LAKEAVG),    clock=clock,          userRC=status)
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! with_lake
@@ -1118,9 +1130,9 @@ contains
        if ( RUN_ROUTE >= 1 ) then
           igc = ROUTE(i)
           call MAPL_TimerOn(MAPL, gcnames(igc))
-          call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(igc), clock=clock, phase=1, userRC=status)
+          call ESMF_GridCompRun(gcs(igc),        importState=gim(igc), exportState=gex(igc),        clock=clock, phase=1, userRC=status)
           VERIFY_(status)
-          call ESMF_GridCompRun(gcs(ROUTEAVG), importState=gex(igc), exportState=gex(ROUTEAVG), clock=clock, userRC=status)
+          call ESMF_GridCompRun(gcs(ROUTEAVG),   importState=gex(igc), exportState=gex(ROUTEAVG),   clock=clock,          userRC=status)
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        endif ! river-routine
