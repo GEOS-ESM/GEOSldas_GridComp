@@ -1053,7 +1053,7 @@ contains
           VERIFY_(status)
        endif
 
-       if (with_landice .and. i ==1 ) then
+       if (with_landice .and. i==1 ) then
           call ESMF_GridCompRun(gcs(igc), importState=gex(igc), exportState=gim(LANDICE(i)),  clock=clock, phase=4, userRC=status)
           VERIFY_(status)
        endif

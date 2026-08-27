@@ -450,6 +450,7 @@ class ldas:
                  landpertRstFile=self.in_rstdir+'/'+tmpFile
                  if ( os.path.isfile(landpertRstFile)) :
                     self.has_geos_pert = True
+                    
            if self.with_lake:
              tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
              lakeRstFile=self.in_rstdir+'/'+tmpFile
