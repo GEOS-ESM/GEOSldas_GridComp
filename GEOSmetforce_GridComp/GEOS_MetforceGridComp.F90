@@ -78,39 +78,34 @@ module GEOS_MetforceGridCompMod
   integer, parameter :: k_landpert     = k_export
   integer, parameter :: k_landice_lake = 10
   integer, parameter :: k_aerosol      = 18
-  
-  character(len=7), dimension(k_export      ) :: export_name
-  character(len=7), dimension(k_landpert    ) :: landpert_name
-  character(len=7), dimension(k_landice_lake) :: landice_lake_name
-  character(len=4), dimension(k_aerosol     ) :: aerosol_name
-  
+
   ! export_name is vector of field names of type metforce; these fields are read from files
   ! and mapped to tile space by LDAS_GetForcing(), then interpolated in time by LDAS_TInterpForcing():
   
-  export_name = [                                         &
-       'Tair   ', 'Qair   ', 'Psurf  ',                   &
-       'Rainf_C', 'Snowf  ', 'LWdown ',                   &
-       'PARdrct', 'PARdffs', 'Wind   ',                   &
+  character(len=7), dimension(k_export      ) :: export_name       = [                  &
+       'Tair   ', 'Qair   ', 'Psurf  ',                                                 &
+       'Rainf_C', 'Snowf  ', 'LWdown ',                                                 &
+       'PARdrct', 'PARdffs', 'Wind   ',                                                 &
        'RefH   ', 'Rainf  ', 'SWdown ']
-
+  
   ! names of forcing variables in Landice and Lake GridComps that match elements 1:10 of export_name;
-  !   remainder of variables done explicitly inside DistributeForcingTo[Landice,Lake]
+  !   remainder of variables done explicitly inside DistributeForcingTo[Landice,Lake]  
   
-  landice_lake_name = [                                   &
-       'TA    ', 'QA     ', 'PS     ',                    &
-       'PCU   ', 'SNO    ', 'LWDNSRF',                    &
-       'DRPAR ', 'DFPAR  ', 'UU     ',                    &
+  character(len=7), dimension(k_landice_lake) :: landice_lake_name = [                  &
+       'TA    ', 'QA     ', 'PS     ',                                                  &
+       'PCU   ', 'SNO    ', 'LWDNSRF',                                                  &
+       'DRPAR ', 'DFPAR  ', 'UU     ',                                                  &
        'DZ    ']
-  
+
   ! names of forcing variables in Landpert GridComp match export_name for all elements:
   
-  landpert_name = export_name
+  character(len=7), dimension(k_landpert    ) :: landpert_name     = export_name
   
-  ! names of aerosol forcing variables:
+  ! names of aerosol forcing variables:  
   
-  aerosol_name = [                                        &
-       'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',    &
-       'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',    &
+  character(len=4), dimension(k_aerosol     ) :: aerosol_name     =                     &
+       'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',                                  &
+       'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',                                  &
        'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
   
 contains
