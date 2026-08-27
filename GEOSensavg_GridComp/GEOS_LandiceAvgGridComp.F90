@@ -21,19 +21,31 @@ module GEOS_LandiceAvgGridCompMod
 contains
   
   subroutine SetServices(gc, rc)
+    
     type(ESMF_GridComp), intent(inout) :: gc ! gridded component
     integer, optional                  :: rc ! return code
 
     integer :: status
     character(len=ESMF_MAXSTR) :: Iam
     character(len=ESMF_MAXSTR) :: comp_name
+    
+    type(MAPL_MetaComp), pointer            :: MAPL
+    integer                                 :: DO_ISSM ! ISSM flag
 
     ! Get my name and setup traceback handle
     Iam = 'SetServices'
     call ESMF_GridCompGet(gc, name=comp_name, rc=status)
     VERIFY_(status)
     Iam = trim(comp_name) // "::" // Iam
+    
+    ! Get internal MAPL_Generic state and query for DO_ISSM:
+    
+    call MAPL_GetObjectFromGC ( GC, MAPL, RC=STATUS)
+    VERIFY_(STATUS)
+    call MAPL_GetResource (MAPL, DO_ISSM, label='DO_ISSM:', DEFAULT=0, __RC__ )
 
+    ! Set entry points
+    
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_INITIALIZE,                                                &
@@ -58,7 +70,45 @@ contains
          )
     VERIFY_(status)
 
-!  export landice
+    !  exports of landice
+    
+    call MAPL_AddExportSpec(GC,                        &
+         SHORT_NAME    = 'ICESMB',                     &
+         LONG_NAME     = 'ice_surface_mass_balance',   &
+         UNITS         = 'kg m-2 s-1',                 &
+         DIMS          = MAPL_DimsTileOnly,            &
+         VLOCATION     = MAPL_VLocationNone,           &
+         RC=STATUS  )
+    VERIFY_(STATUS)
+    
+    if (DO_ISSM==1) then
+       call MAPL_AddExportSpec(GC,                     &
+            SHORT_NAME = 'ICESURF',                    &
+            LONG_NAME  = 'ice_surface_elevation',      &
+            UNITS      = 'm',                          &
+            DIMS       = MAPL_DimsTileOnly,            &
+            VLOCATION  = MAPL_VLocationNone,           &
+            RC=STATUS  )
+       VERIFY_(STATUS)
+       
+       call MAPL_AddExportSpec(GC,                     &
+            SHORT_NAME = 'ICEVEL',                     &
+            LONG_NAME  = 'ice_flow_speed',             &
+            UNITS      = 'm s-1',                      &
+            DIMS       = MAPL_DimsTileOnly,            &
+            VLOCATION  = MAPL_VLocationNone,           &
+            RC=STATUS  )
+       VERIFY_(STATUS)
+       
+       call MAPL_AddExportSpec(GC,                     &
+            SHORT_NAME = 'ICETHICK',                   &
+            LONG_NAME  = 'ice_thickness',              &
+            UNITS      = 'm',                          &
+            DIMS       = MAPL_DimsTileOnly,            &
+            VLOCATION  = MAPL_VLocationNone,           &
+            RC=STATUS  )
+       VERIFY_(STATUS)
+    end if
 
     call MAPL_AddExportSpec(GC,                           &
          LONG_NAME          = 'surface_emissivity'                              ,&
@@ -806,6 +856,11 @@ contains
     type(MAPL_MetaComp), pointer :: MAPL=>null() ! MAPL obj
 
     ! Pointers to imports (1D tile fields)
+    
+    real, pointer :: ICESMB(:)=>null()  
+    real, pointer :: ICESURF(:)=>null() 
+    real, pointer :: ICETHICK(:)=>null()
+    real, pointer :: ICEVEL(:)=>null()  
     real, pointer :: EMIS(:)=>null()
     real, pointer :: ALBVR(:)=>null()
     real, pointer :: ALBVF(:)=>null()
@@ -893,6 +948,11 @@ contains
     real, pointer :: WESNREPAR(:,:)=>null()
 
     ! Pointers to exports ( 1D tile fields)
+
+    real, pointer :: ICESMB_enavg(:)=>null()  
+    real, pointer :: ICESURF_enavg(:)=>null() 
+    real, pointer :: ICETHICK_enavg(:)=>null()
+    real, pointer :: ICEVEL_enavg(:)=>null()  
     real, pointer :: EMIS_enavg(:)=>null()
     real, pointer :: ALBVR_enavg(:)=>null()
     real, pointer :: ALBVF_enavg(:)=>null()
@@ -992,6 +1052,10 @@ contains
     call MAPL_TimerOn(MAPL, "Collect_landice")
 
     ! Get import pointers (1d fields)
+    call MAPL_GetPointer(import, ICESMB  ,    'ICESMB'  ,    _RC)
+    call MAPL_GetPointer(import, ICESURF ,    'ICESURF' ,    _RC)
+    call MAPL_GetPointer(import, ICETHICK,    'ICETHICK',    _RC)
+    call MAPL_GetPointer(import, ICEVEL  ,    'ICEVEL'  ,    _RC)
     call MAPL_GetPointer(import, EMIS,        'EMIS',        _RC)
     call MAPL_GetPointer(import, ALBVR,       'ALBVR',       _RC)
     call MAPL_GetPointer(import, ALBVF,       'ALBVF',       _RC)
@@ -1079,6 +1143,10 @@ contains
     call MAPL_GetPointer(import, WESNREPAR,   'WESNREPAR',   _RC)
 
     ! Get export pointers (1d fields)
+    call MAPL_GetPointer(export, ICESMB_enavg,      'ICESMB'  ,    _RC)
+    call MAPL_GetPointer(export, ICESURF_enavg,     'ICESURF' ,    _RC)
+    call MAPL_GetPointer(export, ICETHICK_enavg,    'ICETHICK',    _RC)
+    call MAPL_GetPointer(export, ICEVEL_enavg,      'ICEVEL'  ,    _RC)
     call MAPL_GetPointer(export, EMIS_enavg,        'EMIS',        _RC)
     call MAPL_GetPointer(export, ALBVR_enavg,       'ALBVR',       _RC)
     call MAPL_GetPointer(export, ALBVF_enavg,       'ALBVF',       _RC)
@@ -1167,6 +1235,11 @@ contains
 
     ! On first ensemble member: zero the export accumulators
     if (collect_landice_counter == 0) then
+
+       if (associated(ICESMB_enavg  ))    ICESMB_enavg      = 0.0
+       if (associated(ICESURF_enavg ))    ICESURF_enavg     = 0.0
+       if (associated(ICETHICK_enavg))    ICETHICK_enavg    = 0.0
+       if (associated(ICEVEL_enavg  ))    ICEVEL_enavg      = 0.0
        if (associated(EMIS_enavg))        EMIS_enavg        = 0.0
        if (associated(ALBVR_enavg))       ALBVR_enavg       = 0.0
        if (associated(ALBVF_enavg))       ALBVF_enavg       = 0.0
@@ -1253,6 +1326,10 @@ contains
     endif
 
     ! Accumulate ensemble members (1d fields)
+    if (associated(ICESMB_enavg  ))    ICESMB_enavg      = ICESMB_enavg      + ICESMB
+    if (associated(ICESURF_enavg ))    ICESURF_enavg     = ICESURF_enavg     + ICESURF
+    if (associated(ICETHICK_enavg))    ICETHICK_enavg    = ICETHICK_enavg    + ICETHICK
+    if (associated(ICEVEL_enavg  ))    ICEVEL_enavg      = ICEVEL_enavg      + ICEVEL
     if (associated(EMIS_enavg))        EMIS_enavg        = EMIS_enavg        + EMIS
     if (associated(ALBVR_enavg))       ALBVR_enavg       = ALBVR_enavg       + ALBVR
     if (associated(ALBVF_enavg))       ALBVF_enavg       = ALBVF_enavg       + ALBVF
@@ -1345,6 +1422,11 @@ contains
        collect_landice_counter = 0
 
        ! Divide by NUM_ENSEMBLE_LANDICE (1d fields)
+
+       if (associated(ICESMB_enavg  ))    ICESMB_enavg      = ICESMB_enavg      / NUM_ENSEMBLE_LANDICE
+       if (associated(ICESURF_enavg ))    ICESURF_enavg     = ICESURF_enavg     / NUM_ENSEMBLE_LANDICE
+       if (associated(ICETHICK_enavg))    ICETHICK_enavg    = ICETHICK_enavg    / NUM_ENSEMBLE_LANDICE
+       if (associated(ICEVEL_enavg  ))    ICEVEL_enavg      = ICEVEL_enavg      / NUM_ENSEMBLE_LANDICE
        if (associated(EMIS_enavg))        EMIS_enavg        = EMIS_enavg        / NUM_ENSEMBLE_LANDICE
        if (associated(ALBVR_enavg))       ALBVR_enavg       = ALBVR_enavg       / NUM_ENSEMBLE_LANDICE
        if (associated(ALBVF_enavg))       ALBVF_enavg       = ALBVF_enavg       / NUM_ENSEMBLE_LANDICE
