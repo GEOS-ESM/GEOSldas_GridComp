@@ -82,7 +82,7 @@ module GEOS_MetforceGridCompMod
   ! export_name is vector of field names of type metforce; these fields are read from files
   ! and mapped to tile space by LDAS_GetForcing(), then interpolated in time by LDAS_TInterpForcing():
   
-  character(len=7), dimension(k_export      ) :: export_name       = [                  &
+  character(len=7), parameter, dimension(k_export      ) :: export_name       = [       &
        'Tair   ', 'Qair   ', 'Psurf  ',                                                 &
        'Rainf_C', 'Snowf  ', 'LWdown ',                                                 &
        'PARdrct', 'PARdffs', 'Wind   ',                                                 &
@@ -91,19 +91,19 @@ module GEOS_MetforceGridCompMod
   ! names of forcing variables in Landice and Lake GridComps that match elements 1:10 of export_name;
   !   remainder of variables done explicitly inside DistributeForcingTo[Landice,Lake]  
   
-  character(len=7), dimension(k_landice_lake) :: landice_lake_name = [                  &
-       'TA    ', 'QA     ', 'PS     ',                                                  &
-       'PCU   ', 'SNO    ', 'LWDNSRF',                                                  &
-       'DRPAR ', 'DFPAR  ', 'UU     ',                                                  &
-       'DZ    ']
+  character(len=7), parameter, dimension(k_landice_lake) :: landice_lake_name = [       &
+       'TA     ', 'QA     ', 'PS     ',                                                 &
+       'PCU    ', 'SNO    ', 'LWDNSRF',                                                 &
+       'DRPAR  ', 'DFPAR  ', 'UU     ',                                                 &
+       'DZ     ']
 
   ! names of forcing variables in Landpert GridComp match export_name for all elements:
   
-  character(len=7), dimension(k_landpert    ) :: landpert_name     = export_name
+  character(len=7), parameter, dimension(k_landpert    ) :: landpert_name     = export_name
   
   ! names of aerosol forcing variables:  
   
-  character(len=4), dimension(k_aerosol     ) :: aerosol_name     =  [                  &
+  character(len=4), parameter, dimension(k_aerosol     ) :: aerosol_name     =  [       &
        'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',                                  &
        'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',                                  &
        'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
