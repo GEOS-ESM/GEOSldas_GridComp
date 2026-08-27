@@ -103,7 +103,7 @@ module GEOS_MetforceGridCompMod
   
   ! names of aerosol forcing variables:  
   
-  character(len=4), dimension(k_aerosol     ) :: aerosol_name     =                     &
+  character(len=4), dimension(k_aerosol     ) :: aerosol_name     =  [                  &
        'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',                                  &
        'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',                                  &
        'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
