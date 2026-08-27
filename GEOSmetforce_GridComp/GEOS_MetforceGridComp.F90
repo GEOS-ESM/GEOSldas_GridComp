@@ -958,7 +958,7 @@ contains
     internal => wrap%ptr
  
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", &
-         DEFAULT=1, RC=STATUS)
+         DEFAULT=0, RC=STATUS)
 
     ! Get number of tiles, tile lats/lons from LocStream
     call MAPL_Get(MAPL, LocStream=locstream)
@@ -1322,31 +1322,45 @@ contains
     type(ESMF_Clock),    intent(inout) :: clock       ! The clock
     integer, optional,   intent(  out) :: rc          ! Error code
     
-    real, pointer :: out1d(:), in1d(:)
-    real, pointer :: out2d(:,:), in2d(:,:)
-    integer :: k, AEROSOL_DEPOSITION, status
-    type(MAPL_MetaComp), pointer :: MAPL
-    character(len=ESMF_MAXSTR) :: Iam
+    integer                            :: k, i1, i2, AEROSOL_DEPOSITION, status
+    real,                pointer       :: out1d(:  ), in1d(:  )
+    real,                pointer       :: out2d(:,:), in2d(:,:)                    ! for aerosol forcing
+    type(MAPL_MetaComp), pointer       :: MAPL                                     ! for aerosol forcing
+    
+    character(len=ESMF_MAXSTR)         :: Iam
     Iam = "metForce::DistributeForcingToLand"
 
+    if (NUM_LAND_TILE == 0) then
+       RETURN_(ESMF_SUCCESS)
+    endif
+    
+    ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE
+    i1 = 1
+    i2 = NUM_LAND_TILE
+    
+    ! fill aerosol forcing (if needed)
     call MAPL_GetObjectFromGC(gc, MAPL, _RC)
-    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC) 
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=0, _RC) 
     if(AEROSOL_DEPOSITION /=0) then
        do k = 1, k_aerosol
           call MAPL_GetPointer(export,     out2d,  aerosol_name(k), _RC)
           call MAPL_GetPointer(land_import, in2d,  aerosol_name(k), _RC)
 
           ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE.
-          in2d(:,:) = out2d(1:NUM_LAND_TILE, :)
+          in2d(:,:) = out2d(i1:i2, :)
        enddo
     endif
 
+    ! fill surface pressure and lowest-model-layer height
+    
     call MAPL_GetPointer(export,     out1d, 'Psurf', _RC)
-    call MAPL_GetPointer(land_import, in1d,  'PS',   _RC)
+    call MAPL_GetPointer(land_import, in1d, 'PS',    _RC)
     in1d = out1d(1:NUM_LAND_TILE)
+    
     call MAPL_GetPointer(export,     out1d, 'RefH',  _RC)
-    call MAPL_GetPointer(land_import, in1d,  'DZ',   _RC)
+    call MAPL_GetPointer(land_import, in1d, 'DZ',    _RC)
     in1d = out1d(1:NUM_LAND_TILE)
+    
     RETURN_(ESMF_SUCCESS)
     
   end subroutine DistributeForcingToLand
@@ -1363,16 +1377,28 @@ contains
     type(ESMF_Clock),    intent(inout) :: clock           ! The clock
     integer, optional,   intent(  out) :: rc              ! Error code
 
-    real, pointer :: out1d(:), in1d(:)
-    integer :: k, status
-    character(len=ESMF_MAXSTR) :: Iam
+    integer                            :: k, i1, i2, status
+    real,                pointer       :: out1d(:), in1d(:)
+    
+    character(len=ESMF_MAXSTR)         :: Iam
     Iam = "metForce::DistributeForcingToLandPert"
+    
+    if (NUM_LAND_TILE == 0) then
+       RETURN_(ESMF_SUCCESS)
+    endif
+    
+    ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE
+    i1 = 1
+    i2 = NUM_LAND_TILE
+
+    ! fill forcing imports of Landpert GridComp (same as variables in "export_name")
 
     do k = 1, k_landpert
        call MAPL_GetPointer(export,          out1d, trim(export_name(  k)), _RC)
        call MAPL_GetPointer(landpert_import, in1d,  trim(landpert_name(k)), _RC)
-       in1d = out1d(1:NUM_LAND_TILE)
+       in1d = out1d(i1:i2)
     enddo
+    
     RETURN_(ESMF_SUCCESS)
     
   end subroutine DistributeForcingToLandPert
@@ -1392,7 +1418,7 @@ contains
     integer, optional,   intent(  out) :: rc             ! Error code
     
     integer                            :: k, i1, i2, AEROSOL_DEPOSITION, status
-    real,                pointer       :: out1d(:), in1d(:), tmp(:)
+    real,                pointer       :: out1d(:  ), in1d(:  ), tmp(:)
     real,                pointer       :: out2d(:,:), in2d(:,:)                    ! for aerosol forcing
     real,                allocatable   :: tmpreal(:)
     type(MAPL_MetaComp), pointer       :: MAPL                                     ! for aerosol forcing
@@ -1401,7 +1427,7 @@ contains
     Iam = "metForce::DistributeForcingToLandice"
 
     if (NUM_LANDICE_TILE == 0) then
-      RETURN_(ESMF_SUCCESS)
+       RETURN_(ESMF_SUCCESS)
     endif
 
     ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE
@@ -1410,13 +1436,12 @@ contains
 
     ! fill aerosol forcing (if needed)
     call MAPL_GetObjectFromGC(gc, MAPL, _RC)
-    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC)
+    call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=0, _RC)
     if(AEROSOL_DEPOSITION /=0) then
        do k = 1, k_aerosol
           call MAPL_GetPointer(export,         out2d, aerosol_name(k), _RC)
           call MAPL_GetPointer(landice_import, in2d,  aerosol_name(k), _RC)
           in2d(:,:) = out2d(i1:i2, :)
-          VERIFY_(status)
        enddo
     endif
     
