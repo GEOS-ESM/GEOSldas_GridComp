@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clarified scope and constraints of RESTART=1 and RESTART=2.
   - Added RESTART=3 (formerly RESTART=G, which had been removed).
   - Cleaned up RESTART=M.
+- Updated CI.
+
 
 ### Fixed
 
