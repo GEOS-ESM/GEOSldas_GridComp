@@ -32,8 +32,6 @@ module GEOS_MetforceGridCompMod
 
   private
 
-  real, parameter      :: daylen = 86400.
-
   ! !PUBLIC MEMBER FUNCTIONS:
 
   public :: SetServices
@@ -70,24 +68,40 @@ module GEOS_MetforceGridCompMod
      type(T_METFORCE_STATE), pointer :: ptr=>null()
   end type METFORCE_WRAP
 
+  ! --------------------------
+  !
+  ! variables needed for DistributeForcingTo[Land,Landpert,Landice,Lake]:
+
   integer, parameter :: k_force   = 12
   integer, parameter :: k_aerosol = 18
   integer, parameter :: k_landice = 15
-  character(len=7), dimension(k_force) :: export_name = ['Tair   ', 'Qair   ', 'Psurf  ', &
-                                                         'Rainf_C', 'Snowf  ', 'LWdown ', &
-                                                         'PARdrct', 'PARdffs', 'Wind   ', &
+
+  ! export_name is vector of field names of type metforce; these fields are read from files
+  ! and mapped to tile space by LDAS_GetForcing() and interpolated in time by LDAS_TInterpForcing()
+  
+  character(len=7), dimension(k_force) :: export_name = ['Tair   ', 'Qair   ', 'Psurf  ',                      &
+                                                         'Rainf_C', 'Snowf  ', 'LWdown ',                      &
+                                                         'PARdrct', 'PARdffs', 'Wind   ',                      &
                                                          'RefH   ', 'Rainf  ', 'SWdown ']
-  character(len=4), dimension(k_aerosol) :: aerosol_name = [                              &
-                        'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',            &
-                        'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',            &
+
+  ! names of aerosol forcing variables 
+  
+  character(len=4), dimension(k_aerosol) :: aerosol_name = [                                                   &
+                        'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',                                        &
+                        'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',                                        &
                         'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
-  character(len=11), dimension(k_landice) :: landice_name = ['TA         ', 'QA         ', 'PS         ', &
-                                                             'PCU        ', 'SNO        ', 'LWDNSRF    ', &
-                                                             'DRPAR      ', 'DFPAR      ', 'UU         ', &
-                                                             'DZ         ', 'DRNIR      ', 'DFNIR      ', &
+
+  ! names of forcing variables in Landice GridComp (translates "export_name" into names of Landice GridComp)
+  
+  character(len=11), dimension(k_landice) :: landice_name = ['TA         ', 'QA         ', 'PS         ',      &
+                                                             'PCU        ', 'SNO        ', 'LWDNSRF    ',      &
+                                                             'DRPAR      ', 'DFPAR      ', 'UU         ',      &
+                                                             'DZ         ', 'DRNIR      ', 'DFNIR      ',      &
                                                              'DRUVR      ', 'DFUVR      ', 'PLS        ']  
+
   integer :: NUM_LAND_TILE, NUM_LAKE_TILE, NUM_LANDICE_TILE
-  contains
+  
+contains
 
   !BOP
 
@@ -133,7 +147,7 @@ module GEOS_MetforceGridCompMod
          )
     VERIFY_(status)
 
-    ! phase 1 get forcing
+    ! phase 1: get forcing
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
          ESMF_METHOD_RUN,                                                       &
@@ -141,6 +155,7 @@ module GEOS_MetforceGridCompMod
          rc=status                                                              &
          )
     VERIFY_(status)
+    
     ! phase 2: to land
     call MAPL_GridCompSetEntryPoint(                                            &
          gc,                                                                    &
@@ -803,13 +818,16 @@ module GEOS_MetforceGridCompMod
 
   end subroutine Initialize
 
-
+  ! ------------------------------------------------------------------------
+  
   !BOP
 
   ! !IROTUINE: Run_GetForcing - a wrapper around Rolf's get_forcing()
 
   ! !INTERFACE:
 
+  ! run method phase 1:
+    
   subroutine Run(gc, import, export, clock, rc)
 
     ! !ARGUMENTS:
@@ -865,6 +883,7 @@ module GEOS_MetforceGridCompMod
     logical :: MERRA_file_specs, S2S3_file_specs
     logical :: backward_looking_fluxes 
     integer :: AEROSOL_DEPOSITION
+
     ! Export pointers
     real, pointer :: Tair(:)=>null()
     real, pointer :: Qair(:)=>null()
@@ -1184,21 +1203,19 @@ module GEOS_MetforceGridCompMod
 
 
     ! Set exports
-    Tair = mfDataNtp%Tair
-    Qair = mfDataNtp%Qair
-    Psurf = mfDataNtp%Psurf
-    Rainf_C = mfDataNtp%Rainf_C
-    Rainf = mfDataNtp%Rainf
-    Snowf = mfDataNtp%Snowf
-    ! *daylen convert [kg/m2/s] into [kg/m2/day]
-    !RainfSnowf= (Rainf+Snowf)*daylen 
-    RainfSnowf= Rainf+Snowf 
-    LWdown = mfDataNtp%LWdown
-    SWdown = mfDataNtp%SWdown
-    PARdrct = mfDataNtp%PARdrct
-    PARdffs = mfDataNtp%PARdffs
-    Wind = mfDataNtp%Wind
-    RefH = mfDataNtp%RefH
+    Tair       = mfDataNtp%Tair
+    Qair       = mfDataNtp%Qair
+    Psurf      = mfDataNtp%Psurf
+    Rainf_C    = mfDataNtp%Rainf_C
+    Rainf      = mfDataNtp%Rainf
+    Snowf      = mfDataNtp%Snowf
+    RainfSnowf =           Rainf+Snowf 
+    LWdown     = mfDataNtp%LWdown
+    SWdown     = mfDataNtp%SWdown
+    PARdrct    = mfDataNtp%PARdrct
+    PARdffs    = mfDataNtp%PARdffs
+    Wind       = mfDataNtp%Wind
+    RefH       = mfDataNtp%RefH
 
 
     if(AEROSOL_DEPOSITION /=0) then
@@ -1286,6 +1303,10 @@ module GEOS_MetforceGridCompMod
 
   end subroutine Run
 
+  ! --------------------------------------------------------------------------
+  !
+  ! run method phase 2:
+  
   subroutine DistributeForcingToLand(gc, export, land_import, clock, rc)
     
     type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
@@ -1307,6 +1328,8 @@ module GEOS_MetforceGridCompMod
        do k = 1, k_aerosol
           call MAPL_GetPointer(export,     out2d,  aerosol_name(k), _RC)
           call MAPL_GetPointer(land_import, in2d,  aerosol_name(k), _RC)
+
+          ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE.
           in2d(:,:) = out2d(1:NUM_LAND_TILE, :)
        enddo
     endif
@@ -1321,6 +1344,10 @@ module GEOS_MetforceGridCompMod
     
   end subroutine DistributeForcingToLand
 
+  ! --------------------------------------------------------------------------
+  !
+  ! run method phase 3:
+  
   subroutine DistributeForcingToLandPert(gc, export, landpert_import, clock, rc)
     
     type(ESMF_GridComp), intent(inout) :: gc              ! Gridded component
@@ -1343,6 +1370,10 @@ module GEOS_MetforceGridCompMod
     
   end subroutine DistributeForcingToLandPert
 
+  ! --------------------------------------------------------------------------
+  !
+  ! run method phase 4:
+  
   subroutine DistributeForcingToLandIce(gc, export, landice_import, clock, rc)
 
     type(ESMF_GridComp), intent(inout) :: gc             ! Gridded component
@@ -1363,9 +1394,11 @@ module GEOS_MetforceGridCompMod
       RETURN_(ESMF_SUCCESS)
     endif
 
+    ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE
     i1 = NUM_LAND_TILE + NUM_LAKE_TILE + 1
     i2 = NUM_LAND_TILE + NUM_LAKE_TILE + NUM_LANDICE_TILE
-  ! Get MAPL obj
+
+    ! Get MAPL obj
     call MAPL_GetObjectFromGC(gc, MAPL, _RC)
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC)
     if(AEROSOL_DEPOSITION /=0) then
@@ -1377,36 +1410,43 @@ module GEOS_MetforceGridCompMod
        enddo
     endif
 
+    ! fill forcing imports of Landice GridComp
+    ! 
+    ! connect: Tair, Qair, Psurf, Rainf_C, Snowf, LWdown , PARdrct, PARdffs, Wind, RefH
+    !      to: TA  , QA  , PS   , PCU    , SNO  , LWDNSRF, DRPAR  , DFPAR  , UU  , DZ  
+                                                
     do k = 1, k_force - 2
        call MAPL_GetPointer(export,        out1d,  trim(export_name(k)),  _RC)
        call MAPL_GetPointer(landice_import, in1d,  trim(landice_name(k)), _RC)
        in1d = out1d(i1:i2)
     enddo
 
+    ! fill more forcing imports of Landice GridComp
+    
     call MAPL_GetPointer(export,        out1d,  'Wind',   _RC)
-    call MAPL_GetPointer(landice_import, in1d,  'UWINDLMTILE',   _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'UWINDLMTILE',   _RC)   ! UWINDLMTILE = Wind
     in1d = out1d(i1:i2)
-    call MAPL_GetPointer(landice_import, in1d,  'VWINDLMTILE',   _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'VWINDLMTILE',   _RC)   ! VWINDLMTILE = 0.
     in1d = 0.
 
     call MAPL_GetPointer(export,        out1d,  'Rainf',   _RC)
     call MAPL_GetPointer(export,        tmp,    'Rainf_C', _RC)
     call MAPL_GetPointer(landice_import, in1d,  'PLS',     _RC)
-    in1d = out1d(i1:i2) - tmp(i1:i2)
+    in1d = out1d(i1:i2) - tmp(i1:i2)                                    ! PLS = Rainf - Rainf_C
 
     allocate(tmpreal(NUM_LANDICE_TILE), stat=status)
     call MAPL_GetPointer(export,        out1d,  'SWdown',  _RC)
     tmpreal = 0.5* out1d(i1:i2)
-    call MAPL_GetPointer(landice_import, in1d,  'DRNIR',   _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'DRNIR',   _RC)         ! DRNIR = 0.5*0.5*SWdown
     in1d = 0.5 * tmpreal
-    call MAPL_GetPointer(landice_import, in1d,  'DFNIR',   _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'DFNIR',   _RC)         ! DFNIR = 0.5*0.5*SWdown
     in1d = 0.5 * tmpreal
 
     call MAPL_GetPointer(export,        out1d,  'PARdrct', _RC)
     call MAPL_GetPointer(landice_import, in1d,  'DRUVR',   _RC)
-    in1d = 0.5* tmpreal - out1d(i1:i2)
+    in1d = 0.5* tmpreal - out1d(i1:i2)                                  ! DRUVR = 0.5*SWdown - PARdrct
     call MAPL_GetPointer(export,        out1d,  'PARdffs', _RC)
-    call MAPL_GetPointer(landice_import, in1d,  'DFUVR',   _RC)
+    call MAPL_GetPointer(landice_import, in1d,  'DFUVR',   _RC)         ! DFUVR = 0.5*SWdown - PARdffs
     in1d = 0.5* tmpreal - out1d(i1:i2)
     deallocate(tmpreal)
 
@@ -1414,6 +1454,10 @@ module GEOS_MetforceGridCompMod
     
   end subroutine DistributeForcingToLandIce
 
+  ! --------------------------------------------------------------------------
+  !
+  ! run method phase 5:
+  
   subroutine DistributeForcingToLake(gc, export, lake_import, clock, rc)
 
     type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
@@ -1433,7 +1477,7 @@ module GEOS_MetforceGridCompMod
        RETURN_(ESMF_SUCCESS)
     endif
 
-    ! Active forcing tile-space order is LAND -> LAKE -> LANDICE.
+    ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE.
     i1 = NUM_LAND_TILE + 1
     i2 = NUM_LAND_TILE + NUM_LAKE_TILE
 
@@ -1515,6 +1559,8 @@ module GEOS_MetforceGridCompMod
 
   end subroutine DistributeForcingToLake
 
+  ! --------------------------------------------------------------------------
+  
   !BOP
 
   ! !IROTUINE: Finalize -- Finalize method for LDAS GridComp
