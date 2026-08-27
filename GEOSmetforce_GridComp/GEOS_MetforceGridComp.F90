@@ -71,38 +71,50 @@ module GEOS_MetforceGridCompMod
   ! --------------------------
   !
   ! variables needed for DistributeForcingTo[Land,Landpert,Landice,Lake]:
-
-  integer, parameter :: k_force   = 12
-  integer, parameter :: k_aerosol = 18
-  integer, parameter :: k_landice = 15
-
-  ! export_name is vector of field names of type metforce; these fields are read from files
-  ! and mapped to tile space by LDAS_GetForcing() and interpolated in time by LDAS_TInterpForcing()
   
-  character(len=7), dimension(k_force) :: export_name = ['Tair   ', 'Qair   ', 'Psurf  ',                      &
-                                                         'Rainf_C', 'Snowf  ', 'LWdown ',                      &
-                                                         'PARdrct', 'PARdffs', 'Wind   ',                      &
-                                                         'RefH   ', 'Rainf  ', 'SWdown ']
-
-  ! names of aerosol forcing variables 
-  
-  character(len=4), dimension(k_aerosol) :: aerosol_name = [                                                   &
-                        'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',                                        &
-                        'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',                                        &
-                        'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
-
-  ! names of forcing variables in Landice GridComp (translates "export_name" into names of Landice GridComp)
-  
-  character(len=11), dimension(k_landice) :: landice_name = ['TA         ', 'QA         ', 'PS         ',      &
-                                                             'PCU        ', 'SNO        ', 'LWDNSRF    ',      &
-                                                             'DRPAR      ', 'DFPAR      ', 'UU         ',      &
-                                                             'DZ         ', 'DRNIR      ', 'DFNIR      ',      &
-                                                             'DRUVR      ', 'DFUVR      ', 'PLS        ']  
-
   integer :: NUM_LAND_TILE, NUM_LAKE_TILE, NUM_LANDICE_TILE
   
-contains
+  integer, parameter :: k_export       = 12
+  integer, parameter :: k_landpert     = k_export
+  integer, parameter :: k_landice_lake = 10
+  integer, parameter :: k_aerosol      = 18
+  
+  character(len=7), dimension(k_export      ) :: export_name
+  character(len=7), dimension(k_landpert    ) :: landpert_name
+  character(len=7), dimension(k_landice_lake) :: landice_lake_name
+  character(len=4), dimension(k_aerosol     ) :: aerosol_name
+  
+  ! export_name is vector of field names of type metforce; these fields are read from files
+  ! and mapped to tile space by LDAS_GetForcing(), then interpolated in time by LDAS_TInterpForcing():
+  
+  export_name = [                                         &
+       'Tair   ', 'Qair   ', 'Psurf  ',                   &
+       'Rainf_C', 'Snowf  ', 'LWdown ',                   &
+       'PARdrct', 'PARdffs', 'Wind   ',                   &
+       'RefH   ', 'Rainf  ', 'SWdown ']
 
+  ! names of forcing variables in Landice and Lake GridComps that match elements 1:10 of export_name;
+  !   remainder of variables done explicitly inside DistributeForcingTo[Landice,Lake]
+  
+  landice_lake_name = [                                   &
+       'TA    ', 'QA     ', 'PS     ',                    &
+       'PCU   ', 'SNO    ', 'LWDNSRF',                    &
+       'DRPAR ', 'DFPAR  ', 'UU     ',                    &
+       'DZ    ']
+  
+  ! names of forcing variables in Landpert GridComp match export_name for all elements:
+  
+  landpert_name = export_name
+  
+  ! names of aerosol forcing variables:
+  
+  aerosol_name = [                                        &
+       'DUDP', 'DUSV', 'DUWT', 'DUSD', 'BCDP', 'BCSV',    &
+       'BCWT', 'BCSD', 'OCDP', 'OCSV', 'OCWT', 'OCSD',    &
+       'SUDP', 'SUSV', 'SUWT', 'SUSD', 'SSDP', 'SSSV' ]
+  
+contains
+  
   !BOP
 
   ! !IROTUINE: SetServices -- Set ESMF services for this component
@@ -1361,9 +1373,9 @@ contains
     character(len=ESMF_MAXSTR) :: Iam
     Iam = "metForce::DistributeForcingToLandPert"
 
-    do k = 1, k_force
-       call MAPL_GetPointer(export,          out1d, trim(export_name(k)), _RC)
-       call MAPL_GetPointer(landpert_import, in1d,  trim(export_name(k)), _RC)
+    do k = 1, k_landpert
+       call MAPL_GetPointer(export,          out1d, trim(export_name(  k)), _RC)
+       call MAPL_GetPointer(landpert_import, in1d,  trim(landpert_name(k)), _RC)
        in1d = out1d(1:NUM_LAND_TILE)
     enddo
     RETURN_(ESMF_SUCCESS)
@@ -1375,19 +1387,22 @@ contains
   ! run method phase 4:
   
   subroutine DistributeForcingToLandIce(gc, export, landice_import, clock, rc)
-
+    
+    ! same as DistributeForcingToLake() except for aerosols and number/indices of tiles
+    
     type(ESMF_GridComp), intent(inout) :: gc             ! Gridded component
     type(ESMF_State),    intent(inout) :: export         ! Export state
     type(ESMF_State),    intent(inout) :: landice_import ! Import state
     type(ESMF_Clock),    intent(inout) :: clock          ! The clock
     integer, optional,   intent(  out) :: rc             ! Error code
     
-    integer :: k, i1, i2, AEROSOL_DEPOSITION, status
-    real, pointer :: out1d(:), in1d(:), tmp(:)
-    real, pointer :: out2d(:,:), in2d(:,:)
-    real, allocatable :: tmpreal(:)
-    type(MAPL_MetaComp), pointer :: MAPL
-    character(len=ESMF_MAXSTR) :: Iam
+    integer                            :: k, i1, i2, AEROSOL_DEPOSITION, status
+    real,                pointer       :: out1d(:), in1d(:), tmp(:)
+    real,                pointer       :: out2d(:,:), in2d(:,:)                    ! for aerosol forcing
+    real,                allocatable   :: tmpreal(:)
+    type(MAPL_MetaComp), pointer       :: MAPL                                     ! for aerosol forcing
+
+    character(len=ESMF_MAXSTR)         :: Iam
     Iam = "metForce::DistributeForcingToLandice"
 
     if (NUM_LANDICE_TILE == 0) then
@@ -1398,7 +1413,7 @@ contains
     i1 = NUM_LAND_TILE + NUM_LAKE_TILE + 1
     i2 = NUM_LAND_TILE + NUM_LAKE_TILE + NUM_LANDICE_TILE
 
-    ! Get MAPL obj
+    ! fill aerosol forcing (if needed)
     call MAPL_GetObjectFromGC(gc, MAPL, _RC)
     call MAPL_GetResource ( MAPL, AEROSOL_DEPOSITION, Label="AEROSOL_DEPOSITION:", DEFAULT=1, _RC)
     if(AEROSOL_DEPOSITION /=0) then
@@ -1409,45 +1424,48 @@ contains
           VERIFY_(status)
        enddo
     endif
-
-    ! fill forcing imports of Landice GridComp
+    
+    ! fill forcing imports of Landice GridComp with matching export_name 
     ! 
-    ! connect: Tair, Qair, Psurf, Rainf_C, Snowf, LWdown , PARdrct, PARdffs, Wind, RefH
-    !      to: TA  , QA  , PS   , PCU    , SNO  , LWDNSRF, DRPAR  , DFPAR  , UU  , DZ  
+    ! connect: Tair, Qair, Psurf, Rainf_C, Snowf, LWdown , PARdrct, PARdffs, Wind, RefH  [export_name(1:10)]
+    !      to: TA  , QA  , PS   , PCU    , SNO  , LWDNSRF, DRPAR  , DFPAR  , UU  , DZ    [landice_lake_name]  
                                                 
-    do k = 1, k_force - 2
-       call MAPL_GetPointer(export,        out1d,  trim(export_name(k)),  _RC)
-       call MAPL_GetPointer(landice_import, in1d,  trim(landice_name(k)), _RC)
+    do k = 1, k_landice_lake
+       call MAPL_GetPointer(export,        out1d,  trim(export_name(      k)), _RC)
+       call MAPL_GetPointer(landice_import, in1d,  trim(landice_lake_name(k)), _RC)
        in1d = out1d(i1:i2)
     enddo
 
     ! fill more forcing imports of Landice GridComp
     
-    call MAPL_GetPointer(export,        out1d,  'Wind',   _RC)
-    call MAPL_GetPointer(landice_import, in1d,  'UWINDLMTILE',   _RC)   ! UWINDLMTILE = Wind
+    call MAPL_GetPointer(   export,         out1d,  'Wind',          _RC)
+    call MAPL_GetPointer(   landice_import,  in1d,  'UWINDLMTILE',   _RC)   ! UWINDLMTILE = Wind
     in1d = out1d(i1:i2)
-    call MAPL_GetPointer(landice_import, in1d,  'VWINDLMTILE',   _RC)   ! VWINDLMTILE = 0.
+    call MAPL_GetPointer(   landice_import,  in1d,  'VWINDLMTILE',   _RC)   ! VWINDLMTILE = 0.
     in1d = 0.
 
-    call MAPL_GetPointer(export,        out1d,  'Rainf',   _RC)
-    call MAPL_GetPointer(export,        tmp,    'Rainf_C', _RC)
-    call MAPL_GetPointer(landice_import, in1d,  'PLS',     _RC)
-    in1d = out1d(i1:i2) - tmp(i1:i2)                                    ! PLS = Rainf - Rainf_C
-
+    call MAPL_GetPointer(   export,         out1d,  'Rainf',         _RC)
+    call MAPL_GetPointer(   export,           tmp,  'Rainf_C',       _RC)
+    call MAPL_GetPointer(   landice_import,  in1d,  'PLS',           _RC)
+    in1d = out1d(i1:i2) - tmp(i1:i2)                                        ! PLS = Rainf - Rainf_C
+ 
     allocate(tmpreal(NUM_LANDICE_TILE), stat=status)
-    call MAPL_GetPointer(export,        out1d,  'SWdown',  _RC)
+    VERIFY_(status)
+
+    call MAPL_GetPointer(   export,         out1d,  'SWdown',        _RC)
     tmpreal = 0.5* out1d(i1:i2)
-    call MAPL_GetPointer(landice_import, in1d,  'DRNIR',   _RC)         ! DRNIR = 0.5*0.5*SWdown
+    call MAPL_GetPointer(   landice_import,  in1d,  'DRNIR',         _RC)   ! DRNIR = 0.5*0.5*SWdown
     in1d = 0.5 * tmpreal
-    call MAPL_GetPointer(landice_import, in1d,  'DFNIR',   _RC)         ! DFNIR = 0.5*0.5*SWdown
+    call MAPL_GetPointer(   landice_import,  in1d,  'DFNIR',         _RC)   ! DFNIR = 0.5*0.5*SWdown
     in1d = 0.5 * tmpreal
 
-    call MAPL_GetPointer(export,        out1d,  'PARdrct', _RC)
-    call MAPL_GetPointer(landice_import, in1d,  'DRUVR',   _RC)
-    in1d = 0.5* tmpreal - out1d(i1:i2)                                  ! DRUVR = 0.5*SWdown - PARdrct
-    call MAPL_GetPointer(export,        out1d,  'PARdffs', _RC)
-    call MAPL_GetPointer(landice_import, in1d,  'DFUVR',   _RC)         ! DFUVR = 0.5*SWdown - PARdffs
+    call MAPL_GetPointer(   export,         out1d,  'PARdrct',       _RC)
+    call MAPL_GetPointer(   landice_import,  in1d,  'DRUVR',         _RC)
+    in1d = 0.5* tmpreal - out1d(i1:i2)                                      ! DRUVR = 0.5*SWdown - PARdrct
+    call MAPL_GetPointer(   export,         out1d,  'PARdffs',       _RC)
+    call MAPL_GetPointer(   landice_import,  in1d,  'DFUVR',         _RC)   ! DFUVR = 0.5*SWdown - PARdffs
     in1d = 0.5* tmpreal - out1d(i1:i2)
+
     deallocate(tmpreal)
 
     RETURN_(ESMF_SUCCESS)
@@ -1460,99 +1478,69 @@ contains
   
   subroutine DistributeForcingToLake(gc, export, lake_import, clock, rc)
 
+    ! same as DistributeForcingToLandice() except for aerosols and number/indices of tiles
+    
     type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
     type(ESMF_State),    intent(inout) :: export      ! Export state
     type(ESMF_State),    intent(inout) :: lake_import ! Import state
     type(ESMF_Clock),    intent(inout) :: clock       ! The clock
     integer, optional,   intent(  out) :: rc          ! Error code
 
-    integer :: i1, i2, status
-    real, pointer :: out1d(:), in1d(:), tmp(:)
-    real, allocatable :: tmpreal(:)
-    character(len=ESMF_MAXSTR) :: Iam
+    integer                            :: k, i1, i2, status
+    real,                pointer       :: out1d(:), in1d(:), tmp(:)
+    real,                allocatable   :: tmpreal(:)
 
+    character(len=ESMF_MAXSTR) :: Iam
     Iam = "metForce::DistributeForcingToLake"
 
     if (NUM_LAKE_TILE == 0) then
        RETURN_(ESMF_SUCCESS)
     endif
 
-    ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE.
+    ! Hardwired active forcing tile-space order is LAND -> LAKE -> LANDICE
     i1 = NUM_LAND_TILE + 1
     i2 = NUM_LAND_TILE + NUM_LAKE_TILE
 
-    call MAPL_GetPointer(export,      out1d, 'Tair', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'TA',   _RC)
+    ! fill forcing imports of Lake GridComp with matching export_name 
+    ! 
+    ! connect: Tair, Qair, Psurf, Rainf_C, Snowf, LWdown , PARdrct, PARdffs, Wind, RefH  [export_name(1:10)]
+    !      to: TA  , QA  , PS   , PCU    , SNO  , LWDNSRF, DRPAR  , DFPAR  , UU  , DZ    [landice_lake_name]
+                                                
+    do k = 1, k_landice_lake
+       call MAPL_GetPointer(export,      out1d, trim(export_name(      k)), _RC)
+       call MAPL_GetPointer(lake_import, in1d,  trim(landice_lake_name(k)), _RC)
+       in1d = out1d(i1:i2)
+    enddo
+
+    ! fill more forcing imports of Lake GridComp
+    
+    call MAPL_GetPointer(   export,        out1d,  'Wind',          _RC)
+    call MAPL_GetPointer(   lake_import,    in1d,  'UWINDLMTILE',   _RC)   ! UWINDLMTILE = Wind
     in1d = out1d(i1:i2)
+    call MAPL_GetPointer(   lake_import,    in1d,  'VWINDLMTILE',   _RC)   ! VWINDLMTILE = 0.
+    in1d = 0.
 
-    call MAPL_GetPointer(export,      out1d, 'Qair', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'QA',   _RC)
-    in1d = out1d(i1:i2)
+    call MAPL_GetPointer(   export,        out1d,  'Rainf',         _RC)
+    call MAPL_GetPointer(   export,          tmp,  'Rainf_C',       _RC)
+    call MAPL_GetPointer(   lake_import,    in1d,  'PLS',           _RC)
+    in1d = out1d(i1:i2) - tmp(i1:i2)                                       ! PLS = Rainf - Rainf_C
 
-    call MAPL_GetPointer(export,      out1d, 'Psurf', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'PS',    _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'Rainf_C', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'PCU',     _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'Snowf', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'SNO',   _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'LWdown',  _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'LWDNSRF', _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'PARdrct', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'DRPAR',   _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'PARdffs', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'DFPAR',   _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'Wind', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'UU',   _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(lake_import, in1d, 'UWINDLMTILE', _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(lake_import, in1d, 'VWINDLMTILE', _RC)
-    in1d = 0.0
-
-    call MAPL_GetPointer(export,      out1d, 'RefH', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'DZ',   _RC)
-    in1d = out1d(i1:i2)
-
-    call MAPL_GetPointer(export,      out1d, 'Rainf',   _RC)
-    call MAPL_GetPointer(export,      tmp,   'Rainf_C', _RC)
-    call MAPL_GetPointer(lake_import, in1d,  'PLS',     _RC)
-    in1d = out1d(i1:i2) - tmp(i1:i2)
-
-    ! Shortwave split, following the existing landice convention.
     allocate(tmpreal(NUM_LAKE_TILE), stat=status)
     VERIFY_(status)
 
-    call MAPL_GetPointer(export, out1d, 'SWdown', _RC)
-    tmpreal = 0.5 * out1d(i1:i2)
-
-    call MAPL_GetPointer(lake_import, in1d, 'DRNIR', _RC)
+    call MAPL_GetPointer(   export,        out1d,  'SWdown',        _RC)
+    tmpreal = 0.5* out1d(i1:i2)
+    call MAPL_GetPointer(   lake_import,    in1d,  'DRNIR',         _RC)   ! DRNIR = 0.5*0.5*SWdown
+    in1d = 0.5 * tmpreal
+    call MAPL_GetPointer(   lake_import,    in1d,  'DFNIR',         _RC)   ! DFNIR = 0.5*0.5*SWdown
     in1d = 0.5 * tmpreal
 
-    call MAPL_GetPointer(lake_import, in1d, 'DFNIR', _RC)
-    in1d = 0.5 * tmpreal
-
-    call MAPL_GetPointer(export, out1d, 'PARdrct', _RC)
-    call MAPL_GetPointer(lake_import, in1d, 'DRUVR', _RC)
-    in1d = 0.5 * tmpreal - out1d(i1:i2)
-
-    call MAPL_GetPointer(export, out1d, 'PARdffs', _RC)
-    call MAPL_GetPointer(lake_import, in1d, 'DFUVR', _RC)
-    in1d = 0.5 * tmpreal - out1d(i1:i2)
-
+    call MAPL_GetPointer(   export,        out1d,  'PARdrct',       _RC)
+    call MAPL_GetPointer(   lake_import,    in1d,  'DRUVR',         _RC)
+    in1d = 0.5* tmpreal - out1d(i1:i2)                                     ! DRUVR = 0.5*SWdown - PARdrct
+    call MAPL_GetPointer(   export,        out1d,  'PARdffs',       _RC)
+    call MAPL_GetPointer(   lake_import,    in1d,  'DFUVR',         _RC)   ! DFUVR = 0.5*SWdown - PARdffs
+    in1d = 0.5* tmpreal - out1d(i1:i2)
     deallocate(tmpreal)
 
     RETURN_(ESMF_SUCCESS)
