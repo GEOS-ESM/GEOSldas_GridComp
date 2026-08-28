@@ -1315,6 +1315,9 @@ contains
   ! run method phase 2:
   
   subroutine DistributeForcingToLand(gc, export, land_import, clock, rc)
+
+    ! distribute those forcing variables to Land that Land does not receive from Landpert
+    ! (variables that could be perturbed are sent to Land via Landpert)
     
     type(ESMF_GridComp), intent(inout) :: gc          ! Gridded component
     type(ESMF_State),    intent(inout) :: export      ! Export state
@@ -1391,8 +1394,10 @@ contains
     i1 = 1
     i2 = NUM_LAND_TILE
 
-    ! fill forcing imports of Landpert GridComp (same as variables in "export_name")
-
+    ! fill forcing imports of Landpert GridComp (same as variables in "export_name"):
+    !
+    !   Tair, Qair, Psurf, Rainf_C, Snowf, LWdown , PARdrct, PARdffs, Wind, RefH, Rainf, SWdown
+    
     do k = 1, k_landpert
        call MAPL_GetPointer(export,          out1d, trim(export_name(  k)), _RC)
        call MAPL_GetPointer(landpert_import, in1d,  trim(landpert_name(k)), _RC)
