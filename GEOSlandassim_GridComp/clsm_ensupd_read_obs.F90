@@ -7897,8 +7897,9 @@ contains
     
     logical,   parameter :: tmp_debug    = .false.
     
-    real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
-    real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
+    real,      parameter :: Tb_min       = 100.0  ! min allowed Tb       [K]
+    real,      parameter :: Tb_max       = 320.0  ! max allowed Tb       [K]
+    real,      parameter :: Tb_error_max  =  1.3  ! max allowed Tb error [K] 
 
     real,      parameter :: max_std_tb_fore_minus_aft = 20.  ! max std-dev L1C[E] fore-minus-aft Tb diffs
 
@@ -7955,8 +7956,9 @@ contains
 
     character(100)       :: dset_name_lon,    dset_name_lat
     character(100)       :: dset_name_col,    dset_name_row
-    character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1
-    character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2
+    
+    character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1, dset_name_tb_error_1
+    character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2, dset_name_tb_error_2
 
     character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
@@ -7976,6 +7978,9 @@ contains
 
     integer,        dimension(:),     allocatable  :: tmp_tb_qual_flag_1
     integer,        dimension(:),     allocatable  :: tmp_tb_qual_flag_2
+
+    real,           dimension(:),     allocatable  :: tmp_tb_error_1
+    real,           dimension(:),     allocatable  :: tmp_tb_error_2
     
     integer,        dimension(:),     allocatable  :: tmp_tile_num
 
@@ -8155,6 +8160,9 @@ contains
           dset_name_tb_qual_flag_1 = '/Global_Projection/cell_tb_qual_flag_h_fore'
           dset_name_tb_qual_flag_2 = '/Global_Projection/cell_tb_qual_flag_h_aft'
           
+          dset_name_tb_error_1     = '/Global_Projection/cell_tb_error_h_fore'
+          dset_name_tb_error_2     = '/Global_Projection/cell_tb_error_h_aft'
+          
        else
           
           dset_name_tb_1           = '/Global_Projection/cell_tb_v_fore'
@@ -8163,6 +8171,9 @@ contains
           dset_name_tb_qual_flag_1 = '/Global_Projection/cell_tb_qual_flag_v_fore'
           dset_name_tb_qual_flag_2 = '/Global_Projection/cell_tb_qual_flag_v_aft'
           
+          dset_name_tb_error_1     = '/Global_Projection/cell_tb_error_v_fore'
+          dset_name_tb_error_2     = '/Global_Projection/cell_tb_error_v_aft'
+ 
        end if
        
     else  
@@ -8459,6 +8470,20 @@ contains
 
           call h5r%readDataset(tmp_tb_qual_flag_1)
 
+          ! TB_ERROR_1: query dataset, check size, allocate space, read data
+          
+          if (tmp_debug .and. logit) write(logunit,*) trim(dset_name_tb_error_1)
+          
+          call h5r%queryDataset(dset_name_tb_error_1, dset_rank, dset_size)
+
+          if (N_obs_tmp/=dset_size(1)) then
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, tmp_err_msg)
+          end if
+          
+          allocate(tmp_tb_error_1(N_obs_tmp))
+          
+          call h5r%readDataset(tmp_tb_error_1)
+
           ! for L1C_TB or L1C_TB_E files also read "aft"
 
           if (L1C_files .or. L1CE_files) then
@@ -8507,7 +8532,21 @@ contains
              allocate(tmp_tb_qual_flag_2(N_obs_tmp))
              
              call h5r%readDataset(tmp_tb_qual_flag_2)
+             
+             ! TB_ERROR_2: query dataset, check size, allocate space, read data
+             
+             if (tmp_debug .and. logit) write(logunit,*) trim(dset_name_tb_error_2)
+             
+             call h5r%queryDataset(dset_name_tb_error_2, dset_rank, dset_size)
+             
+             if (N_obs_tmp/=dset_size(1)) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, tmp_err_msg)
+             end if
 
+             allocate(tmp_tb_error_2(N_obs_tmp))
+             
+             call h5r%readDataset(tmp_tb_error_2)
+             
           end if
           
           ! close file
@@ -8545,15 +8584,17 @@ contains
 
                 ! QC
 
-                keep_data_1 =                                    &
-                     (mod(tmp_tb_qual_flag_1(nn),2)==0)    .and. & ! lowest bit must be 0
-                     (tmp_tb_1(nn)   >  Tb_min)            .and. & ! elim neg nodata
-                     (tmp_tb_1(nn)   <  Tb_max)                    ! elim huge pos nodata
+                keep_data_1 =                                                 &
+                     (mod(tmp_tb_qual_flag_1(nn),2) == 0           )  .and.   &   ! lowest bit must be 0
+                     (    tmp_tb_error_1(    nn)    <= Tb_error_max)  .and.   &   ! elim data w. large tb_error  
+                     (    tmp_tb_1(          nn)    >  Tb_min      )  .and.   &   ! elim neg nodata
+                     (    tmp_tb_1(          nn)    <  Tb_max      )              ! elim huge pos nodata
                 
-                keep_data_2 =                                    &
-                     (mod(tmp_tb_qual_flag_2(nn),2)==0)    .and. & ! lowest bit must be 0
-                     (tmp_tb_2(nn)   >  Tb_min)            .and. & ! elim neg nodata
-                     (tmp_tb_2(nn)   <  Tb_max)                    ! elim huge pos nodata
+                keep_data_2 =                                                 &
+                     (mod(tmp_tb_qual_flag_2(nn),2) == 0           )  .and.   &   ! lowest bit must be 0
+                     (    tmp_tb_error_2(    nn)    <= Tb_error_max)  .and.   &   ! elim data w. large tb_error 
+                     (    tmp_tb_2(          nn)    >  Tb_min      )  .and.   &   ! elim neg nodata
+                     (    tmp_tb_2(          nn)    <  Tb_max      )              ! elim huge pos nodata
 
                 ! thinning of L1C_TB_E obs
                 
@@ -8812,6 +8853,8 @@ contains
           if (allocated(tmp_tb_2          )) deallocate(tmp_tb_2          )
           if (allocated(tmp_tb_qual_flag_1)) deallocate(tmp_tb_qual_flag_1)
           if (allocated(tmp_tb_qual_flag_2)) deallocate(tmp_tb_qual_flag_2)
+          if (allocated(tmp_tb_error_1)) deallocate(tmp_tb_error_1)
+          if (allocated(tmp_tb_error_2)) deallocate(tmp_tb_error_2)
           
        end do  ! kk=1,N_fnames
           
