@@ -1667,6 +1667,7 @@ contains
 
   end subroutine SetServices
 
+  ! -------------------------------------------------------------------------------------------
 
   subroutine Initialize(gc, import, export, clock, rc)
     type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
@@ -3074,37 +3075,37 @@ contains
     collect_land_counter = collect_land_counter + 1
     !collect catch_progn
 
-    catch_progn(:,collect_land_counter)%tc1 = TC(:,1)
-    catch_progn(:,collect_land_counter)%tc2 = TC(:,2)
-    catch_progn(:,collect_land_counter)%tc4 = TC(:,3)
+    catch_progn(:,collect_land_counter)%tc1    = TC(      :,1)
+    catch_progn(:,collect_land_counter)%tc2    = TC(      :,2)
+    catch_progn(:,collect_land_counter)%tc4    = TC(      :,3)
 
-    catch_progn(:,collect_land_counter)%qa1 = QC(:,1)
-    catch_progn(:,collect_land_counter)%qa2 = QC(:,2)
-    catch_progn(:,collect_land_counter)%qa4 = QC(:,3)
+    catch_progn(:,collect_land_counter)%qa1    = QC(      :,1)
+    catch_progn(:,collect_land_counter)%qa2    = QC(      :,2)
+    catch_progn(:,collect_land_counter)%qa4    = QC(      :,3)
 
-    catch_progn(:,collect_land_counter)%capac  = CAPAC(:)
-    catch_progn(:,collect_land_counter)%catdef = catdef(:)
-    catch_progn(:,collect_land_counter)%rzexc  = rzexc(:)
-    catch_progn(:,collect_land_counter)%srfexc = srfexc(:)
+    catch_progn(:,collect_land_counter)%capac  = CAPAC(   :)
+    catch_progn(:,collect_land_counter)%catdef = catdef(  :)
+    catch_progn(:,collect_land_counter)%rzexc  = rzexc(   :)
+    catch_progn(:,collect_land_counter)%srfexc = srfexc(  :)
 
-    catch_progn(:,collect_land_counter)%ght(1) = GHTCNT1(:)
-    catch_progn(:,collect_land_counter)%ght(2) = GHTCNT2(:)
-    catch_progn(:,collect_land_counter)%ght(3) = GHTCNT3(:)
-    catch_progn(:,collect_land_counter)%ght(4) = GHTCNT4(:)
-    catch_progn(:,collect_land_counter)%ght(5) = GHTCNT5(:)
-    catch_progn(:,collect_land_counter)%ght(6) = GHTCNT6(:)
+    catch_progn(:,collect_land_counter)%ght(1) = GHTCNT1( :)
+    catch_progn(:,collect_land_counter)%ght(2) = GHTCNT2( :)
+    catch_progn(:,collect_land_counter)%ght(3) = GHTCNT3( :)
+    catch_progn(:,collect_land_counter)%ght(4) = GHTCNT4( :)
+    catch_progn(:,collect_land_counter)%ght(5) = GHTCNT5( :)
+    catch_progn(:,collect_land_counter)%ght(6) = GHTCNT6( :)
 
-    catch_progn(:,collect_land_counter)%wesn(1) = WESNN1(:)
-    catch_progn(:,collect_land_counter)%wesn(2) = WESNN2(:)
-    catch_progn(:,collect_land_counter)%wesn(3) = WESNN3(:)
+    catch_progn(:,collect_land_counter)%wesn(1) = WESNN1( :)
+    catch_progn(:,collect_land_counter)%wesn(2) = WESNN2( :)
+    catch_progn(:,collect_land_counter)%wesn(3) = WESNN3( :)
 
     catch_progn(:,collect_land_counter)%htsn(1) = HTSNNN1(:)
     catch_progn(:,collect_land_counter)%htsn(2) = HTSNNN2(:)
     catch_progn(:,collect_land_counter)%htsn(3) = HTSNNN3(:)
 
-    catch_progn(:,collect_land_counter)%sndz(1) = SNDZN1(:)
-    catch_progn(:,collect_land_counter)%sndz(2) = SNDZN2(:)
-    catch_progn(:,collect_land_counter)%sndz(3) = SNDZN3(:)
+    catch_progn(:,collect_land_counter)%sndz(1) = SNDZN1( :)
+    catch_progn(:,collect_land_counter)%sndz(2) = SNDZN2( :)
+    catch_progn(:,collect_land_counter)%sndz(3) = SNDZN3( :)
 
 
     if(collect_land_counter == NUM_ENSEMBLE) then

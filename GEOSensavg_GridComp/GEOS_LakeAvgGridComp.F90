@@ -242,14 +242,14 @@ contains
 
     ! Get import pointers (1d fields)
 
-    call MAPL_GetPointer(import, EVAPOUT,        'EVAPOUT',        _RC)
-    call MAPL_GetPointer(import, RUNOFF ,        'RUNOFF' ,        _RC)
-    call MAPL_GetPointer(import, SHOUT  ,        'SHOUT'  ,        _RC)
-    call MAPL_GetPointer(import, LWNDSRF,        'LWNDSRF',        _RC)
-    call MAPL_GetPointer(import, SWNDSRF,        'SWNDSRF',        _RC)
-    call MAPL_GetPointer(import, HLATN  ,        'HLATN'  ,        _RC)
-    call MAPL_GetPointer(import, TST    ,        'TST'    ,        _RC)
-    call MAPL_GetPointer(import, QST    ,        'QST'    ,        _RC)
+    call MAPL_GetPointer(import, EVAPOUT,        'EVAPOUT', _RC)
+    call MAPL_GetPointer(import, RUNOFF ,        'RUNOFF' , _RC)
+    call MAPL_GetPointer(import, SHOUT  ,        'SHOUT'  , _RC)
+    call MAPL_GetPointer(import, LWNDSRF,        'LWNDSRF', _RC)
+    call MAPL_GetPointer(import, SWNDSRF,        'SWNDSRF', _RC)
+    call MAPL_GetPointer(import, HLATN  ,        'HLATN'  , _RC)
+    call MAPL_GetPointer(import, TST    ,        'TST'    , _RC)
+    call MAPL_GetPointer(import, QST    ,        'QST'    , _RC)
 
     ! Get export pointers (1d fields)
 
