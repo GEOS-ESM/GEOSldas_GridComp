@@ -24,12 +24,16 @@ data. It also supports on-demand backfill of a single day or a date range.
   link to the actual location on Discover. 
 
 ## 3. Configuration (`config.yaml`)
-| Key | Meaning |
-|---|---|
-| `ee_to_nc_script` | Path to the external `smos-ee-to-nc.sh` converter. |
-| `smos_base_path` | Where incoming SMOS `SM_*_MIR_SCLF1C_*.zip` (EE) files land, organized `<base>/Y<yyyy>/M<mm>/`. |
-| `tmp_nc_path` | Scratch directory for converted NetCDF files. A `to_delete/` subfolder is created here. files in it are safe to delete after completion. |
-| `out_reg_path` | Output root for REG binaries (`SMOS_reg_Tb_*.bin`, organized by `<out_reg_path>/<YYYYMM>/`). FIT binaries are written to a sibling directory: `_reg_` in this path is replaced by `_fit_` and further nested under `SMOS_fit_poly2/<YYYYMM>/`. |
+| Key                         | Meaning                                                                                         |
+|-----------------------------|-------------------------------------------------------------------------------------------------|
+| `ee_to_nc_script`           | Path to the external `smos-ee-to-nc.sh` converter.                                              |
+| `smos_base_path`            | Where incoming SMOS `SM_*_MIR_SCLF1C_*.zip` (EE) files land, organized `<base>/Y<yyyy>/M<mm>/`. |
+| `tmp_nc_path`               | Scratch directory for converted NetCDF files. A `to_delete/` subfolder is created here. Files therein are safe to delete after completion. |
+| `out_reg_path`              | Output root for REG binaries (`SMOS_reg_Tb_*.bin`, organized by `<out_reg_path>/<YYYYMM>/`). FIT binaries are written to a sibling directory: `_reg_` in this path is replaced by `_fit_` and further nested under `SMOS_fit_poly2/<YYYYMM>/`. |
+| `GEOSIT_path`               | Path to GEOS-IT data.                                                                           |
+| `GEOSIT_to_EASEv2_M36_file` | Path and name of file mapping from GEOS-IT output grid to EASEv2_M36 grid.                      |
+| `SM_OPER_AUS_GAL_SM_path`   | Path to SMOS galaxy correction files.                                                           |
+
 
 Current values are set for the production Discover paths under
 `/discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/...` and
@@ -40,7 +44,7 @@ Current values are set for the production Discover paths under
 module load python/GEOSpyD
 
 python SMOSproc_main.py                                    # NRT: process yesterday's data (normal cron mode)
-python SMOSproc_main.py --date 20260801                    # Backfill a single day
+python SMOSproc_main.py --date  20260801                   # Backfill a single day
 python SMOSproc_main.py --start 20260801 --end 20260803    # Backfill an inclusive date range
 ```
 `--date` and `--start`/`--end` are mutually exclusive; `--end` requires
