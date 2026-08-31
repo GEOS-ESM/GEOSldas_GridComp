@@ -32,8 +32,7 @@ def read_GEOSIT(date_time=None,vegcls_grid=None,EASEv2_M36_to_M2_grid=None,lat=N
  
     #GEOS-IT:
     
-    path='/discover/nobackup/projects/gmao/geos-it/dao_ops/archive/'+stream+ \
-         '/diag/Y'+date_time.strftime("%Y")+'/M'+date_time.strftime("%m")+'/'
+    path=GEOSIT_path+stream+'/diag/Y'+date_time.strftime("%Y")+'/M'+date_time.strftime("%m")+'/'
 
     date_string=date_time.strftime("%Y-%m-%dT%H")
 

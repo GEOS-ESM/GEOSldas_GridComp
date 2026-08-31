@@ -1,5 +1,8 @@
 paths:
-   ee_to_nc_script: /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/smos-ee-to-netcdf/smos-ee-to-nc.sh
-   smos_base_path:  /discover/nobackup/dao_ops/SMOS/AOSMOS.4662/SCLF1C/
-   tmp_nc_path:     /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/netcdf/
-   out_reg_path:    /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/EASEv2/ESA/SMOS_M36_SCLF1C_reg_nosky_noatm_v724_ESA_v102/
+   ee_to_nc_script:            /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/smos-ee-to-netcdf/smos-ee-to-nc.sh
+   smos_base_path:             /discover/nobackup/dao_ops/SMOS/AOSMOS.4662/SCLF1C/
+   tmp_nc_path:                /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/netcdf/
+   out_reg_path:               /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/EASEv2/ESA/SMOS_M36_SCLF1C_reg_nosky_noatm_v724_ESA_v102/
+   GEOSIT_path:                /discover/nobackup/projects/gmao/geos-it/dao_ops/archive/
+   GEOSIT_to_EASEv2_M36_file:  /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/Regrid_data/GEOSIT_to_EASEv2_M36.mat
+   SM_OPER_AUS_GAL_SM_path:    /discover/nobackup/projects/gmao/smap/SMAP_Nature/SMOS/SMOS_ESA/AUX_DATA/SM_OPER_AUX_GAL_SM_20050101T000000_20500101T000000_001_003_3/

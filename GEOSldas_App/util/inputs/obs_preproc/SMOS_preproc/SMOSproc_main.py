@@ -21,10 +21,13 @@ CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),'config.ya
 with open(CONFIG_PATH) as f:
     _cfg = yaml.safe_load(f)['paths']
 
-EE_TO_NC_SCRIPT = _cfg['ee_to_nc_script']
-SMOS_BASE_PATH  = _cfg['smos_base_path']
-TMP_NC_PATH     = _cfg['tmp_nc_path']
-OUT_REG_PATH    = _cfg['out_reg_path']
+EE_TO_NC_SCRIPT           = _cfg['ee_to_nc_script']
+SMOS_BASE_PATH            = _cfg['smos_base_path']
+TMP_NC_PATH               = _cfg['tmp_nc_path']
+OUT_REG_PATH              = _cfg['out_reg_path']
+GEOSIT_PATH               = _cfg['GEOSIT_path']
+GEOSIT_to_EASEv2_M36_file = _cfg['GEOSIT_to_EASEv2_M36_file']
+SM_OPER_AUX_GAL_SM_path   = _cfg['SM_OPER_AUS_GAL_SM_path']
 
 def run_in_isolated_process(func, *args):
     """

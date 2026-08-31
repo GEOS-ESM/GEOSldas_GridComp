@@ -201,7 +201,7 @@ def preprocess_nc(smos_nc, outpath):
     # obtain GEOSIT latlon -> EASEv2 grid remapping info:
     # the mat file is pre-generated usign the "aux_grids_SMOS_prep" matlab script 
 
-    m2d = loadmat(os.path.join('data','GEOSIT_to_EASEv2_M36.mat'))  
+    m2d = loadmat(GEOSIT_to_EASEv2_M36_file)
     vegcls_grid = m2d['vegcls_grid']
     NN_grid = m2d['NN_grid']
         

@@ -78,7 +78,7 @@ def gal_atm_correction(Tb_H=None,Tb_V=None,lat=None,lon=None,angle=None, \
 
         # v724
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_file=os.path.join(current_dir,'..','..','data','SM_OPER_AUX_GAL_SM_20050101T000000_20500101T000000_001_003_3')
+        data_file=SM_OPER_AUX_GAL_SM_path
 
         print('reading galaxy info')
         p=data_file+'/'+data_file[-60:]+'.HDR'
