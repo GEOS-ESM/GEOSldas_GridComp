@@ -82,10 +82,10 @@ endif
 
 if($NENS > 1) then
    set GridComp = LANDAVG
-   sed -i "s|'VEGDYN' |'VEGDYN_e0000'|g" $HISTRC
-   sed -i "s|'ROUTE'  |'ROUTEAVG'    |g" $HISTRC
-   sed -i "s|'LAKE'   |'LAKEAVG'     |g" $HISTRC
-   sed -i "s|'LANDICE'|'LANDICEAVG'  |g" $HISTRC
+   sed -i "s|'VEGDYN'|'VEGDYN_e0000'|g" $HISTRC
+   sed -i "s|'ROUTE'|'ROUTEAVG'|g" $HISTRC
+   sed -i "s|'LAKE'|'LAKEAVG'|g" $HISTRC
+   sed -i "s|'LANDICE'|'LANDICEAVG'|g" $HISTRC
 endif
 
 # fill in source 'GridComp' information for output variables

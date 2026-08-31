@@ -253,14 +253,22 @@ contains
 
     ! Get export pointers (1d fields)
 
-    call MAPL_GetPointer(import, EVAPOUT_enavg,  'EVAPOUT',        _RC)
-    call MAPL_GetPointer(import, RUNOFF_enavg ,  'RUNOFF' ,        _RC)
-    call MAPL_GetPointer(import, SHOUT_enavg  ,  'SHOUT'  ,        _RC)
-    call MAPL_GetPointer(import, LWNDSRF_enavg,  'LWNDSRF',        _RC)
-    call MAPL_GetPointer(import, SWNDSRF_enavg,  'SWNDSRF',        _RC)
-    call MAPL_GetPointer(import, HLATN_enavg  ,  'HLATN'  ,        _RC)
-    call MAPL_GetPointer(import, TST_enavg    ,  'TST'    ,        _RC)
-    call MAPL_GetPointer(import, QST_enavg    ,  'QST'    ,        _RC)
+!    call MAPL_GetPointer(import, EVAPOUT_enavg,  'EVAPOUT',        _RC)
+!    call MAPL_GetPointer(import, RUNOFF_enavg ,  'RUNOFF' ,        _RC)
+!    call MAPL_GetPointer(import, SHOUT_enavg  ,  'SHOUT'  ,        _RC)
+!    call MAPL_GetPointer(import, LWNDSRF_enavg,  'LWNDSRF',        _RC)
+!    call MAPL_GetPointer(import, SWNDSRF_enavg,  'SWNDSRF',        _RC)
+!    call MAPL_GetPointer(import, HLATN_enavg  ,  'HLATN'  ,        _RC)
+!    call MAPL_GetPointer(import, TST_enavg    ,  'TST'    ,        _RC)
+!    call MAPL_GetPointer(import, QST_enavg    ,  'QST'    ,        _RC)
+    call MAPL_GetPointer(export, EVAPOUT_enavg,  'EVAPOUT', _RC)
+    call MAPL_GetPointer(export, RUNOFF_enavg ,  'RUNOFF' , _RC)
+    call MAPL_GetPointer(export, SHOUT_enavg  ,  'SHOUT'  , _RC)
+    call MAPL_GetPointer(export, LWNDSRF_enavg,  'LWNDSRF', _RC)
+    call MAPL_GetPointer(export, SWNDSRF_enavg,  'SWNDSRF', _RC)
+    call MAPL_GetPointer(export, HLATN_enavg  ,  'HLATN'  , _RC)
+    call MAPL_GetPointer(export, TST_enavg    ,  'TST'    , _RC)
+    call MAPL_GetPointer(export, QST_enavg    ,  'QST'    , _RC)    
     
     ! On first ensemble member: zero the export accumulators
     
@@ -279,14 +287,14 @@ contains
 
     ! Accumulate ensemble members (1d fields)
     
-    if (associated(EVAPOUT_enavg))       EVAPOUT_enavg       = EVAPOUT_enavg       + EVAPOUT 
-    if (associated(RUNOFF_enavg ))       RUNOFF_enavg        = RUNOFF_enavg        + RUNOFF  
-    if (associated(SHOUT_enavg  ))       SHOUT_enavg         = SHOUT_enavg         + SHOUT   
-    if (associated(LWNDSRF_enavg))       LWNDSRF_enavg       = LWNDSRF_enavg       + LWNDSRF 
-    if (associated(SWNDSRF_enavg))       SWNDSRF_enavg       = SWNDSRF_enavg       + SWNDSRF 
-    if (associated(HLATN_enavg  ))       HLATN_enavg         = HLATN_enavg         + HLATN   
-    if (associated(TST_enavg    ))       TST_enavg           = TST_enavg           + TST     
-    if (associated(QST_enavg    ))       QST_enavg           = QST_enavg           + QST     
+    if (associated(EVAPOUT_enavg) .and. associated(EVAPOUT)) EVAPOUT_enavg = EVAPOUT_enavg + EVAPOUT
+    if (associated(RUNOFF_enavg)  .and. associated(RUNOFF))  RUNOFF_enavg  = RUNOFF_enavg  + RUNOFF
+    if (associated(SHOUT_enavg)   .and. associated(SHOUT))   SHOUT_enavg   = SHOUT_enavg   + SHOUT
+    if (associated(LWNDSRF_enavg) .and. associated(LWNDSRF)) LWNDSRF_enavg = LWNDSRF_enavg + LWNDSRF
+    if (associated(SWNDSRF_enavg) .and. associated(SWNDSRF)) SWNDSRF_enavg = SWNDSRF_enavg + SWNDSRF
+    if (associated(HLATN_enavg)   .and. associated(HLATN))   HLATN_enavg   = HLATN_enavg   + HLATN
+    if (associated(TST_enavg)     .and. associated(TST))     TST_enavg     = TST_enavg     + TST
+    if (associated(QST_enavg)     .and. associated(QST))     QST_enavg     = QST_enavg     + QST    
     
     collect_lake_counter = collect_lake_counter + 1         ! increment ens member counter 
     
