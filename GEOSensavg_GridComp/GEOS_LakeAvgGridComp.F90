@@ -253,14 +253,6 @@ contains
 
     ! Get export pointers (1d fields)
 
-!    call MAPL_GetPointer(import, EVAPOUT_enavg,  'EVAPOUT',        _RC)
-!    call MAPL_GetPointer(import, RUNOFF_enavg ,  'RUNOFF' ,        _RC)
-!    call MAPL_GetPointer(import, SHOUT_enavg  ,  'SHOUT'  ,        _RC)
-!    call MAPL_GetPointer(import, LWNDSRF_enavg,  'LWNDSRF',        _RC)
-!    call MAPL_GetPointer(import, SWNDSRF_enavg,  'SWNDSRF',        _RC)
-!    call MAPL_GetPointer(import, HLATN_enavg  ,  'HLATN'  ,        _RC)
-!    call MAPL_GetPointer(import, TST_enavg    ,  'TST'    ,        _RC)
-!    call MAPL_GetPointer(import, QST_enavg    ,  'QST'    ,        _RC)
     call MAPL_GetPointer(export, EVAPOUT_enavg,  'EVAPOUT', _RC)
     call MAPL_GetPointer(export, RUNOFF_enavg ,  'RUNOFF' , _RC)
     call MAPL_GetPointer(export, SHOUT_enavg  ,  'SHOUT'  , _RC)
