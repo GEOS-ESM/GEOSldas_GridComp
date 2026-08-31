@@ -87,6 +87,7 @@ if($NENS > 1) then
    sed -i "s|'ROUTE'|'ROUTEAVG'|g" $HISTRC
    sed -i "s|'LAKE'|'LAKE_e0000'|g" $HISTRC
    sed -i "s|'LANDICE'|'LANDICE_e0000'|g" $HISTRC
+   sed -i "s|'ISSM'|'ISSM_e0000'|g" $HISTRC
 endif
 
 # fill in source 'GridComp' information for output variables

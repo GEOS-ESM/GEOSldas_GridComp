@@ -1113,11 +1113,11 @@ class ldas:
                os.symlink(catchRstFile,   myCatchRst)
                os.symlink(vegdynRstFile,  myVegRst)
 
-            if self.with_lake :
+            if self.with_lake and iens == 0:
                 print("link lake restart: " + myLakeRst)
                 os.symlink(lakeRstFile, myLakeRst)
 
-            if self.with_landice :
+            if self.with_landice and iens == 0:
                 print("link landice restart: " + myLandiceRst)
                 os.symlink(landiceRstFile, myLandiceRst)
 
@@ -1125,7 +1125,7 @@ class ldas:
                print("link route restart: " + myRouteRst)
                os.symlink(routeRstFile, myRouteRst)
 
-            if self.with_issm:
+            if self.with_issm and iens == 0:
                if RESTART_str in ['1', '3']:
                   print("link issm restart: " + myIssmRst)
                   os.symlink(issmRstFile, myIssmRst)
