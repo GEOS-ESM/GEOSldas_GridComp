@@ -76,16 +76,17 @@ else
 endif
 
 # for ensemble simulations:
-#   - set 'GridComp' to LANDAVG 
-#   - all VEGDYN members are identical (for now)
-#   - ROUTE, LAKE, and LANDICE always have one member (for now) 
+#   - set 'GridComp' to LANDAVG
+#   - all VEGDYN members are identical (for now); use VEGDYN_e0000
+#   - ROUTE output uses ROUTEAVG
+#   - LAKE and LANDICE have one member (for now); use LAKE_e0000 and LANDICE_e0000
 
 if($NENS > 1) then
    set GridComp = LANDAVG
    sed -i "s|'VEGDYN'|'VEGDYN_e0000'|g" $HISTRC
    sed -i "s|'ROUTE'|'ROUTEAVG'|g" $HISTRC
-   sed -i "s|'LAKE'|'LAKEAVG'|g" $HISTRC
-   sed -i "s|'LANDICE'|'LANDICEAVG'|g" $HISTRC
+   sed -i "s|'LAKE'|'LAKE_e0000'|g" $HISTRC
+   sed -i "s|'LANDICE'|'LANDICE_e0000'|g" $HISTRC
 endif
 
 # fill in source 'GridComp' information for output variables
