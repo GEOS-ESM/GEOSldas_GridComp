@@ -2,7 +2,7 @@ version: 2.1
 
 # Anchors in case we need to override the defaults from the orb
 #baselibs_version: &baselibs_version v8.32.0
-#bcs_version: &bcs_version v12.0.0
+#bcs_version: &bcs_version v12.6.0
 
 orbs:
   ci: geos-esm/circleci-tools@5
@@ -17,11 +17,7 @@ workflows:
             - docker-hub-creds
           matrix:
             parameters:
-              # We cannot currently test with ifx because HDF4 Fortran interface
-              # cannot be compiled with ifx.  The HDF4 Fortran interface is required
-              # for the GEOSldas
-              #compiler: [gfortran, ifort, ifx]
-              compiler: [gfortran, ifort]
+              compiler: [ifort, gfortran, ifx]
           #baselibs_version: *baselibs_version
           repo: GEOSldas
           checkout_fixture: true
