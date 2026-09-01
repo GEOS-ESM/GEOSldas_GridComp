@@ -102,8 +102,9 @@ int32_t ldas_h4_sfginfo(int32_t sds_id, char *name, int32_t name_length, int32_t
         status = SDgetinfo(sds_id, c_name, rank, hdf_dimsizes, data_type, attributes);
         if (status == SUCCEED) {
             memcpy(name, c_name, h4_string_length(c_name, (size_t)name_length));
-            dimsizes[0] = hdf_dimsizes[0];
-            dimsizes[1] = hdf_dimsizes[1];
+            /* The Fortran API reverses HDF dimension order. */
+            dimsizes[0] = hdf_dimsizes[1];
+            dimsizes[1] = hdf_dimsizes[0];
         }
         free(c_name);
     }
@@ -111,7 +112,11 @@ int32_t ldas_h4_sfginfo(int32_t sds_id, char *name, int32_t name_length, int32_t
 }
 int32_t ldas_h4_sfrdata(int32_t sds_id, const int32_t *start, const int32_t *stride, const int32_t *edge, void *data)
 {
-    return SDreaddata(sds_id, (int32_t *)start, (int32_t *)stride, (int32_t *)edge, data);
+    int32_t hdf_start[2] = {start[1], start[0]};
+    int32_t hdf_stride[2] = {stride[1], stride[0]};
+    int32_t hdf_edge[2] = {edge[1], edge[0]};
+
+    return SDreaddata(sds_id, hdf_start, hdf_stride, hdf_edge, data);
 }
 int32_t ldas_h4_sfendacc(int32_t sds_id) { return SDendaccess(sds_id); }
 int32_t ldas_h4_sfend(int32_t sd_id) { return SDend(sd_id); }
