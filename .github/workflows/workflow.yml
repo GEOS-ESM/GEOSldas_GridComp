@@ -22,11 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # We cannot currently test with ifx because HDF4 Fortran interface
-        # cannot be compiled with ifx.  The HDF4 Fortran interface is required
-        # for the GEOSldas
-        #compiler: [ifort, gfortran-15, ifx]
-        compiler: [ifort, gfortran-15]
+        compiler: [ifort, gfortran-15, ifx]
         build-type: [Debug]
     uses: GEOS-ESM/CI-workflows/.github/workflows/geosgcm_build_tests.yml@project/geosgcm
     with:
