@@ -4,6 +4,8 @@ import logging
 import multiprocessing
 import yaml
 
+import sys; sys.path.append('../../../shared/python/')
+
 from src import preprocess_nc, SCLF1C_reg2fit
 from src.helper.util import *
 
@@ -19,15 +21,12 @@ logging.basicConfig(
 # ---------------------------------------------------------
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),'config.yaml')
 with open(CONFIG_PATH) as f:
-    _cfg = yaml.safe_load(f)['paths']
+    config = yaml.safe_load(f)['paths']
 
-EE_TO_NC_SCRIPT           = _cfg['ee_to_nc_script']
-SMOS_BASE_PATH            = _cfg['smos_base_path']
-TMP_NC_PATH               = _cfg['tmp_nc_path']
-OUT_REG_PATH              = _cfg['out_reg_path']
-GEOSIT_PATH               = _cfg['GEOSIT_path']
-GEOSIT_to_EASEv2_M36_file = _cfg['GEOSIT_to_EASEv2_M36_file']
-SM_OPER_AUX_GAL_SM_path   = _cfg['SM_OPER_AUS_GAL_SM_path']
+EE_TO_NC_SCRIPT           = config['ee_to_nc_script']
+SMOS_BASE_PATH            = config['smos_base_path']
+TMP_NC_PATH               = config['tmp_nc_path']
+OUT_REG_PATH              = config['out_reg_path']
 
 def run_in_isolated_process(func, *args):
     """
@@ -43,7 +42,7 @@ def run_in_isolated_process(func, *args):
         logging.error(f"Process running {func.__name__} failed with exit code {p.exitcode}")
         raise RuntimeError(f"{func.__name__} failed during execution.")
 
-    logging.info(f"Successfully completed {func.__name__} via isolated process.")
+    logging.info(f"Successfully completed {func.__name__}.")
 
 def process_ee_to_nc(date_time: datetime) -> list:
     """
@@ -59,7 +58,7 @@ def process_ee_to_nc(date_time: datetime) -> list:
         f'SM_*_MIR_SCLF1C_{date_str}*_724_*zip'
     )
 
-    eeflist = glob.glob(search_pattern)
+    eeflist = sorted(glob.glob(search_pattern))
 
     logging.info(f"[{date_str}] Found {len(eeflist)} zip files to process.")
 
@@ -87,7 +86,7 @@ def process_ee_to_nc(date_time: datetime) -> list:
 
     # Return list of resulting NC files
     nc_search_pattern = os.path.join(TMP_NC_PATH, f'SM_*_MIR_SCLF1C_{date_str}*724*.nc')
-    ncflist = glob.glob(nc_search_pattern)
+    ncflist = sorted(glob.glob(nc_search_pattern))
 
     if len(eeflist) != len(ncflist):
         logging.warning(f"File count mismatch: {len(eeflist)} zip files vs {len(ncflist)} nc files.")
@@ -124,7 +123,7 @@ def main():
         for fnc in ncflist:
             logging.info(f"Preprocessing NC file: {fnc}")
             try:
-                run_in_isolated_process(preprocess_nc, fnc, OUT_REG_PATH)
+                run_in_isolated_process(preprocess_nc, fnc, config)
             except RuntimeError as e:
                 logging.error(f"Skipping {fnc} due to error: {e}")
                 continue

@@ -6,10 +6,10 @@ from netCDF4 import Dataset
 from datetime import timedelta, datetime
 from src.readwrite import read_GEOSIT, read_SCLF1C_nc, write_bin_SMOS_reg
 from src.helper import gal_atm_correction, xy2hv
-from src.helper.EASEv2 import EASEv2_latlon2ind, EASEv2_ind2latlon
+from EASEv2 import EASEv2_latlon2ind, EASEv2_ind2latlon
 import warnings; warnings.filterwarnings("ignore")
 
-def preprocess_nc(smos_nc, outpath):
+def preprocess_nc(smos_nc, config):
 
     # Code to preprocess SMOS data to the M36 EASEv2 grid.
     
@@ -42,6 +42,11 @@ def preprocess_nc(smos_nc, outpath):
     #                - bugfix: 
     #                  + corrected spatial stdv of DGG values within EASE pixel  
     #                  + possibly corrected Tb_Sky radiation 
+
+    outpath = config['out_reg_path']
+    GEOSIT_path = config['GEOSIT_path']
+    GEOSIT_to_EASEv2_M36_file = config['GEOSIT_to_EASEv2_M36_file']
+    SMOS_AUX_path = config['SM_OPER_AUS_GAL_SM_path']
  
     overwrite=1
     
@@ -65,7 +70,7 @@ def preprocess_nc(smos_nc, outpath):
     
     write_ind_latlon='latlon'
     
-    print('WRITE OUT...'+write_ind_latlon)
+    #print('WRITE OUT...'+write_ind_latlon)
 
     # INPUT SPECS:
     N_sec_half_orbit=3239
@@ -121,7 +126,7 @@ def preprocess_nc(smos_nc, outpath):
     N_data_bin=np.full((N_f,N_angle,N_ease_lat,N_ease_lon),0.)
     
     # 2 datasets in the SCL product: dealt with in XY2HV
-    print('READING')
+    #print('READING')
        
     # read SMOS SCLF1C netcdf file
     TB_real,TB_imag,RA,Theta,Az,Fa,Ge,Snap_ID,t_smos_sec,lat,lon,flag_15,flag_16,mask_ok,Grid_ID,BT_count=read_SCLF1C_nc(smos_nc)
@@ -195,7 +200,7 @@ def preprocess_nc(smos_nc, outpath):
     if ((N_points != check) or (N_points != dat_l)):
         raise RuntimeError('error in variable dimensions coming out of rotation')
             
-    print('Working on '+str(N_points)+' data points ; max='+str(max_tot_el))
+    #print('Working on '+str(N_points)+' data points ; max='+str(max_tot_el))
     C=1
 
     # obtain GEOSIT latlon -> EASEv2 grid remapping info:
@@ -205,19 +210,19 @@ def preprocess_nc(smos_nc, outpath):
     vegcls_grid = m2d['vegcls_grid']
     NN_grid = m2d['NN_grid']
         
-    T_air,T_surf,V_surf,P_surf = read_GEOSIT(t_out,vegcls_grid,NN_grid,d_lat, d_lon)
+    T_air,T_surf,V_surf,P_surf = read_GEOSIT(t_out,vegcls_grid,NN_grid,d_lat, d_lon,GEOSIT_path)
         
     Tb_ap_H,Tb_ap_V,Tb_BOA_H,Tb_BOA_V = \
-                   gal_atm_correction(d_Tbh,d_Tbv,d_lat,d_lon,d_inc,d_Az,t_out,  \
-                                      T_air,T_surf,P_surf,V_surf,C,nargout=4)
+              gal_atm_correction(d_Tbh,d_Tbv,d_lat,d_lon,d_inc,d_Az,\
+              t_out,SMOS_AUX_path,T_air,T_surf,P_surf,V_surf,C,nargout=4)
 
-    if correct_galaxy_only:
-        print('Galact corr (H):     maxdiff '+str(np.nanmax(Tb_ap_H - d_Tbh))+' mindiff '+str(np.nanmin(Tb_ap_H - d_Tbh)))
-    else:
-        print('Finished galact+atm correction')
+    #if correct_galaxy_only:
+    #    print('Galact corr (H):     maxdiff '+str(np.nanmax(Tb_ap_H - d_Tbh))+' mindiff '+str(np.nanmin(Tb_ap_H - d_Tbh)))
+    #else:
+    #    print('Finished galact+atm correction')
         #print('Galact+atm corr (H): maxdiff '+str(np.nanmax(Tb_BOA_H - d_Tbh))+' mindiff '+str(np.nanmin(Tb_BOA_H - d_Tbh)))
 
-    print('Project the SMOS data on a M36 grid...')
+    #print('Project the SMOS data on a M36 grid...')
     ind_row,ind_col=EASEv2_latlon2ind(d_lat,d_lon,grid_name,nargout=2)
     if correct_galaxy_only:
         Tb_data=np.array([Tb_ap_H[np.arange(N_points)],
@@ -267,7 +272,6 @@ def preprocess_nc(smos_nc, outpath):
     # Set #points to zero, so that RFI-affected Tb 
     # won't show up in output later.
     N_data_bin[data_gridded_bin_sq > K_err]=0
-    print('Finished the averaging\\n')
        
     for a in np.arange(N_angle):
         data_all[0,:,a]=np.reshape(data_gridded_bin[0,a,:,:],[N_dat],order='F')
@@ -285,10 +289,10 @@ def preprocess_nc(smos_nc, outpath):
         data_all[12,:,a]=np.reshape(N_data_bin[4,a,:,:],[N_dat],order='F')
         data_all[13,:,a]=np.reshape(N_data_bin[5,a,:,:],[N_dat],order='F')
         data_all[14,:,a]=np.reshape(data_gridded_bin[6,a,:,:],[N_dat],order='F')
-        data_all[15,:,a]=np.reshape(data_gridded_bin[7,a,:,:],[N_dat],order='F')
-          
-        ind=np.union1d(np.nonzero(data_all[4,:,a] > 0)[0],np.nonzero(data_all[5,:,a] > 0)[0])
-    
+        data_all[15,:,a]=np.reshape(data_gridded_bin[7,a,:,:],[N_dat],order='F')          
+        
+    ind=np.nonzero(np.any(data_all[4:6,:,:] > 0, axis=(0,2)))[0]
+        
     data_all[np.isnan(data_all)]= -999.0
     stamp1=t_out.strftime("%Y")
     stamp2=t_out.strftime("%m")
@@ -313,6 +317,6 @@ def preprocess_nc(smos_nc, outpath):
                 write_bin_SMOS_reg(out_filename,lon_out,lat_out,inc_angle,data_all[:,ind,:],int_Asc,int(Creator_Version),prep_version,start_time,end_time,overwrite,N_out_fields,write_ind_latlon,'SCLF1C')
             else:
                 raise RuntimeError('Unknown format of indices / latlon output')
-    else:
-        print('Zero valid data, NO output file written')   
+    #else:
+    #    print('Zero valid data, NO output file written')   
 

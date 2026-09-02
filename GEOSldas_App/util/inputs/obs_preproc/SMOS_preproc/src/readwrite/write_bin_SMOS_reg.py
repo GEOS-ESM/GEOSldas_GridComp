@@ -171,7 +171,7 @@ def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
         for i in range(N_out_fields):
             for jj in range(N_angle):
                 if N_angle > 1:
-                    data=np.squeeze(data_org[:,:,jj])
+                    data=data_org[:,:,jj]
 
                 if ((i == 4 or i == 5 or i == 12 or i == 13) and (data_product == 'SCLF1C' or data_product == 'BWLF1C')) \
                     or (i == 9 and data_product == 'SMUDP2'):

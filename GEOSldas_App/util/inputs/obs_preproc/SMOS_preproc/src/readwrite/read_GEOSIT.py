@@ -1,8 +1,8 @@
 import numpy as np 
 from netCDF4 import Dataset
-from src.helper.EASEv2 import EASEv2_latlon2ind
+from EASEv2 import EASEv2_latlon2ind
 
-def read_GEOSIT(date_time=None,vegcls_grid=None,EASEv2_M36_to_M2_grid=None,lat=None,lon=None):
+def read_GEOSIT(date_time=None,vegcls_grid=None,EASEv2_M36_to_M2_grid=None,lat=None,lon=None,GEOSIT_path=None):
     
     # Read fields from a GEOSIT 
 
@@ -50,7 +50,7 @@ def read_GEOSIT(date_time=None,vegcls_grid=None,EASEv2_M36_to_M2_grid=None,lat=N
 
     Tair = filename.variables['T2M']
     
-    print('Read GEOSIT files - '+stream+'.lnd_tavg_1hr_glo_L576x361_slv.'+date_string+'30Z.nc4')
+    #print('Read GEOSIT files - '+stream+'.lnd_tavg_1hr_glo_L576x361_slv.'+date_string+'30Z.nc4')
     # Interpolate, limit to swath
     #-----------------------------------------------------------------
     

@@ -35,7 +35,7 @@ def ind2sub(array_shape, ind):
     return (rows, cols)
 
 def gal_atm_correction(Tb_H=None,Tb_V=None,lat=None,lon=None,angle=None, \
-                           phi=None,time=None,T_air=None,T_surf=None, \
+                       phi=None,time=None,SMOS_AUX_path=None,T_air=None,T_surf=None, \
                         P_surf=None,V_surf=None,C=None,*args,**kwargs):
 
     d2r=np.pi / 180
@@ -78,10 +78,10 @@ def gal_atm_correction(Tb_H=None,Tb_V=None,lat=None,lon=None,angle=None, \
 
         # v724
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_file=SM_OPER_AUX_GAL_SM_path
+        data_file=SMOS_AUX_path
 
-        print('reading galaxy info')
-        p=data_file+'/'+data_file[-60:]+'.HDR'
+        sidx = data_file.index('SM_OPER_AUX_GAL_SM_') 
+        p=data_file+'/'+data_file[sidx:sidx+60]+'.HDR'
         doc = ET.parse(p)
         root = doc.getroot()
         
@@ -109,7 +109,7 @@ def gal_atm_correction(Tb_H=None,Tb_V=None,lat=None,lon=None,angle=None, \
             D_dec = float(tmp.text)    
             del tmp
 
-        TB_Sky_H,TB_Sky_V=read_aux_gal_sm(data_file+'/'+data_file[-60:]+'.DBL')
+        TB_Sky_H,TB_Sky_V=read_aux_gal_sm(data_file+'/'+data_file[sidx:sidx+60]+'.DBL')
 
 #First row corresponds to largest declination.
 #We need to reverse the row order from the smallest to the largest
