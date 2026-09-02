@@ -15,6 +15,12 @@
 ! *********************************************************************
 
 module clsm_ensupd_read_obs
+
+   use, intrinsic :: iso_c_binding,      ONLY:     &
+        c_char
+
+   use, intrinsic :: iso_fortran_env,    ONLY:     &
+        int16
   
   use MAPL_BaseMod,                     ONLY:     &
        MAPL_UNDEF
@@ -22,8 +28,10 @@ module clsm_ensupd_read_obs
   use MAPL_ConstantsMod,                ONLY:     &
        MAPL_TICE
 
-  use io_hdf5,                          ONLY:     &
-       hdf5read 
+   use io_hdf5,                          ONLY:     &
+        hdf5read
+
+   use hdf4_fortran_api
 
   use MAPL,                             ONLY:     &
        MAPL_ease_convert,                         &
@@ -155,12 +163,6 @@ contains
     
     integer, parameter :: max_Heterogeneity_Index      = 500 ! = 5 Kelvin
     
-    ! declarations of hdf functions 
-    
-    integer :: hopen, vfstart, vsfatch, vsqfnelt, vsfseek, vsfsfld, vsfread
-    integer :: vsfdtch, vfend, hclose
-    
-    
     ! declarations of hdf-related parameters and variables
     
     integer, dimension(N_files) :: file_id, vdata_id 
@@ -185,8 +187,8 @@ contains
     integer, dimension(:), allocatable :: surface_type_qc_flag
     integer, dimension(:), allocatable :: Heterogeneity_Index
     
-    integer*2, dimension(:), allocatable :: tmpint2vec
-    real,      dimension(:), allocatable :: tmprealvec
+    integer(int16), dimension(:), allocatable :: tmpint2vec
+    real,           dimension(:), allocatable :: tmprealvec
     
     character(len=*), parameter :: Iam = 'read_ae_l2_sm_hdf'
     character(len=400) :: err_msg
@@ -6820,9 +6822,9 @@ contains
 
     integer,         parameter :: SCF_nodata          = -9999. 
     
-    integer(KIND=2), parameter :: qc_snow_cover_max   = 100    ! exclude lake ice, night, inland water, ocean, etc
-    integer(KIND=2), parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions 
-    integer(KIND=2), parameter :: qc_snow_spatial_max =   2    ! data quality (0=best, 1=good, 2=OK, 3=poor, 4=other) 
+    integer(int16),  parameter :: qc_snow_cover_max   = 100    ! exclude lake ice, night, inland water, ocean, etc
+    integer(int16),  parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
+    integer(int16),  parameter :: qc_snow_spatial_max =   2    ! data quality (0=best, 1=good, 2=OK, 3=poor, 4=other)
     
     integer,         parameter :: DFACC_READ          =   1    ! from hdf.inc
     
@@ -6846,18 +6848,15 @@ contains
     
     integer                                         :: status, sd_id, sds_id, sds_index
     
-    integer                                         :: sfstart, sfn2index, sfselect, sfginfo
-    integer                                         :: sfrdata, sfendacc,  sfend
-    
     character(64)                                   :: sds_name
 
     integer                                         :: rank, data_type, num_attrs
 
-    integer(KIND=2),    dimension(:,:), allocatable :: Snow_Cover
-    integer(KIND=2),    dimension(:,:), allocatable :: Clear_Index
-    integer(KIND=2),    dimension(:,:), allocatable :: Snow_Spatial_QA
+    integer(int16),     dimension(:,:), allocatable :: Snow_Cover
+    integer(int16),     dimension(:,:), allocatable :: Clear_Index
+    integer(int16),     dimension(:,:), allocatable :: Snow_Spatial_QA
     
-    character(1),       dimension(:,:), allocatable :: tmp_char1
+    character(kind=c_char, len=1), dimension(:,:), allocatable :: tmp_char1
 
     character(len=*),                     parameter :: Iam = 'read_MODIS_SCF_hdf'
     character(len=400)                              :: err_msg

@@ -104,6 +104,7 @@ class ldas:
         self.bcs_dir_landiceshared = ''
         self.tile_types         = ''
         self.with_land          = False
+        self.with_lake          = False
         self.with_landice       = False
         self.run_route          = 0
         self.with_issm          = False
@@ -232,10 +233,14 @@ class ldas:
 
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
-          self.with_land    = True
-          assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
-        if  "20" in self.tile_types :
-          self.with_landice = True
+            self.with_land = True
+            assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
+         
+        if "19" in self.tile_types :
+            self.with_lake = True
+
+        if "20" in self.tile_types :
+            self.with_landice = True        
         
         if self.with_landice == True:
             if int(self.ExeInputs.get('DO_ISSM'))==1:
@@ -445,11 +450,16 @@ class ldas:
                  landpertRstFile=self.in_rstdir+'/'+tmpFile
                  if ( os.path.isfile(landpertRstFile)) :
                     self.has_geos_pert = True
+                    
+           if self.with_lake:
+             tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
+             lakeRstFile=self.in_rstdir+'/'+tmpFile
+             assert os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile)
 
            if self.with_landice:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-              landiceRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
+             tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
+             landiceRstFile=self.in_rstdir+'/'+tmpFile
+             assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
 
            if self.run_route > 0:
               tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
@@ -884,7 +894,7 @@ class ldas:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_landice)):
+        if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):    
            bcs_path = self.ExeInputs['BCS_PATH']
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
            bc_base    = os.path.dirname(bcs_path)
@@ -922,25 +932,27 @@ class ldas:
            if self.with_land:
              catch_obj = catchANDcn(config_obj = config)
              catch_obj.remap()
-           if self.with_landice:
-             config['output']['surface']['remap_water'] = True
-             config['input']['surface']['zoom'] = '2'
-             landice_obj = other_restarts(config_obj = config)
-             landice_obj.remap()
+           if self.with_lake or self.with_landice:
+               config['output']['surface']['remap_water'] = True
+               config['input']['surface']['zoom'] = '2'
+               other_rst_obj = other_restarts(config_obj = config)
+               other_rst_obj.remap()             
 
         #for ens in self.ensdirs :
         catchRstFile0  = ''
         vegdynRstFile0 = ''
+        lakeRstFile0 = ''
         landiceRstFile0 = ''
         issmRstFile0   = ''
         
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
-            myCatchRst   = myRstDir+'/'+self.catch +ensid +'_internal_rst'
-            myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
-            myIssmRst = myRstDir+'/'+ 'issm' +ensid +'_internal_rst'
-            myVegRst     = myRstDir+'/'+ 'vegdyn'+ensid +'_internal_rst'
+            myCatchRst   = myRstDir+'/'+ self.catch +ensid +'_internal_rst'
+            myLakeRst    = myRstDir+'/'+ 'lake'     +ensid +'_internal_rst'
+            myLandiceRst = myRstDir+'/'+ 'landice'  +ensid +'_internal_rst'
+            myIssmRst    = myRstDir+'/'+ 'issm'     +ensid +'_internal_rst'
+            myVegRst     = myRstDir+'/'+ 'vegdyn'   +ensid +'_internal_rst'
             myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
             myRouteRst   = myRstDir+'/'+ 'route'    +ensid +'_internal_rst'
 
@@ -995,6 +1007,31 @@ class ldas:
                        vegdynRstFile0 = vegdynRstFile
                else :
                    vegdynRstFile = vegdynRstFile0
+
+            lakeRstFile = ''
+            if self.with_lake :
+                if RESTART_str in ['1', '3'] :
+                    lakeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'lake_internal_rst.'+y4m2d2_h2m2
+
+                if RESTART_str in ['2', 'M']:
+                    lakeRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'lake_internal_rst.'+YYYYMMDD+'*')[0]
+
+                if os.path.isfile(lakeRstFile) :
+                    lakeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
+
+                    if self.isZoomIn :
+                        print ("Creating zoom-in of lake restart file... \n")
+                        cmd=self.bindir + '/preprocess_ldas.x zoomin_lakerst '+ lakeRstFile +' ' + lakeLocal + ' '+ tmp_f2g_file.name
+                        print ("cmd: " + cmd)
+                        sp.call(shlex.split(cmd))
+                    else :
+                        shutil.copy(lakeRstFile,lakeLocal)
+
+                    lakeRstFile = lakeLocal
+                    if '0000' in ensdir :
+                        lakeRstFile0 = lakeRstFile
+                    else :
+                        lakeRstFile = lakeRstFile0
 
             landiceRstFile = ''
             issmRstFile   = ''
@@ -1076,15 +1113,19 @@ class ldas:
                os.symlink(catchRstFile,   myCatchRst)
                os.symlink(vegdynRstFile,  myVegRst)
 
-            if self.with_landice :
-               print("link landice restart: " + myLandiceRst)
-               os.symlink(landiceRstFile, myLandiceRst)
+            if self.with_lake and iens == 0:
+                print("link lake restart: " + myLakeRst)
+                os.symlink(lakeRstFile, myLakeRst)
+
+            if self.with_landice and iens == 0:
+                print("link landice restart: " + myLandiceRst)
+                os.symlink(landiceRstFile, myLandiceRst)
 
             if self.run_route > 0 :
                print("link route restart: " + myRouteRst)
                os.symlink(routeRstFile, myRouteRst)
 
-            if self.with_issm:
+            if self.with_issm and iens == 0:
                if RESTART_str in ['1', '3']:
                   print("link issm restart: " + myIssmRst)
                   os.symlink(issmRstFile, myIssmRst)
@@ -1347,6 +1388,10 @@ class ldas:
                    rstkey.append('VEGDYN')
                    rstval.append(self.catch)
                    rstval.append('vegdyn')
+
+                if self.with_lake:
+                  rstkey.append('LAKE')
+                  rstval.append('lake')
 
                 if self.with_landice:
                   rstkey.append('LANDICE')

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added functionality to simulate lake tiles.
 - Added assimilation of surface soil moisture observations from H-SAF ASCAT H121 CDR v8 and H139 ICDR netcdf products (MetOp-A/B/C).
 - Added peatland QC for sfds and sfmc observations.
 - Added ObsFcstAna postprocessing support for NetCDF4 diagnostics, with fallback to legacy binary ObsFcstAna files.
@@ -25,10 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replaced legacy HDF4 Fortran interface with a C bridge and `ISO_C_BINDING` module ([PR #194](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/194)).
 - Revised and cleaned up RESTART options:
   - Clarified scope and constraints of RESTART=1 and RESTART=2.
   - Added RESTART=3 (formerly RESTART=G, which had been removed).
   - Cleaned up RESTART=M.
+- Updated Landice ("glc") HISTORY Collection to that of M21C plus key ISSM outputs.
+- Updated CI.
+
 
 ### Fixed
 
