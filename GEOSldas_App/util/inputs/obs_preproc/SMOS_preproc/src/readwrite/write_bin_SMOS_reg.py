@@ -246,6 +246,6 @@ def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
                 else:
                     fout.write(struct.pack('>i',fortran_tag))
                     fout.write(struct.pack('>f', -999.0))
-                        fout.write(struct.pack('>i',fortran_tag))     
+                    fout.write(struct.pack('>i',fortran_tag))     
                         
     fout.close()
