@@ -4,16 +4,20 @@ from os import path
 import struct
 
 def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
-                          data=None,asc_flag=None,version=None,version_prep=None,\
-                              start_time=None,end_time=None,overwrite=False,N_out_fields=None,\
-                                  write_ind_latlon=None,data_product=None,tile_id=None,*args,**kwargs):
-
-# write "fortran sequential" tile tavg files (identical to LDASsa output)
+                       data=None,asc_flag=None,version=None,version_prep=None,\
+                       start_time=None,end_time=None,overwrite=False,N_out_fields=None,\
+                       write_ind_latlon=None,data_product=None,tile_id=None,*args,**kwargs):
     
+# write "fortran sequential" tile tavg files (identical to LDASsa output)
+
 # optional input:
 #   overwrite = 0 -- do NOT overwrite existing files, print warning
 #                    message, return
 #   overwrite = 1 -- overwrite existing files, print warning message
+
+# this py function is nearly identical to the matlab function that writes the Tb scaling parameters:
+#    ./util/inputs/obs_scaling_params/write_seqbin_file.m   
+# *except* this py function writes one additional field specifically for SMOS binary files
     
 # ------------------------------------------------------------------
     
@@ -140,32 +144,30 @@ def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
             fout.write(struct.pack('>'+'i'*N_grid,np.round(rowind)))
             fout.write(struct.pack('>i',fortran_tag)) 
             
-        else:
-            if write_ind_latlon == 'latlon':
-                fout.write(struct.pack('>i',fortran_tag))
-                fout.write(struct.pack('>'+'f'*N_grid, *colind))
-                fout.write(struct.pack('>i',fortran_tag)) 
-    
-                fout.write(struct.pack('>i',fortran_tag))
-                fout.write(struct.pack('>'+'f'*N_grid, *rowind))
-                fout.write(struct.pack('>i',fortran_tag)) 
+        elif write_ind_latlon == 'latlon':
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>'+'f'*N_grid, *colind))
+            fout.write(struct.pack('>i',fortran_tag)) 
+            
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>'+'f'*N_grid, *rowind))
+            fout.write(struct.pack('>i',fortran_tag)) 
                 
-            else:
-                if write_ind_latlon == 'latlon_id' and len(args) == 14:
-                    fout.write(struct.pack('>i',fortran_tag))
-                    fout.write(struct.pack('>'+'f'*N_grid, *colind))
-                    fout.write(struct.pack('>i',fortran_tag)) 
-        
-                    fout.write(struct.pack('>i',fortran_tag))
-                    fout.write(struct.pack('>'+'f'*N_grid, *rowind))
-                    fout.write(struct.pack('>i',fortran_tag)) 
+        elif write_ind_latlon == 'latlon_id' and len(args) == 14:
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>'+'f'*N_grid, *colind))
+            fout.write(struct.pack('>i',fortran_tag)) 
+            
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>'+'f'*N_grid, *rowind))
+            fout.write(struct.pack('>i',fortran_tag)) 
                     
-                    for i in range(tile_id.shape[1]):
-                        fout.write(struct.pack('>i',fortran_tag))
-                        fout.write(struct.pack('>'+'i'*N_grid, *tile_id[:][i]))
-                        fout.write(struct.pack('>i',fortran_tag)) 
-                else:
-                    sys.exit('output-arguments do not line up')
+            for i in range(tile_id.shape[1]):
+                fout.write(struct.pack('>i',fortran_tag))
+                fout.write(struct.pack('>'+'i'*N_grid, *tile_id[:][i]))
+                fout.write(struct.pack('>i',fortran_tag)) 
+        else:
+            sys.exit('output-arguments do not line up')
                     
         fortran_tag=N_grid*4
         for i in range(N_out_fields):
@@ -179,15 +181,14 @@ def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
                     fout.write(struct.pack('>'+'i'*N_grid, *data[i,:].round().astype('int')))
                     fout.write(struct.pack('>i',fortran_tag)) 
 
+                elif (i == 4 or i == 9) and data_product == 'scaling':
+                    fout.write(struct.pack('>i',fortran_tag))
+                    fout.write(struct.pack('>'+'i'*N_grid, *data[i,:].round().astype('int')))
+                    fout.write(struct.pack('>i',fortran_tag)) 
                 else:
-                    if (i == 4 or i == 9) and data_product == 'scaling':
-                        fout.write(struct.pack('>i',fortran_tag))
-                        fout.write(struct.pack('>'+'i'*N_grid, *data[i,:].round().astype('int')))
-                        fout.write(struct.pack('>i',fortran_tag)) 
-                    else:
-                        fout.write(struct.pack('>i',fortran_tag))
-                        fout.write(struct.pack('>'+'f'*N_grid, *data[i,:]))
-                        fout.write(struct.pack('>i',fortran_tag)) 
+                    fout.write(struct.pack('>i',fortran_tag))
+                    fout.write(struct.pack('>'+'f'*N_grid, *data[i,:]))
+                    fout.write(struct.pack('>i',fortran_tag)) 
 
     else:
         fortran_tag=N_angle*4
@@ -205,32 +206,30 @@ def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
             fout.write(struct.pack('>i',0))
             fout.write(struct.pack('>i',fortran_tag)) 
              
-        else:
-            if write_ind_latlon == 'latlon':
-                fout.write(struct.pack('>i',fortran_tag))
-                fout.write(struct.pack('>f', 0.))
-                fout.write(struct.pack('>i',fortran_tag)) 
-    
-                fout.write(struct.pack('>i',fortran_tag))
-                fout.write(struct.pack('>f', 0.))
-                fout.write(struct.pack('>i',fortran_tag)) 
+        elif write_ind_latlon == 'latlon':
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>f', 0.))
+            fout.write(struct.pack('>i',fortran_tag)) 
+            
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>f', 0.))
+            fout.write(struct.pack('>i',fortran_tag)) 
 
-            else:
-                if write_ind_latlon == 'latlon_id' and len(args) == 14:
-                    fout.write(struct.pack('>i',fortran_tag))
-                    fout.write(struct.pack('>f', 0.))
-                    fout.write(struct.pack('>i',fortran_tag)) 
+        elif write_ind_latlon == 'latlon_id' and len(args) == 14:
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>f', 0.))
+            fout.write(struct.pack('>i',fortran_tag)) 
+            
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>f', 0.))
+            fout.write(struct.pack('>i',fortran_tag)) 
+            
+            fout.write(struct.pack('>i',fortran_tag))
+            fout.write(struct.pack('>i', 0))
+            fout.write(struct.pack('>i',fortran_tag)) 
         
-                    fout.write(struct.pack('>i',fortran_tag))
-                    fout.write(struct.pack('>f', 0.))
-                    fout.write(struct.pack('>i',fortran_tag)) 
-                    
-                    fout.write(struct.pack('>i',fortran_tag))
-                    fout.write(struct.pack('>i', 0))
-                    fout.write(struct.pack('>i',fortran_tag)) 
-        
-                else:
-                        sys.exit('output-arguments do not line up')
+        else:
+            sys.exit('output-arguments do not line up')
             
         for i in range(N_out_fields):
             for jj in range(N_angle):
@@ -240,14 +239,13 @@ def write_bin_SMOS_reg(fname=None,colind=None,rowind=None,av_angle_bin=None, \
                     fout.write(struct.pack('>i', 0))
                     fout.write(struct.pack('>i',fortran_tag)) 
 
+                elif (i == 4 or i == 9) and data_product == 'scaling':
+                    fout.write(struct.pack('>i',fortran_tag))
+                    fout.write(struct.pack('>i', 0))
+                    fout.write(struct.pack('>i',fortran_tag)) 
                 else:
-                    if (i == 4 or i == 9) and data_product == 'scaling':
-                        fout.write(struct.pack('>i',fortran_tag))
-                        fout.write(struct.pack('>i', 0))
-                        fout.write(struct.pack('>i',fortran_tag)) 
-                    else:
-                        fout.write(struct.pack('>i',fortran_tag))
-                        fout.write(struct.pack('>f', -999.0))
+                    fout.write(struct.pack('>i',fortran_tag))
+                    fout.write(struct.pack('>f', -999.0))
                         fout.write(struct.pack('>i',fortran_tag))     
-    
+                        
     fout.close()

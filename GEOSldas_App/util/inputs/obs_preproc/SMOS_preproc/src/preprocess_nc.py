@@ -43,10 +43,10 @@ def preprocess_nc(smos_nc, config):
     #                  + corrected spatial stdv of DGG values within EASE pixel  
     #                  + possibly corrected Tb_Sky radiation 
 
-    outpath = config['out_reg_path']
-    GEOSIT_path = config['GEOSIT_path']
+    outpath                   = config['out_reg_path']
+    GEOSIT_path               = config['GEOSIT_path']
     GEOSIT_to_EASEv2_M36_file = config['GEOSIT_to_EASEv2_M36_file']
-    SMOS_AUX_path = config['SM_OPER_AUS_GAL_SM_path']
+    SMOS_AUX_path             = config['SM_OPER_AUX_GAL_SM_path']
  
     overwrite=1
     
@@ -121,9 +121,9 @@ def preprocess_nc(smos_nc, config):
     ind_j_all=np.reshape(ind_j_tmp,N_dat,order='F')
     
     N_f=8
-    data_gridded_bin=np.full((N_f,N_angle,N_ease_lat,N_ease_lon),0.)
+    data_gridded_bin   =np.full((N_f,N_angle,N_ease_lat,N_ease_lon),0.)
     data_gridded_bin_sq=np.full((N_f,N_angle,N_ease_lat,N_ease_lon),0.)
-    N_data_bin=np.full((N_f,N_angle,N_ease_lat,N_ease_lon),0.)
+    N_data_bin         =np.full((N_f,N_angle,N_ease_lat,N_ease_lon),0.)
     
     # 2 datasets in the SCL product: dealt with in XY2HV
     #print('READING')
@@ -132,24 +132,25 @@ def preprocess_nc(smos_nc, config):
     TB_real,TB_imag,RA,Theta,Az,Fa,Ge,Snap_ID,t_smos_sec,lat,lon,flag_15,flag_16,mask_ok,Grid_ID,BT_count=read_SCLF1C_nc(smos_nc)
             
     fin =  Dataset(smos_nc,'r')
-    Creator_Version=fin.getncattr('Fixed_Header:Source:Creator_Version')
-    Asc=fin.getncattr('Variable_Header:Specific_Product_Header:Main_Info:Time_Info:Ascending_Flag')
-    fname =  fin.getncattr('Fixed_Header:File_Name')
-    idx = fname.index('SCLF1C_')
+    Creator_Version = fin.getncattr('Fixed_Header:Source:Creator_Version')
+    Asc             = fin.getncattr('Variable_Header:Specific_Product_Header:Main_Info:Time_Info:Ascending_Flag')
+    fname           = fin.getncattr('Fixed_Header:File_Name')
+
+    idx             = fname.index('SCLF1C_')
                        
     start_time = datetime(int(fname[idx+7:idx+11]),
-                      int(fname[idx+11:idx+13]),
-                      int(fname[idx+13:idx+15]),
-                      int(fname[idx+16:idx+18]),
-                      int(fname[idx+18:idx+20]),
-                      int(fname[idx+20:idx+22]))
+                          int(fname[idx+11:idx+13]),
+                          int(fname[idx+13:idx+15]),
+                          int(fname[idx+16:idx+18]),
+                          int(fname[idx+18:idx+20]),
+                          int(fname[idx+20:idx+22]))
              
-    end_time = datetime(int(fname[idx+23:idx+27]),
-                      int(fname[idx+27:idx+29]),
-                      int(fname[idx+29:idx+31]),
-                      int(fname[idx+32:idx+34]),
-                      int(fname[idx+34:idx+36]),
-                      int(fname[idx+36:idx+38]))
+    end_time   = datetime(int(fname[idx+23:idx+27]),
+                          int(fname[idx+27:idx+29]),
+                          int(fname[idx+29:idx+31]),
+                          int(fname[idx+32:idx+34]),
+                          int(fname[idx+34:idx+36]),
+                          int(fname[idx+36:idx+38]))
         
     N_sec_date_diff =  end_time - start_time;
         
@@ -182,8 +183,8 @@ def preprocess_nc(smos_nc, config):
          (TB_real,TB_imag,RA,Theta,Az,alpha,Snap_ID,t_smos_sec,\
          lat,lon,flag_15,flag_16,mask_ok,Grid_ID,BT_count,nargout=17)
         
-    d_Tbh[d_Xorg == 0]=np.nan
-    d_Tbv[d_Yorg == 0]=np.nan
+    d_Tbh[d_Xorg  == 0]=np.nan
+    d_Tbv[d_Yorg  == 0]=np.nan
     d_T3[d_RXYorg == 0]=np.nan
     d_T4[d_IXYorg == 0]=np.nan
         
@@ -226,26 +227,26 @@ def preprocess_nc(smos_nc, config):
     ind_row,ind_col=EASEv2_latlon2ind(d_lat,d_lon,grid_name,nargout=2)
     if correct_galaxy_only:
         Tb_data=np.array([Tb_ap_H[np.arange(N_points)],
-                     Tb_ap_V[np.arange(N_points)],
-                     d_RAh[np.arange(N_points)],
-                     d_RAv[np.arange(N_points)],
-                     np.nan*d_T3[np.arange(N_points)],
-                     np.nan*d_T4[np.arange(N_points)],
-                     np.nan*d_RA3[np.arange(N_points)],
-                     np.nan*d_RA4[np.arange(N_points)]])
+                          Tb_ap_V[np.arange(N_points)],
+                          d_RAh[  np.arange(N_points)],
+                          d_RAv[  np.arange(N_points)],
+                          np.nan*d_T3[ np.arange(N_points)],
+                          np.nan*d_T4[ np.arange(N_points)],
+                          np.nan*d_RA3[np.arange(N_points)],
+                          np.nan*d_RA4[np.arange(N_points)]])
     else:
         Tb_data=np.array([Tb_BOA_H[np.arange(N_points)],
-                     Tb_BOA_V[np.arange(N_points)],
-                     d_RAh[np.arange(N_points)],
-                     d_RAv[np.arange(N_points)],
-                     np.nan*d_T3[np.arange(N_points)],
-                     np.nan*d_T4[np.arange(N_points)],
-                     np.nan*d_RA3[np.arange(N_points)],
-                     np.nan*d_RA4[np.arange(N_points)]])
+                          Tb_BOA_V[np.arange(N_points)],
+                          d_RAh[   np.arange(N_points)],
+                          d_RAv[   np.arange(N_points)],
+                          np.nan*d_T3[ np.arange(N_points)],
+                          np.nan*d_T4[ np.arange(N_points)],
+                          np.nan*d_RA3[np.arange(N_points)],
+                          np.nan*d_RA4[np.arange(N_points)]])
         
     coord=np.array([ind_col[np.arange(N_points)],
-               ind_row[np.arange(N_points)],
-               d_inc[np.arange(N_points)]])
+                    ind_row[np.arange(N_points)],
+                    d_inc[np.arange(N_points)]])
        
     for i in np.arange(N_points):
         ind_j=coord[0,i].astype('int')
@@ -274,16 +275,16 @@ def preprocess_nc(smos_nc, config):
     N_data_bin[data_gridded_bin_sq > K_err]=0
        
     for a in np.arange(N_angle):
-        data_all[0,:,a]=np.reshape(data_gridded_bin[0,a,:,:],[N_dat],order='F')
-        data_all[1,:,a]=np.reshape(data_gridded_bin[1,a,:,:],[N_dat],order='F')
-        data_all[2,:,a]=np.reshape(data_gridded_bin_sq[0,a,:,:],[N_dat],order='F')
-        data_all[3,:,a]=np.reshape(data_gridded_bin_sq[1,a,:,:],[N_dat],order='F')
-        data_all[4,:,a]=np.reshape(N_data_bin[0,a,:,:],[N_dat],order='F')
-        data_all[5,:,a]=np.reshape(N_data_bin[1,a,:,:],[N_dat],order='F')
-        data_all[6,:,a]=np.reshape(data_gridded_bin[2,a,:,:],[N_dat],order='F')
-        data_all[7,:,a]=np.reshape(data_gridded_bin[3,a,:,:],[N_dat],order='F')
-        data_all[8,:,a]=np.reshape(data_gridded_bin[4,a,:,:],[N_dat],order='F')
-        data_all[9,:,a]=np.reshape(data_gridded_bin[5,a,:,:],[N_dat],order='F')
+        data_all[ 0,:,a]=np.reshape(data_gridded_bin[0,a,:,:],[N_dat],order='F')
+        data_all[ 1,:,a]=np.reshape(data_gridded_bin[1,a,:,:],[N_dat],order='F')
+        data_all[ 2,:,a]=np.reshape(data_gridded_bin_sq[0,a,:,:],[N_dat],order='F')
+        data_all[ 3,:,a]=np.reshape(data_gridded_bin_sq[1,a,:,:],[N_dat],order='F')
+        data_all[ 4,:,a]=np.reshape(N_data_bin[0,a,:,:],[N_dat],order='F')
+        data_all[ 5,:,a]=np.reshape(N_data_bin[1,a,:,:],[N_dat],order='F')
+        data_all[ 6,:,a]=np.reshape(data_gridded_bin[2,a,:,:],[N_dat],order='F')
+        data_all[ 7,:,a]=np.reshape(data_gridded_bin[3,a,:,:],[N_dat],order='F')
+        data_all[ 8,:,a]=np.reshape(data_gridded_bin[4,a,:,:],[N_dat],order='F')
+        data_all[ 9,:,a]=np.reshape(data_gridded_bin[5,a,:,:],[N_dat],order='F')
         data_all[10,:,a]=np.reshape(data_gridded_bin_sq[4,a,:,:],[N_dat],order='F')
         data_all[11,:,a]=np.reshape(data_gridded_bin_sq[5,a,:,:],[N_dat],order='F')
         data_all[12,:,a]=np.reshape(N_data_bin[4,a,:,:],[N_dat],order='F')

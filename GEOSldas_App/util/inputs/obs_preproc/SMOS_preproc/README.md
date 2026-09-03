@@ -32,7 +32,7 @@ data. It also supports on-demand backfill of a single day or a date range.
 | `out_reg_path`              | Output root for REG binaries (`SMOS_reg_Tb_*.bin`, organized by `<out_reg_path>/<YYYYMM>/`). FIT binaries are written to a sibling directory: `_reg_` in this path is replaced by `_fit_` and further nested under `SMOS_fit_poly2/<YYYYMM>/`. |
 | `GEOSIT_path`               | Path to GEOS-IT data.                                                                           |
 | `GEOSIT_to_EASEv2_M36_file` | Path and name of file mapping from GEOS-IT output grid to EASEv2_M36 grid.                      |
-| `SM_OPER_AUS_GAL_SM_path`   | Path to SMOS galaxy correction files.                                                           |
+| `SM_OPER_AUX_GAL_SM_path`   | Path to SMOS galaxy correction files.                                                           |
 
 
 Current values are set for the production Discover paths under
@@ -59,8 +59,7 @@ src/preprocess_nc.py      NetCDF -> EASEv2 M36 REG binaries
 src/SCLF1C_reg2fit.py     REG -> Tb40 FIT binaries
 src/readwrite/            I/O helpers (SMOS NetCDF, REG binary, GEOS-IT, aux Gal SM)
 src/helper/               grid/geometry/time utilities (EASEv2 indexing, h/v tile
-                          conversion, celestial angle calc, pentad/leap-year,
-                          galactic+atmospheric correction)
+                          conversion, celestial angle calc, galactic+atmospheric correction)
 ```
 
 
