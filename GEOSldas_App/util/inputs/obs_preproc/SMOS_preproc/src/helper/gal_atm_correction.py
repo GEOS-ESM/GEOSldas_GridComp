@@ -54,7 +54,7 @@ def gal_atm_correction(Tb_H=None,Tb_V=None,lat=None,lon=None,angle=None, \
                    np.logical_not(np.isnan(P_surf)) & \
                    np.logical_not(np.isnan(V_surf)))[0]    
 
-    print('galactic and atmospheric correction on ', str(len(limited_ind)),' of ',length_org)
+    #print('galactic and atmospheric correction on ', str(len(limited_ind)),' of ',length_org)
     Tb_ap_H_out = np.full([length_org],np.nan)
     Tb_ap_V_out = np.full([length_org],np.nan)
     Tb_BOA_H_out = np.full([length_org],np.nan)
