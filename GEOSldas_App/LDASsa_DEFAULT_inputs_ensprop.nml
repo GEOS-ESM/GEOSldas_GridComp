@@ -103,6 +103,9 @@ progn_pert_dtstep = 10800  ! time step for generation of AR(1) prognostics perts
 
 force_pert_dtstep = 10800  ! time step for generation of AR(1) forcing perts     [s]
 
+! use spherical random fields for both forcing and prognostic perturbations?
+use_sphere_pert = .false.
+
 ! ---------------------------------------------------------------------
 !
 ! forcing error (or forcing perturbation) parameters
