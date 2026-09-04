@@ -499,13 +499,13 @@ while ( $counter <= ${{NUM_SGMT}} )
 
 
    #######################################################################
-   #              Move HISTORY Files to cat/ens Directory
+   #              Move HISTORY Files to diag/ens[XXXX] Directory
    #######################################################################
 
    set outfiles = `ls $EXPID.*[bin,nc4]`
    set TILECOORD=`ls ../output/*/rc_out/*ldas_tilecoord.bin`
 
-   # Move current files to /cat/ens
+   # Move current files to diag/ens[XXXX]
    # ------------------------------
 
    foreach ofile ( $outfiles )
@@ -513,9 +513,9 @@ while ( $counter <= ${{NUM_SGMT}} )
       set TY = `echo $ThisTime | cut -c1-4`
       set TM = `echo $ThisTime | cut -c5-6`
       if ($NENS == 1) then
-         set THISDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens0000/Y${{TY}}/M${{TM}}/
+         set THISDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens0000/Y${{TY}}/M${{TM}}/
       else
-         set THISDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens_avg/Y${{TY}}/M${{TM}}/
+         set THISDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens_avg/Y${{TY}}/M${{TM}}/
       endif
       if (! -e $THISDIR            ) mkdir -p $THISDIR
 
@@ -542,9 +542,9 @@ while ( $counter <= ${{NUM_SGMT}} )
      set PWD = `pwd`
 
      if ($NENS == 1) then
-        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens0000/
+        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens0000/
      else
-        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens_avg/
+        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens_avg/
      endif
 
      set MONTHDIRS = `ls -d $OUTDIR/*/*`
