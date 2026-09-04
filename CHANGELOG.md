@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Matlab and python readers for binary Tb scaling parameters files.
 - Added python reader for binary catparam files.
 - Added QC of SMAP L1C_TB using max value for Tb_error.
+- Added SMOS Tb preprocessing scripts.
 
 
 ### Changed
