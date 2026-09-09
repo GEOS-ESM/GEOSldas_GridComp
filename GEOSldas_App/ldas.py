@@ -689,7 +689,7 @@ class ldas:
             # ExpDomain/ana/, /diag/ directories
             for ensdir in self.ensdirs_avg:
                 for y4m2 in y4m2_list:
-                    os.makedirs(_getDirName('ana', ensdir, y4m2), exist_ok=True)
+                    os.makedirs(_getDirName('ana',  ensdir, y4m2), exist_ok=True)
                     os.makedirs(_getDirName('diag', ensdir, y4m2), exist_ok=True)
             # ExpDomain/rs/ directories
             for ensdir in self.ensdirs:
@@ -699,9 +699,10 @@ class ldas:
             # ExpDomain/rc_out/ - only for _start
             os.makedirs(_getDirName('rc_out', '', y4m2_list[0]), exist_ok=True)
 
-        # restart dir
+        # create restart dir
         os.makedirs(self.inpdir + '/restart', exist_ok=True)
-        # create a link cat to diag for backward compatibility
+
+        # output dir: create link from ./cat to ./diag for backward compatibility
         os.symlink(_getDirName('', '', 'diag'), _getDirName('', '', 'cat'))
 
         status = True
