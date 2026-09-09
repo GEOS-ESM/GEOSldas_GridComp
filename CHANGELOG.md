@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added support for river routing, incl. ensemble simulations ([PR #145](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/145), [PR #174](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/174)), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)).
+- Added support for river routing, incl. ensemble simulations ([PR #145](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/145), [PR #174](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/174), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)).
 - Added support for lake tiles (single ensemble member only) ([PR #181](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/181), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)).
 - Added support for running ISSM (Ice-Sheet and Sea-level System Model; single ensemble member only) ([PR #161](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/161), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)). 
 
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Added peatland QC for sfds and sfmc observations ([PR #186](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/186).
+- Added peatland QC for sfds and sfmc observations ([PR #186](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/186)).
 - Added QC of SMAP L1C_TB using max value for Tb_error ([PR #190](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/190)).
 
 - Renamed './cat' output directory to './diag'; created link from './cat' to './diag' for backward compatibility ([PR #198](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/198)).
