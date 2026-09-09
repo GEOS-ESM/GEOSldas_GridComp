@@ -663,7 +663,7 @@ class ldas:
             return '/'.join([
                     self.outdir,
                     self.ExeInputs['EXP_DOMAIN'],
-                    outtyp, # ana/cat/rs/rc_out
+                    outtyp, # ana/diag/rs/rc_out
                     ensdir,
                     yyyymm
                     ])
@@ -686,12 +686,11 @@ class ldas:
                 newDate += relativedelta(months=1)
                 y4m2_list.append('Y%4d/M%02d' % (newDate.year, newDate.month))
 
-            # ExpDomain/ana/, /cat/ directories
+            # ExpDomain/ana/, /diag/ directories
             for ensdir in self.ensdirs_avg:
                 for y4m2 in y4m2_list:
                     os.makedirs(_getDirName('ana', ensdir, y4m2), exist_ok=True)
-                    os.makedirs(_getDirName('cat', ensdir, y4m2), exist_ok=True)
-
+                    os.makedirs(_getDirName('diag', ensdir, y4m2), exist_ok=True)
             # ExpDomain/rs/ directories
             for ensdir in self.ensdirs:
                 for y4m2 in y4m2_list:
@@ -702,6 +701,8 @@ class ldas:
 
         # restart dir
         os.makedirs(self.inpdir + '/restart', exist_ok=True)
+        # create a link cat to diag for backward compatibility
+        os.symlink(_getDirName('', '', 'diag'), _getDirName('', '', 'cat'))
 
         status = True
         return status
