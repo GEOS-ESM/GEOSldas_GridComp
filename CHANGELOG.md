@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cleaned up RESTART=M.
 - Renamed './cat' output directory to './diag'; created link from './cat' to './diag' for backward compatibility ([PR #198](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/198)).
 - Updated Landice ("glc") HISTORY Collection to match that of M21C, plus key ISSM outputs ([PR #181](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/181)).
-- Replaced legacy HDF4 Fortran interface with a C bridge and `ISO_C_BINDING` module ([PR #194](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/194)).
+- Replaced legacy HDF4 Fortran interface with a C bridge and `ISO_C_BINDING` module ([PR #194](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/194), [PR #201](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/201)).
 - Updated CI ([PR #181](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/181)).
 
 
