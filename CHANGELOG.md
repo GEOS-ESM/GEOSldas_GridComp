@@ -11,46 +11,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added functionality to simulate lake tiles.
-- Added assimilation of surface soil moisture observations from H-SAF ASCAT H121 CDR v8 and H139 ICDR netcdf products (MetOp-A/B/C).
-- Added peatland QC for sfds and sfmc observations.
-- Added ObsFcstAna postprocessing support for NetCDF4 diagnostics, with fallback to legacy binary ObsFcstAna files.
-- Added support for river routing.
-- Added optional NetCDF4 output mode for ObsFcstAna, including NetCDF metadata and runtime context. Changed namelist variable "out_ObsFcstAna" from logical to integer.
-- Added support for ensemble simulations for routing; for now, landice hardwired to NensLandice=1.
-- Added support for running ISSM (Ice-Sheet and Sea-level System Model). This includes a new collection in GEOSldas_HIST.rc (tavg24_1d_issm_Nt) as well as additions to the landice gridded collection (tavg24_2d_glac_Nx), and small additions to lenkf_j_template.py and ldas.py for handling ISSM boundary conditions and restarts.
-- Added Matlab and python readers for binary Tb scaling parameters files.
-- Added python reader for binary catparam files.
-- Added QC of SMAP L1C_TB using max value for Tb_error.
-- Added SMOS Tb preprocessing scripts.
+### Changed
+
+### Fixed
+
+### Removed
+
+### Deprecated
+
+-----------------------------
+
+## [v4.0.0] - 2026-09-10
+
+- Generally not 0-diff vs. v3.2.0 (owing to revised QC of Tb, sfds, sfmc; also requires newer, non-0-diff GEOSgcm_GridComp).
+
+### Added
+
+- Added support for river routing, incl. ensemble simulations ([PR #145](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/145), [PR #174](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/174)), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)).
+- Added support for lake tiles (single ensemble member only) ([PR #181](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/181), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)).
+- Added support for running ISSM (Ice-Sheet and Sea-level System Model; single ensemble member only) ([PR #161](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/161), [PR #176](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/176)). 
+
+- Added assimilation of surface soil moisture observations from H-SAF ASCAT H121 CDR v8 and H139 ICDR netcdf products (MetOp-A/B/C) ([PR #186](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/186)).
+
+- Added optional NetCDF4 output of ObsFcstAna; changed namelist variable "out_ObsFcstAna" from logical to integer ([PR #163](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/163), [PR #185](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/185)).
+
+- Added Matlab and python readers for binary Tb scaling parameters files ([PR #179](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/179), [PR #191](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/191)).
+- Added python reader for binary catparam files ([PR #191](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/191)).
+
+- Added SMOS Tb preprocessing scripts ([PR #189](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/189)).
 
 
 ### Changed
 
-- Renamed './cat' output directory to './diag'; created link from './cat' to './diag' for backward compatibility.
-- Replaced legacy HDF4 Fortran interface with a C bridge and `ISO_C_BINDING` module ([PR #194](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/194)).
-- Revised and cleaned up RESTART options:
+- Added peatland QC for sfds and sfmc observations ([PR #186](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/186).
+- Added QC of SMAP L1C_TB using max value for Tb_error ([PR #190](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/190)).
+
+- Renamed './cat' output directory to './diag'; created link from './cat' to './diag' for backward compatibility ([PR #198](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/198)).
+
+
+- Revised and cleaned up RESTART options ([PR #160](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/160), [PR #166](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/166)):
   - Clarified scope and constraints of RESTART=1 and RESTART=2.
   - Added RESTART=3 (formerly RESTART=G, which had been removed).
   - Cleaned up RESTART=M.
-- Updated Landice ("glc") HISTORY Collection to that of M21C plus key ISSM outputs.
-- Updated CI.
+- Updated Landice ("glc") HISTORY Collection to that of M21C plus key ISSM outputs ([PR #181](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/181)).
+- Replaced legacy HDF4 Fortran interface with a C bridge and `ISO_C_BINDING` module ([PR #194](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/194)).
+- Updated CI ([PR #181](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/181)).
 
 
 ### Fixed
 
-- Fixed `read_obs_param()` parsing for the current obsparam format by reading forecast variable names and units.
-- Fixed crashes in debug mode; including adding an extra mask to work around a compiler bug in "where(elemental)".
-- Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes.
-- Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected.
-- Fixed NAG Fortran compiler issues.
-- Fixed missing deallocate and nullify statements.
+- Fixed `read_obs_param()` parsing for the current obsparam format by reading forecast variable names and units ([PR #185](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/185)).
+- Fixed crashes in debug mode ([PR #173](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/173)).
+- Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes ([PR #160](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/160)).
+- Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected ([PR #162](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/162)).
+- Fixed NAG Fortran compiler issues ([PR #170](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/170)).
+- Fixed missing deallocate and nullify statements ([PR #180](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/180)).
   
 ### Removed
 
-- Removed 2d lfs collection from HISTORY.rc template.
-
-### Deprecated
+- Removed 2d lfs collection from HISTORY.rc template ([PR #156](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/156)).
 
 -----------------------------
 
