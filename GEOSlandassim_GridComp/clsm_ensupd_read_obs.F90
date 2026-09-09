@@ -15,24 +15,29 @@
 ! *********************************************************************
 
 module clsm_ensupd_read_obs
-
-   use, intrinsic :: iso_c_binding,      ONLY:     &
-        c_char
-
-   use, intrinsic :: iso_fortran_env,    ONLY:     &
-        int16
+  
+  use, intrinsic :: iso_c_binding,      ONLY:     &
+       c_char
+  
+  use, intrinsic :: iso_fortran_env,    ONLY:     &
+       int16
   
   use MAPL_BaseMod,                     ONLY:     &
        MAPL_UNDEF
 
   use MAPL_ConstantsMod,                ONLY:     &
        MAPL_TICE
-
-   use io_hdf5,                          ONLY:     &
-        hdf5read
-
-   use hdf4_fortran_api
-
+  
+  use io_hdf5,                          ONLY:     &
+       hdf5read
+  
+  use hdf4_fortran_api,                 ONLY:     &
+       hopen, hclose, vfstart, vsfatch,           &
+       vsqfnelt, vsfseek, vsfsfld,                &
+       vsfread, vsfdtch, vfend,                   &
+       sfstart, sfn2index, sfselect,              &
+       sfginfo, sfrdata, sfendacc, sfend
+  
   use MAPL,                             ONLY:     &
        MAPL_ease_convert,                         &
        MAPL_ease_extent
