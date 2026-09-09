@@ -461,15 +461,15 @@ class ldas:
              landiceRstFile=self.in_rstdir+'/'+tmpFile
              assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
 
-           if self.run_route > 0:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
-              routeRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile)
+           #if self.run_route > 0:
+           #   tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
+           #   routeRstFile=self.in_rstdir+'/'+tmpFile
+           #   assert os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile)
             
-           if self.with_issm:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
-              issmRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
+           #if self.with_issm:
+           #   tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+           #   issmRstFile=self.in_rstdir+'/'+tmpFile
+           #   assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -1042,6 +1042,8 @@ class ldas:
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
                   if self.with_issm:
                      issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+                     if not os.path.isfile(issmRstFile) :
+                        issmRstFile = '/discover/nobackup/projects/gmao/bcs_shared/restarts/surface/issm/v202609/issm_internal_rst'
  
                       
                       
@@ -1086,8 +1088,8 @@ class ldas:
                if RESTART_str in ['1', '2'] :
                   routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
                   if not os.path.isfile(routeRstFile) :
-                     exit("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
-                            to " + routeRstFile)
+                     routeRstFile = '/discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/v202605/route_internal_rst.0101_0000'
+
                if RESTART_str  == 'M':
                   exit(" RUN_ROUTE does not support MERRA 2 option")
 

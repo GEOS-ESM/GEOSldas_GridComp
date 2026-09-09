@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Copied route and issm restarts from BC if there are no restarts in the restart directory
 - Added functionality to simulate lake tiles.
 - Added assimilation of surface soil moisture observations from H-SAF ASCAT H121 CDR v8 and H139 ICDR netcdf products (MetOp-A/B/C).
 - Added peatland QC for sfds and sfmc observations.
