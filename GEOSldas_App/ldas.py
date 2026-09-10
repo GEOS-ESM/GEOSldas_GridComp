@@ -17,7 +17,7 @@ from datetime                     import timedelta
 from collections                  import OrderedDict
 from dateutil.relativedelta       import relativedelta
 from remap_utils                  import *
-from remap_lake_landice_saltwater import *
+from remap_other_restarts         import *
 from remap_catchANDcn             import *
 from lenkf_j_template             import *
 from setup_utils                  import *
@@ -31,11 +31,14 @@ class ldas:
     def __init__(self, cmdLineArgs):
         """
         """
-        # These keywords are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
+        # List of keywords, including:
+        # - keywords that are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
+        # - keywords whose values are re-assigned between the exeinp and LDAS.rc files
+        # - keywords that are not in exeinp file but are in LDAS.rc file
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
             'RESTART_DOMAIN','RESTART_ID','BCS_PATH','TILING_FILE','GRN_FILE','LAI_FILE','LNFM_FILE','NIRDF_FILE',
-            'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE',
+            'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE', 'EASE_PFAF_TILE_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
             'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_FORMAT' ]
@@ -98,9 +101,13 @@ class ldas:
         self.bcs_dir_land       = ''
         self.bcs_dir_geom       = ''
         self.bcs_dir_landshared = ''
+        self.bcs_dir_landiceshared = ''
         self.tile_types         = ''
         self.with_land          = False
+        self.with_lake          = False
         self.with_landice       = False
+        self.run_route          = 0
+        self.with_issm          = False
         self.adas_expdir        = ''
 
         # assert necessary optional arguments in command line if exeinp file does not exsit
@@ -129,18 +136,14 @@ class ldas:
         if 'RESTART' not in self.ExeInputs :
             self.ExeInputs['RESTART'] = "1"
 
-        if self.ExeInputs['RESTART'].isdigit() :
-            if int(self.ExeInputs['RESTART']) ==0 :
-                self.ExeInputs['RESTART_ID']     = 'None'
-                self.ExeInputs['RESTART_DOMAIN'] = 'None'
-                self.ExeInputs['RESTART_PATH']   = 'None'
-        else:
-            if self.ExeInputs['RESTART'] =='G' :
-                self.ExeInputs['RESTART_DOMAIN'] = 'None'
-            else:
-                self.ExeInputs['RESTART_ID']     = 'None'
-                self.ExeInputs['RESTART_DOMAIN'] = 'None'
-                self.ExeInputs['RESTART_PATH']   = 'None'
+        RESTART_str  = str(self.ExeInputs['RESTART'])
+        assert RESTART_str in ["1", "2", "3", "M"], "RESTART must be 1, 2, 3, or M"
+
+        if RESTART_str == 'M':
+            # use archived MERRA-2 restarts, no need for RESTART_ID/DOMAIN/PATH
+            self.ExeInputs['RESTART_ID']     = 'None'
+            self.ExeInputs['RESTART_DOMAIN'] = 'None'
+            self.ExeInputs['RESTART_PATH']   = 'None'
     
         ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
         if self.ladas_cpl > 0 :
@@ -230,10 +233,20 @@ class ldas:
 
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
-          self.with_land    = True
-          assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
-        if  "20" in self.tile_types :
-          self.with_landice = True
+            self.with_land = True
+            assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
+         
+        if "19" in self.tile_types :
+            self.with_lake = True
+
+        if "20" in self.tile_types :
+            self.with_landice = True        
+        
+        if self.with_landice == True:
+            if int(self.ExeInputs.get('DO_ISSM'))==1:
+                self.with_issm = True
+
+        self.run_route = int(self.ExeInputs.get('RUN_ROUTE',0))
 
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
@@ -259,6 +272,8 @@ class ldas:
         self.bcs_dir_land       = self.ExeInputs['BCS_PATH']+ '/land/'       + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_geom       = self.ExeInputs['BCS_PATH']+ '/geometry/'   + self.ExeInputs['BCS_RESOLUTION']+'/'
         self.bcs_dir_landshared = self.ExeInputs['BCS_PATH']+ '/land/shared/'
+        self.bcs_dir_landiceshared = self.ExeInputs['BCS_PATH']+ '/landice/shared/'
+        
 
         # make sure MET_PATH and RESTART_PATH have trailing '/'
         if self.ExeInputs['MET_PATH'][-1] != '/':
@@ -266,28 +281,59 @@ class ldas:
         if self.ExeInputs['RESTART_PATH'][-1] != '/':
            self.ExeInputs['RESTART_PATH'] = self.ExeInputs['RESTART_PATH']+'/'
 
-        # make sure catchment and vegdyn restart files ( at least one for each) exist
+        # make sure catchment and vegdyn restart files exist (at least one of each)
         if 'CATCH_DEF_FILE' not in self.ExeInputs :
            self.ExeInputs['CATCH_DEF_FILE']= self.bcs_dir_land + 'clsm/catchment.def'
         if self.with_land :
            assert os.path.isfile(self.ExeInputs['CATCH_DEF_FILE']),"[%s] file does not exist " % self.ExeInputs['CATCH_DEF_FILE']
 
         # assigning BC files
-        self.ExeInputs['LNFM_FILE'] = ''
+        self.ExeInputs['LNFM_FILE'] = ''      
+        self.ExeInputs['EASE_PFAF_TILE_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
         domain_  = ''
         inpdir_  = self.bcs_dir_land  
         inpgeom_ = self.bcs_dir_geom
 
-        if self.ExeInputs['RESTART'] == '1' :
-           inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
+        
+        # find restart files and tile file in restart dir (if necessary)
+        inp_ = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
                     self.ExeInputs['RESTART_DOMAIN'], 'rc_out/'])
+        if RESTART_str == '1' :
+           inpdir_  = inp_
+           inpgeom_ = inp_
+
+           # verify that BCS_VERSION and BCS_RESOLUTION of restart experiment match those of new experiment           
+           BCS_txt  = glob.glob(inp_ + 'BCS_info.txt')
+           if len(BCS_txt)== 0:
+              print("Warning: BCS_info.txt not found for restart experiment. User is responsible for ensuring consistency of restart and experiment BCS.")
+           elif len(BCS_txt)== 1:
+              BCS_tmp   = parseInputFile(BCS_txt[0])
+              # get BCS_VERSION (trailing dir name of BCS_PATH)
+              bcs_path_ = self.ExeInputs['BCS_PATH']
+              while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
+              bcs_version_ = os.path.basename(bcs_path_)
+              
+              assert bcs_version_ == BCS_tmp['BCS_VERSION'], "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bcs_version_ + ")"
+              assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
+
            txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
               domain_  = '.domain'
-              inpdir_  = inp_
-              inpgeom_ = inp_
-        
+              
+        elif RESTART_str == '2':
+           txt_tile = glob.glob(inp_ + '*.domain')
+           assert len(txt_tile) == 0, "For RESTART=2, must restart from and run on global domain"
+           in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
+           if len(in_tilefiles_) == 0 :
+              nc4_tmp = glob.glob(inp_+'/*.nc4')
+           if len(in_tilefiles_) == 0 :
+              in_tilefiles_ = glob.glob(inp_+'/*.til')
+           # for EASE tile space, pick "standard" tile file (one tile per grid cell) and not "-Pfafstetter" tile file
+           if 'EASEv' in in_tilefiles_[0]:
+              in_tilefiles_ = [ item_ for item_ in in_tilefiles_ if '-Pfafstetter' not in item_ ]
+           self.in_tilefile =os.path.realpath(in_tilefiles_[0])
+ 
         inpdir_  = os.path.realpath(inpdir_)+'/'
         inpgeom_ = os.path.realpath(inpgeom_)+'/'
  
@@ -297,6 +343,9 @@ class ldas:
               txt_tile = [f]
               break
         nc4_tile = glob.glob(inpgeom_ + '*.nc4' + domain_)
+        if len(nc4_tile) > 0:
+           if 'EASEv' in nc4_tile[0]:
+             nc4_tile = [ item_ for item_ in nc4_tile if '-Pfafstetter' not in item_ ]
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
@@ -305,18 +354,43 @@ class ldas:
         tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+domain_)
         if (len(tmp_) ==1) :
            self.ExeInputs['LNFM_FILE'] = tmp_[0]
+
         self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_ )[0]
         self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +domain_ )[0]
         self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
+
+        # assigning Gridname
+        if 'GRIDNAME' not in self.ExeInputs :
+           tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
+           extension = os.path.splitext(tmptile)[1]
+           if extension == '.domain':
+             extension = os.path.splitext(tmptile)[0]
+           gridname_ =''
+           if extension == '.til':
+              gridname_ = linecache.getline(tmptile, 3).strip()
+           else:
+              nc_file = netCDF4.Dataset(tmptile,'r')
+              gridname_ = nc_file.getncattr('Grid_Name')
+           # in case it is an old name: SMAP-EASEvx-Mxx
+           gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
+           self.ExeInputs['GRIDNAME']  = gridname_
+
+        # to run routing on standard EASE tile space, need EASE_PFAF_TILE_FILE
+        if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
+           tmp_ =  glob.glob(inpgeom_ + '*Pfafstetter.nc4' + domain_)
+           if (len(tmp_) > 0) : 
+              self.ExeInputs['EASE_PFAF_TILE_FILE'] = tmp_[0]
+
         inpdir_ = None
         domain_ = None
         inpgeom_= None
+
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
             tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
             extension = os.path.splitext(tmptile)[1]
             if extension == '.domain':
-              extension = os.path.splitext(tmptile)[0]
+              extension = os.path.splitext(os.path.splitext(tmptile)[0])[1]
             gridname_ =''
             if extension == '.til':
                gridname_ = linecache.getline(tmptile, 3).strip()
@@ -335,6 +409,7 @@ class ldas:
 
         if 'AEROSOL_DEPOSITION' not in self.ExeInputs:
             self.ExeInputs['AEROSOL_DEPOSITION'] = 0
+            
         # default is global
         _domain_dic=OrderedDict()
         _domain_dic['MINLON']=-180.
@@ -346,7 +421,8 @@ class ldas:
 
         for key,val in _domain_dic.items() :
             if key in self.ExeInputs :
-                _domain_dic[key]= self.ExeInputs[key]
+               _domain_dic[key]= self.ExeInputs[key]
+ 
         self.domain_def = tempfile.NamedTemporaryFile(mode='w', delete=False)
         self.domain_def.write('&domain_inputs\n')
         for key,val in _domain_dic.items() :
@@ -359,22 +435,7 @@ class ldas:
         self.domain_def.write('/\n')
         self.domain_def.close()
 
-        # find restart files and tile files (if necessary)
-        RESTART_str  = str(self.ExeInputs['RESTART'])
-
-        if RESTART_str == '2':
-           inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/input/'
-           in_tilefiles_ = glob.glob(inpdir+'*tile.data')
-           if len(in_tilefiles_) == 0 :
-              inpdir=self.ExeInputs['RESTART_PATH']+self.ExeInputs['RESTART_ID']+'/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
-              in_tilefiles_ = glob.glob(inpdir+'MAPL_*.til')
-              if len(in_tilefiles_) == 0 :
-                 in_tilefiles_ = glob.glob(inpdir+'/*.til')
-              if len(in_tilefiles_) == 0 :
-                 in_tilefiles_ = glob.glob(inpdir+'/*.nc4')
-           self.in_tilefile =os.path.realpath(in_tilefiles_[0])
-
-        if RESTART_str in ['1', '2']:
+        if RESTART_str in ['1','2','3']:
            y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
            y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
                                                   self.begDates[0].day,self.begDates[0].hour,self.begDates[0].minute)
@@ -389,29 +450,26 @@ class ldas:
                  landpertRstFile=self.in_rstdir+'/'+tmpFile
                  if ( os.path.isfile(landpertRstFile)) :
                     self.has_geos_pert = True
+                    
+           if self.with_lake:
+             tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
+             lakeRstFile=self.in_rstdir+'/'+tmpFile
+             assert os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile)
 
            if self.with_landice:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-              landiceRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
+             tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
+             landiceRstFile=self.in_rstdir+'/'+tmpFile
+             assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
 
-        if RESTART_str == '0':
-           assert ( self.with_land and not self.with_landice), "RESTART = 0 is only for land"
-           if (self.catch == 'catch'):
-             self.in_rstdir = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                               '/Catch/M09/20170101/' #catch_internal_rst
-             self.in_tilefile = '/discover/nobackup/projects/gmao/ssd/land/l_data/geos5/bcs/CLSM_params' \
-                                '/mkCatchParam_SMAP_L4SM_v002/SMAP_EASEv2_M09/SMAP_EASEv2_M09_3856x1624.til'
-           elif (self.catch == 'catchcnclm40'):
-             self.in_rstdir  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                '/CatchCN/M36/20150301_0000/' #catchcnclm40_internal_dummy
-             self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Heracles-NL/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-           elif (self.catch == 'catchcnclm45'):
-             self.in_rstdir  = '/discover/nobackup/projects/gmao/ssd/land/l_data/LandRestarts_for_Regridding' \
-                                '/CatchCN/M36/19800101_0000/' #catchcnclm45_internal_dummy
-             self.in_tilefile = '/discover/nobackup/projects/gmao/bcs_shared/legacy_bcs/Icarus-NLv3/Icarus-NLv3_EASE/SMAP_EASEv2_M36/SMAP_EASEv2_M36_964x406.til'
-           else:
-             sys.exit('need to provide at least dummy files')
+           if self.run_route > 0:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
+              routeRstFile=self.in_rstdir+'/'+tmpFile
+              assert os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile)
+            
+           if self.with_issm:
+              tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+              issmRstFile=self.in_rstdir+'/'+tmpFile
+              assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -432,7 +490,7 @@ class ldas:
 
 
         # ------------------
-        # Read rm input file
+        # Read resource manager (rm) input file
         # ------------------
 
         if self.ladas_cpl == 0 :
@@ -472,7 +530,7 @@ class ldas:
         self.scratchdir = self.expdir   + '/scratch'
         self.blddirLn   = self.expdir   + '/build'
         self.out_path   = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']
-        self.bcsdir     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rc_out/'
+        self.rc_out     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rc_out/'
         self.rstdir     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rs/'
         self.exefyl     = self.blddirLn + exefyl
 
@@ -493,8 +551,6 @@ class ldas:
        ExeInputs = self.ExeInputs
        #) verify keys
        option = '1'
-       if (ExeInputs['RESTART'] == 'G' or  ExeInputs['RESTART'] == '0'):
-          option = '0'
      
        rqdExeInpKeys = getExeKeys(option)
        for key in rqdExeInpKeys:
@@ -543,11 +599,6 @@ class ldas:
                     '%Y%m%d %H%M%S'
                     )
                 )
-        if self.ExeInputs['RESTART'].isdigit() :
-            if int(self.ExeInputs['RESTART']) == 0 :
-                print ("No restart file (cold restart): Forcing start date to January 1, 0z")
-                year = self.begDates[0].year
-                self.begDates[0]=datetime(year =year,month=1,day =1,hour =0, minute= 0,second= 0)
 
         assert self.endDates[0]>self.begDates[0], \
             'END_DATE <= BEG_DATE'
@@ -612,7 +663,7 @@ class ldas:
             return '/'.join([
                     self.outdir,
                     self.ExeInputs['EXP_DOMAIN'],
-                    outtyp, # ana/cat/rs/rc_out
+                    outtyp, # ana/diag/rs/rc_out
                     ensdir,
                     yyyymm
                     ])
@@ -635,12 +686,11 @@ class ldas:
                 newDate += relativedelta(months=1)
                 y4m2_list.append('Y%4d/M%02d' % (newDate.year, newDate.month))
 
-            # ExpDomain/ana/, /cat/ directories
+            # ExpDomain/ana/, /diag/ directories
             for ensdir in self.ensdirs_avg:
                 for y4m2 in y4m2_list:
-                    os.makedirs(_getDirName('ana', ensdir, y4m2), exist_ok=True)
-                    os.makedirs(_getDirName('cat', ensdir, y4m2), exist_ok=True)
-
+                    os.makedirs(_getDirName('ana',  ensdir, y4m2), exist_ok=True)
+                    os.makedirs(_getDirName('diag', ensdir, y4m2), exist_ok=True)
             # ExpDomain/rs/ directories
             for ensdir in self.ensdirs:
                 for y4m2 in y4m2_list:
@@ -649,8 +699,11 @@ class ldas:
             # ExpDomain/rc_out/ - only for _start
             os.makedirs(_getDirName('rc_out', '', y4m2_list[0]), exist_ok=True)
 
-        # restart dir
+        # create restart dir
         os.makedirs(self.inpdir + '/restart', exist_ok=True)
+
+        # output dir: create link from ./cat to ./diag for backward compatibility
+        os.symlink(_getDirName('', '', 'diag'), _getDirName('', '', 'cat'))
 
         status = True
         return status
@@ -689,13 +742,13 @@ class ldas:
         # update tile file
         tile= self.ExeInputs['TILING_FILE']
         short_tile= os.path.basename(self.ExeInputs['TILING_FILE'])
-        newtile = self.bcsdir+'/'+short_tile
+        newtile = self.rc_out+'/'+short_tile
         shutil.copy(tile, newtile)
         tile=newtile
         # if three extra lines exist, remove them and save it to inputdir
 
         print ('\nCorrect the tile file if it is an old EASE tile format... \n')
-        EASEtile=self.bcsdir+'/MAPL_'+short_tile
+        EASEtile=self.rc_out+'/MAPL_'+short_tile
         cmd = self.bindir + '/preprocess_ldas.x correctease  '+ tile + ' '+ EASEtile
         print ("cmd:   " + cmd)
 
@@ -736,6 +789,13 @@ class ldas:
            self.isZoomIn= True
         #os.remove(self.domain_def.name)
 
+        # if running routing, make sure domain is global
+        if self.run_route>0 and self.isZoomIn:
+            exit( "Must have global domain to run routing model, RUN_ROUTE=" + self.run_route )
+        # if running ISSM, make sure domain is global
+        if self.with_issm and self.isZoomIn:
+            exit( "Must have global domain to run ISSM (DO_ISSM: 1)")    
+        
         # update tile domain
         if self.isZoomIn:
             newZoominTile = tile+'.domain'
@@ -759,11 +819,14 @@ class ldas:
            if (self.ExeInputs['LNFM_FILE'] != ''):
               bcs += [self.ExeInputs['LNFM_FILE']]
            if (self.has_vegopacity):
-              bcs += [self.ExeInputs['VEGOPACITY_FILE']]
+              bcs += [self.ExeInputs['VEGOPACITY_FILE']]            
+           if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
+              bcs += [self.ExeInputs['EASE_PFAF_TILE_FILE']]
+
            bcstmp=[]
            for bcf in bcs :
-               shutil.copy(bcf, self.bcsdir+'/')
-               bcstmp=bcstmp+[self.bcsdir+'/'+os.path.basename(bcf)]
+               shutil.copy(bcf, self.rc_out+'/')
+               bcstmp=bcstmp+[self.rc_out+'/'+os.path.basename(bcf)]
            bcs=bcstmp
 
            if self.isZoomIn:
@@ -783,15 +846,25 @@ class ldas:
            if (self.ExeInputs['LNFM_FILE'] != ''):
               bcnames += ['lnfm']
            if (self.has_vegopacity):
-              bcnames += ['vegopacity']
+              bcnames += ['vegopacity']            
+           if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
+              bcnames += ['EASE_pfaf_tile_file.nc4']
            for bcln,bc in zip(bcnames,bcs) :
               myBC=self.inpdir+'/'+bcln+'.data'
+              if '.nc4' in bcln:
+                 myBC=self.inpdir+'/'+bcln
               os.symlink(bc,myBC)
 
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
                           self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
-
+        
+        if self.with_issm:
+           for pattern in ('*.bin', '*.toolkits', '*.nc*'):
+              for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
+                 myISSMBC = self.inpdir+'/'+os.path.basename(issmbc)
+                 os.symlink(issmbc, myISSMBC)        
+      
         # create and link restart
         print ("Creating and linking restart...")
         _start = self.begDates[0]
@@ -801,13 +874,6 @@ class ldas:
 
         myRstDir = self.inpdir + '/restart/'
 
-        rstpath = self.ExeInputs['RESTART_PATH']+ \
-                  self.ExeInputs['RESTART_ID'] + \
-                  '/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rs/'
-        rcoutpath = self.ExeInputs['RESTART_PATH']+ \
-                  self.ExeInputs['RESTART_ID'] + \
-                  '/output/'+self.ExeInputs['RESTART_DOMAIN']+'/rc_out/'
-
         # pass into remap_config_ldas
         exp_id    = self.ExeInputs['EXP_ID']
         RESTART_str  = str(self.ExeInputs['RESTART'])
@@ -816,6 +882,7 @@ class ldas:
         rstid     = self.ExeInputs['RESTART_ID']
         rstdomain = self.ExeInputs['RESTART_DOMAIN']
         rstpath0  = self.ExeInputs['RESTART_PATH']
+        rstpath   = rstpath0 + rstid + '/output/'+ rstdomain + '/rs/'
 
         # just copy the landassim pert seed if it exists
         for iens in range(self.nens) :
@@ -829,25 +896,29 @@ class ldas:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        if (RESTART_str != '1' and (self.with_land or self.with_landice)):
+        if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):    
            bcs_path = self.ExeInputs['BCS_PATH']
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
            bc_base    = os.path.dirname(bcs_path)
            bc_version = os.path.basename(bcs_path)
-
-           remap_tpl = os.path.dirname(os.path.realpath(__file__)) + '/remap_params.tpl'
-           config = yaml_to_config(remap_tpl)
+           answers={}
+           if RESTART_str == 'M' : 
+              answers['input:shared:MERRA-2']   = True
+              answers['input:shared:yyyymmddhh']= YYYYMMDDHH
+              answers['output:shared:out_dir']  = mk_outdir
+              init_merra2(answers)
+           config = get_config_from_answers(answers, config_tpl = True)
 
            config['slurm_pbs']['account'] = self.RmInputs['account']
            config['slurm_pbs']['qos'] = 'debug'
 
-           config['input']['surface']['catch_tilefile']  = self.in_tilefile
-           config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
-           config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-           if RESTART_str != 'M':
-             config['input']['shared']['rst_dir']        = self.in_rstdir
-           config['input']['surface']['wemin']           = wemin_in
-           config['input']['surface']['catch_model']     = self.catch
+           if RESTART_str == '2' : 
+              config['input']['surface']['catch_tilefile']  = self.in_tilefile
+              config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
+              config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
+              config['input']['shared']['rst_dir']          = self.in_rstdir
+              config['input']['surface']['wemin']           = wemin_in
+              config['input']['surface']['catch_model']     = self.catch
 
            config['output']['shared']['out_dir']         = mk_outdir
            config['output']['surface']['catch_remap']    = True
@@ -860,75 +931,48 @@ class ldas:
            config['output']['surface']['surflay']        = dzsf
            config['output']['surface']['wemin']          = wemin_out
 
-           if RESTART_str == "M" : # restart from merra2
-             yyyymm = int(YYYYMMDDHH[0:6])
-             merra2_expid = "d5124_m2_jan10"
-             if yyyymm < 197901 :
-                exit("Error. MERRA-2 data < 1979 not available\n")
-             elif (yyyymm < 199201):
-                merra2_expid = "d5124_m2_jan79"
-             elif (yyyymm < 200106):
-                merra2_expid = "d5124_m2_jan91"
-             elif (yyyymm < 201101):
-                merra2_expid = "d5124_m2_jan00"
-             elif (yyyymm < 202106):
-                merra2_expid = "d5124_m2_jan10"
-             # There was a rewind in MERRA2 from Jun 2021 to Sept 2021
-             elif (yyyymm < 202110):
-                merra2_expid = "d5124_m2_jun21"
-             config['input']['shared']['expid']      = merra2_expid
-             config['input']['shared']['rst_dir']    = mk_outdir+ '/merra2_tmp_'+ YYYYMMDDHH
-             config['input']['surface']['wemin']     = 26
-             config['input']['shared']['bc_base']    = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles'
-             config['input']['shared']['bc_version'] = 'GM4'
-             config['input']['shared']['agrid']      = 'C180'
-             config['input']['shared']['ogrid']      = '1440x720'
-             config['input']['shared']['omodel']     = 'data'
-             config['input']['shared']['MERRA-2']    = True
-             config['input']['surface']['catch_tilefile'] = '/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles/GM4/geometry/CF0180x6C_DE1440xPE0720/CF0180x6C_DE1440xPE0720-Pfafstetter.til'
-
            if self.with_land:
              catch_obj = catchANDcn(config_obj = config)
              catch_obj.remap()
-           if self.with_landice:
-             config['output']['surface']['remap_water'] = True
-             config['input']['surface']['zoom'] = '2'
-             landice_obj = lake_landice_saltwater(config_obj = config)
-             landice_obj.remap()
+           if self.with_lake or self.with_landice:
+               config['output']['surface']['remap_water'] = True
+               config['input']['surface']['zoom'] = '2'
+               other_rst_obj = other_restarts(config_obj = config)
+               other_rst_obj.remap()             
 
         #for ens in self.ensdirs :
         catchRstFile0  = ''
         vegdynRstFile0 = ''
+        lakeRstFile0 = ''
         landiceRstFile0 = ''
+        issmRstFile0   = ''
+        
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
             ensid    = self.ensids[iens]
-            myCatchRst = myRstDir+'/'+self.catch +ensid +'_internal_rst'
-            myLandiceRst = myRstDir+'/'+ 'landice' +ensid +'_internal_rst'
-            myVegRst   = myRstDir+'/'+'vegdyn'+ensid +'_internal_rst'
-            myPertRst  = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
+            myCatchRst   = myRstDir+'/'+ self.catch +ensid +'_internal_rst'
+            myLakeRst    = myRstDir+'/'+ 'lake'     +ensid +'_internal_rst'
+            myLandiceRst = myRstDir+'/'+ 'landice'  +ensid +'_internal_rst'
+            myIssmRst    = myRstDir+'/'+ 'issm'     +ensid +'_internal_rst'
+            myVegRst     = myRstDir+'/'+ 'vegdyn'   +ensid +'_internal_rst'
+            myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
+            myRouteRst   = myRstDir+'/'+ 'route'    +ensid +'_internal_rst'
 
             catchRstFile  = ''
             vegdynRstFile = ''
             pertRstFile   = ''
-            print ("restart: " + self.ExeInputs['RESTART'])
+            print ("restart: " + RESTART_str)
 
             if self.with_land :
-               if self.ExeInputs['RESTART'].isdigit() :
 
-                   if int(self.ExeInputs['RESTART']) == 0 or int(self.ExeInputs['RESTART']) == 2 :
+               if RESTART_str in ['2', 'M']: # remap_restart has generated the file in mk_restarts directory
+                    vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
+                    catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
+               if RESTART_str in ['1', '3']:
+                    catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
+                    vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
+                    if RESTART_str == '3':
                        vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                       catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
-                   else : # RESTART == 1
-                       catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                       vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
-                       if not os.path.isfile(vegdynRstFile): # no vegdyn restart from LDASsa
-                          if not os.path.isfile(vegdynRstFile0):
-                            vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-               else :
-                   vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                   if self.with_land:
-                     catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
 
                # catchment restart file
                if os.path.isfile(catchRstFile) :
@@ -966,14 +1010,48 @@ class ldas:
                else :
                    vegdynRstFile = vegdynRstFile0
 
+            lakeRstFile = ''
+            if self.with_lake :
+                if RESTART_str in ['1', '3'] :
+                    lakeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'lake_internal_rst.'+y4m2d2_h2m2
+
+                if RESTART_str in ['2', 'M']:
+                    lakeRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'lake_internal_rst.'+YYYYMMDD+'*')[0]
+
+                if os.path.isfile(lakeRstFile) :
+                    lakeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
+
+                    if self.isZoomIn :
+                        print ("Creating zoom-in of lake restart file... \n")
+                        cmd=self.bindir + '/preprocess_ldas.x zoomin_lakerst '+ lakeRstFile +' ' + lakeLocal + ' '+ tmp_f2g_file.name
+                        print ("cmd: " + cmd)
+                        sp.call(shlex.split(cmd))
+                    else :
+                        shutil.copy(lakeRstFile,lakeLocal)
+
+                    lakeRstFile = lakeLocal
+                    if '0000' in ensdir :
+                        lakeRstFile0 = lakeRstFile
+                    else :
+                        lakeRstFile = lakeRstFile0
+
             landiceRstFile = ''
+            issmRstFile   = ''
             if self.with_landice :
-               if RESTART_str == '0' :
-                  exit("RESTART=0 not supported for landice tiles. Please use RESTART=M, 1, or 2")
-               if RESTART_str == '1' :
+               if RESTART_str in ['1', '3'] :
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-               if RESTART_str == '2' or RESTART_str == 'M':
+                  if self.with_issm:
+                     issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+ 
+                      
+                      
+               if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+                  if self.with_issm and RESTART_str in ['2']:
+                     exit( "Restart '2' not supported when running ISSM (DO_ISSM: 1)") 
+                  if self.with_issm and RESTART_str in ['M']:
+                     print("issm_internal_rst will be bootstrapped for Restart 'M' ")
+                     
 
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
@@ -991,6 +1069,39 @@ class ldas:
                      landiceRstFile0 = landiceRstFile
                else :
                    landiceRstFile = landiceRstFile0
+
+               if self.with_issm:
+                  if os.path.isfile(issmRstFile) :
+                     issmLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+                     shutil.copy(issmRstFile,issmLocal)
+                     issmRstFile = issmLocal
+
+                     if '0000' in ensdir :
+                        issmRstFile0 = issmRstFile
+                  else :
+                     issmRstFile = issmRstFile0
+
+            routeRstFile = ''
+            if self.run_route > 0 :
+               if RESTART_str in ['1', '2'] :
+                  routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
+                  if not os.path.isfile(routeRstFile) :
+                     exit("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
+                            to " + routeRstFile)
+               if RESTART_str  == 'M':
+                  exit(" RUN_ROUTE does not support MERRA 2 option")
+
+               if os.path.isfile(routeRstFile) :
+                  routeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.route_internal_rst.'+y4m2d2_h2m2
+                  shutil.copy(routeRstFile,routeLocal)
+                  # WY note: after the copy, depending on in_bc and out_bc version, 
+                  # the routeLocal can be changed here
+                  routeRstFile = routeLocal
+
+                  if '0000' in ensdir :
+                     routeRstFile0 = routeRstFile
+               else :
+                   routeRstFile = routeRstFile0
             
             if (self.has_geos_pert and self.perturb == 1) :
                 pertRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
@@ -1003,20 +1114,35 @@ class ldas:
                print ('vegdynRstFile: ' +  vegdynRstFile)
                os.symlink(catchRstFile,   myCatchRst)
                os.symlink(vegdynRstFile,  myVegRst)
-            if self.with_landice :
-               print("link landice restart: " + myLandiceRst)
-               os.symlink(landiceRstFile, myLandiceRst)
+
+            if self.with_lake and iens == 0:
+                print("link lake restart: " + myLakeRst)
+                os.symlink(lakeRstFile, myLakeRst)
+
+            if self.with_landice and iens == 0:
+                print("link landice restart: " + myLandiceRst)
+                os.symlink(landiceRstFile, myLandiceRst)
+
+            if self.run_route > 0 :
+               print("link route restart: " + myRouteRst)
+               os.symlink(routeRstFile, myRouteRst)
+
+            if self.with_issm and iens == 0:
+               if RESTART_str in ['1', '3']:
+                  print("link issm restart: " + myIssmRst)
+                  os.symlink(issmRstFile, myIssmRst)
+                     
             if ( self.has_geos_pert and  self.perturb == 1 ):
                os.symlink(pertRstFile,    myPertRst)
 
         # catch_param restar file
-        catch_param_file = self.bcsdir+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
+        catch_param_file = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
         if self.with_land:
            assert os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file
 
         if self.has_mwrtm :
            mwRTMRstFile = self.mwrtm_file
-           mwRTMLocal = self.bcsdir+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
+           mwRTMLocal = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
            if self.isZoomIn :
               print ("Creating the local mwRTM restart file... \n")
               cmd= self.bindir +'/preprocess_ldas.x zoomin_mwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
@@ -1030,11 +1156,18 @@ class ldas:
            mymwRTMRst = myRstDir+'/mwrtm_param_rst'
            os.symlink(mwRTMRstFile,  mymwRTMRst)
 
+        # create BCS_info.txt (facilitates BCS consistency check when exp is later used as restart for another exp) 
+        with open(self.rc_out+'/BCS_info.txt','wt') as fout :
+           # get BCS_VERSION (trailing dir name of BCS_PATH)
+           bcs_path_ = self.ExeInputs['BCS_PATH']
+           while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
+           bc_version_ = os.path.basename(bcs_path_)
+           
+           fout.write("BCS_VERSION: "    + bc_version_ + '\n')
+           fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
         # update 'restart_path' to use relative path from outdir
         print ("Updating restart path...")
         self.ExeInputs['RESTART_PATH'] = myRstDir
-        #if os.path.isfile(tmp_f2g_file.name):
-        #   os.remove(tmp_f2g_file.name)
         status = True
         return status
 
@@ -1151,7 +1284,8 @@ class ldas:
                         + str(self.ExeInputs['LSM_CHOICE'])         + ' ' \
                         + str(self.ExeInputs['AEROSOL_DEPOSITION']) + ' ' \
                         + str(self.ExeInputs['RUN_IRRIG'])          + ' ' \
-                        + str(self.nens)
+                        + str(self.nens)                            + ' ' \
+                        + str(self.ExeInputs['DO_ISSM'])   
                     print(cmd)
                     #os.system(cmd)
                     sp.call(shlex.split(cmd))
@@ -1219,10 +1353,16 @@ class ldas:
                 if self.with_land :
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
+                   if self.ExeInputs['EASE_PFAF_TILE_FILE'] !='':
+                      bcval.append('../input/EASE_pfaf_tile_file.nc4')
+                      bckey.append('EASE_PFAF_TILE')                     
                    for key, val in zip(bckey,bcval):
                       keyn = key+'_FILE'
                       valn = val+'.data'
+                      if '.nc4' in val:
+                        valn = val
                       ldasrcInp[keyn]= valn
+
                    if('catchcn' in self.catch):
                       ldasrcInp['CO2_MonthlyMean_DiurnalCycle_FILE']= '../input/CO2_MonthlyMean_DiurnalCycle.nc4'
                    else:
@@ -1251,9 +1391,20 @@ class ldas:
                    rstval.append(self.catch)
                    rstval.append('vegdyn')
 
+                if self.with_lake:
+                  rstkey.append('LAKE')
+                  rstval.append('lake')
+
                 if self.with_landice:
                   rstkey.append('LANDICE')
                   rstval.append('landice')
+                  if self.with_issm:
+                     rstkey.append('ISSM')
+                     rstval.append('issm')
+
+                if self.run_route > 0:
+                  rstkey.append('ROUTE')
+                  rstval.append('route')
 
                 if self.has_mwrtm :
                    keyn='LANDASSIM_INTERNAL_RESTART_FILE'
@@ -1282,18 +1433,18 @@ class ldas:
                 for key,val in zip(rstkey,rstval) :
                     keyn = key+ '_INTERNAL_RESTART_FILE'
                     valn = '../input/restart/'+val+tmpl_+'_internal_rst'
-                    ldasrcInp[keyn]= valn
+                    ldasrcInp[keyn] = valn
+                    if 'VEGDYN' not in key: # not checkpoi for vegdyn
+                       keyn = key + '_INTERNAL_CHECKPOINT_FILE'
+                       valn = val + tmpl_ + '_internal_checkpoint'
+                       ldasrcInp[keyn] = valn
 
-                # checkpoint file and its type
-                if self.with_land :
-                   keyn = catch_ + '_INTERNAL_CHECKPOINT_FILE'
-                   valn = self.catch+tmpl_+'_internal_checkpoint'
-                   ldasrcInp[keyn]= valn
-
-                if self.with_landice :
-                   keyn = 'LANDICE_INTERNAL_CHECKPOINT_FILE'
-                   valn = 'landice'+tmpl_+'_internal_checkpoint'
-                   ldasrcInp[keyn]= valn
+                    if self.with_issm:
+                       keyn = 'ISSM_INTERNAL_CHECKPOINT_FILE'
+                       valn = 'issm'+tmpl_+'_internal_checkpoint'
+                       ldasrcInp[keyn]= valn
+                      
+                   
                 # specify LANDPERT restart file
                 if (self.perturb == 1):
                     keyn = 'LANDPERT_INTERNAL_RESTART_FILE'

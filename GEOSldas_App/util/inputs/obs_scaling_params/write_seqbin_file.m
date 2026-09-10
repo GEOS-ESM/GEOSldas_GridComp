@@ -13,6 +13,10 @@ function [] = write_seqbin_file(fname, colind, rowind,...
 %                    message, return
 %   overwrite = 1 -- overwrite existing files, print warning message
 %
+% this matlab function is nearly identical to the py function that writes the preprocessed SMOS obs:
+%    ./util/inputs/obs_preproc/SMOS_preproc/src/readwrite/write_bin_SMOS_reg.py
+% *except* that the py function writes one additional field specifically for SMOS binary files
+%
 % De Lannoy,  4 Oct 2010
 % De Lannoy, 26 Sep 2012: added optional argument of tile_id
 %           used to write scaling files, with ''latlon_id''.

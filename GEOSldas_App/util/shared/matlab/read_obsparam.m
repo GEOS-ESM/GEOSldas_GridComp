@@ -7,7 +7,9 @@ function [ N_obs_param, obs_param ] = read_obs_param( fname )
 %
 %  1 Dec 2011 - reichle: minor modifications and check-in to CVS
 %
-%  8 Jun 2017 - reichle: added "flistpath" and "flistname" 
+%  8 Jun 2017 - reichle: added "flistpath" and "flistname"
+%
+% 17 Apr 2026 - reichle: added "fcstvarname" and "fcstunits"
 %
 % ------------------------------------------------------------------     
 
@@ -40,6 +42,8 @@ for i=1:N_obs_param
     obs_param(i).nodata          = fscanf(fid, '%f ', 1);    
     obs_param(i).varname         = fscanf(fid, '%s ', 1);
     obs_param(i).units           = fscanf(fid, '%s ', 1);
+    obs_param(i).fcstvarname     = fscanf(fid, '%s ', 1);
+    obs_param(i).fcstunits       = fscanf(fid, '%s ', 1);
     obs_param(i).path            = fscanf(fid, '%s ', 1);
     obs_param(i).name            = fscanf(fid, '%s ', 1);
     obs_param(i).maskpath        = fscanf(fid, '%s ', 1);
@@ -58,18 +62,20 @@ for i=1:N_obs_param
         
     % remove leading and trailing quotes from strings
     
-    obs_param(i).descr           = obs_param(i).descr(    2:end-1);
-    obs_param(i).FOV_units       = obs_param(i).FOV_units(2:end-1);
-    obs_param(i).varname         = obs_param(i).varname(  2:end-1);
-    obs_param(i).units           = obs_param(i).units(    2:end-1);
-    obs_param(i).path            = obs_param(i).path(     2:end-1);
-    obs_param(i).name            = obs_param(i).name(     2:end-1);
-    obs_param(i).maskpath        = obs_param(i).maskpath( 2:end-1);
-    obs_param(i).maskname        = obs_param(i).maskname( 2:end-1);
-    obs_param(i).scalepath       = obs_param(i).scalepath(2:end-1);
-    obs_param(i).scalename       = obs_param(i).scalename(2:end-1);
-    obs_param(i).flistpath       = obs_param(i).flistpath(2:end-1);
-    obs_param(i).flistname       = obs_param(i).flistname(2:end-1);
+    obs_param(i).descr           = obs_param(i).descr(      2:end-1);
+    obs_param(i).FOV_units       = obs_param(i).FOV_units(  2:end-1);
+    obs_param(i).varname         = obs_param(i).varname(    2:end-1);
+    obs_param(i).units           = obs_param(i).units(      2:end-1);
+    obs_param(i).fcstvarname     = obs_param(i).fcstvarname(2:end-1);
+    obs_param(i).fcstunits       = obs_param(i).fcstunits(  2:end-1);
+    obs_param(i).path            = obs_param(i).path(       2:end-1);
+    obs_param(i).name            = obs_param(i).name(       2:end-1);
+    obs_param(i).maskpath        = obs_param(i).maskpath(   2:end-1);
+    obs_param(i).maskname        = obs_param(i).maskname(   2:end-1);
+    obs_param(i).scalepath       = obs_param(i).scalepath(  2:end-1);
+    obs_param(i).scalename       = obs_param(i).scalename(  2:end-1);
+    obs_param(i).flistpath       = obs_param(i).flistpath(  2:end-1);
+    obs_param(i).flistname       = obs_param(i).flistname(  2:end-1);
     
 end
 

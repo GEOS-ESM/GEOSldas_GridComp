@@ -235,7 +235,7 @@ contains
     type(obs_param_type), dimension(:), pointer :: obs_param     ! output
     
     logical,              intent(out)   :: out_obslog
-    logical,              intent(out)   :: out_ObsFcstAna
+    integer,              intent(out)   :: out_ObsFcstAna
     logical,              intent(out)   :: out_smapL4SMaup
 
     integer,              intent(out)   :: N_obsbias_max
@@ -272,6 +272,8 @@ contains
     character(len=400) :: err_msg
     character(len=  6) :: tmpstring6
     logical :: file_exists
+    integer :: ios
+    character(len=400) :: iomsg
 
     ! -----------------------------------------------------------------
     
@@ -300,8 +302,12 @@ contains
     if (logit) write (logunit,*)
     if (logit) write (logunit,'(400A)') 'reading *default* EnKF inputs from ' // trim(fname)
     if (logit) write (logunit,*)
-
-    read (10, nml=ens_upd_inputs)
+    
+    read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
+    if (ios /= 0) then
+       err_msg = 'Error reading ens_upd_inputs.  NOTE: "out_ObsFcstAna" must be integer.  ' // trim(iomsg)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
     
     close(10,status='keep')
     
@@ -325,7 +331,13 @@ contains
        if (logit) write (logunit,'(400A)') 'reading *special* EnKF inputs from ' // trim(fname)
        if (logit) write (logunit,*)
 
-       read (10, nml=ens_upd_inputs)
+       read (10, nml=ens_upd_inputs, iostat=ios, iomsg=iomsg)
+       
+       ! if read error, exit gracefully; hint at possible cause (out_ObsFcstAna changed from logical to integer, Apr 2026)
+       if (ios /= 0) then
+          err_msg = 'Error reading ens_upd_inputs.  NOTE: "out_ObsFcstAna" must be integer.  ' // trim(iomsg)
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
 
        close(10,status='keep')
        
@@ -337,15 +349,63 @@ contains
     !
     ! none implemented so far (reichle, 19 Jul 2005)
     
+
+    ! -----------------------------------------------------------------
+
+    ! fill obs_param%fcstvarname and obs_param%fcstunits
+    
+    do i=1,N_obs_species_nml
+
+       ! expect "fcstvarname" and "fcstunits" to be 'NULL'; they are not meant to be filled by the user in the config nml file
+       
+       if (trim(obs_param_nml(i)%fcstvarname) /= 'NULL' .and. trim(obs_param_nml(i)%fcstvarname) /= 'null')     &
+            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstvarname must be NULL on input')
+              
+       if (trim(obs_param_nml(i)%fcstunits  ) /= 'NULL' .and. trim(obs_param_nml(i)%fcstunits  ) /= 'null')     &
+            call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%fcstunits must be NULL on input')
+
+       ! IMPORTANT: Must maintain consistency in the mapping between obs and model variables 
+       !            that is encoded here with that in get_obs_pred().
+
+       select case (trim(obs_param_nml(i)%varname))
+          
+       case ('sfmc', 'sfds')
+          
+          ! NOTE: 'sfds' is scaled into volumetric units of sfmc
+          
+          obs_param_nml(i)%fcstvarname = 'sfmc'
+          obs_param_nml(i)%fcstunits   = 'm3 m-3'
+          
+       case ('rzmc', 'tsurf', 'FT', 'Tb', 'asnow', 'NULL')
+          
+          obs_param_nml(i)%fcstvarname = obs_param_nml(i)%varname 
+          obs_param_nml(i)%fcstunits   = obs_param_nml(i)%units  
+          
+       case default
+          
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown obs_param_nml%varname')
+          
+       end select
+       
+    end do
+        
     ! -----------------------------------------------------------------
     !
     ! consistency checks etc
+
+    if (out_ObsFcstAna<0 .or. out_ObsFcstAna>3) then        
+       write(tmpstring6,'(I6)') out_ObsFcstAna
+       err_msg = 'Unknown integer value of "out_ObsFcstAna": "' // trim(tmpstring6) // '". Use 0=OFF, 1=BIN, 2=NC4, 3=BIN and NC4.'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
     
     if (update_type==0) then
        err_msg = 'executable was built for assimilation but update_type=0'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
+    ! obs bias init and checks
+    
     N_obsbias_max = 0  ! initialize
 
     do i=1,N_obs_species_nml
@@ -523,7 +583,7 @@ contains
              need_mwRTM_param = .true.
              
           end if
-          
+
        end do
        
     end if
@@ -1007,6 +1067,7 @@ contains
     real,    parameter                      :: fac_search_FOV_km     = 2.   ! [-]
     
     real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
+    real,    parameter                      :: SM_max_peat_frac      = 0.10 ! [-]
 
     integer                                 :: N_catlH, n_e, i, j, k, N_tmp, ii, jj
     integer                                 :: N_fields, N_Tbspecies, N_TbuniqFreqAngRTMid
@@ -1021,9 +1082,10 @@ contains
 
     real, dimension(numprocs)               :: xhalo, yhalo, tmplatvec, tmprx
     
-    real                                    :: tmpreal, tmp_stemp, tmp_fraccell
+    real                                    :: tmpreal, tmp_stemp, tmp_fraccell, tmp_peatfrac
+    real                                    :: tmpsum_w
 
-    logical                                 :: tmpRFI, tmpWater, use_distance_weights
+    logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
 
     real, dimension(1)                      :: tmpmean, tmpvar
         
@@ -1034,6 +1096,7 @@ contains
     logical                                 :: get_Tb_l,     get_Tb_lH
     logical                                 :: get_FT_l,     get_FT_lH
     logical                                 :: get_asnow_l,  get_asnow_lH
+    logical                                 :: get_peat_lH
     type(grid_def_type)                     :: tile_grid_lH        
     
     integer, dimension(N_obs_param)         :: ind_obsparam2Tbspecies
@@ -1053,6 +1116,7 @@ contains
                                                      !  for consistency w/ calc_tp
 
     real,    dimension(N_catl)              :: Tb_h_vec, Tb_v_vec
+    real,    dimension(N_catl)              :: peat_l
     
     real,    dimension(N_catl)              :: precip, SWE, smoist
 
@@ -1083,6 +1147,8 @@ contains
     real,    dimension(:,:),   allocatable  :: FT_lH,     asnow_lH
     
     real,    dimension(:,:,:), allocatable  :: Tb_h_lH, Tb_v_lH
+
+    real,    dimension(:),     allocatable  :: peat_lH
     
     real,    dimension(:,:,:), pointer      :: tile_data_lH => null()
     
@@ -1157,6 +1223,7 @@ contains
     get_FT_lH    = .false.
     get_Tb_lH    = .false.
     get_asnow_lH = .false.
+    get_peat_lH  = .false.
 
     ! loop through obs_param b/c obs on local proc may not reflect all obs
     
@@ -1166,6 +1233,9 @@ contains
     
     do i=1,N_obs_param  
        
+       ! IMPORTANT: Must maintain consistency in the mapping between obs and model ("lH") variables 
+       !            that is encoded here with that in read_ens_upd_inputs().
+       
        select case (trim(obs_param(i)%varname))
           
        case ('sfmc', 'sfds')
@@ -1173,6 +1243,8 @@ contains
           get_sfmc_l   = .true.
           get_sfmc_lH  = .true.
           get_tsurf_l  = .true.    ! needed for model-based QC
+
+          if (beforeEnKFupdate)  get_peat_lH = .true.
 
        case ('rzmc')
           
@@ -1478,10 +1550,28 @@ contains
     
     ! determine N_catlH and tile_coord_lH  
 
+    if (get_peat_lH) then
+
+       ! build local static PEATCLSM tile indicator
+       !
+       ! peatland is identified via porosity (as in PEATCLSM and elsewhere in
+       ! this module), *not* via a soil class, so that the indicator is available
+       ! without mwRTM parameters
+
+       peat_l = 0.
+
+       where (abs(cat_param(:)%poros-nodata_generic)<nodata_tol_generic)
+          peat_l = nodata_generic
+       elsewhere (cat_param(:)%poros>=PEATCLSM_POROS_THRESHOLD)
+          peat_l = 1.
+       end where
+
+    end if
+
     N_fields = 0  ! set to zero temporarily, not yet needed
     ! move up the allocation. The input should be allocated in debug mode although it is not used
     ! allocate and assemble tile_data_l
-    allocate(tile_data_l(0,0,0))  ! for debugging to pass  
+    allocate(tile_data_l(0,0,0))  ! for debugging to pass
     call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
          tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
          N_catlH, tile_coord_lH=tile_coord_lH )
@@ -1494,23 +1584,26 @@ contains
     if (get_Tb_lH)     allocate(stemp_lH(N_catlH,                     N_ens))
     if (get_Tb_lH)     allocate(Tb_h_lH( N_catlH,N_TbuniqFreqAngRTMid,N_ens))
     if (get_Tb_lH)     allocate(Tb_v_lH( N_catlH,N_TbuniqFreqAngRTMid,N_ens))
+    if (get_peat_lH)   allocate(peat_lH( N_catlH                            ))
     
 #ifdef LDAS_MPI
     
     ! count number of fields that need to be communicated (N_fields), allocate as needed
 
     call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields)
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_peat_lH, N_fields)
     
     ! allocate and assemble tile_data_l
 
     if (allocated(tile_data_l))  deallocate(tile_data_l)
     allocate(tile_data_l(N_catl,N_fields,N_ens))
     call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields, &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_peat_lH, N_fields,                                                   &
          option=1, tile_data=tile_data_l,                                        &
          sfmc=sfmc_l, rzmc=rzmc_l, tsurf=tsurf_l, FT=FT_l, stemp=stemp_l,        &
-         Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l )
+         Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l, peat=peat_l )
     
     ! communicate tile_data_l as needed and get tile_data_lH
 
@@ -1521,10 +1614,11 @@ contains
     ! read out sfmc, rzmc, etc. from tile_data_lH    
 
     call get_obs_pred_comm_helper( N_catlH, N_ens, N_TbuniqFreqAngRTMid,         &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, N_fields, &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+         get_peat_lH, N_fields,                                                   &
          option=2, tile_data=tile_data_lH,                                       &
          sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_l, stemp=stemp_lH,    &
-         Tb_h=Tb_h_lH, Tb_v=Tb_v_lH )
+         Tb_h=Tb_h_lH, Tb_v=Tb_v_lH, peat=peat_lH )
     
     ! clean up
     
@@ -1540,6 +1634,7 @@ contains
     if (get_Tb_lH)     stemp_lH = stemp_l
     if (get_Tb_lH)     Tb_h_lH  = Tb_h_l
     if (get_Tb_lH)     Tb_v_lH  = Tb_v_l
+    if (get_peat_lH)   peat_lH  = peat_l
     
 #endif
     if (allocated(tile_data_l))  deallocate(tile_data_l)
@@ -1694,6 +1789,38 @@ contains
              tmp_weights(1:N_tmp) = tmp_wFOV(1:N_tmp) * tile_coord_lH(ind_tmp(1:N_tmp))%area
              
           end if
+
+          ! screen surface soil moisture observations if too much of the FOV is peatland
+
+          tmpPeat = .false.
+
+          if (get_peat_lH .and.                                                &
+               (trim(obs_param(this_species)%varname)=='sfmc' .or.             &
+                trim(obs_param(this_species)%varname)=='sfds')) then
+
+             tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
+
+             ! FOV- and area-weighted peat fraction over tiles with valid porosity
+
+             tmpsum_w = sum( merge( tmp_weights(1:N_tmp), 0.,                    &
+                  abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )
+
+             if (tmpsum_w > 0.) then
+
+                tmp_peatfrac = sum( merge(                                       &
+                     tmp_weights(1:N_tmp)*tmp_data(1:N_tmp), 0.,                 &
+                     abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )&
+                     / tmpsum_w
+
+                tmpPeat = (tmp_peatfrac>=SM_max_peat_frac)
+
+             else
+
+                tmpPeat = .true.   ! no valid porosity anywhere in FOV
+
+             end if
+
+          end if
           
           do n_e=1,N_ens
              
@@ -1705,8 +1832,10 @@ contains
              select case (trim(obs_param(this_species)%varname))
                 
              case ('sfmc', 'sfds')
-                
-                tmp_data(1:N_tmp)    = sfmc_lH(  ind_tmp(1:N_tmp), n_e )
+
+                tmp_data(1:N_tmp) = sfmc_lH( ind_tmp(1:N_tmp), n_e )
+
+                if (tmpPeat)  tmp_data(1:N_tmp) = nodata_generic
                 
              case ('rzmc') 
                 
@@ -1891,8 +2020,11 @@ contains
     
     if (allocated(ind_tmp))                  deallocate(ind_tmp)
     if (allocated(tmp_ndst2))                deallocate(tmp_ndst2)
+    if (allocated(tmp_wFOV))                 deallocate(tmp_wFOV)   ! fix memory leak
     if (allocated(tmp_weights))              deallocate(tmp_weights)
     if (allocated(tmp_data))                 deallocate(tmp_data)
+
+    if (allocated(peat_lH))                  deallocate(peat_lH)
     
     if (associated(tile_coord_lH))           deallocate(tile_coord_lH)
     
@@ -2007,7 +2139,8 @@ contains
 
   subroutine get_obs_pred_comm_helper(                                                  &
        N_cat, N_ens, N_Tb, get_sfmc, get_rzmc, get_tsurf, get_FT, get_asnow, get_Tb,    &
-       N_fields, option, tile_data, sfmc, rzmc, tsurf, FT, asnow, stemp, Tb_h, Tb_v )
+       get_peat, N_fields, option, tile_data, sfmc, rzmc, tsurf, FT, asnow, stemp,      &
+       Tb_h, Tb_v, peat )
     
     ! bundle/unbundle individual fields into/from single array for more 
     ! efficient communication across processors
@@ -2025,7 +2158,8 @@ contains
 
     integer, intent(in)    :: N_cat, N_ens, N_Tb
     
-    logical, intent(in)    :: get_sfmc, get_rzmc, get_tsurf, get_FT, get_Tb, get_asnow 
+    logical, intent(in)    :: get_sfmc, get_rzmc, get_tsurf, get_FT, get_Tb, get_asnow
+    logical, intent(in)    :: get_peat
     
     integer, intent(inout) :: N_fields
     
@@ -2036,6 +2170,7 @@ contains
     real, dimension(N_cat,         N_ens), intent(inout), optional :: sfmc, rzmc
     real, dimension(N_cat,         N_ens), intent(inout), optional :: tsurf, FT, asnow, stemp
     real, dimension(N_cat,N_Tb,    N_ens), intent(inout), optional :: Tb_h, Tb_v
+    real, dimension(N_cat),                intent(inout), optional :: peat
     
     ! -----------------------------------
 
@@ -2068,11 +2203,13 @@ contains
             ((get_FT)    .and. (.not. present(FT   )))    .or.            &
             ((get_Tb)    .and. (.not. present(stemp)))    .or.            &
             ((get_Tb)    .and. (.not. present(Tb_h )))    .or.            &
-            ((get_Tb)    .and. (.not. present(Tb_v )))             ) then
+            ((get_Tb)    .and. (.not. present(Tb_v )))    .or.            &
+            ((get_peat)  .and. (.not. present(peat )))             ) then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error 1')
        end if
        
-       if ( (get_sfmc .or. get_rzmc .or. get_tsurf .or. get_FT .or. get_Tb .or. get_asnow) .and.   &
+       if ( (get_sfmc .or. get_rzmc .or. get_tsurf .or. get_FT .or. get_Tb .or.  &
+             get_asnow .or. get_peat)                                      .and. &
             (.not. present(tile_data))                                              &
             )  then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'error 2')
@@ -2164,6 +2301,16 @@ contains
        
        if (opt==2)  Tb_v = tile_data(1:N_cat,ks:k,1:N_ens)
               
+    end if
+
+    if (get_peat)   then
+
+       k = k+1
+
+       if (opt==1)  tile_data(1:N_cat,k,1:N_ens) = spread(peat,2,N_ens)
+
+       if (opt==2)  peat = tile_data(1:N_cat,k,1)
+
     end if
     
     N_fields = k

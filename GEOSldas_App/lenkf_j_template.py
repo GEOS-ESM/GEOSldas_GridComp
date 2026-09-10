@@ -158,6 +158,12 @@ cd $SCRDIR
 /bin/cp -f  $HOMDIR/*.rc .
 /bin/cp -f  $HOMDIR/*.nml .
 
+# copy ISSM input files to scratch
+/bin/find $EXPDIR/input -maxdepth 1 -name "ISSM*" -exec /bin/cp {{}} . \\;
+
+# move ISSM auxiliary mesh file to rc_out
+if (-e $EXPDIR/input/ISSM_MESH.nc) /bin/mv $EXPDIR/input/ISSM_MESH.nc $EXPDIR/output/$EXPDOMAIN/rc_out
+
 set LSMCHOICE = `grep -n -m 1 "LSM_CHOICE" $HOMDIR/LDAS.rc | cut -d':' -f3`
 
 #######################################################################
@@ -471,7 +477,7 @@ while ( $counter <= ${{NUM_SGMT}} )
 
    # must be done before moving HISTORY files
 
-   set ObsFcses = `ls *.ldas_ObsFcstAna.*.bin`
+   set ObsFcses = `ls *.ldas_ObsFcstAna.*`
    foreach obsfcs ( $ObsFcses )
       set ThisTime = `echo $obsfcs | rev | cut -d'.' -f2 | rev`
       set TY = `echo $ThisTime | cut -c1-4`
@@ -493,13 +499,13 @@ while ( $counter <= ${{NUM_SGMT}} )
 
 
    #######################################################################
-   #              Move HISTORY Files to cat/ens Directory
+   #              Move HISTORY Files to diag/ens[XXXX] Directory
    #######################################################################
 
    set outfiles = `ls $EXPID.*[bin,nc4]`
    set TILECOORD=`ls ../output/*/rc_out/*ldas_tilecoord.bin`
 
-   # Move current files to /cat/ens
+   # Move current files to diag/ens[XXXX]
    # ------------------------------
 
    foreach ofile ( $outfiles )
@@ -507,9 +513,9 @@ while ( $counter <= ${{NUM_SGMT}} )
       set TY = `echo $ThisTime | cut -c1-4`
       set TM = `echo $ThisTime | cut -c5-6`
       if ($NENS == 1) then
-         set THISDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens0000/Y${{TY}}/M${{TM}}/
+         set THISDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens0000/Y${{TY}}/M${{TM}}/
       else
-         set THISDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens_avg/Y${{TY}}/M${{TM}}/
+         set THISDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens_avg/Y${{TY}}/M${{TM}}/
       endif
       if (! -e $THISDIR            ) mkdir -p $THISDIR
 
@@ -536,9 +542,9 @@ while ( $counter <= ${{NUM_SGMT}} )
      set PWD = `pwd`
 
      if ($NENS == 1) then
-        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens0000/
+        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens0000/
      else
-        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/cat/ens_avg/
+        set OUTDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens_avg/
      endif
 
      set MONTHDIRS = `ls -d $OUTDIR/*/*`
@@ -721,7 +727,8 @@ EOF
        set THISDIR = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/
        if (! -e $THISDIR            ) mkdir -p $THISDIR
    
-       set rstfs = (${{LANDMODEL}} 'landice')
+       set rstfs = (${{LANDMODEL}} 'lake' 'landice' 'route' 'issm')
+
        foreach rstf ( $rstfs )
           if (-f ${{rstf}}${{ENSID}}_internal_checkpoint ) then
              set tmp_file = $EXPDIR/output/$EXPDOMAIN/rs/$ENSDIR/Y${{eYEAR}}/M${{eMON}}/${{EXPID}}.${{rstf}}_internal_rst.${{eYEAR}}${{eMON}}${{eDAY}}_${{eHour}}${{eMin}}
@@ -759,8 +766,9 @@ EOF
        set rstfiles2 = `ls landpert${{ENSID}}_internal_checkpoint.*`
        set rstfiles3 = `ls landassim_obspertrseed${{ENSID}}_checkpoint.*`
        set rstfiles4 = `ls landice${{ENSID}}_internal_checkpoint.*`
+       set rstfiles5 = `ls issm${{ENSID}}_internal_checkpoint.*`
    
-       foreach rfile ( $rstfiles1 $rstfiles4 ) 
+       foreach rfile ( $rstfiles1 $rstfiles4 $rstfiles5 ) 
           set ThisTime = `echo $rfile | rev | cut -d'.' -f2 | rev`
           set TY = `echo $ThisTime | cut -c1-4`
           set TM = `echo $ThisTime | cut -c5-6`

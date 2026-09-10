@@ -7,6 +7,7 @@ set (SRCS
   LDAS_TileCoordRoutines.F90
   LDAS_RepairForcing.F90
   LDAS_ensdrv_mpi.F90
+  StateMerge.F90
   )
 
 list (APPEND SRCS
