@@ -53,8 +53,8 @@ TILE_TYPES: 100
 
 # ---- Format of tile file (from bcs directory)
 #
-#    DEFAULT : Use nc4 tile file if it exists, txt tile file otherwise 
-#    TXT     : Use txt tile file (e.g., for 0-diff testing)
+#    DEFAULT : Use nc4 if file present in restart dir (RESTART=1,3) or bcs dir (RESTART=2), txt otherwise 
+#    TXT     : Use txt (e.g., if needed for 0-diff testing)
 # 
 TILE_FILE_FORMAT: DEFAULT 
 
