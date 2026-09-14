@@ -896,6 +896,10 @@ class ldas:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
+        # MERRA-2 cannot provide ISSM restart
+        if (RESTART_str=='M' and self.with_issm):    
+           exit("RESTART=M does not support DO_ISSM=1. Please provide a compatible ISSM restart and use RESTART=2.")               
+
         if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):    
            bcs_path = self.ExeInputs['BCS_PATH']
            while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
@@ -1044,13 +1048,10 @@ class ldas:
                      issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'   +y4m2d2_h2m2
                if RESTART_str in ['2', 'M']:
                   landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
-                  if self.with_issm:
-                     if RESTART_str == '2':
-                        issmRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'   +YYYYMMDD+'*')[0]
-                        if len(issmRstFile) == 0:
-                           exit("RESTART=2 with DO_ISSM=1 expects an ISSM restart in ./mk_restarts, but none was found.")             
-                     else:
-                        exit("RESTART=M does not support DO_ISSM=1. Please provide a compatible ISSM restart and use RESTART=2.")               
+                  if self.with_issm and RESTART_str == '2':
+                     issmRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'   +YYYYMMDD+'*')[0]
+                     if len(issmRstFile) == 0:
+                        exit("RESTART=2 with DO_ISSM=1 expects an ISSM restart in ./mk_restarts, but none was found.")             
 
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
