@@ -1043,17 +1043,20 @@ class ldas:
                   if self.with_issm:
                      issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
  
-                      
+
                if RESTART_str in ['2', 'M']:
                    landiceRstFile = glob.glob(
                        self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
                
                    if self.with_issm and RESTART_str == '2':
-                       issmRstFile = glob.glob(
-                           self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')[0]
+                       issmRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+               
+                       if '0000' in ensdir and not os.path.isfile(issmRstFile):
+                           exit("RESTART=2 does not remap the ISSM restart. "
+                                "Please copy a compatible ISSM restart to " + issmRstFile)
                
                    if self.with_issm and RESTART_str == 'M':
-                       print("issm_internal_rst will be bootstrapped for Restart 'M' ")        
+                       print("issm_internal_rst will be bootstrapped for Restart 'M' ")
 
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
