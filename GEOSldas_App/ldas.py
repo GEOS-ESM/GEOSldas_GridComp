@@ -326,7 +326,7 @@ class ldas:
            assert len(txt_tile) == 0, "For RESTART=2, must restart from and run on global domain"
            in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
            if len(in_tilefiles_) == 0 :
-              nc4_tmp = glob.glob(inp_+'/*.nc4')
+              in_tilefiles_ = glob.glob(inp_+'/*.nc4')
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.til')
            # for EASE tile space, pick "standard" tile file (one tile per grid cell) and not "-Pfafstetter" tile file
