@@ -791,7 +791,7 @@ class ldas:
 
         # if running routing, make sure domain is global
         if self.run_route>0 and self.isZoomIn:
-            exit( "Must have global domain to run routing model, RUN_ROUTE=" + self.run_route )
+            exit(f"Must have global domain to run routing model, RUN_ROUTE={self.run_route}")
         # if running ISSM, make sure domain is global
         if self.with_issm and self.isZoomIn:
             exit( "Must have global domain to run ISSM (DO_ISSM: 1)")    
