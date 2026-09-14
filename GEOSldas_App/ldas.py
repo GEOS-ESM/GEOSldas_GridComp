@@ -1042,22 +1042,25 @@ class ldas:
                   landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
                   if self.with_issm:
                      issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
- 
-
-               if RESTART_str in ['2', 'M']:
-                   landiceRstFile = glob.glob(
-                       self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
-               
-                   if self.with_issm and RESTART_str == '2':
-                       issmRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
-               
-                       if '0000' in ensdir and not os.path.isfile(issmRstFile):
-                           exit("RESTART=2 does not remap the ISSM restart. "
-                                "Please copy a compatible ISSM restart to " + issmRstFile)
-               
-                   if self.with_issm and RESTART_str == 'M':
-                       print("issm_internal_rst will be bootstrapped for Restart 'M' ")
-
+             if RESTART_str in ['2', 'M']:
+             
+                 if self.with_issm and RESTART_str == 'M':
+                     exit("RESTART=M does not support DO_ISSM=1. "
+                          "Please provide a compatible ISSM restart and use RESTART=2.")
+             
+                 landiceRstFile = glob.glob(
+                     self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+             
+                 if self.with_issm and RESTART_str == '2':
+                     issmRstFiles = glob.glob(
+                         self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')
+             
+                     if len(issmRstFiles) == 0:
+                         exit("RESTART=2 with DO_ISSM=1 requires a compatible ISSM restart "
+                              "in the source restart directory.")
+             
+                     issmRstFile = issmRstFiles[0]
+        
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
                   if self.isZoomIn :
@@ -1090,7 +1093,7 @@ class ldas:
             if self.run_route > 0 :
                if RESTART_str in ['1', '2'] :
                   routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
-                  if '0000' in ensdir and not os.path.isfile(routeRstFile):    
+                  if not os.path.isfile(routeRstFile):    
                      exit("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
                             to " + routeRstFile)
                if RESTART_str  == 'M':
