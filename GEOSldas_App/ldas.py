@@ -1044,14 +1044,16 @@ class ldas:
                      issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
  
                       
-                      
                if RESTART_str in ['2', 'M']:
-                  landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
-                  if self.with_issm and RESTART_str in ['2']:
-                     exit( "Restart '2' not supported when running ISSM (DO_ISSM: 1)") 
-                  if self.with_issm and RESTART_str in ['M']:
-                     print("issm_internal_rst will be bootstrapped for Restart 'M' ")
-                     
+                   landiceRstFile = glob.glob(
+                       self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
+               
+                   if self.with_issm and RESTART_str == '2':
+                       issmRstFile = glob.glob(
+                           self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')[0]
+               
+                   if self.with_issm and RESTART_str == 'M':
+                       print("issm_internal_rst will be bootstrapped for Restart 'M' ")        
 
                if os.path.isfile(landiceRstFile) :
                   landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
@@ -1128,7 +1130,7 @@ class ldas:
                os.symlink(routeRstFile, myRouteRst)
 
             if self.with_issm and iens == 0:
-               if RESTART_str in ['1', '3']:
+               if RESTART_str in ['1', '2', '3']:     
                   print("link issm restart: " + myIssmRst)
                   os.symlink(issmRstFile, myIssmRst)
                      
