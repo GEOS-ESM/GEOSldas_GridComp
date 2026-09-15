@@ -1039,33 +1039,52 @@ class ldas:
 
             landiceRstFile = ''
             issmRstFile    = ''
-            if self.with_landice :
-               if RESTART_str in ['1', '3'] :
-                  landiceRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-                  if self.with_issm:
-                     issmRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'   +y4m2d2_h2m2
-               if RESTART_str in ['2', 'M']:
-                  landiceRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')[0]
-                  if self.with_issm and RESTART_str == '2':
-                     issmRstFile = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'   +YYYYMMDD+'*')[0]
-                     if len(issmRstFile) == 0:
-                        exit("RESTART=2 with DO_ISSM=1 expects an ISSM restart in ./mk_restarts, but none was found.")
-               if os.path.isfile(landiceRstFile) :
-                  landiceLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-                  if self.isZoomIn :
-                     print ("Creating zoom-in of landice restart file... \n")
-                     cmd=self.bindir + '/preprocess_ldas.x zoomin_landicerst '+ landiceRstFile +' ' + landiceLocal + ' '+ tmp_f2g_file.name
-                     print ("cmd:   " + cmd)
-                     sp.call(shlex.split(cmd))
-                  else :
-                     shutil.copy(landiceRstFile,landiceLocal)
-                  landiceRstFile = landiceLocal
-
-               if self.with_issm:
-                  if os.path.isfile(issmRstFile) :
-                     issmLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
-                     shutil.copy(issmRstFile,issmLocal)
-                     issmRstFile = issmLocal
+             
+            if self.with_landice and iens == 0:
+            
+                if RESTART_str in ['1', '3']:
+                    landiceRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
+            
+                    if self.with_issm:
+                        issmRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
+            
+                if RESTART_str in ['2', 'M']:
+                    landiceRstFiles = glob.glob(
+                        self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')
+             
+                    if len(landiceRstFiles) == 0:
+                        exit("Expected a landice restart in ./mk_restarts, but none was found.")
+             
+                    landiceRstFile = landiceRstFiles[0]
+             
+                    if self.with_issm and RESTART_str == '2':
+                        issmRstFiles = glob.glob(
+                            self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')
+             
+                        if len(issmRstFiles) == 0:
+                            exit("RESTART=2 with DO_ISSM=1 expects an ISSM restart in "
+                                 "./mk_restarts, but none was found.")
+             
+                        issmRstFile = issmRstFiles[0]
+             
+                if os.path.isfile(landiceRstFile):
+                    landiceLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
+             
+                    if self.isZoomIn:
+                        print("Creating zoom-in of landice restart file... \n")
+                        cmd = self.bindir + '/preprocess_ldas.x zoomin_landicerst ' + landiceRstFile + ' ' + landiceLocal + ' ' + tmp_f2g_file.name
+                        print("cmd:   " + cmd)
+                        sp.call(shlex.split(cmd))
+                    else:
+                        shutil.copy(landiceRstFile, landiceLocal)
+            
+                    landiceRstFile = landiceLocal
+             
+                if self.with_issm:
+                    if os.path.isfile(issmRstFile):
+                        issmLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
+                        shutil.copy(issmRstFile, issmLocal)
+                        issmRstFile = issmLocal
 
             routeRstFile = ''
             if self.run_route > 0 :
