@@ -1012,7 +1012,7 @@ class ldas:
 
                    catchRstFile = catchLocal
 
-                   if '0000' in ensdir :
+                   if ensdir == self.ensdirs[0] :
                        catchRstFile0 = catchRstFile
                else : # re-use 0000 catch file
                    catchRstFile = catchRstFile0
@@ -1030,7 +1030,7 @@ class ldas:
 
                    vegdynRstFile = vegdynLocal
 
-                   if '0000' in ensdir :
+                   if ensdir == self.ensdirs[0]:
                        vegdynRstFile0 = vegdynRstFile
                else :
                    vegdynRstFile = vegdynRstFile0
@@ -1127,7 +1127,7 @@ class ldas:
                   # the routeLocal can be changed here
                   routeRstFile = routeLocal
 
-                  if '0000' in ensdir :
+                  if ensdir == self.ensdirs[0] :
                      routeRstFile0 = routeRstFile
                else :
                    routeRstFile = routeRstFile0
