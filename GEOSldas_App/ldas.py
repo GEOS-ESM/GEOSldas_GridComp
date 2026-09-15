@@ -86,6 +86,9 @@ class ldas:
         self.inpdir             = None
         self.exefyl             = None
         self.isZoomIn           = False
+        self.isZoomInLand       = False
+        self.isZoomInLake       = False
+        self.isZoomInLandice    = False
         self.catch              = ''
         self.has_mwrtm          = False
         self.has_vegopacity     = False
@@ -784,16 +787,37 @@ class ldas:
         print ('Creating f2g file if necessary: '+ tmp_f2g_file.name +'....\n')
         print ("cmd:   " + cmd)
         sp.call(shlex.split(cmd))
-        # check if it is local or global
-        if os.path.getsize(tmp_f2g_file.name) !=0 :
-           self.isZoomIn= True
-        #os.remove(self.domain_def.name)
+
+        # Check whether the simulation domain differs from the input domain, and determine which tile types are affected.
+        if os.path.getsize(tmp_f2g_file.name) != 0:
+
+            with open(tmp_f2g_file.name, 'r') as f:
+                n_types      = int(f.readline().split()[0])
+                tile_types   = [int(x) for x in f.readline().split()]
+                n_tiles_r    = [int(x) for x in f.readline().split()]
+                n_tiles_f    = [int(x) for x in f.readline().split()]
+
+            assert len(tile_types) == n_types
+            assert len(n_tiles_r)  == n_types
+            assert len(n_tiles_f)  == n_types
+
+            zoom_by_type = {
+                tile_type: (nr != nf)
+                for tile_type, nr, nf in zip(tile_types, n_tiles_r, n_tiles_f)
+            }
+
+            self.isZoomInLand    = zoom_by_type.get(100, False)
+            self.isZoomInLake    = zoom_by_type.get(19,  False)
+            self.isZoomInLandice = zoom_by_type.get(20,  False)
+
+            self.isZoomIn = any(zoom_by_type.values())
+
 
         # if running routing, make sure domain is global
-        if self.run_route>0 and self.isZoomIn:
+        if self.run_route > 0 and self.isZoomInLand:
             exit(f"Must have global domain to run routing model, RUN_ROUTE={self.run_route}")
         # if running ISSM, make sure domain is global
-        if self.with_issm and self.isZoomIn:
+        if self.with_issm and self.isZoomInLandice:
             exit( "Must have global domain to run ISSM (DO_ISSM: 1)")
 
         # update tile domain
@@ -829,7 +853,7 @@ class ldas:
                bcstmp=bcstmp+[self.rc_out+'/'+os.path.basename(bcf)]
            bcs=bcstmp
 
-           if self.isZoomIn:
+           if self.isZoomInLand:
               print ("Creating the boundary files for the simulation domain...\n")
               bcs_tmp=[]
               for bcf in bcs :
@@ -978,7 +1002,7 @@ class ldas:
                # catchment restart file
                if os.path.isfile(catchRstFile) :
                    catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                   if self.isZoomIn :
+                   if self.isZoomInLand:
                        print( "Creating local catchment restart file... \n")
                        cmd=self.bindir +'/preprocess_ldas.x zoomin_catchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
                        print ("cmd:  "+cmd)
@@ -996,7 +1020,7 @@ class ldas:
                # vegdyn restart file
                if os.path.isfile(vegdynRstFile) :
                    vegdynLocal = self.rstdir+ensdir +'/'+self.ExeInputs['EXP_ID']+'.vegdyn_internal_rst'
-                   if self.isZoomIn :
+                   if self.isZoomInLand:
                        print ("Creating the local veg restart file... \n")
                        cmd=self.bindir + '/preprocess_ldas.x zoomin_vegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
                        print ("cmd:   " + cmd)
@@ -1027,7 +1051,7 @@ class ldas:
 
                 if os.path.isfile(lakeRstFile):
                     lakeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
-                    if self.isZoomIn:
+                    if self.isZoomInLake:
                         print ("Creating zoom-in of lake restart file... \n")
                         cmd=self.bindir + '/preprocess_ldas.x zoomin_lakerst '+ lakeRstFile +' ' + lakeLocal + ' '+ tmp_f2g_file.name
                         print ("cmd: " + cmd)
@@ -1039,47 +1063,47 @@ class ldas:
 
             landiceRstFile = ''
             issmRstFile    = ''
-             
+
             if self.with_landice and iens == 0:
-            
+
                 if RESTART_str in ['1', '3']:
                     landiceRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-            
+
                     if self.with_issm:
                         issmRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
-            
+
                 if RESTART_str in ['2', 'M']:
                     landiceRstFiles = glob.glob(
                         self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')
-             
+
                     if len(landiceRstFiles) == 0:
                         exit("Expected a landice restart in ./mk_restarts, but none was found.")
-             
+
                     landiceRstFile = landiceRstFiles[0]
-             
+
                     if self.with_issm and RESTART_str == '2':
                         issmRstFiles = glob.glob(
                             self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')
-             
+
                         if len(issmRstFiles) == 0:
                             exit("RESTART=2 with DO_ISSM=1 expects an ISSM restart in "
                                  "./mk_restarts, but none was found.")
-             
+
                         issmRstFile = issmRstFiles[0]
-             
+
                 if os.path.isfile(landiceRstFile):
                     landiceLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-             
-                    if self.isZoomIn:
+
+                    if self.isZoomInLandice:
                         print("Creating zoom-in of landice restart file... \n")
                         cmd = self.bindir + '/preprocess_ldas.x zoomin_landicerst ' + landiceRstFile + ' ' + landiceLocal + ' ' + tmp_f2g_file.name
                         print("cmd:   " + cmd)
                         sp.call(shlex.split(cmd))
                     else:
                         shutil.copy(landiceRstFile, landiceLocal)
-            
+
                     landiceRstFile = landiceLocal
-             
+
                 if self.with_issm:
                     if os.path.isfile(issmRstFile):
                         issmLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
@@ -1148,7 +1172,7 @@ class ldas:
         if self.has_mwrtm :
            mwRTMRstFile = self.mwrtm_file
            mwRTMLocal = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
-           if self.isZoomIn :
+           if self.isZoomInLand:
               print ("Creating the local mwRTM restart file... \n")
               cmd= self.bindir +'/preprocess_ldas.x zoomin_mwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
 
