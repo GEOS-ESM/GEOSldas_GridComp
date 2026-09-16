@@ -294,7 +294,8 @@ class ldas:
         self.ExeInputs['LNFM_FILE'] = ''
         self.ExeInputs['EASE_PFAF_TILE_FILE'] = ''
         tile_file_format = self.ExeInputs.get('TILE_FILE_FORMAT', 'DEFAULT')
-        domain_  = ''
+        domain_      = ''  # tile geometry domain
+        land_domain_ = ''  # Land BC domain
         inpdir_  = self.bcs_dir_land
         inpgeom_ = self.bcs_dir_geom
 
@@ -320,9 +321,15 @@ class ldas:
               assert bcs_version_ == BCS_tmp['BCS_VERSION'], "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bcs_version_ + ")"
               assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
 
+           # Any reduced tile type produces a .domain tile file
            txt_tile = glob.glob(inp_ + '*.domain')
            if len(txt_tile) > 0:
               domain_  = '.domain'
+           # Land BCs have .domain only when Land itself was reduced
+           land_bc = glob.glob(inp_ + 'green_clim_*.data.domain')
+           
+           if len(land_bc) > 0:
+               land_domain_ = '.domain'              
 
         elif RESTART_str == '2':
            txt_tile = glob.glob(inp_ + '*.domain')
@@ -352,15 +359,15 @@ class ldas:
         if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
-        self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+domain_)[0]
-        self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +domain_)[0]
-        tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+domain_)
+        self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+land_domain_ )[0]
+        self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +land_domain_ )[0]
+        tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+land_domain_)
         if (len(tmp_) ==1) :
            self.ExeInputs['LNFM_FILE'] = tmp_[0]
 
-        self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+domain_ )[0]
-        self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +domain_ )[0]
-        self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +domain_ )[0]
+        self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+land_domain_ )[0]
+        self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +land_domain_ )[0]
+        self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +land_domain_ )[0]
 
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
@@ -380,13 +387,14 @@ class ldas:
 
         # to run routing on standard EASE tile space, need EASE_PFAF_TILE_FILE
         if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
-           tmp_ =  glob.glob(inpgeom_ + '*Pfafstetter.nc4' + domain_)
+           tmp_ =  glob.glob(inpgeom_ + '*Pfafstetter.nc4' + land_domain_ )
            if (len(tmp_) > 0) :
               self.ExeInputs['EASE_PFAF_TILE_FILE'] = tmp_[0]
 
-        inpdir_ = None
-        domain_ = None
-        inpgeom_= None
+        inpdir_      = None
+        domain_      = None
+        land_domain_ = None
+        inpgeom_     = None
 
         # assigning Gridname
         if 'GRIDNAME' not in self.ExeInputs :
