@@ -1112,9 +1112,15 @@ class ldas:
 
             routeRstFile = ''
             if self.run_route > 0 :
-               if RESTART_str in ['1', '2'] :
+               if RESTART_str in ['1', '3'] :
                   routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
-                  if iens == 0 and not os.path.isfile(routeRstFile):
+               if RESTART_str == '2':
+                  routeRstFiles = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*route_internal_rst.'+YYYYMMDD+'*')
+                  if len(routeRstFiles) == 0:
+                     exit("Expected a route restart in ./mk_restarts, but none was found.")
+                  routeRstFile = routeRstFiles[0]
+
+               if iens == 0 and not os.path.isfile(routeRstFile):
                      exit("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
                             to " + routeRstFile)
                if RESTART_str  == 'M':
