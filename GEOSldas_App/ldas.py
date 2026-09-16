@@ -979,6 +979,7 @@ class ldas:
         #for ens in self.ensdirs :
         catchRstFile0  = ''
         vegdynRstFile0 = ''
+        routeRstFile0  = ''
 
         for iens in range(self.nens) :
             ensdir   = self.ensdirs[iens]
@@ -1119,7 +1120,6 @@ class ldas:
                         issmRstFile = issmLocal
 
             routeRstFile  = ''
-            routeRstFile0 = ''
             if self.run_route > 0 :
                if RESTART_str in ['1', '3'] :
                   routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
