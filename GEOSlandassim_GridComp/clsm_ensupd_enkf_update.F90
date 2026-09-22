@@ -136,6 +136,8 @@ module clsm_ensupd_enkf_update
 
   private
 
+  logical, parameter :: ANA_LOADBAL_COST_WEIGHTED = .true.
+
   public :: get_enkf_increments
   public :: apply_enkf_increments
   public :: output_ObsFcstAna_wrapper
@@ -288,15 +290,18 @@ contains
        integer, dimension(:), allocatable :: ind
     end type varLenIntArr
     integer                            :: N_select_species  ! input to get_ind_obs_lat_lon_box()
-    integer, dimension(:), allocatable :: select_species    ! input to get_ind_obs_lat_lon_box() and TileNnzObs()
+    integer, dimension(:), allocatable :: select_species    ! input to obs-selection routines
+    logical, dimension(N_obs_param)    :: expensive_species
     type(halo_type)                    :: halo
-    integer                            :: N_selected_obs
+    integer                            :: N_selected_obs, N_selected_expensive
     integer, dimension(numprocs)       :: tmp_low_ind    ! tmp_low_ind-1 is the displs vector for Gatherv/Scatterv
 
     ! tiles related
     integer                            :: nTiles_l,   nTilesl_vec(numprocs),  nTiles_f
     integer                            :: nTiles_ana, nTilesAna_vec(numprocs)
     integer, dimension(:), allocatable :: indTiles_l, indTiles_f, indTiles_ana
+    real(kind=8), dimension(:), allocatable :: costTiles_l, costTiles_f
+    real(kind=8), dimension(numprocs)       :: costTilesAna_vec
     type(varLenIntArr)                 :: indTilesAna_vec(numprocs)
 
     type(tile_coord_type), dimension(:), pointer    :: tile_coord_ana  ! input to cat_enkf_increment() is a pointer
@@ -324,9 +329,12 @@ contains
 
     ! odds and ends
     real               :: t_start, t_end, tmax, tmin            ! for timing routines
-    integer            :: iTile, iproc, iEns, ctr               ! counters
+    integer            :: iTile, iproc, iEns, iObs, ctr, k      ! counters
     integer            :: quotient, remainder
+    integer            :: remaining_tiles, remaining_procs
     integer            :: dest, src, sendct, recvct, sendtag, recvtag
+    real(kind=8)       :: total_cost, target_cost, cumulative_cost
+    real(kind=8)       :: mean_cost, max_mean_cost
 
     character(12)      :: tmpstr12
 
@@ -681,16 +689,60 @@ contains
           ! NOTE: loop over tile_coord_l, if tile has nnz obs, store the 'full' index
           call cpu_time(t_start)
           allocate(indTiles_l(N_catl), source=-99)
+          allocate(costTiles_l(N_catl), source=0.d0)
+          allocate(tmp_ind_obs(N_obsf_assim), source=-99)
           N_select_species=0                           ! include *all* obs species 
           allocate(select_species(N_select_species))   ! allocate() needed for gcc10
+          expensive_species = .false.
+          do i=1,N_obs_param
+             if (obs_param(i)%assim) then
+                if (update_type==12) then
+                   ! Must match select_varnames in cat_enkf_increments, case (12).
+                   select case (trim(obs_param(i)%varname))
+                   case ('Tb', 'sfmc', 'sfds')
+                      expensive_species(obs_param(i)%species) = .true.
+                   end select
+                else
+                   expensive_species(obs_param(i)%species) = .true.
+                end if
+             end if
+          end do
           nTiles_l = 0
           do iTile=1,N_catl
              halo = get_halo_around_tile(tile_coord_l(iTile), xcompact, ycompact)
-             if (TileNnzObs(Obs_f_assim, halo, select_species)) then
+             if (ANA_LOADBAL_COST_WEIGHTED) then
+                call get_ind_obs_lat_lon_box(                            &
+                     N_obsf_assim,     Obs_f_assim,                      &
+                     halo%minlon, halo%maxlon, halo%minlat, halo%maxlat, &
+                     N_select_species, select_species,                   &
+                     N_selected_obs,   tmp_ind_obs )
+             else
+                N_selected_obs = 0
+                if (TileNnzObs(Obs_f_assim, halo, select_species)) N_selected_obs = 1
+             end if
+             if (N_selected_obs>0) then
                 nTiles_l = nTiles_l + 1 ! num of tiles w/ nnz obs
                 indTiles_l(nTiles_l) = l2f(iTile) ! 'full' index of tile w/ nnz obs
+                ! The default halo matches the clipped +/-xcompact/ycompact box used by
+                ! cat_enkf_increments. For update type 12, only Tb/sfmc/sfds obs enter
+                ! the expensive matrix solve; other species get a small linear cost.
+                if (ANA_LOADBAL_COST_WEIGHTED) then
+                   N_selected_expensive = 0
+                   do iObs=1,N_selected_obs
+                      if (expensive_species(Obs_f_assim(tmp_ind_obs(iObs))%species)) &
+                           N_selected_expensive = N_selected_expensive+1
+                   end do
+                   ! LU factorization scales as n^3, ensemble matrix terms as
+                   ! N_ens*n^2, and the remaining 1d updates approximately linearly.
+                   costTiles_l(nTiles_l) = real(N_selected_expensive,8)**3 + &
+                        real(N_ens,8)*real(N_selected_expensive,8)**2 +       &
+                        real(N_ens,8)*real(N_selected_obs-N_selected_expensive,8)
+                else
+                   costTiles_l(nTiles_l) = 1.d0
+                end if
              end if
           end do
+          if (allocated(tmp_ind_obs)) deallocate(tmp_ind_obs)
           call MPI_Gather(nTiles_l,1,MPI_INTEGER,                                    &
                nTilesl_vec,1,MPI_INTEGER,0,mpicomm,mpierr)
           if (root_proc) nTiles_f = sum(nTilesl_vec)
@@ -704,8 +756,10 @@ contains
           ! Step 2b: indTiles_l -> indTiles_f (on root)
           if (root_proc) then
             allocate(indTiles_f(nTiles_f), source=-99)
+            allocate(costTiles_f(nTiles_f), source=0.d0)
           else
             allocate(indTiles_f(0))  ! for debugging mode
+            allocate(costTiles_f(0))
           endif
   
           if (root_proc) then
@@ -718,16 +772,81 @@ contains
                indTiles_l(1:nTiles_l), nTiles_l,                   MPI_INTEGER,      &
                indTiles_f,             nTilesl_vec, tmp_low_ind-1, MPI_INTEGER,      &
                0, mpicomm, mpierr)
+          call MPI_Gatherv(                                                          &
+               costTiles_l(1:nTiles_l), nTiles_l,                   MPI_DOUBLE_PRECISION, &
+               costTiles_f,             nTilesl_vec, tmp_low_ind-1, MPI_DOUBLE_PRECISION, &
+               0, mpicomm, mpierr)
           if (allocated(indTiles_l)) deallocate(indTiles_l)
+          if (allocated(costTiles_l)) deallocate(costTiles_l)
 
           ! Step 2c: compute nTiles_ana, indTiles_f -> indTiles_ana
-          quotient = nTiles_f/numprocs
-          remainder = mod(nTiles_f,numprocs)
+          if (root_proc) then
+             nTilesAna_vec = 0
+             if (ANA_LOADBAL_COST_WEIGHTED .and. nTiles_f>0) then
+                total_cost = sum(costTiles_f)
+                target_cost = total_cost/real(numprocs,8)
+                iproc = 1
+                ctr = 0
+                cumulative_cost = 0.d0
+                do k=1,nTiles_f
+                   remaining_tiles = nTiles_f-k+1
+                   remaining_procs = numprocs-iproc
+                   if (iproc<numprocs .and. ctr>0 .and.                         &
+                        (cumulative_cost+0.5d0*costTiles_f(k)>                  &
+                         real(iproc,8)*target_cost .or.                         &
+                         remaining_tiles<=remaining_procs)) then
+                      nTilesAna_vec(iproc) = ctr
+                      iproc = iproc+1
+                      ctr = 0
+                   end if
+                   ctr = ctr+1
+                   cumulative_cost = cumulative_cost+costTiles_f(k)
+                end do
+                nTilesAna_vec(iproc) = ctr
+             else
+                quotient = nTiles_f/numprocs
+                remainder = mod(nTiles_f,numprocs)
+                do iproc=1,numprocs
+                   nTilesAna_vec(iproc) = quotient
+                   if (iproc<=remainder) nTilesAna_vec(iproc) = nTilesAna_vec(iproc)+1
+                end do
+             end if
 
-          do iproc=1,numprocs
-             nTilesAna_vec(iproc) = quotient
-             if (iproc<=remainder) nTilesAna_vec(iproc) = nTilesAna_vec(iproc) + 1
-          end do
+             if (sum(nTilesAna_vec)/=nTiles_f) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                     'AnaLoadBal tile-count mismatch after partitioning')
+             end if
+             if (nTiles_f>=numprocs .and. minval(nTilesAna_vec)<1) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                     'AnaLoadBal produced an empty rank despite sufficient tiles')
+             end if
+
+             costTilesAna_vec = 0.d0
+             k = 1
+             do iproc=1,numprocs
+                if (nTilesAna_vec(iproc)>0) then
+                   costTilesAna_vec(iproc) = &
+                        sum(costTiles_f(k:k+nTilesAna_vec(iproc)-1))
+                   k = k+nTilesAna_vec(iproc)
+                end if
+             end do
+             mean_cost = sum(costTilesAna_vec)/real(numprocs,8)
+             max_mean_cost = 0.d0
+             if (mean_cost>0.d0) max_mean_cost=maxval(costTilesAna_vec)/mean_cost
+             if (logit) then
+                write(logunit,'(2A,ES12.4,A,ES12.4,A,F8.3)')                    &
+                     'AnaLoadBal: estimated cost statistics: ',                &
+                     'max =', maxval(costTilesAna_vec),                         &
+                     ',  min =', minval(costTilesAna_vec),                      &
+                     ',  max/mean =', max_mean_cost
+                write(logunit,'(2A,I8,A,I8)')                                  &
+                     'AnaLoadBal: tiles per rank statistics: ',                 &
+                     'max =', maxval(nTilesAna_vec),                            &
+                     ',  min =', minval(nTilesAna_vec)
+             end if
+          end if
+          call MPI_Bcast(nTilesAna_vec,numprocs,MPI_INTEGER,0,mpicomm,mpierr)
+          if (allocated(costTiles_f)) deallocate(costTiles_f)
 
           nTiles_ana = nTilesAna_vec(myid+1) ! shorthand
           allocate(indTiles_ana(nTiles_ana), source=-99)
