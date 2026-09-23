@@ -104,6 +104,8 @@ fcsterr_inflation_fac = -9999.
 ! %freq           = frequency [Hz]
 ! %FOV            = field-of-view *radius*, see NOTES below
 !                   (if FOV==0. equate obs footprint w/ tile)
+! %superob_grid_deg = fixed global lat/lon super-ob spacing for H SAF ASCAT [deg]
+!                     (0 disables; see H SAF entries below)
 ! %FOV_units      = FOV units ('km' or 'deg'), see NOTES below 
 ! %assim          = assimilate obs species: true/false (see also "obs_type")
 ! %scale          = scale      obs species: true/false
@@ -2564,6 +2566,12 @@ obs_param_nml(55)%adapt          = 0
 !
 ! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
 !
+! To enable fixed-grid super-obbing, set %superob_grid_deg>0 and use
+! FOV_units='deg' with FOV approximately superob_grid_deg/sqrt(pi).
+! Production scaling parameters should be generated from observations
+! super-obbed on the same grid and model predictions using the same FOV.
+! Existing finer-resolution scaling files are suitable only for initial tests.
+!
 ! ------------------------
 !
 !  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A)
@@ -2577,6 +2585,7 @@ obs_param_nml(56)%pol            = 0
 obs_param_nml(56)%N_ang          = 0
 obs_param_nml(56)%freq           = 0
 obs_param_nml(56)%FOV            = 12.5
+obs_param_nml(56)%superob_grid_deg = 0.
 obs_param_nml(56)%FOV_units      = 'km'
 obs_param_nml(56)%assim          = .false.
 obs_param_nml(56)%scale          = .false.
@@ -2620,6 +2629,7 @@ obs_param_nml(57)%pol            = 0
 obs_param_nml(57)%N_ang          = 0
 obs_param_nml(57)%freq           = 0
 obs_param_nml(57)%FOV            = 12.5
+obs_param_nml(57)%superob_grid_deg = 0.
 obs_param_nml(57)%FOV_units      = 'km'
 obs_param_nml(57)%assim          = .false.
 obs_param_nml(57)%scale          = .false.
@@ -2663,6 +2673,7 @@ obs_param_nml(58)%pol            = 0
 obs_param_nml(58)%N_ang          = 0
 obs_param_nml(58)%freq           = 0
 obs_param_nml(58)%FOV            = 12.5
+obs_param_nml(58)%superob_grid_deg = 0.
 obs_param_nml(58)%FOV_units      = 'km'
 obs_param_nml(58)%assim          = .false.
 obs_param_nml(58)%scale          = .false.

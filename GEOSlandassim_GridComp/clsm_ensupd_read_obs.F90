@@ -99,6 +99,8 @@ module clsm_ensupd_read_obs
   
   public :: collect_obs  
 
+  logical, save :: warned_superob_scaling_mismatch = .false.
+
 contains
  
   ! ***************************************************************** 
@@ -2228,6 +2230,7 @@ contains
     integer,      parameter :: dt_ASCAT_obsfile = 3600                ! seconds (1-hour files)
     integer,      parameter :: N_fnames_max     = 24                  ! max obs files per daily flist
     integer,      parameter :: max_obs_per_file = 300000              ! max obs per 1-hr granule (H121 ~200k)
+    integer,      parameter :: max_superob_cells = 5000000            ! bound root-process scratch memory
     character(4), parameter :: J2000_epoch_id   = 'TT12'              ! see date_time_util.F90
 
     ! Offset from Unix epoch (1970-01-01 00:00:00 UTC) to J2000 TT12 epoch (2000-01-01 12:00:00 TT) in seconds:
@@ -2252,6 +2255,8 @@ contains
     real,         parameter :: ssm_scale    = 0.01                    ! SSM stored as short * 0.01 -> %
     real*8,       parameter :: sens_scale   = 1.0d-7                  ! sensitivity stored as int * 1e-7 -> dB
 
+    real,         parameter :: superob_grid_tol = 1.e-3               ! [deg]
+
     ! ---------------
 
     type(date_time_type) :: date_time_obs_beg, date_time_obs_end
@@ -2261,7 +2266,10 @@ contains
     character( 80) :: fname_of_fname_list
     character(300) :: tmpfname
 
-    integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
+    integer :: ii, jj, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
+    integer :: i_superob, j_superob, N_superob_lon, N_superob_lat, N_superob_cells
+    integer :: N_superob_occupied, N_superob_no_tile, N_superob_collisions
+    integer :: N_valid_total, N_invalid_location
 
     character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
     character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
@@ -2269,8 +2277,9 @@ contains
     character(300), allocatable               :: fnames(:)
 
     real*8 :: J2000_low, J2000_up, obs_j2000
+    real*8 :: superob_lon, superob_lat, dlon, dlat, dist2
 
-    logical :: file_exists
+    logical :: file_exists, use_superobs
 
     ! netCDF handles
     integer :: ncid, ierr, obs_dimid
@@ -2302,6 +2311,11 @@ contains
     ! tile accumulation across all files
     integer, dimension(N_catd)     :: N_obs_in_tile
 
+    ! fixed-grid super-ob accumulation across all files in the window
+    integer, allocatable :: N_obs_in_superob(:), superob_cell_ind(:)
+    real,    allocatable :: superob_sm_sum(:), best_dist2(:)
+    real*8,  allocatable :: superob_time_sum(:)
+
     character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
     character(len=400)             :: err_msg
 
@@ -2325,6 +2339,39 @@ contains
     else
        err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    use_superobs = (this_obs_param%superob_grid_deg > 0.)
+
+    if (use_superobs) then
+
+       if (this_obs_param%superob_grid_deg < 0.01 .or. &
+            this_obs_param%superob_grid_deg > 180.) then
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'superob_grid_deg is outside its supported range')
+       end if
+
+       N_superob_lon = nint(360./this_obs_param%superob_grid_deg)
+       N_superob_lat = nint(180./this_obs_param%superob_grid_deg)
+
+       if (N_superob_lon < 1 .or. N_superob_lat < 1 .or.                 &
+            abs(real(N_superob_lon)*this_obs_param%superob_grid_deg-360.) > superob_grid_tol .or. &
+            abs(real(N_superob_lat)*this_obs_param%superob_grid_deg-180.) > superob_grid_tol) then
+          err_msg = 'superob_grid_deg must divide both 180 and 360 degrees'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+
+       if (real(N_superob_lon,8)*real(N_superob_lat,8) > real(max_superob_cells,8)) then
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'super-ob grid exceeds max_superob_cells')
+       end if
+
+       N_superob_cells = N_superob_lon*N_superob_lat
+
+    else
+
+       N_superob_lon   = 0
+       N_superob_lat   = 0
+       N_superob_cells = 0
+
     end if
 
     ! return if date_time falls outside operating time range
@@ -2436,6 +2483,19 @@ contains
     ASCAT_lat     = 0.
     ASCAT_time    = 0.0D0
     N_obs_in_tile = 0
+
+    N_valid_total      = 0
+    N_invalid_location = 0
+
+    if (use_superobs) then
+       allocate(N_obs_in_superob(N_superob_cells))
+       allocate(superob_sm_sum(  N_superob_cells))
+       allocate(superob_time_sum(N_superob_cells))
+
+       N_obs_in_superob = 0
+       superob_sm_sum   = 0.
+       superob_time_sum = 0.0D0
+    end if
 
     ! scratch arrays for valid obs from one file at a time
 
@@ -2588,75 +2648,214 @@ contains
 
        if (N_valid == 0) cycle
 
+       N_valid_total = N_valid_total + N_valid
+
        ! ----------------------------------------------------------------
        !
-       ! tile matching and accumulation for this file's valid obs
+       ! accumulate either on the configured global grid or directly by tile
 
-       allocate(tmp_lat(        N_valid))
-       allocate(tmp_lon(        N_valid))
-       allocate(tmp_jtime(      N_valid))
-       allocate(tmp_tile_num(   N_valid))
+       if (use_superobs) then
 
-       tmp_lat   = tmp1_lat(  1:N_valid)
-       tmp_lon   = tmp1_lon(  1:N_valid)
-       tmp_jtime = tmp1_jtime(1:N_valid)
+          do ii = 1, N_valid
 
-       call get_tile_num_for_obs(N_catd, tile_coord,                      &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
-            N_valid, tmp_lat, tmp_lon,                                    &
-            this_obs_param,                                               &
-            tmp_tile_num )
+             superob_lat = real(tmp1_lat(ii),8)
 
-       do ii = 1, N_valid
+             if (superob_lat < -90.0D0 .or. superob_lat > 90.0D0 .or. &
+                  abs(real(tmp1_lon(ii),8)) > 360.0D0) then
+                N_invalid_location = N_invalid_location + 1
+                cycle
+             end if
 
-          ind = tmp_tile_num(ii)
+             superob_lon = modulo(real(tmp1_lon(ii),8)+180.0D0, 360.0D0)-180.0D0
 
-          if (ind > 0) then
+             i_superob = min(N_superob_lon, int((superob_lon+180.0D0) / &
+                  real(this_obs_param%superob_grid_deg,8))+1)
+             j_superob = min(N_superob_lat, int((superob_lat+ 90.0D0) / &
+                  real(this_obs_param%superob_grid_deg,8))+1)
 
-             ASCAT_sm(  ind) = ASCAT_sm(  ind) + tmp1_obs(  ii)
-             ASCAT_lon( ind) = ASCAT_lon( ind) + tmp_lon(   ii)
-             ASCAT_lat( ind) = ASCAT_lat( ind) + tmp_lat(   ii)
-             ASCAT_time(ind) = ASCAT_time(ind) + tmp_jtime( ii)
+             ind = (j_superob-1)*N_superob_lon + i_superob
 
-             N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
+             superob_sm_sum(  ind) = superob_sm_sum(  ind) + tmp1_obs(  ii)
+             superob_time_sum(ind) = superob_time_sum(ind) + tmp1_jtime(ii)
+             N_obs_in_superob(ind) = N_obs_in_superob(ind) + 1
 
-          end if
+          end do
 
-       end do
+       else
 
-       deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
+          allocate(tmp_lat(        N_valid))
+          allocate(tmp_lon(        N_valid))
+          allocate(tmp_jtime(      N_valid))
+          allocate(tmp_tile_num(   N_valid))
+
+          tmp_lat   = tmp1_lat(  1:N_valid)
+          tmp_lon   = tmp1_lon(  1:N_valid)
+          tmp_jtime = tmp1_jtime(1:N_valid)
+
+          call get_tile_num_for_obs(N_catd, tile_coord,                      &
+               tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
+               N_valid, tmp_lat, tmp_lon,                                    &
+               this_obs_param,                                               &
+               tmp_tile_num )
+
+          do ii = 1, N_valid
+
+             ind = tmp_tile_num(ii)
+
+             if (ind > 0) then
+
+                ASCAT_sm(  ind) = ASCAT_sm(  ind) + tmp1_obs(  ii)
+                ASCAT_lon( ind) = ASCAT_lon( ind) + tmp_lon(   ii)
+                ASCAT_lat( ind) = ASCAT_lat( ind) + tmp_lat(   ii)
+                ASCAT_time(ind) = ASCAT_time(ind) + tmp_jtime( ii)
+
+                N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
+
+             end if
+
+          end do
+
+          deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
+
+       end if
 
     end do  ! file loop
 
     deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
     deallocate(fnames)
 
-    ! ----------------------------------------------------------------
-    !
-    ! normalise tile super-obs and set obs error std-dev
+    if (use_superobs) then
 
-    do ii = 1, N_catd
+       ASCAT_sm     = this_obs_param%nodata
+       ASCAT_sm_std = this_obs_param%nodata
+       ASCAT_lon    = this_obs_param%nodata
+       ASCAT_lat    = this_obs_param%nodata
+       ASCAT_time   = real(this_obs_param%nodata, kind(0.0D0))
 
-       ASCAT_sm_std(ii) = this_obs_param%errstd / 100.   ! % -> fraction
+       N_superob_occupied   = count(N_obs_in_superob > 0)
+       N_superob_no_tile    = 0
+       N_superob_collisions = 0
 
-       if (N_obs_in_tile(ii) > 1) then
+       if (N_superob_occupied > 0) then
 
-          ASCAT_sm(  ii) = ASCAT_sm(  ii) / real(N_obs_in_tile(ii))
-          ASCAT_lon( ii) = ASCAT_lon( ii) / real(N_obs_in_tile(ii))
-          ASCAT_lat( ii) = ASCAT_lat( ii) / real(N_obs_in_tile(ii))
-          ASCAT_time(ii) = ASCAT_time(ii) / real(N_obs_in_tile(ii), kind(0.0D0))
+          allocate(tmp_lat(         N_superob_occupied))
+          allocate(tmp_lon(         N_superob_occupied))
+          allocate(tmp_tile_num(    N_superob_occupied))
+          allocate(superob_cell_ind(N_superob_occupied))
+          allocate(best_dist2(      N_catd))
 
-       elseif (N_obs_in_tile(ii) == 0) then
+          kk = 0
+          do jj = 1, N_superob_lat
+             do ii = 1, N_superob_lon
 
-          ASCAT_sm(  ii)   =      this_obs_param%nodata
-          ASCAT_lon( ii)   =      this_obs_param%nodata
-          ASCAT_lat( ii)   =      this_obs_param%nodata
-          ASCAT_time(ii)   = real(this_obs_param%nodata, kind(0.0D0))
-          ASCAT_sm_std(ii) =      this_obs_param%nodata
+                ind = (jj-1)*N_superob_lon + ii
+
+                if (N_obs_in_superob(ind) > 0) then
+                   kk = kk + 1
+                   superob_cell_ind(kk) = ind
+                   tmp_lon(kk) = -180. + (real(ii)-0.5)*this_obs_param%superob_grid_deg
+                   tmp_lat(kk) =  -90. + (real(jj)-0.5)*this_obs_param%superob_grid_deg
+                end if
+
+             end do
+          end do
+
+          call get_tile_num_for_obs(N_catd, tile_coord,                     &
+               tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,         &
+               N_superob_occupied, tmp_lat, tmp_lon,                        &
+               this_obs_param,                                              &
+               tmp_tile_num )
+
+          best_dist2 = huge(1.)
+
+          do ii = 1, N_superob_occupied
+
+             ind = tmp_tile_num(ii)
+
+             if (ind <= 0) then
+                N_superob_no_tile = N_superob_no_tile + 1
+                cycle
+             end if
+
+             dlon = abs(real(tmp_lon(ii),8)-real(tile_coord(ind)%com_lon,8))
+             dlon = min(dlon, 360.0D0-dlon)
+             dlat = real(tmp_lat(ii),8)-real(tile_coord(ind)%com_lat,8)
+             dist2 = dlon*dlon + dlat*dlat
+
+             if (N_obs_in_tile(ind) > 0) N_superob_collisions = N_superob_collisions + 1
+
+             if (N_obs_in_tile(ind) == 0 .or. dist2 < real(best_dist2(ind),8)) then
+
+                kk = superob_cell_ind(ii)
+
+                ASCAT_sm(  ind) = superob_sm_sum(kk) / real(N_obs_in_superob(kk))
+                ASCAT_lon( ind) = tmp_lon(ii)
+                ASCAT_lat( ind) = tmp_lat(ii)
+                ASCAT_time(ind) = superob_time_sum(kk) / &
+                     real(N_obs_in_superob(kk), kind(0.0D0))
+                ASCAT_sm_std(ind) = this_obs_param%errstd / 100.   ! % -> fraction
+
+                N_obs_in_tile(ind) = N_obs_in_superob(kk)
+                best_dist2(ind) = real(dist2)
+
+             end if
+
+          end do
+
+          deallocate(tmp_lat, tmp_lon, tmp_tile_num, superob_cell_ind, best_dist2)
 
        end if
 
-    end do
+       if (logit) then
+          write(logunit,*) trim(Iam)//': superob_grid_deg = ', this_obs_param%superob_grid_deg
+          write(logunit,*) '  raw obs passing QC       = ', N_valid_total
+          write(logunit,*) '  invalid obs locations    = ', N_invalid_location
+          write(logunit,*) '  occupied super-ob cells  = ', N_superob_occupied
+          write(logunit,*) '  cells with 1 raw obs     = ', count(N_obs_in_superob == 1)
+          write(logunit,*) '  cells with 2 raw obs     = ', count(N_obs_in_superob == 2)
+          write(logunit,*) '  cells without a tile     = ', N_superob_no_tile
+          write(logunit,*) '  tile collisions          = ', N_superob_collisions
+          write(logunit,*) '  emitted super-obs        = ', count(N_obs_in_tile > 0)
+          if (N_superob_occupied > 0) then
+             write(logunit,*) '  samples per occupied cell= ',                        &
+                  minval(N_obs_in_superob, mask=(N_obs_in_superob>0)),             &
+                  real(sum(N_obs_in_superob))/real(N_superob_occupied),            &
+                  maxval(N_obs_in_superob)
+          end if
+       end if
+
+       deallocate(N_obs_in_superob, superob_sm_sum, superob_time_sum)
+
+    else
+
+       ! ----------------------------------------------------------------
+       !
+       ! normalise tile super-obs and set obs error std-dev
+
+       do ii = 1, N_catd
+
+          ASCAT_sm_std(ii) = this_obs_param%errstd / 100.   ! % -> fraction
+
+          if (N_obs_in_tile(ii) > 1) then
+
+             ASCAT_sm(  ii) = ASCAT_sm(  ii) / real(N_obs_in_tile(ii))
+             ASCAT_lon( ii) = ASCAT_lon( ii) / real(N_obs_in_tile(ii))
+             ASCAT_lat( ii) = ASCAT_lat( ii) / real(N_obs_in_tile(ii))
+             ASCAT_time(ii) = ASCAT_time(ii) / real(N_obs_in_tile(ii), kind(0.0D0))
+
+          elseif (N_obs_in_tile(ii) == 0) then
+
+             ASCAT_sm(  ii)   =      this_obs_param%nodata
+             ASCAT_lon( ii)   =      this_obs_param%nodata
+             ASCAT_lat( ii)   =      this_obs_param%nodata
+             ASCAT_time(ii)   = real(this_obs_param%nodata, kind(0.0D0))
+             ASCAT_sm_std(ii) =      this_obs_param%nodata
+
+          end if
+
+       end do
+
+    end if
 
     if (any(N_obs_in_tile > 0)) found_obs = .true.
 
@@ -10447,7 +10646,7 @@ contains
     
     character(300) :: fname
     
-    integer :: i, ind, pp, j_ind, i_ind
+    integer :: i, ind, pp, j_ind, i_ind, N_obs_before_scale
     integer :: ncid, varid, ierr, ierr2
     integer :: pentad_dimid, lon_dimid, lat_dimid
     integer :: N_pentad, N_lon, N_lat
@@ -10459,6 +10658,8 @@ contains
     logical :: file_exists
     
     real :: tmpreal, this_lon, this_lat, ll_lon, ll_lat, dlon, dlat
+
+    real, parameter :: superob_scaling_grid_tol = 1.e-3
     
     integer, dimension(:), allocatable :: sclprm_tile_id
     integer, dimension(:), allocatable :: pentads
@@ -10531,6 +10732,18 @@ contains
     ierr = nf90_get_var(ncid, ll_lat_varid, ll_lat)
     ierr = nf90_get_var(ncid, dlon_varid,   dlon)
     ierr = nf90_get_var(ncid, dlat_varid,   dlat)
+
+    if (this_obs_param%superob_grid_deg > 0. .and. &
+         .not. warned_superob_scaling_mismatch) then
+       if (abs(dlon-this_obs_param%superob_grid_deg) > superob_scaling_grid_tol .or. &
+            abs(dlat-this_obs_param%superob_grid_deg) > superob_scaling_grid_tol) then
+          write(err_msg,'(A,F8.4,A,2F8.4)') &
+               'super-ob spacing is ', this_obs_param%superob_grid_deg, &
+               ' deg but scaling-grid spacing is ', dlon, dlat
+          call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
+          warned_superob_scaling_mismatch = .true.
+       end if
+    end if
     
     start  = [1,     1,     pp]
     icount = [N_lat, N_lon, 1 ]
@@ -10556,6 +10769,8 @@ contains
     
     ! Scale observations (at this point all obs are of same type because
     ! of the way the subroutine is called from subroutine read_obs()
+
+    N_obs_before_scale = count(tmp_obs >= 0.)
     
     do i=1,N_catd
        
@@ -10618,6 +10833,11 @@ contains
        end if
        
     end do
+
+    if (logit .and. this_obs_param%superob_grid_deg > 0.) then
+       write(logunit,*) trim(Iam)//': super-obs rejected during scaling = ', &
+            N_obs_before_scale-count(tmp_obs >= 0.)
+    end if
         
     deallocate(sclprm_mean_obs)     
     deallocate(sclprm_std_obs)      

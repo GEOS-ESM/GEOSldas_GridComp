@@ -728,6 +728,7 @@ contains
     !       dimension(N_obs_ang_max) :: ang                   ! block  #3 (real)
     !  real                          :: freq    
     !  real                          :: FOV     
+    !  real                          :: superob_grid_deg
     !  character(40)                 :: FOV_units             ! block  #4 (character)
     !  logical                       :: assim                 ! block  #5 (logical)
     !  logical                       :: scale   
@@ -778,7 +779,7 @@ contains
 
     iblock( 1) = 40
     iblock( 2) = 4
-    iblock( 3) = N_obs_ang_max+2
+    iblock( 3) = N_obs_ang_max+3
     iblock( 4) = 40
     iblock( 5) = 3  
     iblock( 6) = 4

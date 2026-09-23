@@ -260,7 +260,7 @@ contains
     
     integer :: i, j, k, N_tmp, k_hD, k_hA, k_vD, k_vA
 
-    real    :: r_y
+    real    :: r_y, expected_FOV
     
     real, dimension(1) :: tmp_lat, r_x
     
@@ -386,6 +386,30 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown obs_param_nml%varname')
           
        end select
+
+       if (obs_param_nml(i)%superob_grid_deg < 0.) then
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%superob_grid_deg must be non-negative')
+       elseif (obs_param_nml(i)%superob_grid_deg > 0.) then
+          select case (trim(obs_param_nml(i)%descr))
+          case ('ASCAT_HSAF_META_SM','ASCAT_HSAF_METB_SM','ASCAT_HSAF_METC_SM')
+             if (trim(obs_param_nml(i)%FOV_units) /= 'deg' .or. &
+                  obs_param_nml(i)%FOV <= 0.) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                     'H SAF super-obs require a positive FOV with FOV_units="deg"')
+             end if
+
+             ! A degree-based FOV is a uniformly weighted ellipse.  Match its
+             ! area to the square super-ob cell within a modest tolerance.
+             expected_FOV = obs_param_nml(i)%superob_grid_deg/sqrt(MAPL_PI)
+             if (abs(obs_param_nml(i)%FOV-expected_FOV) > 0.25*expected_FOV) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                     'H SAF super-ob FOV must be within 25% of superob_grid_deg/sqrt(pi)')
+             end if
+          case default
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                  'obs_param_nml%superob_grid_deg is supported only for H SAF ASCAT species')
+          end select
+       end if
        
     end do
         
