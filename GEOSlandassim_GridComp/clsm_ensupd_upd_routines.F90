@@ -3576,11 +3576,20 @@ contains
     do k=1,N_obs
        
        ! map from grid to obs
+       !
+       ! get i/j_ind w.r.t. pert_grid_f and convert to pert_grid_lH with integer offsets;
+       ! using pert_grid_lH directly makes the result layout-dependent because its
+       ! ll_lon/ll_lat (computed from the local obs extent) are subject to roundoff,
+       ! so an obs near a pert grid cell edge could be mapped to different cells
+       ! on different processors (amfox, 24 Sep 2026)
        
        this_lon = Observations(k)%lon
        this_lat = Observations(k)%lat
        
-       call get_ij_ind_from_latlon( pert_grid_lH, this_lat, this_lon, lon_ind, lat_ind )
+       call get_ij_ind_from_latlon( pert_grid_f, this_lat, this_lon, lon_ind, lat_ind )
+
+       lon_ind = lon_ind - (pert_grid_lH%i_offg - pert_grid_f%i_offg)
+       lat_ind = lat_ind - (pert_grid_lH%j_offg - pert_grid_f%j_offg)
        
        j = ind_species2obsparam(Observations(k)%species)
        

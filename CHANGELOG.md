@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Refined ldas_setup restart handling for multiple restart options and surface components
+- Made observation perturbation grid-cell lookup independent of the EnKF analysis layout.
 ### Removed
 
 ### Deprecated
