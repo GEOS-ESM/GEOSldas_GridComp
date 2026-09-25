@@ -1735,6 +1735,8 @@ contains
           call cygnss_preproc_get_obs_pred(                                      &
                obs_param(this_species), N_catlH, tile_coord_lH, N_ens,           &
                sfmc_lH, mwp_clay_lH, mwp_poros_lH, f2l(this_tilenum),            &
+               Observations_l(i)%time, Observations_l(i)%lon,                    &
+               Observations_l(i)%lat,                                            &
                date_time, dtstep_assim,                                          &
                Obs_pred_l(i,1:N_ens) )
 

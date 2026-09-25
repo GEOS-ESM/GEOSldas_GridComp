@@ -34,7 +34,8 @@ module cygnss_preprocessed_obs
   use LDAS_DateTimeMod,                 ONLY:     &
        date_time_type,                            &
        augment_date_time,                         &
-       datetime_le_refdatetime
+       datetime_le_refdatetime,                   &
+       datetime_to_J2000seconds
 
   use mwRTM_routines,                   ONLY:     &
        mwRTM_get_lr_reflectivity
@@ -60,7 +61,14 @@ module cygnss_preprocessed_obs
 
   real,    allocatable     :: coefficient(:)
   real,    allocatable     :: sp_inc_angle(:)
-  real,    allocatable     :: sp_nearest_tile_distance_km(:)
+
+  ! identity of each cached obs, computed exactly as in read_obs_cygnss_l1_scalar()
+  ! so that the operator can find the obs the reader actually selected
+  real*8,  allocatable     :: obs_J2000(:)
+  real,    allocatable     :: obs_sp_lon(:)
+  real,    allocatable     :: obs_sp_lat(:)
+
+  character(4), parameter  :: J2000_epoch_id = 'TT12'   ! must match read_obs_cygnss_l1_scalar()
 
 contains
 
@@ -168,7 +176,9 @@ contains
     if (allocated(support_tile_jg))               deallocate(support_tile_jg)
     if (allocated(coefficient))                   deallocate(coefficient)
     if (allocated(sp_inc_angle))                  deallocate(sp_inc_angle)
-    if (allocated(sp_nearest_tile_distance_km))   deallocate(sp_nearest_tile_distance_km)
+    if (allocated(obs_J2000))                     deallocate(obs_J2000)
+    if (allocated(obs_sp_lon))                    deallocate(obs_sp_lon)
+    if (allocated(obs_sp_lat))                    deallocate(obs_sp_lat)
 
     is_loaded = .false.
     loaded_fname = ''
@@ -203,6 +213,10 @@ contains
 
     integer, allocatable :: tmp_tile_ig(:), tmp_tile_jg(:)
     integer, allocatable :: tmp_tile_start(:)
+    integer, allocatable :: tmp_year(:), tmp_day(:)
+    real*8,  allocatable :: tmp_seconds_utc(:)
+
+    type(date_time_type) :: date_time_obs
 
     character(len=400) :: fname
     character(len=2000) :: fname_key
@@ -308,7 +322,9 @@ contains
     allocate(tile_start(N_obs_file))
     allocate(tile_count(N_obs_file))
     allocate(sp_inc_angle(N_obs_file))
-    allocate(sp_nearest_tile_distance_km(N_obs_file))
+    allocate(obs_J2000(N_obs_file))
+    allocate(obs_sp_lon(N_obs_file))
+    allocate(obs_sp_lat(N_obs_file))
     allocate(support_tile_ig(N_support_file))
     allocate(support_tile_jg(N_support_file))
     allocate(coefficient(N_support_file))
@@ -344,6 +360,9 @@ contains
           allocate(tmp_tile_ig(N_obs_this))
           allocate(tmp_tile_jg(N_obs_this))
           allocate(tmp_tile_start(N_obs_this))
+          allocate(tmp_year(N_obs_this))
+          allocate(tmp_day(N_obs_this))
+          allocate(tmp_seconds_utc(N_obs_this))
 
           status = nf90_inq_varid(ncid, 'sp_nearest_tile_ig', varid)
           call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_ig')
@@ -380,10 +399,38 @@ contains
           status = nf90_get_var(ncid, varid, sp_inc_angle(obs_offset+1:obs_offset+N_obs_this))
           call cygnss_preproc_nc_check(status, Iam, 'reading sp_inc_angle')
 
-          status = nf90_inq_varid(ncid, 'sp_nearest_tile_distance_km', varid)
-          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_nearest_tile_distance_km')
-          status = nf90_get_var(ncid, varid, sp_nearest_tile_distance_km(obs_offset+1:obs_offset+N_obs_this))
-          call cygnss_preproc_nc_check(status, Iam, 'reading sp_nearest_tile_distance_km')
+          status = nf90_inq_varid(ncid, 'sp_lon', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_lon')
+          status = nf90_get_var(ncid, varid, obs_sp_lon(obs_offset+1:obs_offset+N_obs_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_lon')
+
+          status = nf90_inq_varid(ncid, 'sp_lat', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring sp_lat')
+          status = nf90_get_var(ncid, varid, obs_sp_lat(obs_offset+1:obs_offset+N_obs_this))
+          call cygnss_preproc_nc_check(status, Iam, 'reading sp_lat')
+
+          status = nf90_inq_varid(ncid, 'year', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring year')
+          status = nf90_get_var(ncid, varid, tmp_year)
+          call cygnss_preproc_nc_check(status, Iam, 'reading year')
+
+          status = nf90_inq_varid(ncid, 'day', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring day')
+          status = nf90_get_var(ncid, varid, tmp_day)
+          call cygnss_preproc_nc_check(status, Iam, 'reading day')
+
+          status = nf90_inq_varid(ncid, 'ddm_timestamp_utc_sec', varid)
+          call cygnss_preproc_nc_check(status, Iam, 'inquiring ddm_timestamp_utc_sec')
+          status = nf90_get_var(ncid, varid, tmp_seconds_utc)
+          call cygnss_preproc_nc_check(status, Iam, 'reading ddm_timestamp_utc_sec')
+
+          ! obs time stamp, computed exactly as in read_obs_cygnss_l1_scalar()
+
+          do i = 1, N_obs_this
+             date_time_obs = date_time_type(tmp_year(i), 1, 1, 0, 0, 0, -9999, -9999)
+             call augment_date_time( (tmp_day(i)-1)*86400 + nint(tmp_seconds_utc(i)), date_time_obs )
+             obs_J2000(obs_offset+i) = datetime_to_J2000seconds(date_time_obs, J2000_epoch_id)
+          end do
 
           status = nf90_inq_varid(ncid, 'tile_ig', varid)
           call cygnss_preproc_nc_check(status, Iam, 'inquiring tile_ig')
@@ -406,6 +453,9 @@ contains
           deallocate(tmp_tile_ig)
           deallocate(tmp_tile_jg)
           deallocate(tmp_tile_start)
+          deallocate(tmp_year)
+          deallocate(tmp_day)
+          deallocate(tmp_seconds_utc)
 
           obs_offset = obs_offset + N_obs_this
           support_offset = support_offset + N_support_this
@@ -423,11 +473,19 @@ contains
 
   ! *****************************************************************
 
-  integer function cygnss_preproc_find_obs(tilenum)
+  integer function cygnss_preproc_find_obs(tilenum, obs_time, obs_lon, obs_lat)
 
-    ! Find the cached coefficient-product observation for a GEOSldas owner
-    ! tile.  If duplicates exist, use the observation whose specular point is
-    ! closest to the owner tile.
+    ! Find the cached coefficient-product observation that the reader
+    ! (read_obs_cygnss_l1_scalar) selected for this GEOSldas owner tile,
+    ! identified by its owner tile and time stamp (J2000 seconds, as stored in
+    ! Observations%time), with the specular-point lon/lat as a tie-breaker.
+    !
+    ! The cache holds every obs in the daily files touched by the assimilation
+    ! window, so a tile can have several candidates at different times.  The
+    ! support coefficients and incidence angle MUST come from the same obs as
+    ! the observed value; earlier versions picked the obs closest to the tile
+    ! among all cached candidates, which could be a different obs from the one
+    ! the reader kept (amfox, 25 Sep 2026).
     !
     ! tilenum (here and in obs_tilenum) is a local-plus-halo ("lH") tile
     ! index, matching cygnss_preproc_get_obs_pred's tile_coord_lH -- not the
@@ -436,22 +494,27 @@ contains
     implicit none
 
     integer, intent(in) :: tilenum
+    real*8,  intent(in) :: obs_time
+    real,    intent(in) :: obs_lon, obs_lat
+
+    real*8,  parameter  :: time_tol = 0.5d0   ! [s]; obs times are whole seconds
 
     integer :: i
-    real    :: best_distance
+    real    :: dist2, best_dist2
 
     cygnss_preproc_find_obs = -1
-    best_distance = huge(best_distance)
+    best_dist2 = huge(best_dist2)
 
     do i=1,N_obs_file
 
-       if (obs_tilenum(i) == tilenum) then
+       if (obs_tilenum(i) /= tilenum)                 cycle
+       if (abs(obs_J2000(i) - obs_time) > time_tol)  cycle
 
-          if (sp_nearest_tile_distance_km(i) < best_distance) then
-             best_distance = sp_nearest_tile_distance_km(i)
-             cygnss_preproc_find_obs = i
-          end if
+       dist2 = (obs_sp_lon(i) - obs_lon)**2 + (obs_sp_lat(i) - obs_lat)**2
 
+       if (dist2 < best_dist2) then
+          best_dist2 = dist2
+          cygnss_preproc_find_obs = i
        end if
 
     end do
@@ -491,6 +554,7 @@ contains
   subroutine cygnss_preproc_get_obs_pred(                                      &
        this_obs_param, N_catlH, tile_coord_lH, N_ens,                          &
        sfmc_lH, mwp_clay_lH, mwp_poros_lH, tilenum,                            &
+       obs_time, obs_lon, obs_lat,                                             &
        date_time, dtstep_assim, obs_pred)
 
     ! Evaluate the CYGNSS coefficient operator for one GEOSldas observation
@@ -512,6 +576,9 @@ contains
     real, dimension(N_catlH,N_ens),          intent(in)  :: mwp_poros_lH
 
     integer,                                 intent(in)  :: tilenum
+    real*8,                                  intent(in)  :: obs_time    ! Observations%time [J2000 s]
+    real,                                    intent(in)  :: obs_lon     ! Observations%lon
+    real,                                    intent(in)  :: obs_lat     ! Observations%lat
     type(date_time_type),                    intent(in)  :: date_time
     integer,                                 intent(in)  :: dtstep_assim
     real, dimension(N_ens),                  intent(out) :: obs_pred
@@ -532,10 +599,11 @@ contains
 
     obs_pred = nodata_generic
 
-    obs_ind = cygnss_preproc_find_obs(tilenum)
+    obs_ind = cygnss_preproc_find_obs(tilenum, obs_time, obs_lon, obs_lat)
 
     if (obs_ind < 1) then
-       write(err_msg,*) 'CYGNSS coefficient obs not found for tilenum=', tilenum
+       write(err_msg,*) 'CYGNSS coefficient obs not found for tilenum=', tilenum, &
+            ' obs_time=', obs_time, ' obs_lon=', obs_lon, ' obs_lat=', obs_lat
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
 
