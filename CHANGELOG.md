@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added comment to clarify the selection of the tile file ( nc4 or acsii)
-- Added configurable fixed-grid super-observation support for H SAF ASCAT soil moisture.
+- Added configurable fixed-grid super-observation support for H SAF ASCAT soil moisture (super-obs placed at the mean location and time of contributing obs).
 ### Changed
 
 ### Fixed

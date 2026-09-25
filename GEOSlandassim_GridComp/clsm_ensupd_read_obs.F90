@@ -2314,7 +2314,7 @@ contains
     ! fixed-grid super-ob accumulation across all files in the window
     integer, allocatable :: N_obs_in_superob(:), superob_cell_ind(:)
     real,    allocatable :: superob_sm_sum(:), best_dist2(:)
-    real*8,  allocatable :: superob_time_sum(:)
+    real*8,  allocatable :: superob_time_sum(:), superob_lat_sum(:), superob_lon_sum(:)
 
     character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
     character(len=400)             :: err_msg
@@ -2491,10 +2491,14 @@ contains
        allocate(N_obs_in_superob(N_superob_cells))
        allocate(superob_sm_sum(  N_superob_cells))
        allocate(superob_time_sum(N_superob_cells))
+       allocate(superob_lat_sum( N_superob_cells))
+       allocate(superob_lon_sum( N_superob_cells))
 
        N_obs_in_superob = 0
        superob_sm_sum   = 0.
        superob_time_sum = 0.0D0
+       superob_lat_sum  = 0.0D0
+       superob_lon_sum  = 0.0D0
     end if
 
     ! scratch arrays for valid obs from one file at a time
@@ -2677,6 +2681,8 @@ contains
 
              superob_sm_sum(  ind) = superob_sm_sum(  ind) + tmp1_obs(  ii)
              superob_time_sum(ind) = superob_time_sum(ind) + tmp1_jtime(ii)
+             superob_lat_sum( ind) = superob_lat_sum( ind) + superob_lat
+             superob_lon_sum( ind) = superob_lon_sum( ind) + superob_lon   ! normalised, so no dateline wrap within a cell
              N_obs_in_superob(ind) = N_obs_in_superob(ind) + 1
 
           end do
@@ -2753,8 +2759,9 @@ contains
                 if (N_obs_in_superob(ind) > 0) then
                    kk = kk + 1
                    superob_cell_ind(kk) = ind
-                   tmp_lon(kk) = -180. + (real(ii)-0.5)*this_obs_param%superob_grid_deg
-                   tmp_lat(kk) =  -90. + (real(jj)-0.5)*this_obs_param%superob_grid_deg
+                   ! place super-ob at mean location of contributing raw obs (consistent with mean time)
+                   tmp_lon(kk) = real(superob_lon_sum(ind) / real(N_obs_in_superob(ind),8))
+                   tmp_lat(kk) = real(superob_lat_sum(ind) / real(N_obs_in_superob(ind),8))
                 end if
 
              end do
@@ -2825,6 +2832,7 @@ contains
        end if
 
        deallocate(N_obs_in_superob, superob_sm_sum, superob_time_sum)
+       deallocate(superob_lat_sum, superob_lon_sum)
 
     else
 
