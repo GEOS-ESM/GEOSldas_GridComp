@@ -16,15 +16,28 @@
 
 module clsm_ensupd_read_obs
   
+  use, intrinsic :: iso_c_binding,      ONLY:     &
+       c_char
+  
+  use, intrinsic :: iso_fortran_env,    ONLY:     &
+       int16
+  
   use MAPL_BaseMod,                     ONLY:     &
        MAPL_UNDEF
 
   use MAPL_ConstantsMod,                ONLY:     &
        MAPL_TICE
-
+  
   use io_hdf5,                          ONLY:     &
-       hdf5read 
-
+       hdf5read
+  
+  use hdf4_fortran_api,                 ONLY:     &
+       hopen, hclose, vfstart, vsfatch,           &
+       vsqfnelt, vsfseek, vsfsfld,                &
+       vsfread, vsfdtch, vfend,                   &
+       sfstart, sfn2index, sfselect,              &
+       sfginfo, sfrdata, sfendacc, sfend
+  
   use MAPL,                             ONLY:     &
        MAPL_ease_convert,                         &
        MAPL_ease_extent
@@ -216,12 +229,6 @@ contains
     
     integer, parameter :: max_Heterogeneity_Index      = 500 ! = 5 Kelvin
     
-    ! declarations of hdf functions 
-    
-    integer :: hopen, vfstart, vsfatch, vsqfnelt, vsfseek, vsfsfld, vsfread
-    integer :: vsfdtch, vfend, hclose
-    
-    
     ! declarations of hdf-related parameters and variables
     
     integer, dimension(N_files) :: file_id, vdata_id 
@@ -246,8 +253,8 @@ contains
     integer, dimension(:), allocatable :: surface_type_qc_flag
     integer, dimension(:), allocatable :: Heterogeneity_Index
     
-    integer*2, dimension(:), allocatable :: tmpint2vec
-    real,      dimension(:), allocatable :: tmprealvec
+    integer(int16), dimension(:), allocatable :: tmpint2vec
+    real,           dimension(:), allocatable :: tmprealvec
     
     character(len=*), parameter :: Iam = 'read_ae_l2_sm_hdf'
     character(len=400) :: err_msg
@@ -7303,9 +7310,9 @@ contains
 
     integer,         parameter :: SCF_nodata          = -9999. 
     
-    integer(KIND=2), parameter :: qc_snow_cover_max   = 100    ! exclude lake ice, night, inland water, ocean, etc
-    integer(KIND=2), parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions 
-    integer(KIND=2), parameter :: qc_snow_spatial_max =   2    ! data quality (0=best, 1=good, 2=OK, 3=poor, 4=other) 
+    integer(int16),  parameter :: qc_snow_cover_max   = 100    ! exclude lake ice, night, inland water, ocean, etc
+    integer(int16),  parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
+    integer(int16),  parameter :: qc_snow_spatial_max =   2    ! data quality (0=best, 1=good, 2=OK, 3=poor, 4=other)
     
     integer,         parameter :: DFACC_READ          =   1    ! from hdf.inc
     
@@ -7329,18 +7336,15 @@ contains
     
     integer                                         :: status, sd_id, sds_id, sds_index
     
-    integer                                         :: sfstart, sfn2index, sfselect, sfginfo
-    integer                                         :: sfrdata, sfendacc,  sfend
-    
     character(64)                                   :: sds_name
 
     integer                                         :: rank, data_type, num_attrs
 
-    integer(KIND=2),    dimension(:,:), allocatable :: Snow_Cover
-    integer(KIND=2),    dimension(:,:), allocatable :: Clear_Index
-    integer(KIND=2),    dimension(:,:), allocatable :: Snow_Spatial_QA
+    integer(int16),     dimension(:,:), allocatable :: Snow_Cover
+    integer(int16),     dimension(:,:), allocatable :: Clear_Index
+    integer(int16),     dimension(:,:), allocatable :: Snow_Spatial_QA
     
-    character(1),       dimension(:,:), allocatable :: tmp_char1
+    character(kind=c_char, len=1), dimension(:,:), allocatable :: tmp_char1
 
     character(len=*),                     parameter :: Iam = 'read_MODIS_SCF_hdf'
     character(len=400)                              :: err_msg
@@ -8381,8 +8385,9 @@ contains
     
     logical,   parameter :: tmp_debug    = .false.
     
-    real,      parameter :: Tb_min       = 100.0  ! min allowed Tb
-    real,      parameter :: Tb_max       = 320.0  ! max allowed Tb
+    real,      parameter :: Tb_min       = 100.0  ! min allowed Tb       [K]
+    real,      parameter :: Tb_max       = 320.0  ! max allowed Tb       [K]
+    real,      parameter :: Tb_error_max  =  1.3  ! max allowed Tb error [K] 
 
     real,      parameter :: max_std_tb_fore_minus_aft = 20.  ! max std-dev L1C[E] fore-minus-aft Tb diffs
 
@@ -8439,8 +8444,9 @@ contains
 
     character(100)       :: dset_name_lon,    dset_name_lat
     character(100)       :: dset_name_col,    dset_name_row
-    character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1
-    character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2
+    
+    character(100)       :: dset_name_time_1, dset_name_tb_1, dset_name_tb_qual_flag_1, dset_name_tb_error_1
+    character(100)       :: dset_name_time_2, dset_name_tb_2, dset_name_tb_qual_flag_2, dset_name_tb_error_2
 
     character(200), dimension(2*N_halforbits_max)  :: fname_list  ! max 2 days of files
 
@@ -8460,6 +8466,9 @@ contains
 
     integer,        dimension(:),     allocatable  :: tmp_tb_qual_flag_1
     integer,        dimension(:),     allocatable  :: tmp_tb_qual_flag_2
+
+    real,           dimension(:),     allocatable  :: tmp_tb_error_1
+    real,           dimension(:),     allocatable  :: tmp_tb_error_2
     
     integer,        dimension(:),     allocatable  :: tmp_tile_num
 
@@ -8639,6 +8648,9 @@ contains
           dset_name_tb_qual_flag_1 = '/Global_Projection/cell_tb_qual_flag_h_fore'
           dset_name_tb_qual_flag_2 = '/Global_Projection/cell_tb_qual_flag_h_aft'
           
+          dset_name_tb_error_1     = '/Global_Projection/cell_tb_error_h_fore'
+          dset_name_tb_error_2     = '/Global_Projection/cell_tb_error_h_aft'
+          
        else
           
           dset_name_tb_1           = '/Global_Projection/cell_tb_v_fore'
@@ -8647,6 +8659,9 @@ contains
           dset_name_tb_qual_flag_1 = '/Global_Projection/cell_tb_qual_flag_v_fore'
           dset_name_tb_qual_flag_2 = '/Global_Projection/cell_tb_qual_flag_v_aft'
           
+          dset_name_tb_error_1     = '/Global_Projection/cell_tb_error_v_fore'
+          dset_name_tb_error_2     = '/Global_Projection/cell_tb_error_v_aft'
+ 
        end if
        
     else  
@@ -8943,6 +8958,20 @@ contains
 
           call h5r%readDataset(tmp_tb_qual_flag_1)
 
+          ! TB_ERROR_1: query dataset, check size, allocate space, read data
+          
+          if (tmp_debug .and. logit) write(logunit,*) trim(dset_name_tb_error_1)
+          
+          call h5r%queryDataset(dset_name_tb_error_1, dset_rank, dset_size)
+
+          if (N_obs_tmp/=dset_size(1)) then
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, tmp_err_msg)
+          end if
+          
+          allocate(tmp_tb_error_1(N_obs_tmp))
+          
+          call h5r%readDataset(tmp_tb_error_1)
+
           ! for L1C_TB or L1C_TB_E files also read "aft"
 
           if (L1C_files .or. L1CE_files) then
@@ -8991,7 +9020,21 @@ contains
              allocate(tmp_tb_qual_flag_2(N_obs_tmp))
              
              call h5r%readDataset(tmp_tb_qual_flag_2)
+             
+             ! TB_ERROR_2: query dataset, check size, allocate space, read data
+             
+             if (tmp_debug .and. logit) write(logunit,*) trim(dset_name_tb_error_2)
+             
+             call h5r%queryDataset(dset_name_tb_error_2, dset_rank, dset_size)
+             
+             if (N_obs_tmp/=dset_size(1)) then
+                call ldas_abort(LDAS_GENERIC_ERROR, Iam, tmp_err_msg)
+             end if
 
+             allocate(tmp_tb_error_2(N_obs_tmp))
+             
+             call h5r%readDataset(tmp_tb_error_2)
+             
           end if
           
           ! close file
@@ -9029,15 +9072,17 @@ contains
 
                 ! QC
 
-                keep_data_1 =                                    &
-                     (mod(tmp_tb_qual_flag_1(nn),2)==0)    .and. & ! lowest bit must be 0
-                     (tmp_tb_1(nn)   >  Tb_min)            .and. & ! elim neg nodata
-                     (tmp_tb_1(nn)   <  Tb_max)                    ! elim huge pos nodata
+                keep_data_1 =                                                 &
+                     (mod(tmp_tb_qual_flag_1(nn),2) == 0           )  .and.   &   ! lowest bit must be 0
+                     (    tmp_tb_error_1(    nn)    <= Tb_error_max)  .and.   &   ! elim data w. large tb_error  
+                     (    tmp_tb_1(          nn)    >  Tb_min      )  .and.   &   ! elim neg nodata
+                     (    tmp_tb_1(          nn)    <  Tb_max      )              ! elim huge pos nodata
                 
-                keep_data_2 =                                    &
-                     (mod(tmp_tb_qual_flag_2(nn),2)==0)    .and. & ! lowest bit must be 0
-                     (tmp_tb_2(nn)   >  Tb_min)            .and. & ! elim neg nodata
-                     (tmp_tb_2(nn)   <  Tb_max)                    ! elim huge pos nodata
+                keep_data_2 =                                                 &
+                     (mod(tmp_tb_qual_flag_2(nn),2) == 0           )  .and.   &   ! lowest bit must be 0
+                     (    tmp_tb_error_2(    nn)    <= Tb_error_max)  .and.   &   ! elim data w. large tb_error 
+                     (    tmp_tb_2(          nn)    >  Tb_min      )  .and.   &   ! elim neg nodata
+                     (    tmp_tb_2(          nn)    <  Tb_max      )              ! elim huge pos nodata
 
                 ! thinning of L1C_TB_E obs
                 
@@ -9296,6 +9341,8 @@ contains
           if (allocated(tmp_tb_2          )) deallocate(tmp_tb_2          )
           if (allocated(tmp_tb_qual_flag_1)) deallocate(tmp_tb_qual_flag_1)
           if (allocated(tmp_tb_qual_flag_2)) deallocate(tmp_tb_qual_flag_2)
+          if (allocated(tmp_tb_error_1)) deallocate(tmp_tb_error_1)
+          if (allocated(tmp_tb_error_2)) deallocate(tmp_tb_error_2)
           
        end do  ! kk=1,N_fnames
           

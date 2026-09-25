@@ -14,7 +14,7 @@ import warnings;  warnings.filterwarnings("ignore")
 from datetime                    import datetime, timedelta
 from dateutil.relativedelta      import relativedelta
 from netCDF4                     import Dataset, date2num
-from read_GEOSldas               import read_ObsFcstAna, read_tilecoord, read_obs_param
+from read_GEOSldas               import read_ObsFcstAna, read_ObsFcstAna_nc4, read_tilecoord, read_obs_param
 
 from helper.write_nc4            import write_sums_nc4, write_stats_nc4
 
@@ -94,6 +94,7 @@ class postproc_ObsFcstAna:
         n_spec = len(obsparam_list[0])
 
         date_time = date_time.replace(hour=int(self.da_t0), minute=int(np.mod(self.da_t0,1)*60))
+        month_string = date_time.strftime('%Y%m')
         stop_time = date_time + relativedelta(months=1) 
         
         data_sum  = {}
@@ -108,19 +109,28 @@ class postproc_ObsFcstAna:
             data_sum[ var] = np.zeros((n_tile, n_spec))
             data2_sum[var] = np.zeros((n_tile, n_spec))
 
+        n_files_read = 0
+
         while date_time < stop_time:
             
             # read the list of experiments at each time step (OFA="ObsFcstAna")
             OFA_list = []
             for i in range(len(expdir_list)):
-                fname = expdir_list[i]+expid_list[i]+'/output/'+self.domain+'/ana/ens_avg/Y'+ \
-                                  date_time.strftime('%Y') + '/M' + \
-                                  date_time.strftime('%m') + '/'  + \
-                                  expid_list[i]+'.ens_avg.ldas_ObsFcstAna.' + \
-                                  date_time.strftime('%Y%m%d_%H%M') +'z.bin'
-                if os.path.isfile(fname):
-                    print('read '+fname)
-                    OFA_list.append(read_ObsFcstAna(fname))
+                fname_base = expdir_list[i]+expid_list[i]+'/output/'+self.domain+'/ana/ens_avg/Y'+ \
+                                      date_time.strftime('%Y') + '/M' + \
+                                      date_time.strftime('%m') + '/'  + \
+                                      expid_list[i]+'.ens_avg.ldas_ObsFcstAna.' + \
+                                      date_time.strftime('%Y%m%d_%H%M') +'z'
+                fname_nc4 = fname_base + '.nc4'
+                fname_bin = fname_base + '.bin'
+                if os.path.isfile(fname_nc4):
+                    print('read '+fname_nc4)
+                    OFA_list.append(read_ObsFcstAna_nc4(fname_nc4))
+                    n_files_read += 1
+                elif os.path.isfile(fname_bin):
+                    print('read '+fname_bin)
+                    OFA_list.append(read_ObsFcstAna(fname_bin))
+                    n_files_read += 1
 
             data_all=[]
             for OFA, obs_param in zip(OFA_list,obsparam_list):
@@ -181,6 +191,9 @@ class postproc_ObsFcstAna:
             
             date_time = date_time + timedelta(seconds=da_dt)
 
+        if n_files_read == 0:
+            raise FileNotFoundError('No ObsFcstAna .nc4 or .bin files found for ' + month_string)
+
         return N_data, data_sum, data2_sum, oxf_sum, oxa_sum, fxa_sum
 
     # ----------------------------------------------------------------------------------------------------------
@@ -212,8 +225,13 @@ class postproc_ObsFcstAna:
             if  not os.path.isfile(fout):
                 print('computing monthly sums...')
                 # compute monthly sums
-                mN_data, mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum = \
-                    self.compute_monthly_sums(date_time)
+                try:
+                    mN_data, mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum = \
+                        self.compute_monthly_sums(date_time)
+                except FileNotFoundError as e:
+                    print(f'WARNING: skipping {date_time.strftime("%Y%m")} - {e}')
+                    date_time = date_time + relativedelta(months=1)
+                    continue
 
                 # save monthly sums in nc4 file
                 write_sums_nc4(fout, mN_data,mdata_sum, mdata2_sum, moxf_sum, moxa_sum, mfxa_sum, obsparam_list[0])
