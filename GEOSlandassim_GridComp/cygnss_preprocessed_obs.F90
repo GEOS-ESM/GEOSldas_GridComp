@@ -46,6 +46,7 @@ module cygnss_preprocessed_obs
 
   public :: cygnss_preproc_get_obs_pred
   public :: cygnss_preproc_clear
+  public :: cygnss_l1_obs_J2000
 
   logical                  :: is_loaded = .false.
   character(len=2000)      :: loaded_fname = ''
@@ -68,7 +69,7 @@ module cygnss_preprocessed_obs
   real,    allocatable     :: obs_sp_lon(:)
   real,    allocatable     :: obs_sp_lat(:)
 
-  character(4), parameter  :: J2000_epoch_id = 'TT12'   ! must match read_obs_cygnss_l1_scalar()
+  character(4), parameter  :: J2000_epoch_id = 'TT12'   ! epoch of Observations%time (see cygnss_l1_obs_J2000)
 
 contains
 
@@ -215,8 +216,6 @@ contains
     integer, allocatable :: tmp_tile_start(:)
     integer, allocatable :: tmp_year(:), tmp_day(:)
     real*8,  allocatable :: tmp_seconds_utc(:)
-
-    type(date_time_type) :: date_time_obs
 
     character(len=400) :: fname
     character(len=2000) :: fname_key
@@ -424,12 +423,10 @@ contains
           status = nf90_get_var(ncid, varid, tmp_seconds_utc)
           call cygnss_preproc_nc_check(status, Iam, 'reading ddm_timestamp_utc_sec')
 
-          ! obs time stamp, computed exactly as in read_obs_cygnss_l1_scalar()
+          ! obs time stamp, computed by the same function as in read_obs_cygnss_l1_scalar()
 
           do i = 1, N_obs_this
-             date_time_obs = date_time_type(tmp_year(i), 1, 1, 0, 0, 0, -9999, -9999)
-             call augment_date_time( (tmp_day(i)-1)*86400 + nint(tmp_seconds_utc(i)), date_time_obs )
-             obs_J2000(obs_offset+i) = datetime_to_J2000seconds(date_time_obs, J2000_epoch_id)
+             obs_J2000(obs_offset+i) = cygnss_l1_obs_J2000(tmp_year(i), tmp_day(i), tmp_seconds_utc(i))
           end do
 
           status = nf90_inq_varid(ncid, 'tile_ig', varid)
@@ -480,6 +477,11 @@ contains
     ! identified by its owner tile and time stamp (J2000 seconds, as stored in
     ! Observations%time), with the specular-point lon/lat as a tie-breaker.
     !
+    ! Returns -1 if no cached obs has this owner tile and time stamp, and -2 if
+    ! the closest candidate's specular point does not match obs_lon/obs_lat.
+    ! The reader stores the sp_lon/sp_lat of the obs it kept, so the selected
+    ! obs matches exactly; a mismatch means reader and cache have diverged.
+    !
     ! The cache holds every obs in the daily files touched by the assimilation
     ! window, so a tile can have several candidates at different times.  The
     ! support coefficients and incidence angle MUST come from the same obs as
@@ -497,7 +499,8 @@ contains
     real*8,  intent(in) :: obs_time
     real,    intent(in) :: obs_lon, obs_lat
 
-    real*8,  parameter  :: time_tol = 0.5d0   ! [s]; obs times are whole seconds
+    real*8,  parameter  :: time_tol   = 0.5d0   ! [s]; obs times are whole seconds
+    real,    parameter  :: lonlat_tol = 1.e-4   ! [deg]; selected obs matches exactly
 
     integer :: i
     real    :: dist2, best_dist2
@@ -519,7 +522,33 @@ contains
 
     end do
 
+    if (cygnss_preproc_find_obs > 0 .and. best_dist2 > lonlat_tol**2) cygnss_preproc_find_obs = -2
+
   end function cygnss_preproc_find_obs
+
+  ! *****************************************************************
+
+  real*8 function cygnss_l1_obs_J2000(year, day, seconds_utc)
+
+    ! Time stamp [J2000 seconds, 'TT12' epoch] of one CYGNSS L1 coefficient-
+    ! product obs.  Used by read_obs_cygnss_l1_scalar() for Observations%time
+    ! and by cygnss_preproc_load() for the cache, so that the operator can
+    ! identify the obs the reader kept by its exact time stamp.
+
+    implicit none
+
+    integer, intent(in) :: year          ! calendar year
+    integer, intent(in) :: day           ! day of year
+    real*8,  intent(in) :: seconds_utc   ! ddm_timestamp_utc_sec [s since 00z]
+
+    type(date_time_type) :: date_time_obs
+
+    date_time_obs = date_time_type(year, 1, 1, 0, 0, 0, -9999, -9999)
+    call augment_date_time( (day-1)*86400 + nint(seconds_utc), date_time_obs )
+
+    cygnss_l1_obs_J2000 = datetime_to_J2000seconds(date_time_obs, J2000_epoch_id)
+
+  end function cygnss_l1_obs_J2000
 
   ! *****************************************************************
 
@@ -601,7 +630,11 @@ contains
 
     obs_ind = cygnss_preproc_find_obs(tilenum, obs_time, obs_lon, obs_lat)
 
-    if (obs_ind < 1) then
+    if (obs_ind == -2) then
+       write(err_msg,*) 'CYGNSS coefficient obs sp_lon/sp_lat mismatch for tilenum=', tilenum, &
+            ' obs_time=', obs_time, ' obs_lon=', obs_lon, ' obs_lat=', obs_lat
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    elseif (obs_ind < 1) then
        write(err_msg,*) 'CYGNSS coefficient obs not found for tilenum=', tilenum, &
             ' obs_time=', obs_time, ' obs_lon=', obs_lon, ' obs_lat=', obs_lat
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)

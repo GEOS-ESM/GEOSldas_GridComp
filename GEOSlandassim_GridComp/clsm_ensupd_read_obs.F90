@@ -77,6 +77,9 @@ module clsm_ensupd_read_obs
 
   use clsm_ensupd_upd_routines,         ONLY:     &
        dist_km2deg
+
+  use cygnss_preprocessed_obs,          ONLY:     &
+       cygnss_l1_obs_J2000
   
   implicit none
 
@@ -3363,7 +3366,7 @@ contains
     character(len=*),  parameter :: Iam = 'read_obs_cygnss_l1_scalar'
     real,              parameter :: huge_distance = 1.0e30
 
-    type(date_time_type) :: date_time_low, date_time_up, date_time_file, date_time_obs
+    type(date_time_type) :: date_time_low, date_time_up, date_time_file
 
     character(400) :: err_msg
     character(400) :: tmpfname
@@ -3375,7 +3378,6 @@ contains
     integer :: ncid, dimid, varid
     integer :: N_obs, N_read, N_kept, N_duplicate, N_bad_owner, N_outside_time
     integer :: N_files_read
-    integer :: obs_seconds
 
     integer, allocatable :: owner_tile_ig(:), owner_tile_jg(:)
     integer, allocatable :: obs_year(:), obs_day(:)
@@ -3593,10 +3595,10 @@ contains
 
        if (abs(obs_db(i)-this_obs_param%nodata) <= tol) cycle
 
-       obs_seconds = nint(obs_seconds_utc(i))
-       date_time_obs = date_time_type(obs_year(i), 1, 1, 0, 0, 0, -9999, -9999)
-       call augment_date_time( (obs_day(i)-1)*86400 + obs_seconds, date_time_obs )
-       J2000_seconds_obs = datetime_to_J2000seconds(date_time_obs, J2000_epoch_id)
+       ! same function as the operator's cache (cygnss_preprocessed_obs), so that
+       ! Observations%time identifies this obs in the coefficient product
+
+       J2000_seconds_obs = cygnss_l1_obs_J2000(obs_year(i), obs_day(i), obs_seconds_utc(i))
 
        if (J2000_seconds_obs <= J2000_seconds_low .or. J2000_seconds_obs > J2000_seconds_up) then
           N_outside_time = N_outside_time + 1
