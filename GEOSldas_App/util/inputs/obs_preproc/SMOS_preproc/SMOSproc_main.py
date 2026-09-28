@@ -115,9 +115,10 @@ def main():
         try:
             ncflist = process_ee_to_nc(current_date)
         except RuntimeError as e:
-            logging.error(f"Halting processing for {date_str} due to error: {e}")
-            current_date += timedelta(days=1)
-            continue
+            logging.error(f"Halting processing for {date_str} due to error: {e} related to building nc file list")
+            sys.exit(1) 
+            #current_date += timedelta(days=1)
+            #continue
 
         # Step 2: Preprocess NetCDF files into REG 
         for fnc in ncflist:
@@ -125,8 +126,9 @@ def main():
             try:
                 run_in_isolated_process(preprocess_nc, fnc, config)
             except RuntimeError as e:
-                logging.error(f"Skipping {fnc} due to error: {e}")
-                continue
+                logging.error(f"Skipping {fnc} due to error: {e} in preprocessing of nc files")
+                sys.exit(1) 
+                #continue
 
             # Move processed file to 'to_delete'
             dest = os.path.join(TMP_NC_PATH, 'to_delete', os.path.basename(fnc))
@@ -141,12 +143,14 @@ def main():
             run_in_isolated_process(SCLF1C_reg2fit, OUT_REG_PATH, current_date, next_date, '_A')
         except RuntimeError as e:
             logging.error(f"SCLF1C_reg2fit failed for Ascending (_A) on {date_str}: {e}")
+            sys.exit(1) 
 
         logging.info("Running SCLF1C_reg2fit for Descending (_D)")
         try:
             run_in_isolated_process(SCLF1C_reg2fit, OUT_REG_PATH, current_date, next_date, '_D')
         except RuntimeError as e:
             logging.error(f"SCLF1C_reg2fit failed for Descending (_D) on {date_str}: {e}")
+            sys.exit(1) 
         
         logging.info(f"=== Completed processing to Tb40 for {date_str} ===")
         
