@@ -83,8 +83,20 @@ module LDAS_PertTypes
      real             :: xcorr  ! correlation length along latitudes   [deg]
      real             :: ycorr  ! correlation length along longitudes  [deg]
      real             :: tcorr  ! temporal correlation length          [s]
-     
-  end type pert_param_type
+
+     ! ------------------------------------------------------------------
+     ! Sphere-native perturbation parameters (SMERFS-based).
+     !
+     ! When use_sphere_pert = .true., perturbations are generated directly
+     ! on the sphere using the SMERFS
+     ! Power spectrum: C_l = 1 / (c0 + c2 * (l*(l+1))^2), with c0=1
+     ! and c2 derived from xcorr by sphere_random_fields.
+     ! Native sphere dimensions are automatically calculated from xcorr and
+     ! the fine-grid spacing.
+     ! ------------------------------------------------------------------
+     logical :: use_sphere_pert  = .false.  ! .true. => SMERFS; .false. => flat FFT
+
+   end type pert_param_type
   
   ! **********************************************************************
 

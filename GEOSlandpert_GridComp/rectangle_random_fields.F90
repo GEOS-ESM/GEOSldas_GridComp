@@ -1,17 +1,17 @@
 ! =========================================================================
 !
-! random_fields.f90
+! rectangle_random_fields.f90
 !
 ! random field generator in 2d:
 !  generate a pair of random fields in 2d with zero mean
 !
-! subroutines rfg2d_fft() and sqrt_gauss_spectrum are translated from 
+! subroutines generate_2d_Random_field() and sqrt_gauss_spectrum are translated from
 !  C++ code rfg2d.C written for MIT EnKF work by reichle
 !  (see janus:~reichle/nasa/EnKF)
 !
 ! covariance is specified through its spectrum, so far only Gaussian
 !
-! IMPORTANT: read comments for function rfg2d_fft()
+! IMPORTANT: read comments for generate_2d_Random_field()
 !
 ! written for NSIPP - EnKF
 ! Type:   f90
@@ -33,7 +33,10 @@
 #include "MAPL_ErrLog.h"
 #include "unused_dummy.H"
 
-module random_fieldsMod
+module rectangle_random_fieldsMod
+  use abstract_random_fieldsMod, only: abstract_random_fields
+  use LDAS_PertTypes, only: pert_param_type
+  use LDAS_TileCoordType, only: grid_def_type
   
 #ifdef MKL_AVAILABLE
   use, intrinsic :: iso_c_binding, only: c_loc, c_f_pointer, c_ptr, c_sizeof, C_NULL_PTR
@@ -53,15 +56,18 @@ module random_fieldsMod
 
   implicit none
   
-  private
+   private
+   public :: rectangle_random_fields_id
 
-  real, parameter :: TWO_PI = 2.*3.14159265
-  real, parameter :: SQRT2 = sqrt(2.0)
+   real, parameter :: TWO_PI = 2.*3.14159265
+   real, parameter :: SQRT2 = sqrt(2.0)
   
-  type, public :: random_fields
+   type, public, extends(abstract_random_fields) :: rectangle_random_fields
      private
-     integer :: N_x, N_y
-     integer :: N_x_fft, N_y_fft ! computed by calc_fft_grid
+     integer, public :: N_x, N_y
+     integer, public :: N_x_fft, N_y_fft
+     integer, public :: xStride, yStride
+     real, public :: rdlon, rdlat, xCorr, yCorr
      real, allocatable :: field1_fft(:,:), field2_fft(:,:)
      integer :: fft_lens(2) ! length of each dim for 2D transform
 #ifdef MKL_AVAILABLE
@@ -81,43 +87,93 @@ module random_fieldsMod
      
      !     procedure, public  :: initialize
      procedure, public  :: finalize
-     procedure, public  :: rfg2d_fft
+     procedure, public  :: generate_2d_Random_field
      procedure, public  :: generate_white_field
      procedure, private :: sqrt_gauss_spectrum_2d
 #ifdef MKL_AVAILABLE
      procedure, private :: win_allocate
      procedure, private :: win_deallocate
 #endif
-  end type random_fields
+   end type rectangle_random_fields
 
-  interface random_fields
-     module procedure new_random_fields
-  end interface random_fields
+   interface rectangle_random_fields
+      module procedure new_rectangle_random_fields
+   end interface rectangle_random_fields
   
 contains
-  
+
+   function rectangle_random_fields_id(pert_param, pert_grid_f) result(id_string)
+     type(pert_param_type), intent(in) :: pert_param
+     type(grid_def_type), intent(in) :: pert_grid_f
+     character(len=:), allocatable :: id_string
+     integer :: nx, ny, nx_fft, ny_fft, xstride, ystride
+     real :: rdlon, rdlat
+     character(len=256) :: id
+     real, parameter :: mult_of_xcorr = 2.
+     real, parameter :: mult_of_ycorr = 2.
+     real, parameter :: coarsen_param = 0.8
+
+     xstride = 1
+     ystride = 1
+     if (pert_param%coarsen) then
+        xstride = max(1, floor(coarsen_param * pert_param%xcorr / pert_grid_f%dlon))
+        ystride = max(1, floor(coarsen_param * pert_param%ycorr / pert_grid_f%dlat))
+     endif
+     rdlon = real(xstride) * pert_grid_f%dlon
+     rdlat = real(ystride) * pert_grid_f%dlat
+     nx = (pert_grid_f%N_lon + xstride - 1) / xstride
+     ny = (pert_grid_f%N_lat + ystride - 1) / ystride
+     nx_fft = 2**ceiling(log(real(nx + ceiling(mult_of_xcorr*pert_param%xcorr/rdlon)))/log(2.))
+     ny_fft = 2**ceiling(log(real(ny + ceiling(mult_of_ycorr*pert_param%ycorr/rdlat)))/log(2.))
+     write(id,'(i0,":",i0,":",i0,":",i0,":",i0,":",i0,":",es16.8,":",es16.8)') &
+          nx, ny, nx_fft, ny_fft, xstride, ystride, pert_param%xcorr, pert_param%ycorr
+     id_string = trim(id)
+   end function rectangle_random_fields_id
+
   ! constructor (set parameter values), allocate memory
-  function new_random_fields(Nx, Ny, Nx_fft, Ny_fft, comm, rc) result (rf)
+    function new_rectangle_random_fields(pert_param, pert_grid_f, comm, rc) result (rf)
     
-    ! input/output variables [NEED class(random_fields)
-    !   instead of type(random_fields)] - F2003 quirk?!?
-    type(random_fields)            :: rf
-    integer,           intent(in)  :: Nx, Ny, Nx_fft, Ny_fft
+     ! input/output variables [NEED class(rectangle_random_fields)
+     !   instead of type(rectangle_random_fields)] - F2003 quirk?!?
+    type(rectangle_random_fields)  :: rf
+     type(pert_param_type), intent(in) :: pert_param
+     type(grid_def_type), intent(in) :: pert_grid_f
     integer, optional, intent(in)  :: comm
     integer, optional, intent(out) :: rc 
     
     ! local variables
     integer :: status, ierror
     integer :: rank, npes, local_dim1, local_dim2, remainder
-    integer :: Stride(2)
+     integer :: Stride(2), Nx_fft, Ny_fft
+     real, parameter :: mult_of_xcorr = 2.
+     real, parameter :: mult_of_ycorr = 2.
+     real, parameter :: coarsen_param = 0.8
+     character(len=256) :: id_string
     
     ! set obj param vals
-    rf%N_x = Nx
-    rf%N_y = Ny
+     rf%xCorr = pert_param%xcorr
+     rf%yCorr = pert_param%ycorr
+     rf%xStride = 1
+     rf%yStride = 1
+     if (pert_param%coarsen) then
+        rf%xStride = max(1, floor(coarsen_param * rf%xCorr / pert_grid_f%dlon))
+        rf%yStride = max(1, floor(coarsen_param * rf%yCorr / pert_grid_f%dlat))
+     endif
+     rf%rdlon = real(rf%xStride) * pert_grid_f%dlon
+     rf%rdlat = real(rf%yStride) * pert_grid_f%dlat
+     rf%N_x = pert_grid_f%N_lon / rf%xStride
+     rf%N_y = pert_grid_f%N_lat / rf%yStride
+     if (mod(pert_grid_f%N_lon,rf%xStride)>0) rf%N_x = rf%N_x + 1
+     if (mod(pert_grid_f%N_lat,rf%yStride)>0) rf%N_y = rf%N_y + 1
 
-    ! ensure N_x_fft, N_y_fft are powers of two
-    rf%N_x_fft = Nx_fft
-    rf%N_y_fft = Ny_fft
+     ! ensure N_x_fft, N_y_fft are powers of two
+     Nx_fft = rf%N_x + ceiling(mult_of_xcorr*rf%xCorr/rf%rdlon)
+     Ny_fft = rf%N_y + ceiling(mult_of_ycorr*rf%yCorr/rf%rdlat)
+     rf%N_x_fft = 2**ceiling(log(real(Nx_fft))/log(2.))
+     rf%N_y_fft = 2**ceiling(log(real(Ny_fft))/log(2.))
+     write(id_string,'(i0,":",i0,":",i0,":",i0,":",i0,":",i0,":",es16.8,":",es16.8)') &
+          rf%N_x, rf%N_y, rf%N_x_fft, rf%N_y_fft, rf%xStride, rf%yStride, rf%xCorr, rf%yCorr
+     rf%ID_string = trim(id_string)
 
 
     ! allocate memory
@@ -138,36 +194,36 @@ contains
           _FAIL('Parallel FFT failed')
        endif
 
-       call rf%win_allocate(Nx_fft, Ny_fft, _RC)
+        call rf%win_allocate(rf%N_x_fft, rf%N_y_fft, _RC)
 
        ! distribution of the grid for fft
        allocate(rf%dim1_counts(npes),rf%dim2_counts(npes))
-       local_dim1 = Nx_fft/npes
+        local_dim1 = rf%N_x_fft/npes
        rf%dim1_counts = local_dim1
-       remainder = mod(Nx_fft, npes)
+        remainder = mod(rf%N_x_fft, npes)
        rf%dim1_counts(1:remainder) = local_dim1 + 1
        local_dim1 = rf%dim1_counts(rank+1) 
 
-       local_dim2 = Ny_fft/npes
+        local_dim2 = rf%N_y_fft/npes
        rf%dim2_counts = local_dim2
-       remainder = mod(Ny_fft, npes)
+        remainder = mod(rf%N_y_fft, npes)
        rf%dim2_counts(1:remainder) = local_dim2 + 1
        local_dim2 = rf%dim2_counts(rank+1)
 
 
        status = DftiCreateDescriptor(rf%Desc_Handle_Dim1, DFTI_SINGLE,&
-                                DFTI_COMPLEX, 1, Nx_fft )
+                                 DFTI_COMPLEX, 1, rf%N_x_fft )
        _VERIFY(status)
        status = DftiCreateDescriptor(rf%Desc_Handle_Dim2, DFTI_SINGLE,&
-                                DFTI_COMPLEX, 1, Ny_fft )
+                                 DFTI_COMPLEX, 1, rf%N_y_fft )
        _VERIFY(status)
 
        ! perform local_dim2 one-dimensional transforms along 1st dimension
        status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_NUMBER_OF_TRANSFORMS, local_dim2 )
        _VERIFY(status)
-       status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_INPUT_DISTANCE, Nx_fft )
+        status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_INPUT_DISTANCE, rf%N_x_fft )
        _VERIFY(status)
-       status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_OUTPUT_DISTANCE, Nx_fft )
+        status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_OUTPUT_DISTANCE, rf%N_x_fft )
        _VERIFY(status)
        status = DftiCommitDescriptor( rf%Desc_Handle_Dim1 )
        _VERIFY(status)
@@ -190,7 +246,7 @@ contains
     else
        rf%comm = MPI_COMM_NULL
        ! allocate mem and init mkl dft
-       status = DftiCreateDescriptor(rf%Desc_Handle, DFTI_SINGLE, DFTI_COMPLEX, 2, [Nx_fft, Ny_fft])
+        status = DftiCreateDescriptor(rf%Desc_Handle, DFTI_SINGLE, DFTI_COMPLEX, 2, [rf%N_x_fft, rf%N_y_fft])
        _VERIFY(status)
 
        ! initialize for actual dft computation
@@ -199,7 +255,7 @@ contains
     endif
 #endif
     _RETURN(_SUCCESS)
-  end function new_random_fields
+   end function new_rectangle_random_fields
   
   ! **************************************************************************
   
@@ -207,7 +263,7 @@ contains
   subroutine finalize(this, rc)
 
     ! input/output variables
-    class(random_fields), intent(inout) :: this
+    class(rectangle_random_fields), intent(inout) :: this
     integer, optional, intent(out) :: rc
     ! local variable
     integer :: status
@@ -271,7 +327,7 @@ contains
   subroutine sqrt_gauss_spectrum_2d(this, lx, ly, dx, dy)
 
     ! input/output variables
-    class(random_fields), intent(inout) :: this
+    class(rectangle_random_fields), intent(inout) :: this
     real,                 intent(in)    :: lx, ly, dx, dy
 
     ! local variables
@@ -331,7 +387,7 @@ contains
   
   ! ----------------------------------------------------------------------
   !
-  ! subroutine rfg2d_fft()
+   ! subroutine generate_2d_Random_field()
   !  
   ! generate a pair of 2d zero-mean random fields using FFT method
   ! (so far only Gaussian covariance implemented)
@@ -353,7 +409,7 @@ contains
   !       generated on a grid that is two correlation lenghts bigger
   !       than the field on which the grid is desired. Then cut out
   !       fields of the necessary size.
-  !       This procedure is included in rfg2d_fft().
+   !       This procedure is included in generate_2d_Random_field().
   !
   ! NOTE: The variance specified as input is the theoretical variance of 
   !       the complex field that is obtained from the inverse fft of the 
@@ -382,12 +438,12 @@ contains
   !       The individual sample variances within each pair vary from 
   !       realization to realization.
   
-  subroutine rfg2d_fft(this, rseed, rfield, rfield2, lx, ly, dx, dy)
+   subroutine generate_2d_Random_field(this, rseed, rfield, rfield2, lx, ly, dx, dy)
     
     ! input/output variables
-    class(random_fields),                  intent(inout) :: this ! ffield*_fft is modified
+    class(rectangle_random_fields),        intent(inout) :: this ! ffield*_fft is modified
     integer,                               intent(inout) :: rseed(NRANDSEED) ! nr_ran2 modifies rseed
-    real,    dimension(this%N_x,this%N_y), intent(out)   :: rfield, rfield2
+     real,    dimension(:,:), intent(out)   :: rfield, rfield2
     real,                                  intent(in)    :: lx, ly, dx, dy
 
     ! local variables
@@ -566,7 +622,7 @@ contains
     rfield  = SQRT2*N_xy_fft_real*this%field1_fft(1:this%N_x,1:this%N_y)
     rfield2 = SQRT2*N_xy_fft_real*this%field2_fft(1:this%N_x,1:this%N_y)
     
-  end subroutine rfg2d_fft
+   end subroutine generate_2d_Random_field
   
   
   
@@ -586,9 +642,9 @@ contains
     implicit none
 
     ! input/output variables
-    class(random_fields), intent(in) :: this
+     class(rectangle_random_fields), intent(inout) :: this
     integer, intent(inout) :: rseed(NRANDSEED) ! nr_gasdev modifies rseed
-    real, dimension(this%N_x,this%N_y), intent(out), target :: rfield
+    real, dimension(:,:), intent(out), target :: rfield
     
     ! local variables
     integer :: Nxy, index
@@ -629,7 +685,7 @@ contains
 
 #ifdef MKL_AVAILABLE
   subroutine win_allocate(this, nx, ny, rc)
-     class(random_fields), intent(inout) :: this
+     class(rectangle_random_fields), intent(inout) :: this
      integer, intent(in) :: nx, ny
      integer, optional, intent(out) :: rc
      complex :: dummy
@@ -655,7 +711,7 @@ contains
   end subroutine win_allocate
 
   subroutine win_deallocate(this, rc)
-     class(random_fields), intent(inout) :: this
+     class(rectangle_random_fields), intent(inout) :: this
      integer, optional, intent(out) :: rc
      integer :: status
      call MPI_Win_fence(0, this%win, status)
@@ -668,36 +724,13 @@ contains
   end subroutine win_deallocate
 #endif
   
-end module Random_fieldsMod
-
-module StringRandom_fieldsMapMod
-   use Random_fieldsMod
-
-#include "types/key_deferredLengthString.inc"
-#define _value type (random_fields)
-#define _value_equal_defined
-
-#define _map StringRandom_fieldsMap
-#define _iterator StringRandom_fieldsMapIterator
-
-#define _alt
-
-#include "templates/map.inc"
-
-#undef _alt
-#undef _iterator
-#undef _map
-#undef _value
-#undef _key
-#undef _value_equal_defined
-end module StringRandom_fieldsMapMod
-
+end module rectangle_random_fieldsMod
 
 #ifdef TEST_RFG2D
 
 !program test_rfg2d
 !  
-!  use Random_fieldsMod
+!  use rectangle_random_fieldsMod
 !  use nr_ran2_gasdev
 !  
 !  implicit none
@@ -716,8 +749,8 @@ end module StringRandom_fieldsMapMod
 !  
 !  character(5) :: fft_tag
 !    
-!  ! instance of random_fields
-!  type(random_fields) :: rf
+!  ! instance of rectangle_random_fields
+!  type(rectangle_random_fields) :: rf
 !
 !  ! start
 !  RSEEDCONST = -777
@@ -747,8 +780,8 @@ end module StringRandom_fieldsMapMod
 !  N_e_tot = 10
 !  do n_e=1,N_e_tot,2
 !
-!     rf = random_fields(N_x, N_y, Nx_fft, Ny_fft)
-!     call rf%rfg2d_fft(rseed, field1, field2, lx, ly, dx, dy)
+!     rf = rectangle_random_fields(N_x, N_y, Nx_fft, Ny_fft)
+!     call rf%generate_2d_Random_field(rseed, field1, field2, lx, ly, dx, dy)
 !     !call rf%generate_white_field(rseed, field1)
 !     call rf%finalize
 !      
@@ -784,4 +817,3 @@ end module StringRandom_fieldsMapMod
 
 
 ! ======= EOF ==================================================
-

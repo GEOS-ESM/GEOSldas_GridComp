@@ -12,7 +12,7 @@
 !  (otherwise set initialize=.false.)
 !
 ! compile line for test program:
-! cpp -P -C nr_ran2_gasdev.f90 nr_ran2_gasdev.cpp.f90; cpp -P -C random_fields.f90 random_fields.cpp.f90; cpp -P -C land_pert.f90 land_pert.cpp.f90; f90 nr_ran2_gasdev.cpp.f90 random_fields.cpp.f90 land_pert.cpp.f90
+! cpp -P -C nr_ran2_gasdev.f90 nr_ran2_gasdev.cpp.f90; cpp -P -C rectangle_random_fields.f90 rectangle_random_fields.cpp.f90; cpp -P -C land_pert.f90 land_pert.cpp.f90
 !
 ! reichle, 24 Jan 2005
 ! reichle, 11 Feb 2005
@@ -37,8 +37,10 @@ module land_pert_routines
        NRANDSEED,                                 &
        init_randseed
 
-  use Random_FieldsMod
-  use StringRandom_fieldsMapMod
+  use rectangle_random_fieldsMod
+  use sphere_random_fields_mod, only: sphere_random_fields, sphere_random_fields_id
+  use StringAbstractRandom_fieldsMapMod
+  use abstract_random_fieldsMod, only: abstract_random_fields
 
   use nr_jacobi,                        ONLY:     &
        jacobi
@@ -68,7 +70,7 @@ module land_pert_routines
 
   ! **********************************************************************
 
-  type(StringRandom_fieldsMap) :: random_fieldsMap
+  type(StringAbstractRandom_fieldsMap) :: random_fieldsMap
 
 contains
   
@@ -455,7 +457,7 @@ contains
     !
     ! ----------------------
 
-    integer :: i, j, m, n, Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, imax, jmax
+    integer :: i, j, m, n, xStride, yStride, imax, jmax
 
     real    :: cc, dd, xCorr, yCorr, tCorr, tmpReal, rdlon, rdlat
 
@@ -467,7 +469,7 @@ contains
 
     integer :: tmpInt, xstart, xend, ystart, yend
 
-    type(random_fields), pointer :: rf
+    class(abstract_random_fields), pointer :: rf
 
     type(ESMF_VM) :: vm
     integer :: mpicomm, status  
@@ -504,10 +506,28 @@ contains
        end if
 
 
-       ! get grid parameters for generation of new random fields on 
-       ! possibly coarsened grid
+       ! initialize instance rf and get its grid parameters
+#ifdef MKL_AVAILABLE
+       rf => find_rf(pert_param(m), pert_grid_f, comm=mpicomm)
+#else
+       rf => find_rf(pert_param(m), pert_grid_f)
+#endif
 
-       call calc_fft_grid(pert_param(m), pert_grid_f, Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, rdlon, rdlat)
+       if (pert_param(m)%use_sphere_pert) then
+          ! Sphere fields are generated directly on the fine lat-lon grid.
+          xStride = 1
+          yStride = 1
+          rdlon   = pert_grid_f%dlon
+          rdlat   = pert_grid_f%dlat
+       else
+          select type (rectangle => rf)
+          class is (rectangle_random_fields)
+             xStride = rectangle%xStride
+             yStride = rectangle%yStride
+             rdlon   = rectangle%rdlon
+             rdlat   = rectangle%rdlat
+          end select
+       end if
 
        ptr2rfield  => rfield( 1:pert_grid_f%N_lon:xStride,1:pert_grid_f%N_lat:yStride)
        ptr2rfield2 => rfield2(1:pert_grid_f%N_lon:xStride,1:pert_grid_f%N_lat:yStride)
@@ -523,15 +543,6 @@ contains
 
        stored_field = .false.
 
-       ! initialize instance rf of class random_fields
-       ! this needs to be done for each pert field
-#ifdef MKL_AVAILABLE      
-       ! W.J Note: hardcoded comm = mpicomm to activate parallel fft
-       rf => find_rf(Nx, Ny, Nx_fft, Ny_fft, comm=mpicomm )
-#else
-       rf => find_rf(Nx, Ny, Nx_fft, Ny_fft)
-#endif
-
        do n=1,N_ens
 
           ! generate a random field
@@ -542,11 +553,11 @@ contains
 
           else       ! spatially correlated random fields
 
-             ! NOTE: rfg2d_fft() relies on CXML math library (22 Feb 05)
-             ! rfg2d_fft() now relies on Intel MKL (19 Jun 13)
+              ! The rectangle generator uses the configured FFT backend.
 
              if (.not. stored_field) then
-                call rf%rfg2d_fft(Pert_rseed(:,n), ptr2rfield, ptr2rfield2, xCorr, yCorr, rdlon, rdlat)
+                call rf%generate_2d_Random_field(Pert_rseed(:,n), ptr2rfield, ptr2rfield2, &
+                     xCorr, yCorr, rdlon, rdlat)
                 stored_field = .true.
              else
                 rfield = rfield2
@@ -619,57 +630,6 @@ contains
 
   end subroutine propagate_pert
 
-  ! ******************************************************************************************
-
-  subroutine calc_fft_grid(pert_param, pert_grid_f, Nx, Ny, N_x_fft, N_y_fft, xStride, yStride, rdlon, rdlat) 
-
-    type(pert_param_type), intent(in)  :: pert_param
-    type(grid_def_type),   intent(in)  :: pert_grid_f
-
-    integer,               intent(out) :: Nx, Ny, N_x_fft, N_y_fft, xStride, yStride
-    real,                  intent(out) :: rdlon, rdlat
-
-    ! local variables
-    
-    integer         :: Nx_fft, Ny_fft
-    real, parameter :: mult_of_xcorr = 2.
-    real, parameter :: mult_of_ycorr = 2.
-    real, parameter :: coarsen_param = 0.8
-    real            :: xCorr, yCorr
-
-    xCorr = pert_param%xcorr
-    yCorr = pert_param%ycorr
-
-    xStride = 1
-    yStride = 1
-    if (pert_param%coarsen) then
-       xStride = max( 1, floor(coarsen_param * xCorr / pert_grid_f%dlon) )
-       yStride = max( 1, floor(coarsen_param * yCorr / pert_grid_f%dlat) )
-    endif
-    rdlon = real(xStride)*pert_grid_f%dlon
-    rdlat = real(yStride)*pert_grid_f%dlat
-
-    ! NOTE: number of grid cells of coarsened grid might not evenly divide 
-    ! that of pert_grid_f
-
-    Nx = pert_grid_f%N_lon / xStride
-    Ny = pert_grid_f%N_lat / yStride
-
-    if (mod(pert_grid_f%N_lon,xStride)>0) Nx = Nx + 1
-    if (mod(pert_grid_f%N_lat,yStride)>0) Ny = Ny + 1
-  
-    ! add minimum required correlation lengths 
-    Nx_fft = Nx + ceiling(mult_of_xcorr*xCorr/rdlon)
-    Ny_fft = Ny + ceiling(mult_of_ycorr*yCorr/rdlat)
-       
-    ! ensure N_x_fft, N_y_fft are powers of two
-    N_x_fft = 2**ceiling(log(real(Nx_fft))/log(2.))
-    N_y_fft = 2**ceiling(log(real(Ny_fft))/log(2.))
-
-  end subroutine
-
-  ! ******************************************************************
-  
   subroutine truncate_std_normal( N_x, N_y, std_normal_max, grid_data )
     
     ! truncate a realization of standard normal variables
@@ -1269,24 +1229,43 @@ contains
   
   ! ************************************************************************
 
-  function find_rf(Nx, Ny, Nx_fft, Ny_fft, comm) result (rf)
-    
-    type(random_fields), pointer              :: rf 
-    integer,                       intent(in) :: Nx, Ny, Nx_fft, Ny_fft
+  function find_rf(pert_param, pert_grid_f, comm) result (rf)
+
+    class(abstract_random_fields), pointer   :: rf
+    type(pert_param_type),         intent(in) :: pert_param
+    type(grid_def_type),           intent(in) :: pert_grid_f
     integer,             optional, intent(in) :: comm
     
     ! local variables
     
-    type(StringRandom_fieldsMapIterator) :: iter
-    Character(len=:), allocatable :: id_string
-    type(random_fields) :: rf_tmp
-    
-    id_string = i_to_string(Nx)//":"//i_to_string(Ny)//":"//i_to_string(Nx_fft)//":"//i_to_string(Ny_fft)
+    type(StringAbstractRandom_fieldsMapIterator) :: iter
+    character(len=:), allocatable :: id_string
+    type(rectangle_random_fields) :: rf_tmp
+    type(sphere_random_fields) :: sf_tmp
+
+    if (pert_param%use_sphere_pert) then
+       id_string = sphere_random_fields_id(pert_param, pert_grid_f)
+    else
+       id_string = rectangle_random_fields_id(pert_param, pert_grid_f)
+    end if
     iter = random_fieldsMap%find(id_string)
     if (iter == random_fieldsMap%end() ) then
-       rf_tmp = random_fields(Nx, Ny, Nx_fft, Ny_fft, comm=comm)
-       call random_fieldsMap%insert(id_string, rf_tmp)
-       iter = random_fieldsMap%find(id_string) 
+       if (pert_param%use_sphere_pert) then
+          if (present(comm)) then
+             sf_tmp = sphere_random_fields(pert_param, pert_grid_f, comm=comm)
+          else
+             sf_tmp = sphere_random_fields(pert_param, pert_grid_f)
+          end if
+          call random_fieldsMap%insert(id_string, sf_tmp)
+       else
+          if (present(comm)) then
+             rf_tmp = rectangle_random_fields(pert_param, pert_grid_f, comm=comm)
+          else
+             rf_tmp = rectangle_random_fields(pert_param, pert_grid_f)
+          end if
+          call random_fieldsMap%insert(id_string, rf_tmp)
+       end if
+       iter = random_fieldsMap%find(id_string)
     endif
     rf => iter%value()
     
@@ -1296,8 +1275,8 @@ contains
   
   subroutine clear_rf()
     
-    type(StringRandom_fieldsMapIterator)          :: iter     
-    type(random_fields),                  pointer :: rf_ptr 
+    type(StringAbstractRandom_fieldsMapIterator)          :: iter
+    class(abstract_random_fields),                  pointer :: rf_ptr
     
     iter = random_fieldsMap%begin()
     do while (iter /= random_fieldsMap%end())
