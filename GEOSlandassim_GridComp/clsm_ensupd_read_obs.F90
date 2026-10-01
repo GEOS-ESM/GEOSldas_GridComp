@@ -2257,6 +2257,10 @@ contains
 
     real,         parameter :: superob_grid_tol = 1.e-3               ! [deg]
 
+    ! Tile collisions between super-obs should be rare geometric cases (coastal
+    ! or high-latitude EASE tiles); warn if they exceed this fraction of occupied cells.
+    real,         parameter :: superob_collision_warn_frac = 0.01
+
     ! ---------------
 
     type(date_time_type) :: date_time_obs_beg, date_time_obs_end
@@ -2362,6 +2366,21 @@ contains
 
        if (real(N_superob_lon,8)*real(N_superob_lat,8) > real(max_superob_cells,8)) then
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'super-ob grid exceeds max_superob_cells')
+       end if
+
+       ! Each tile can administer at most one obs.  If the super-ob grid is
+       ! finer than the tile space, two super-obs are systematically nearest
+       ! to the same tile and one of them is dropped below.  Require the
+       ! super-ob spacing to be at least the (nominal) tile grid spacing.
+       ! (For EASE grids %dlat is the extent average; rows near the poles
+       ! are taller, which is tolerated by the collision warning below.)
+
+       if (this_obs_param%superob_grid_deg < &
+            max(tile_grid_d%dlon, tile_grid_d%dlat) - superob_grid_tol) then
+          write(err_msg,'(A,F8.4,A,2F8.4,A)') 'superob_grid_deg (', this_obs_param%superob_grid_deg, &
+               ') must not be finer than tile grid spacing (dlon,dlat = ', &
+               tile_grid_d%dlon, tile_grid_d%dlat, ')'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
 
        N_superob_cells = N_superob_lon*N_superob_lat
@@ -2829,6 +2848,18 @@ contains
                   real(sum(N_obs_in_superob))/real(N_superob_occupied),            &
                   maxval(N_obs_in_superob)
           end if
+       end if
+
+       ! The startup check above rules out systematic collisions; a residual few
+       ! remain possible where the mean locations of two partly-land cells are
+       ! both nearest to one isolated tile.  More than that indicates a mismatch
+       ! between the super-ob grid and the tile space.
+
+       if (real(N_superob_collisions) > superob_collision_warn_frac*real(N_superob_occupied)) then
+          write(err_msg,'(A,I8,A,I8,A)') 'super-ob tile collisions (', N_superob_collisions, &
+               ' of ', N_superob_occupied, ' occupied cells) exceed the expected rare cases;'// &
+               ' check superob_grid_deg against the tile grid spacing'
+          call ldas_warn(LDAS_GENERIC_WARNING, Iam, err_msg)
        end if
 
        deallocate(N_obs_in_superob, superob_sm_sum, superob_time_sum)

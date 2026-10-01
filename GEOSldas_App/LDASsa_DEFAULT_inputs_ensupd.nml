@@ -2568,9 +2568,6 @@ obs_param_nml(55)%adapt          = 0
 !
 ! To enable fixed-grid super-obbing, set %superob_grid_deg>0 and use
 ! FOV_units='deg' with FOV approximately superob_grid_deg/sqrt(pi).
-! Production scaling parameters should be generated from observations
-! super-obbed on the same grid and model predictions using the same FOV.
-! Existing finer-resolution scaling files are suitable only for initial tests.
 !
 ! ------------------------
 !
