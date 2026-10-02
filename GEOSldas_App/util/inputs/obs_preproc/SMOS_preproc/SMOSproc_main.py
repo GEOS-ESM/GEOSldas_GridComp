@@ -73,7 +73,7 @@ def process_ee_to_nc(date_time: datetime) -> list:
     eeflist = sorted(glob.glob(search_pattern))
 
     if len(eeflist) < 20:
-        raise RuntimeError("Found {len(eeflist)} ee files for {date_str}. Minimum 20 ee files needed. Exiting.")
+        raise RuntimeError(f"Found {len(eeflist)} ee files for {date_str}. Minimum 20 ee files needed. Exiting.")
     else:
         logging.info(f"[{date_str}] Found {len(eeflist)} zip files to process. Proceeding with conversion.")
 
