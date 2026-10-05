@@ -72,10 +72,10 @@ def process_ee_to_nc(date_time: datetime) -> list:
 
     eeflist = sorted(glob.glob(search_pattern))
 
-    if len(eeflist) < 20:
-        raise RuntimeError(f"Found {len(eeflist)} ee files for {date_str}. Minimum 20 ee files needed. Exiting.")
-    else:
-        logging.info(f"[{date_str}] Found {len(eeflist)} zip files to process. Proceeding with conversion.")
+    logging.info(f"[{date_str}] Found {len(eeflist)} zip files to process.")
+
+    if not eeflist:
+        raise RuntimeError(f"No SMOS EE zip files found for {date_str}")
 
     # Convert EE to NC
     for fee in eeflist:
