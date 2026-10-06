@@ -386,6 +386,17 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown obs_param_nml%varname')
           
        end select
+
+       if (obs_param_nml(i)%thin_dist_km < 0.) then
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'obs_param_nml%thin_dist_km must be non-negative')
+       elseif (obs_param_nml(i)%thin_dist_km > 0.) then
+          select case (trim(obs_param_nml(i)%descr))
+          case ('ASCAT_HSAF_META_SM','ASCAT_HSAF_METB_SM','ASCAT_HSAF_METC_SM')
+          case default
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
+                  'obs_param_nml%thin_dist_km is supported only for H SAF ASCAT species')
+          end select
+       end if
        
     end do
         

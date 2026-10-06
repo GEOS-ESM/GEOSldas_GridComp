@@ -26,7 +26,9 @@ module clsm_ensupd_read_obs
        MAPL_UNDEF
 
   use MAPL_ConstantsMod,                ONLY:     &
-       MAPL_TICE
+       MAPL_TICE,                                 &
+       MAPL_PI_R8,                                &
+       MAPL_RADIUS
   
   use io_hdf5,                          ONLY:     &
        hdf5read
@@ -2184,6 +2186,10 @@ contains
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
+    ! Optional thinning (this_obs_param%thin_dist_km>0): the QC-passing obs of
+    ! the assimilation window are thinned so that no two kept obs are closer than
+    ! thin_dist_km (obs visited in file order; see subroutine thin_min_dist).
+    !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
     !             https://hsaf.meteoam.it/
     !
@@ -2262,6 +2268,7 @@ contains
     character(300) :: tmpfname
 
     integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
+    integer :: N_win, N_raw_total
 
     character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
     character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
@@ -2293,6 +2300,11 @@ contains
     ! valid-obs scratch arrays (max one file at a time)
     real,       allocatable :: tmp1_lat(:), tmp1_lon(:), tmp1_obs(:)
     real*8,     allocatable :: tmp1_jtime(:)
+
+    ! valid obs of all files in the assimilation window (grown as needed)
+    real,       allocatable :: win_lat(:), win_lon(:), win_obs(:), tmpr(:)
+    real*8,     allocatable :: win_jtime(:), tmpr8(:)
+    logical,    allocatable :: keep(:)
 
     ! pointers for get_tile_num_for_obs
     real,    dimension(:), pointer :: tmp_lat, tmp_lon
@@ -2444,6 +2456,16 @@ contains
     allocate(tmp1_obs(  max_obs_per_file))
     allocate(tmp1_jtime(max_obs_per_file))
 
+    ! valid obs of all files in the window
+
+    allocate(win_lat(  max_obs_per_file))
+    allocate(win_lon(  max_obs_per_file))
+    allocate(win_obs(  max_obs_per_file))
+    allocate(win_jtime(max_obs_per_file))
+
+    N_win       = 0
+    N_raw_total = 0
+
     ! ----------------------------------------------------------------
     !
     ! loop over files
@@ -2586,34 +2608,91 @@ contains
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
 
+       N_raw_total = N_raw_total + N_obs_file
+
        if (N_valid == 0) cycle
 
-       ! ----------------------------------------------------------------
-       !
-       ! tile matching and accumulation for this file's valid obs
+       ! append this file's valid obs to the window (grow arrays if needed)
 
-       allocate(tmp_lat(        N_valid))
-       allocate(tmp_lon(        N_valid))
-       allocate(tmp_jtime(      N_valid))
-       allocate(tmp_tile_num(   N_valid))
+       if (N_win + N_valid > size(win_lat)) then
 
-       tmp_lat   = tmp1_lat(  1:N_valid)
-       tmp_lon   = tmp1_lon(  1:N_valid)
-       tmp_jtime = tmp1_jtime(1:N_valid)
+          N_tmp = max( 2*size(win_lat), N_win + N_valid )
+
+          allocate(tmpr( N_tmp)); tmpr( 1:N_win) = win_lat(  1:N_win); call move_alloc(tmpr,  win_lat  )
+          allocate(tmpr( N_tmp)); tmpr( 1:N_win) = win_lon(  1:N_win); call move_alloc(tmpr,  win_lon  )
+          allocate(tmpr( N_tmp)); tmpr( 1:N_win) = win_obs(  1:N_win); call move_alloc(tmpr,  win_obs  )
+          allocate(tmpr8(N_tmp)); tmpr8(1:N_win) = win_jtime(1:N_win); call move_alloc(tmpr8, win_jtime)
+
+       end if
+
+       win_lat(  N_win+1:N_win+N_valid) = tmp1_lat(  1:N_valid)
+       win_lon(  N_win+1:N_win+N_valid) = tmp1_lon(  1:N_valid)
+       win_obs(  N_win+1:N_win+N_valid) = tmp1_obs(  1:N_valid)
+       win_jtime(N_win+1:N_win+N_valid) = tmp1_jtime(1:N_valid)
+
+       N_win = N_win + N_valid
+
+    end do  ! file loop
+
+    deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
+    deallocate(fnames)
+
+    if (logit) write(logunit,*) trim(Iam)//': obs in files, passing QC = ', N_raw_total, N_win
+
+    ! ----------------------------------------------------------------
+    !
+    ! optional thinning to a minimum distance between obs (after QC, across
+    ! all files in the window)
+
+    if (this_obs_param%thin_dist_km > 0. .and. N_win > 0) then
+
+       allocate(keep(N_win))
+
+       call thin_min_dist( N_win, win_lat(1:N_win), win_lon(1:N_win),       &
+            this_obs_param%thin_dist_km, keep, N_tmp )
+
+       win_lat(  1:N_tmp) = pack( win_lat(  1:N_win), keep )
+       win_lon(  1:N_tmp) = pack( win_lon(  1:N_win), keep )
+       win_obs(  1:N_tmp) = pack( win_obs(  1:N_win), keep )
+       win_jtime(1:N_tmp) = pack( win_jtime(1:N_win), keep )
+
+       deallocate(keep)
+
+       if (logit) write(logunit,*) trim(Iam)//': obs kept after thinning to ', &
+            this_obs_param%thin_dist_km, ' km = ', N_tmp
+
+       N_win = N_tmp
+
+    end if
+
+    ! ----------------------------------------------------------------
+    !
+    ! tile matching and accumulation for the window's valid obs
+
+    if (N_win > 0) then
+
+       allocate(tmp_lat(        N_win))
+       allocate(tmp_lon(        N_win))
+       allocate(tmp_jtime(      N_win))
+       allocate(tmp_tile_num(   N_win))
+
+       tmp_lat   = win_lat(  1:N_win)
+       tmp_lon   = win_lon(  1:N_win)
+       tmp_jtime = win_jtime(1:N_win)
 
        call get_tile_num_for_obs(N_catd, tile_coord,                      &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
-            N_valid, tmp_lat, tmp_lon,                                    &
+            N_win, tmp_lat, tmp_lon,                                      &
             this_obs_param,                                               &
             tmp_tile_num )
 
-       do ii = 1, N_valid
+       do ii = 1, N_win
 
           ind = tmp_tile_num(ii)
 
           if (ind > 0) then
 
-             ASCAT_sm(  ind) = ASCAT_sm(  ind) + tmp1_obs(  ii)
+             ASCAT_sm(  ind) = ASCAT_sm(  ind) + win_obs(   ii)
              ASCAT_lon( ind) = ASCAT_lon( ind) + tmp_lon(   ii)
              ASCAT_lat( ind) = ASCAT_lat( ind) + tmp_lat(   ii)
              ASCAT_time(ind) = ASCAT_time(ind) + tmp_jtime( ii)
@@ -2626,10 +2705,9 @@ contains
 
        deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
 
-    end do  ! file loop
+    end if
 
-    deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
-    deallocate(fnames)
+    deallocate(win_lat, win_lon, win_obs, win_jtime)
 
     ! ----------------------------------------------------------------
     !
@@ -11622,6 +11700,175 @@ contains
 
     
   end subroutine get_tile_num_for_obs
+
+  ! *****************************************************************
+
+  subroutine thin_min_dist( N_obs, lat, lon, min_dist_km, keep, N_keep )
+
+    ! Thin observations to a minimum separation distance.
+    !
+    ! Obs are visited in the given order.  An obs is kept unless it lies closer
+    ! than min_dist (great-circle) to an obs that was kept earlier.  Hence no two
+    ! kept obs are closer than min_dist, and the result is deterministic.
+    !
+    ! Kept obs are stored in a lat/lon bucket grid whose buckets are at least
+    ! min_dist tall and wide, so only the neighbouring buckets need checking.
+    !
+    ! A. Fox, Oct 2026
+
+    implicit none
+
+    integer,                   intent(in)  :: N_obs
+    real,    dimension(N_obs), intent(in)  :: lat, lon         ! [deg]
+    real,                      intent(in)  :: min_dist_km      ! [km]
+    logical, dimension(N_obs), intent(out) :: keep
+    integer,                   intent(out) :: N_keep
+
+    real*8, parameter :: PI         = MAPL_PI_R8
+    real*8, parameter :: R_EARTH_KM = real(MAPL_RADIUS,8)/1000.d0
+
+    real*8  :: ang, chord2_min, row_height, lat_pole, dlon, cos_min
+    real*8  :: qlat, qlon
+    integer :: N_rows, N_bkts, kk, r, r0, c, c_beg, c_end, bb, mm
+    logical :: too_close
+
+    integer, dimension(:),   allocatable :: row_ncol, row_off, head, next
+    real*8,  dimension(:,:), allocatable :: xyz
+
+    ! -----------------------------------------------------
+
+    keep   = .true.
+    N_keep = N_obs
+
+    if (N_obs < 2 .or. min_dist_km <= 0.) return
+
+    ang        = min( PI, real(min_dist_km,8)/R_EARTH_KM )     ! angular distance [rad]
+    chord2_min = (2.d0*sin(0.5d0*ang))**2                      ! square chord distance
+
+    ! rows of equal latitude height >= ang
+
+    N_rows     = max( 1, floor( PI/ang ))
+    row_height = PI/real(N_rows,8)
+
+    ! columns per row: at least row_height wide at the row's poleward edge
+
+    allocate(row_ncol(N_rows))
+    allocate(row_off( N_rows))
+
+    N_bkts = 0
+
+    do r=1,N_rows
+       lat_pole    = max( abs(-0.5d0*PI + real(r-1,8)*row_height),          &
+                          abs(-0.5d0*PI + real(r,  8)*row_height) )
+       row_ncol(r) = max( 1, floor( 2.d0*PI*cos(min(0.5d0*PI,lat_pole))/row_height ))
+       row_off( r) = N_bkts
+       N_bkts      = N_bkts + row_ncol(r)
+    end do
+
+    ! kept obs per bucket as linked lists (head of list per bucket, next obs in list)
+
+    allocate(head(N_bkts))
+    allocate(next(N_obs))
+    allocate(xyz(3,N_obs))
+
+    head = 0
+
+    N_keep = 0
+
+    do kk=1,N_obs
+
+       qlat = max( -0.5d0*PI, min( 0.5d0*PI, real(lat(kk),8)*PI/180.d0 ))
+       qlon = modulo( real(lon(kk),8)*PI/180.d0, 2.d0*PI )
+
+       xyz(1,kk) = cos(qlat)*cos(qlon)
+       xyz(2,kk) = cos(qlat)*sin(qlon)
+       xyz(3,kk) = sin(qlat)
+
+       r0 = row_of_lat( qlat )
+
+       ! obs within ang of this obs differ in longitude by at most dlon, where
+       ! sin(dlon/2) <= sin(ang/2)/sqrt(cos(qlat)*cos(lat_other)) (haversine)
+
+       cos_min = cos( min( 0.5d0*PI, abs(qlat) + ang ))
+
+       if (cos(qlat)*cos_min > sin(0.5d0*ang)**2) then
+          dlon = 2.d0*asin( sin(0.5d0*ang)/sqrt(cos(qlat)*cos_min) )
+       else
+          dlon = PI
+       end if
+
+       ! check kept obs in neighbouring buckets (rows r0-1..r0+1 because row_height >= ang)
+
+       too_close = .false.
+
+       do r=max(1,r0-1),min(N_rows,r0+1)
+
+          if (dlon >= PI) then
+             c_beg = 0
+             c_end = row_ncol(r) - 1
+          else
+             c_beg = floor( (qlon-dlon)/(2.d0*PI)*real(row_ncol(r),8) )
+             c_end = floor( (qlon+dlon)/(2.d0*PI)*real(row_ncol(r),8) )
+             if (c_end-c_beg+1 >= row_ncol(r)) then
+                c_beg = 0
+                c_end = row_ncol(r) - 1
+             end if
+          end if
+
+          do c=c_beg,c_end
+
+             bb = row_off(r) + modulo( c, row_ncol(r) ) + 1    ! wrap around in longitude
+
+             mm = head(bb)
+
+             do while (mm > 0)
+                if ( (xyz(1,mm)-xyz(1,kk))**2 + (xyz(2,mm)-xyz(2,kk))**2 +         &
+                     (xyz(3,mm)-xyz(3,kk))**2 < chord2_min ) then
+                   too_close = .true.
+                   exit
+                end if
+                mm = next(mm)
+             end do
+
+             if (too_close) exit
+          end do
+
+          if (too_close) exit
+       end do
+
+       if (too_close) then
+
+          keep(kk) = .false.
+
+       else
+
+          ! keep obs and add it to its bucket
+
+          N_keep = N_keep + 1
+
+          bb = row_off(r0) + min( row_ncol(r0)-1,                               &
+               floor( qlon/(2.d0*PI)*real(row_ncol(r0),8) )) + 1
+
+          next(kk) = head(bb)
+          head(bb) = kk
+
+       end if
+
+    end do
+
+    deallocate(row_ncol, row_off, head, next, xyz)
+
+  contains
+
+    integer function row_of_lat( lat_rad )
+
+      real*8, intent(in) :: lat_rad
+
+      row_of_lat = max( 1, min( N_rows, floor( (lat_rad + 0.5d0*PI)/row_height ) + 1 ))
+
+    end function row_of_lat
+
+  end subroutine thin_min_dist
 
   ! *****************************************************************
 
