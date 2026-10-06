@@ -684,6 +684,10 @@ contains
     !  real    :: fcstvar   
     !  real    :: ana       
     !  real    :: anavar    
+    !  real    :: spread_xx
+    !  real    :: spread_yy
+    !  real    :: spread_xy
+    !  real    :: DUMMYGAP2 ! fill gap so that extent is a multiple of 8 bytes
 
     icount = 4
     
@@ -699,7 +703,7 @@ contains
     iblock(1) = 1
     iblock(2) = 3
     iblock(3) = 1
-    iblock(4) = 8
+    iblock(4) = 12
         
     idisp(1)  = 0
     idisp(2)  = idisp(1) + iblock(1)*4          

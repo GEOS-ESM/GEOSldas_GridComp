@@ -80,6 +80,10 @@ module enkf_types
      real    :: fcstvar   ! forecast error var (in obs space), a.k.a. HPHt
      real    :: ana       ! "analysis": value of obs pred after EnKF update (ens mean)
      real    :: anavar    ! analysis error var (in obs space), a.k.a. HAHt
+     real    :: spread_xx ! super-obs only: spatial (co)variance of contributing raw obs
+     real    :: spread_yy !  about the obs lat/lon [km^2] (x=east, y=north); 0 otherwise
+     real    :: spread_xy !  (see get_obs_pred() for its use in the obs footprint)
+     real    :: DUMMYGAP2 ! fill gap so that MPI STRUCT extent is a multiple of 8 bytes
      
   end type obs_type
   

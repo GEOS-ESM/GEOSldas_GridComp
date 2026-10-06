@@ -26,7 +26,9 @@ module clsm_ensupd_read_obs
        MAPL_UNDEF
 
   use MAPL_ConstantsMod,                ONLY:     &
-       MAPL_TICE
+       MAPL_TICE,                                 &
+       MAPL_PI,                                   &
+       MAPL_RADIUS
   
   use io_hdf5,                          ONLY:     &
        hdf5read
@@ -2161,7 +2163,8 @@ contains
        date_time, dtstep_assim, N_catd, tile_coord,                           &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                                        &
-       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
+       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time,   &
+       ASCAT_spread_xx, ASCAT_spread_yy, ASCAT_spread_xy )
 
     ! Read H SAF ASCAT SSM CDR (H121) and ICDR (H139) from netCDF swath files.
     !
@@ -2185,6 +2188,13 @@ contains
     !   backscatter40_flag bit 4 (noise_out_of_limits)          -> reject (new w.r.t. "EUMETSAT" product)
     !
     ! SM output is degree of saturation as a fraction [0,1].
+    !
+    ! Optional super-obs (this_obs_param%superob_grid_deg>0): QC-passing obs are
+    ! averaged on a fixed global lat/lon grid.  Each super-ob is placed at the
+    ! mean location of its raw obs, and ASCAT_spread_* return the spatial
+    ! covariance [km^2] of those raw obs about that location.  get_obs_pred()
+    ! adds this spread to the raw-sample footprint (FOV) so that the model
+    ! prediction approximates the mean of the raw-obs footprints.
     !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
     !             https://hsaf.meteoam.it/
@@ -2221,6 +2231,9 @@ contains
     real,    intent(out), dimension(N_catd) :: ASCAT_sm_std           ! sfds obs error std          [fraction 0-1]
     real,    intent(out), dimension(N_catd) :: ASCAT_lon, ASCAT_lat
     real*8,  intent(out), dimension(N_catd) :: ASCAT_time             ! J2000 seconds
+    real,    intent(out), dimension(N_catd) :: ASCAT_spread_xx        ! super-ob spread [km^2] (0 otherwise)
+    real,    intent(out), dimension(N_catd) :: ASCAT_spread_yy
+    real,    intent(out), dimension(N_catd) :: ASCAT_spread_xy
 
     ! ---------------
 
@@ -2282,6 +2295,8 @@ contains
 
     real*8 :: J2000_low, J2000_up, obs_j2000
     real*8 :: superob_lon, superob_lat, dlon, dlat, dist2
+    real*8 :: cell_lon, cell_lat, mean_dlon, mean_dlat, km_per_deg, coslat
+    real*8 :: var_lon, var_lat, cov_lonlat
 
     logical :: file_exists, use_superobs
 
@@ -2316,9 +2331,12 @@ contains
     integer, dimension(N_catd)     :: N_obs_in_tile
 
     ! fixed-grid super-ob accumulation across all files in the window
+    ! (second moments are of lat/lon offsets from the cell centre, to avoid cancellation)
     integer, allocatable :: N_obs_in_superob(:), superob_cell_ind(:)
     real,    allocatable :: superob_sm_sum(:), best_dist2(:)
     real*8,  allocatable :: superob_time_sum(:), superob_lat_sum(:), superob_lon_sum(:)
+    real*8,  allocatable :: superob_dlon2_sum(:), superob_dlat2_sum(:), superob_dlonlat_sum(:)
+    real,    allocatable :: tmp_spread_xx(:), tmp_spread_yy(:), tmp_spread_xy(:)
 
     character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
     character(len=400)             :: err_msg
@@ -2503,21 +2521,31 @@ contains
     ASCAT_time    = 0.0D0
     N_obs_in_tile = 0
 
+    ASCAT_spread_xx = 0.
+    ASCAT_spread_yy = 0.
+    ASCAT_spread_xy = 0.
+
     N_valid_total      = 0
     N_invalid_location = 0
 
     if (use_superobs) then
-       allocate(N_obs_in_superob(N_superob_cells))
-       allocate(superob_sm_sum(  N_superob_cells))
-       allocate(superob_time_sum(N_superob_cells))
-       allocate(superob_lat_sum( N_superob_cells))
-       allocate(superob_lon_sum( N_superob_cells))
+       allocate(N_obs_in_superob(   N_superob_cells))
+       allocate(superob_sm_sum(     N_superob_cells))
+       allocate(superob_time_sum(   N_superob_cells))
+       allocate(superob_lat_sum(    N_superob_cells))
+       allocate(superob_lon_sum(    N_superob_cells))
+       allocate(superob_dlon2_sum(  N_superob_cells))
+       allocate(superob_dlat2_sum(  N_superob_cells))
+       allocate(superob_dlonlat_sum(N_superob_cells))
 
-       N_obs_in_superob = 0
-       superob_sm_sum   = 0.
-       superob_time_sum = 0.0D0
-       superob_lat_sum  = 0.0D0
-       superob_lon_sum  = 0.0D0
+       N_obs_in_superob    = 0
+       superob_sm_sum      = 0.
+       superob_time_sum    = 0.0D0
+       superob_lat_sum     = 0.0D0
+       superob_lon_sum     = 0.0D0
+       superob_dlon2_sum   = 0.0D0
+       superob_dlat2_sum   = 0.0D0
+       superob_dlonlat_sum = 0.0D0
     end if
 
     ! scratch arrays for valid obs from one file at a time
@@ -2698,11 +2726,19 @@ contains
 
              ind = (j_superob-1)*N_superob_lon + i_superob
 
-             superob_sm_sum(  ind) = superob_sm_sum(  ind) + tmp1_obs(  ii)
-             superob_time_sum(ind) = superob_time_sum(ind) + tmp1_jtime(ii)
-             superob_lat_sum( ind) = superob_lat_sum( ind) + superob_lat
-             superob_lon_sum( ind) = superob_lon_sum( ind) + superob_lon   ! normalised, so no dateline wrap within a cell
-             N_obs_in_superob(ind) = N_obs_in_superob(ind) + 1
+             ! offsets from cell centre (bounded by superob_grid_deg)
+
+             dlon = superob_lon - (-180.0D0 + (real(i_superob,8)-0.5D0)*real(this_obs_param%superob_grid_deg,8))
+             dlat = superob_lat - ( -90.0D0 + (real(j_superob,8)-0.5D0)*real(this_obs_param%superob_grid_deg,8))
+
+             superob_sm_sum(     ind) = superob_sm_sum(     ind) + tmp1_obs(  ii)
+             superob_time_sum(   ind) = superob_time_sum(   ind) + tmp1_jtime(ii)
+             superob_lat_sum(    ind) = superob_lat_sum(    ind) + superob_lat
+             superob_lon_sum(    ind) = superob_lon_sum(    ind) + superob_lon   ! normalised, so no dateline wrap within a cell
+             superob_dlon2_sum(  ind) = superob_dlon2_sum(  ind) + dlon*dlon
+             superob_dlat2_sum(  ind) = superob_dlat2_sum(  ind) + dlat*dlat
+             superob_dlonlat_sum(ind) = superob_dlonlat_sum(ind) + dlon*dlat
+             N_obs_in_superob(   ind) = N_obs_in_superob(   ind) + 1
 
           end do
 
@@ -2767,7 +2803,12 @@ contains
           allocate(tmp_lon(         N_superob_occupied))
           allocate(tmp_tile_num(    N_superob_occupied))
           allocate(superob_cell_ind(N_superob_occupied))
+          allocate(tmp_spread_xx(   N_superob_occupied))
+          allocate(tmp_spread_yy(   N_superob_occupied))
+          allocate(tmp_spread_xy(   N_superob_occupied))
           allocate(best_dist2(      N_catd))
+
+          km_per_deg = real(MAPL_PI,8)/180.0D0 * real(MAPL_RADIUS,8)/1000.0D0
 
           kk = 0
           do jj = 1, N_superob_lat
@@ -2781,6 +2822,25 @@ contains
                    ! place super-ob at mean location of contributing raw obs (consistent with mean time)
                    tmp_lon(kk) = real(superob_lon_sum(ind) / real(N_obs_in_superob(ind),8))
                    tmp_lat(kk) = real(superob_lat_sum(ind) / real(N_obs_in_superob(ind),8))
+
+                   ! spatial covariance of the raw obs about their mean location (population
+                   ! moments, i.e. 1/N), converted to km at the mean latitude; clip round-off
+
+                   cell_lon  = -180.0D0 + (real(ii,8)-0.5D0)*real(this_obs_param%superob_grid_deg,8)
+                   cell_lat  =  -90.0D0 + (real(jj,8)-0.5D0)*real(this_obs_param%superob_grid_deg,8)
+
+                   mean_dlon = superob_lon_sum(ind)/real(N_obs_in_superob(ind),8) - cell_lon
+                   mean_dlat = superob_lat_sum(ind)/real(N_obs_in_superob(ind),8) - cell_lat
+
+                   var_lon    = max(0.0D0, superob_dlon2_sum(ind)/real(N_obs_in_superob(ind),8) - mean_dlon**2)
+                   var_lat    = max(0.0D0, superob_dlat2_sum(ind)/real(N_obs_in_superob(ind),8) - mean_dlat**2)
+                   cov_lonlat = superob_dlonlat_sum(ind)/real(N_obs_in_superob(ind),8) - mean_dlon*mean_dlat
+
+                   coslat = cos(real(MAPL_PI,8)/180.0D0 * real(tmp_lat(kk),8))
+
+                   tmp_spread_xx(kk) = real(var_lon    * (km_per_deg*coslat)**2)
+                   tmp_spread_yy(kk) = real(var_lat    *  km_per_deg**2)
+                   tmp_spread_xy(kk) = real(cov_lonlat *  km_per_deg**2 * coslat)
                 end if
 
              end do
@@ -2821,6 +2881,10 @@ contains
                      real(N_obs_in_superob(kk), kind(0.0D0))
                 ASCAT_sm_std(ind) = this_obs_param%errstd / 100.   ! % -> fraction
 
+                ASCAT_spread_xx(ind) = tmp_spread_xx(ii)
+                ASCAT_spread_yy(ind) = tmp_spread_yy(ii)
+                ASCAT_spread_xy(ind) = tmp_spread_xy(ii)
+
                 N_obs_in_tile(ind) = N_obs_in_superob(kk)
                 best_dist2(ind) = real(dist2)
 
@@ -2829,6 +2893,7 @@ contains
           end do
 
           deallocate(tmp_lat, tmp_lon, tmp_tile_num, superob_cell_ind, best_dist2)
+          deallocate(tmp_spread_xx, tmp_spread_yy, tmp_spread_xy)
 
        end if
 
@@ -2842,6 +2907,11 @@ contains
           write(logunit,*) '  cells without a tile     = ', N_superob_no_tile
           write(logunit,*) '  tile collisions          = ', N_superob_collisions
           write(logunit,*) '  emitted super-obs        = ', count(N_obs_in_tile > 0)
+          if (any(N_obs_in_tile > 0)) then
+             write(logunit,*) '  mean footprint sigma [km]= ',                        &
+                  sum(sqrt(this_obs_param%FOV**2 + 0.5*(ASCAT_spread_xx+ASCAT_spread_yy)), &
+                  mask=(N_obs_in_tile>0)) / real(count(N_obs_in_tile > 0))
+          end if
           if (N_superob_occupied > 0) then
              write(logunit,*) '  samples per occupied cell= ',                        &
                   minval(N_obs_in_superob, mask=(N_obs_in_superob>0)),             &
@@ -2864,6 +2934,7 @@ contains
 
        deallocate(N_obs_in_superob, superob_sm_sum, superob_time_sum)
        deallocate(superob_lat_sum, superob_lon_sum)
+       deallocate(superob_dlon2_sum, superob_dlat2_sum, superob_dlonlat_sum)
 
     else
 
@@ -9785,7 +9856,8 @@ contains
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
        this_obs_param, write_obslog,                                 &
        found_obs, scaled_obs,                                        &
-       tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim )
+       tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim,  &
+       tmp_spread_xx, tmp_spread_yy, tmp_spread_xy )
     
     ! read observations and optionally scale observations to model clim
     !
@@ -9835,6 +9907,10 @@ contains
     real*8,  intent(out), dimension(N_catd) :: tmp_time
     logical, intent(out), dimension(N_catd) :: tmp_assim
 
+    real,    intent(out), dimension(N_catd) :: tmp_spread_xx   ! super-ob spread [km^2] (see obs_type)
+    real,    intent(out), dimension(N_catd) :: tmp_spread_yy
+    real,    intent(out), dimension(N_catd) :: tmp_spread_xy
+
     logical, intent(out)                    :: found_obs, scaled_obs
 
     ! obs time stamp in LDASsa *must* be in J2000 seconds with 'TT12' epoch
@@ -9861,6 +9937,12 @@ contains
     ! if needed, must be converted by obs reader (e.g., ASCAT/EUMETSAT)
 
     tmp_time = datetime_to_J2000seconds(date_time, J2000_epoch_id )
+
+    ! no super-ob spread unless set by individual reader
+
+    tmp_spread_xx = 0.
+    tmp_spread_yy = 0.
+    tmp_spread_xy = 0.
     
     ! -----------------------------
     
@@ -9958,7 +10040,7 @@ contains
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-            tmp_time)
+            tmp_time, tmp_spread_xx, tmp_spread_yy, tmp_spread_xy )
 
        ! scale observations to model climatology
 
@@ -11380,6 +11462,9 @@ contains
     real,   dimension(N_catl) :: tmp_obs,   tmp_std_obs,   tmp_lon,   tmp_lat
     real,   dimension(N_catf) :: tmp_obs_f, tmp_std_obs_f, tmp_lon_f, tmp_lat_f
 
+    real,   dimension(N_catl) :: tmp_spread_xx,   tmp_spread_yy,   tmp_spread_xy
+    real,   dimension(N_catf) :: tmp_spread_xx_f, tmp_spread_yy_f, tmp_spread_xy_f
+
     real*8, dimension(N_catl) :: tmp_time
     real*8, dimension(N_catf) :: tmp_time_f
 
@@ -11433,7 +11518,8 @@ contains
                tile_grid_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                &
                obs_param(species), write_obslog,                                       &
                found_obs, scaled_obs,                                                  &
-               tmp_obs_f, tmp_std_obs_f, tmp_lon_f, tmp_lat_f, tmp_time_f, tmp_assim_f)
+               tmp_obs_f, tmp_std_obs_f, tmp_lon_f, tmp_lat_f, tmp_time_f, tmp_assim_f, &
+               tmp_spread_xx_f, tmp_spread_yy_f, tmp_spread_xy_f )
           
           if (scaled_obs)  any_scaled_obs = .true.
 
@@ -11467,11 +11553,27 @@ contains
           
           call f2l_logical(N_catf,N_catl,N_catl_vec,low_ind, tmp_assim_f,   tmp_assim)
           
+          ! super-ob spread is non-zero only for super-ob species (avoid needless communication)
+
+          if (obs_param(species)%superob_grid_deg > 0.) then
+
+             call f2l_real(N_catf,N_catl,N_catl_vec,low_ind, tmp_spread_xx_f, tmp_spread_xx)
+             call f2l_real(N_catf,N_catl,N_catl_vec,low_ind, tmp_spread_yy_f, tmp_spread_yy)
+             call f2l_real(N_catf,N_catl,N_catl_vec,low_ind, tmp_spread_xy_f, tmp_spread_xy)
+
+          else
+
+             tmp_spread_xx = 0.
+             tmp_spread_yy = 0.
+             tmp_spread_xy = 0.
+
+          end if
 
           ! NOTE: "Observations" here are l(ocal) obs only
           
           call put_into_Observations( obs_param(species), N_obsl_max, N_catl, l2f,  &
                tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim,         &
+               tmp_spread_xx, tmp_spread_yy, tmp_spread_xy,                         &
                obs_count, Observations_l )
           
        end if
@@ -11665,6 +11767,7 @@ contains
 
   subroutine put_into_Observations( this_obs_param, N_obs_max, N_catd, l2f,   &
        tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim,           &
+       tmp_spread_xx, tmp_spread_yy, tmp_spread_xy,                           &
        obs_count, Observations )
     
     ! Put one type of observations into the general "Observations" vector:
@@ -11694,6 +11797,8 @@ contains
     real*8,  dimension(N_catd), intent(in) :: tmp_time
 
     logical, dimension(N_catd), intent(in) :: tmp_assim
+
+    real,    dimension(N_catd), intent(in) :: tmp_spread_xx, tmp_spread_yy, tmp_spread_xy
     
     integer,                              intent(inout) :: obs_count
     
@@ -11748,6 +11853,11 @@ contains
           
           Observations(obs_count)%ana     = this_obs_param%nodata
           Observations(obs_count)%anavar  = this_obs_param%nodata
+
+          Observations(obs_count)%spread_xx = tmp_spread_xx(i)
+          Observations(obs_count)%spread_yy = tmp_spread_yy(i)
+          Observations(obs_count)%spread_xy = tmp_spread_xy(i)
+          Observations(obs_count)%DUMMYGAP2 = 0.
           
        end if
     end do

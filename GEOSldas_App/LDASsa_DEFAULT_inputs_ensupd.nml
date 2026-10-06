@@ -198,6 +198,13 @@ fcsterr_inflation_fac = -9999.
 !  This is useful if the resolution of the assimilated observations is higher
 !  than that of the model tile space.  This might be the case for snow-cover-fraction 
 !  observations. FOV=0 can also be useful for tile-based synthetic observations.
+! Super-obs (superob_grid_deg>0., H SAF ASCAT only, requires FOV_units='km'):
+!  FOV is the footprint of a single raw observation.  Each super-ob averages the
+!  raw obs within a grid cell, so its footprint is the mean of their Gaussian
+!  footprints.  This is approximated by a Gaussian with covariance FOV^2*I + S,
+!  where S is the spatial covariance of the contributing raw obs about the
+!  super-ob location.  The search distance and weights then use the Mahalanobis
+!  distance w.r.t. this covariance (instead of ndist2 above).
 !
 !
 ! ------------------------------------------------------------------------
@@ -2566,8 +2573,9 @@ obs_param_nml(55)%adapt          = 0
 !
 ! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
 !
-! To enable fixed-grid super-obbing, set %superob_grid_deg>0 and use
-! FOV_units='deg' with FOV approximately superob_grid_deg/sqrt(pi).
+! To enable fixed-grid super-obbing, set %superob_grid_deg>0 and keep the
+! raw-obs footprint FOV=12.5, FOV_units='km'; the super-ob footprint is
+! derived from it (see NOTES on FOV above).
 !
 ! ------------------------
 !

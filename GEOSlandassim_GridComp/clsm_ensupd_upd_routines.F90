@@ -260,7 +260,7 @@ contains
     
     integer :: i, j, k, N_tmp, k_hD, k_hA, k_vD, k_vA
 
-    real    :: r_y, expected_FOV
+    real    :: r_y
     
     real, dimension(1) :: tmp_lat, r_x
     
@@ -392,18 +392,12 @@ contains
        elseif (obs_param_nml(i)%superob_grid_deg > 0.) then
           select case (trim(obs_param_nml(i)%descr))
           case ('ASCAT_HSAF_META_SM','ASCAT_HSAF_METB_SM','ASCAT_HSAF_METC_SM')
-             if (trim(obs_param_nml(i)%FOV_units) /= 'deg' .or. &
+             ! FOV is the (Gaussian) footprint of a single raw obs; get_obs_pred()
+             ! widens it for each super-ob by the spread of its contributing raw obs.
+             if (trim(obs_param_nml(i)%FOV_units) /= 'km' .or. &
                   obs_param_nml(i)%FOV <= 0.) then
                 call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
-                     'H SAF super-obs require a positive FOV with FOV_units="deg"')
-             end if
-
-             ! A degree-based FOV is a uniformly weighted ellipse.  Match its
-             ! area to the square super-ob cell within a modest tolerance.
-             expected_FOV = obs_param_nml(i)%superob_grid_deg/sqrt(MAPL_PI)
-             if (abs(obs_param_nml(i)%FOV-expected_FOV) > 0.25*expected_FOV) then
-                call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
-                     'H SAF super-ob FOV must be within 25% of superob_grid_deg/sqrt(pi)')
+                     'H SAF super-obs require the raw-obs footprint as a positive FOV with FOV_units="km"')
              end if
           case default
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, &
@@ -1102,6 +1096,12 @@ contains
     real                                    :: this_lon, this_FOV, r_y
     real, dimension(1)                      :: this_lat, r_x
     
+    ! super-ob footprint covariance C=[cxx cxy; cxy cyy] [km^2] and related
+
+    real                                    :: fp_cxx, fp_cyy, fp_cxy, fp_det, fp_lmax
+    real                                    :: fp_dx, fp_dy, km_per_deg, coslat
+    integer                                 :: N_keep
+    
     real                                    :: freq, inc_angle
 
     real, dimension(numprocs)               :: xhalo, yhalo, tmplatvec, tmprx
@@ -1110,6 +1110,7 @@ contains
     real                                    :: tmpsum_w
 
     logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
+    logical                                 :: use_superob_footprint
 
     real, dimension(1)                      :: tmpmean, tmpvar
         
@@ -1367,6 +1368,8 @@ contains
     
     ! find maximum FOV in units of [deg] across all obs params 
     
+    km_per_deg = (MAPL_PI/180.) * (MAPL_RADIUS/1000.)
+
     do ii=1,N_obs_param
        
        if     ( trim(obs_param(ii)%FOV_units)=='deg' ) then
@@ -1376,9 +1379,17 @@ contains
           
        elseif ( trim(obs_param(ii)%FOV_units)=='km'  ) then
           
+          this_FOV = obs_param(ii)%FOV
+
+          ! super-obs: widest possible footprint (see below); the spread of raw obs
+          !  within a cell along any direction is at most (cell diagonal/2)^2
+
+          if (obs_param(ii)%superob_grid_deg > 0.)                                    &
+               this_FOV = sqrt( this_FOV**2 + 0.5*(obs_param(ii)%superob_grid_deg*km_per_deg)**2 )
+
           ! convert from [km] (FOV) to [deg] 
           
-          call dist_km2deg( obs_param(ii)%FOV, numprocs, tmplatvec, tmprx, r_y )
+          call dist_km2deg( this_FOV, numprocs, tmplatvec, tmprx, r_y )
 
           ! for now, ignore what happens to xhalo for processors without tiles (fixed below)
           
@@ -1730,7 +1741,8 @@ contains
        !
        ! map from full domain to this Observation
 
-       use_distance_weights = .false.   ! initialize
+       use_distance_weights  = .false.   ! initialize
+       use_superob_footprint = .false.   ! initialize
        
        if (this_FOV < FOV_threshold) then
           
@@ -1760,7 +1772,31 @@ contains
              
              ! IMPORTANT: search distance is fac_search_FOV_km*FOV when FOV_units='km' !!!
              
-             call dist_km2deg( fac_search_FOV_km*this_FOV, 1, this_lat, r_x, r_y )
+             if (obs_param(this_species)%superob_grid_deg > 0.) then
+
+                ! Super-ob: the exact footprint is the mean of the Gaussian footprints
+                !  (FOV) of the contributing raw obs.  Approximate it by the Gaussian
+                !  with the same mean (obs lat/lon) and covariance, C = FOV^2*I + spread,
+                !  where "spread" is the spatial covariance of the raw obs [km^2].
+                !  Search out to fac_search_FOV_km std-devs along the major axis of C.
+
+                fp_cxx  = this_FOV**2 + Observations_l(i)%spread_xx
+                fp_cyy  = this_FOV**2 + Observations_l(i)%spread_yy
+                fp_cxy  =               Observations_l(i)%spread_xy
+
+                fp_det  = fp_cxx*fp_cyy - fp_cxy**2     ! >= FOV^4 > 0 because spread is pos. semi-def.
+
+                fp_lmax = 0.5*(fp_cxx+fp_cyy) + sqrt( 0.25*(fp_cxx-fp_cyy)**2 + fp_cxy**2 )
+
+                call dist_km2deg( fac_search_FOV_km*sqrt(fp_lmax), 1, this_lat, r_x, r_y )
+
+                use_superob_footprint = .true.
+
+             else
+
+                call dist_km2deg( fac_search_FOV_km*this_FOV, 1, this_lat, r_x, r_y )
+
+             end if
              
              use_distance_weights = .true.
              
@@ -1777,6 +1813,37 @@ contains
           
           ! N_tmp could be zero (if ellipse straddles dateline)
           ! - reichle, 17 Apr 2017
+
+          if (use_superob_footprint) then
+
+             ! replace the normalized square distance from the circular search with the
+             !  Mahalanobis square distance w.r.t. C (in km, like dist_km2deg()), and keep
+             !  only tiles within fac_search_FOV_km std-devs
+
+             coslat = cos( MAPL_PI/180. * this_lat(1) )
+
+             N_keep = 0
+
+             do k=1,N_tmp
+
+                fp_dx = (tile_coord_lH(ind_tmp(k))%com_lon - this_lon   ) * km_per_deg * coslat
+                fp_dy = (tile_coord_lH(ind_tmp(k))%com_lat - this_lat(1)) * km_per_deg
+
+                tmpreal = ( fp_cyy*fp_dx**2 - 2.*fp_cxy*fp_dx*fp_dy + fp_cxx*fp_dy**2 ) / fp_det
+
+                if (tmpreal <= fac_search_FOV_km**2) then
+
+                   N_keep            = N_keep + 1
+                   ind_tmp(  N_keep) = ind_tmp(k)
+                   tmp_ndst2(N_keep) = tmpreal
+
+                end if
+
+             end do
+
+             N_tmp = N_keep
+
+          end if
 
        end if
        
@@ -1803,8 +1870,10 @@ contains
              
              ! normalized distance from get_tile_num_in_ellipse() is relative to r_x and r_y,
              !  first scale back so that distance is w.r.t. FOV
+             !  (super-obs: tmp_ndst2 is already the Mahalanobis square distance w.r.t. C)
              
-             tmp_ndst2(  1:N_tmp) = (fac_search_FOV_km**2) * tmp_ndst2(1:N_tmp) 
+             if (.not. use_superob_footprint)                                    &
+                  tmp_ndst2(1:N_tmp) = (fac_search_FOV_km**2) * tmp_ndst2(1:N_tmp)
              
              tmp_wFOV(   1:N_tmp) = exp( -0.5*tmp_ndst2(1:N_tmp) )
              
