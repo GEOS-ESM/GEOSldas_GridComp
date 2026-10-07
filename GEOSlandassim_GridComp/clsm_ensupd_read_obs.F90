@@ -2187,8 +2187,9 @@ contains
     ! SM output is degree of saturation as a fraction [0,1].
     !
     ! Optional thinning (this_obs_param%thin_dist_km>0): the QC-passing obs of
-    ! the assimilation window are thinned so that no two kept obs are closer than
-    ! thin_dist_km (obs visited in file order; see subroutine thin_min_dist).
+    ! the assimilation window that are assigned to a tile are thinned so that no
+    ! two kept obs are closer than thin_dist_km (obs visited in file order; see
+    ! subroutine thin_min_dist).
     !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
     !             https://hsaf.meteoam.it/
@@ -2268,7 +2269,7 @@ contains
     character(300) :: tmpfname
 
     integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
-    integer :: N_win, N_raw_total
+    integer :: N_win, N_raw_total, N_kept
 
     character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
     character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
@@ -2304,7 +2305,8 @@ contains
     ! valid obs of all files in the assimilation window (grown as needed)
     real,       allocatable :: win_lat(:), win_lon(:), win_obs(:), tmpr(:)
     real*8,     allocatable :: win_jtime(:), tmpr8(:)
-    logical,    allocatable :: keep(:)
+    logical,    allocatable :: keep(:), keep_elig(:)
+    integer,    allocatable :: ind_elig(:)
 
     ! pointers for get_tile_num_for_obs
     real,    dimension(:), pointer :: tmp_lat, tmp_lon
@@ -2641,33 +2643,7 @@ contains
 
     ! ----------------------------------------------------------------
     !
-    ! optional thinning to a minimum distance between obs (after QC, across
-    ! all files in the window)
-
-    if (this_obs_param%thin_dist_km > 0. .and. N_win > 0) then
-
-       allocate(keep(N_win))
-
-       call thin_min_dist( N_win, win_lat(1:N_win), win_lon(1:N_win),       &
-            this_obs_param%thin_dist_km, keep, N_tmp )
-
-       win_lat(  1:N_tmp) = pack( win_lat(  1:N_win), keep )
-       win_lon(  1:N_tmp) = pack( win_lon(  1:N_win), keep )
-       win_obs(  1:N_tmp) = pack( win_obs(  1:N_win), keep )
-       win_jtime(1:N_tmp) = pack( win_jtime(1:N_win), keep )
-
-       deallocate(keep)
-
-       if (logit) write(logunit,*) trim(Iam)//': obs kept after thinning to ', &
-            this_obs_param%thin_dist_km, ' km = ', N_tmp
-
-       N_win = N_tmp
-
-    end if
-
-    ! ----------------------------------------------------------------
-    !
-    ! tile matching and accumulation for the window's valid obs
+    ! tile matching, optional thinning, and accumulation for the window's valid obs
 
     if (N_win > 0) then
 
@@ -2686,11 +2662,47 @@ contains
             this_obs_param,                                               &
             tmp_tile_num )
 
+       ! only obs assigned to a tile can be assimilated
+
+       allocate(keep(N_win))
+
+       keep = (tmp_tile_num > 0)
+
+       ! optional thinning to a minimum distance between obs (across all files
+       ! in the window); restricted to obs assigned to a tile so that obs outside
+       ! the domain or without a tile cannot suppress obs that can be assimilated
+
+       if (this_obs_param%thin_dist_km > 0.) then
+
+          N_tmp  = count(keep)
+          N_kept = 0
+
+          if (N_tmp > 0) then
+
+             allocate(ind_elig( N_tmp))
+             allocate(keep_elig(N_tmp))
+
+             ind_elig = pack( (/ (ii, ii=1,N_win) /), keep )
+
+             call thin_min_dist( N_tmp, tmp_lat(ind_elig), tmp_lon(ind_elig), &
+                  this_obs_param%thin_dist_km, keep_elig, N_kept )
+
+             keep(ind_elig) = keep_elig
+
+             deallocate(ind_elig, keep_elig)
+
+          end if
+
+          if (logit) write(logunit,*) trim(Iam)//': obs assigned to tiles = ', N_tmp, &
+               ', kept after thinning to ', this_obs_param%thin_dist_km, ' km = ', N_kept
+
+       end if
+
        do ii = 1, N_win
 
-          ind = tmp_tile_num(ii)
+          if (keep(ii)) then
 
-          if (ind > 0) then
+             ind = tmp_tile_num(ii)
 
              ASCAT_sm(  ind) = ASCAT_sm(  ind) + win_obs(   ii)
              ASCAT_lon( ind) = ASCAT_lon( ind) + tmp_lon(   ii)
@@ -2703,7 +2715,7 @@ contains
 
        end do
 
-       deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
+       deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num, keep)
 
     end if
 
