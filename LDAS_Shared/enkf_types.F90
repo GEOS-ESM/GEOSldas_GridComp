@@ -121,6 +121,8 @@ module enkf_types
      real                          :: FOV             ! field-of-view *radius* 
                                                       ! if FOV==0. equate obs footprint w/ tile
                                                       ! for details see LDASsa_DEFAULT_inputs ensupd.nml
+     real                          :: thin_dist_km = 0. ! obs thinning: minimum distance [km] between
+                                                        !   kept obs (H SAF ASCAT only); 0 disables
      character(40)                 :: FOV_units       ! FOV units ('km' or 'deg') 
 
      logical                       :: assim           ! assimilate obs species: yes/no? (see also "obs_type")
@@ -199,6 +201,8 @@ contains
        
        write (unitnumber,       *) obs_param(i)%freq      
        write (unitnumber,       *) obs_param(i)%FOV
+       ! Keep thin_dist_km out of this legacy fixed-order format.  It is
+       ! preserved in the saved ens_upd_inputs namelist instead.
        write (unitnumber, '(42A)') "'" // trim(obs_param(i)%FOV_units) // "'"       
        write (unitnumber,       *) obs_param(i)%assim     
        write (unitnumber,       *) obs_param(i)%scale     

@@ -104,6 +104,8 @@ fcsterr_inflation_fac = -9999.
 ! %freq           = frequency [Hz]
 ! %FOV            = field-of-view *radius*, see NOTES below
 !                   (if FOV==0. equate obs footprint w/ tile)
+! %thin_dist_km   = obs thinning for H SAF ASCAT: minimum distance [km] between
+!                   assimilated obs (0.=no thinning)
 ! %FOV_units      = FOV units ('km' or 'deg'), see NOTES below 
 ! %assim          = assimilate obs species: true/false (see also "obs_type")
 ! %scale          = scale      obs species: true/false
@@ -2564,6 +2566,14 @@ obs_param_nml(55)%adapt          = 0
 !
 ! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
 !
+! To thin the obs spatially, set %thin_dist_km>0: after QC, the obs of the
+! assimilation window that are assigned to a model tile are visited in file
+! order, and an obs is kept unless it is closer than thin_dist_km to an obs
+! kept earlier.  No two kept obs of a species are then closer than
+! thin_dist_km (e.g., 20. keeps ~1/4 of a full swath).
+! Thinning is meant for tiles finer than thin_dist_km (e.g., M09).  On coarser
+! tiles (e.g., M36), the obs are already averaged per tile; do not thin.
+!
 ! ------------------------
 !
 !  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A)
@@ -2577,6 +2587,7 @@ obs_param_nml(56)%pol            = 0
 obs_param_nml(56)%N_ang          = 0
 obs_param_nml(56)%freq           = 0
 obs_param_nml(56)%FOV            = 12.5
+obs_param_nml(56)%thin_dist_km   = 0.
 obs_param_nml(56)%FOV_units      = 'km'
 obs_param_nml(56)%assim          = .false.
 obs_param_nml(56)%scale          = .false.
@@ -2620,6 +2631,7 @@ obs_param_nml(57)%pol            = 0
 obs_param_nml(57)%N_ang          = 0
 obs_param_nml(57)%freq           = 0
 obs_param_nml(57)%FOV            = 12.5
+obs_param_nml(57)%thin_dist_km   = 0.
 obs_param_nml(57)%FOV_units      = 'km'
 obs_param_nml(57)%assim          = .false.
 obs_param_nml(57)%scale          = .false.
@@ -2663,6 +2675,7 @@ obs_param_nml(58)%pol            = 0
 obs_param_nml(58)%N_ang          = 0
 obs_param_nml(58)%freq           = 0
 obs_param_nml(58)%FOV            = 12.5
+obs_param_nml(58)%thin_dist_km   = 0.
 obs_param_nml(58)%FOV_units      = 'km'
 obs_param_nml(58)%assim          = .false.
 obs_param_nml(58)%scale          = .false.
