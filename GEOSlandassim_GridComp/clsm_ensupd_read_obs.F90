@@ -26,9 +26,7 @@ module clsm_ensupd_read_obs
        MAPL_UNDEF
 
   use MAPL_ConstantsMod,                ONLY:     &
-       MAPL_TICE,                                 &
-       MAPL_PI_R8,                                &
-       MAPL_RADIUS
+       MAPL_TICE
   
   use io_hdf5,                          ONLY:     &
        hdf5read
@@ -11717,16 +11715,28 @@ contains
 
   subroutine thin_min_dist( N_obs, lat, lon, min_dist_km, keep, N_keep )
 
-    ! Thin observations to a minimum separation distance.
+    ! thin obs to a minimum distance between kept obs
     !
-    ! Obs are visited in the given order.  An obs is kept unless it lies closer
-    ! than min_dist (great-circle) to an obs that was kept earlier.  Hence no two
-    ! kept obs are closer than min_dist, and the result is deterministic.
+    ! Obs are visited in the given order.  An obs is kept unless it is closer
+    ! than min_dist_km to an obs that was kept earlier.  Hence no two kept obs
+    ! are closer than min_dist_km, and the result is deterministic.
     !
-    ! Kept obs are stored in a lat/lon bucket grid whose buckets are at least
-    ! min_dist tall and wide, so only the neighbouring buckets need checking.
+    ! Distances are in [deg] lat/lon, as for the field-of-view (FOV) of the obs
+    ! (see get_tile_num_for_obs() and get_obs_pred()):  min_dist_km is converted
+    ! with dist_km2deg() into r_y (scalar) and r_x (depends on latitude), and an
+    ! obs is too close to a kept obs if (dlon/r_x)**2 + (dlat/r_y)**2 < 1, the
+    ! normalized square distance of get_tile_num_in_ellipse().
+    ! The dateline is ignored (as in get_tile_num_in_ellipse()).
     !
-    ! A. Fox, Oct 2026
+    ! Kept obs are stored in "buckets" of a regular lat/lon grid with r_y x r_y [deg]
+    ! cells, so that only the kept obs in nearby buckets need to be checked.
+    !
+    ! Unlike SMAP L1C_TB_E obs (see "L1CE_thinning" in read_obs_SMAP_halforbit_Tb()),
+    ! H SAF obs cannot be thinned via their grid indices because the indices
+    ! (location_id) of the Fibonacci grid are not arranged in lat/lon rows and
+    ! columns, so that thinning via the indices does not give a uniform spacing.
+    !
+    ! amfox, 9 Oct 2026
 
     implicit none
 
@@ -11736,16 +11746,15 @@ contains
     logical, dimension(N_obs), intent(out) :: keep
     integer,                   intent(out) :: N_keep
 
-    real*8, parameter :: PI         = MAPL_PI_R8
-    real*8, parameter :: R_EARTH_KM = real(MAPL_RADIUS,8)/1000.d0
+    ! local variables
 
-    real*8  :: ang, chord2_min, row_height, lat_pole, dlon, cos_min
-    real*8  :: qlat, qlon
-    integer :: N_rows, N_bkts, kk, r, r0, c, c_beg, c_end, bb, mm
+    real    :: r_y, dx, dy
+    integer :: N_lon_bkt, N_lat_bkt, kk, mm, ii, jj, i_ind, j_ind, di
     logical :: too_close
 
-    integer, dimension(:),   allocatable :: row_ncol, row_off, head, next
-    real*8,  dimension(:,:), allocatable :: xyz
+    real,    dimension(:),   allocatable :: r_x
+    integer, dimension(:),   allocatable :: next
+    integer, dimension(:,:), allocatable :: head
 
     ! -----------------------------------------------------
 
@@ -11754,97 +11763,69 @@ contains
 
     if (N_obs < 2 .or. min_dist_km <= 0.) return
 
-    ang        = min( PI, real(min_dist_km,8)/R_EARTH_KM )     ! angular distance [rad]
-    chord2_min = (2.d0*sin(0.5d0*ang))**2                      ! square chord distance
+    ! convert min_dist_km to [deg]
 
-    ! rows of equal latitude height >= ang
+    allocate(r_x(N_obs))
 
-    N_rows     = max( 1, floor( PI/ang ))
-    row_height = PI/real(N_rows,8)
+    call dist_km2deg( min_dist_km, N_obs, lat, r_x, r_y )
 
-    ! columns per row: at least row_height wide at the row's poleward edge
+    ! buckets: obs closer than min_dist_km are in the same or a neighbouring
+    ! bucket in latitude (because |dlat|<r_y), and at most ceiling(r_x/r_y)
+    ! buckets apart in longitude
 
-    allocate(row_ncol(N_rows))
-    allocate(row_off( N_rows))
+    N_lon_bkt = ceiling( 360./r_y )
+    N_lat_bkt = ceiling( 180./r_y )
 
-    N_bkts = 0
+    ! kept obs in each bucket as a linked list:
+    !   head(i,j) = last kept obs in bucket (i,j)        (0 = none)
+    !   next(kk)  = obs kept before kk in the same bucket (0 = none)
 
-    do r=1,N_rows
-       lat_pole    = max( abs(-0.5d0*PI + real(r-1,8)*row_height),          &
-                          abs(-0.5d0*PI + real(r,  8)*row_height) )
-       row_ncol(r) = max( 1, floor( 2.d0*PI*cos(min(0.5d0*PI,lat_pole))/row_height ))
-       row_off( r) = N_bkts
-       N_bkts      = N_bkts + row_ncol(r)
-    end do
-
-    ! kept obs per bucket as linked lists (head of list per bucket, next obs in list)
-
-    allocate(head(N_bkts))
+    allocate(head(N_lon_bkt,N_lat_bkt))
     allocate(next(N_obs))
-    allocate(xyz(3,N_obs))
 
-    head = 0
+    head   = 0
+    next   = 0
 
     N_keep = 0
 
     do kk=1,N_obs
 
-       qlat = max( -0.5d0*PI, min( 0.5d0*PI, real(lat(kk),8)*PI/180.d0 ))
-       qlon = modulo( real(lon(kk),8)*PI/180.d0, 2.d0*PI )
+       ! bucket of obs kk
 
-       xyz(1,kk) = cos(qlat)*cos(qlon)
-       xyz(2,kk) = cos(qlat)*sin(qlon)
-       xyz(3,kk) = sin(qlat)
+       i_ind = min( N_lon_bkt, max( 1, floor( (lon(kk)+180.)/r_y ) + 1 ))
+       j_ind = min( N_lat_bkt, max( 1, floor( (lat(kk)+ 90.)/r_y ) + 1 ))
 
-       r0 = row_of_lat( qlat )
-
-       ! obs within ang of this obs differ in longitude by at most dlon, where
-       ! sin(dlon/2) <= sin(ang/2)/sqrt(cos(qlat)*cos(lat_other)) (haversine)
-
-       cos_min = cos( min( 0.5d0*PI, abs(qlat) + ang ))
-
-       if (cos(qlat)*cos_min > sin(0.5d0*ang)**2) then
-          dlon = 2.d0*asin( sin(0.5d0*ang)/sqrt(cos(qlat)*cos_min) )
+       if (r_x(kk) < 360.) then
+          di = ceiling( r_x(kk)/r_y )
        else
-          dlon = PI
+          di = N_lon_bkt              ! near the poles
        end if
 
-       ! check kept obs in neighbouring buckets (rows r0-1..r0+1 because row_height >= ang)
+       ! check kept obs in nearby buckets
 
        too_close = .false.
 
-       do r=max(1,r0-1),min(N_rows,r0+1)
+       do jj=max(1,j_ind-1),min(N_lat_bkt,j_ind+1)
+          do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)
 
-          if (dlon >= PI) then
-             c_beg = 0
-             c_end = row_ncol(r) - 1
-          else
-             c_beg = floor( (qlon-dlon)/(2.d0*PI)*real(row_ncol(r),8) )
-             c_end = floor( (qlon+dlon)/(2.d0*PI)*real(row_ncol(r),8) )
-             if (c_end-c_beg+1 >= row_ncol(r)) then
-                c_beg = 0
-                c_end = row_ncol(r) - 1
-             end if
-          end if
-
-          do c=c_beg,c_end
-
-             bb = row_off(r) + modulo( c, row_ncol(r) ) + 1    ! wrap around in longitude
-
-             mm = head(bb)
+             mm = head(ii,jj)
 
              do while (mm > 0)
-                if ( (xyz(1,mm)-xyz(1,kk))**2 + (xyz(2,mm)-xyz(2,kk))**2 +         &
-                     (xyz(3,mm)-xyz(3,kk))**2 < chord2_min ) then
+
+                dx = (lon(mm) - lon(kk)) / r_x(kk)
+                dy = (lat(mm) - lat(kk)) / r_y
+
+                if (dx**2 + dy**2 < 1.) then
                    too_close = .true.
                    exit
                 end if
+
                 mm = next(mm)
+
              end do
 
              if (too_close) exit
           end do
-
           if (too_close) exit
        end do
 
@@ -11854,31 +11835,18 @@ contains
 
        else
 
-          ! keep obs and add it to its bucket
+          ! keep obs kk and add it to its bucket
 
           N_keep = N_keep + 1
 
-          bb = row_off(r0) + min( row_ncol(r0)-1,                               &
-               floor( qlon/(2.d0*PI)*real(row_ncol(r0),8) )) + 1
-
-          next(kk) = head(bb)
-          head(bb) = kk
+          next(kk)          = head(i_ind,j_ind)
+          head(i_ind,j_ind) = kk
 
        end if
 
     end do
 
-    deallocate(row_ncol, row_off, head, next, xyz)
-
-  contains
-
-    integer function row_of_lat( lat_rad )
-
-      real*8, intent(in) :: lat_rad
-
-      row_of_lat = max( 1, min( N_rows, floor( (lat_rad + 0.5d0*PI)/row_height ) + 1 ))
-
-    end function row_of_lat
+    deallocate(r_x, head, next)
 
   end subroutine thin_min_dist
 
