@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added comment to clarify the selection of the tile file ( nc4 or acsii)
+- Added comment to clarify the selection of the tile file (nc4 or acsii).
+- Improved error handling in preprocessor for SMOS obs.
 ### Changed
 
 ### Fixed
