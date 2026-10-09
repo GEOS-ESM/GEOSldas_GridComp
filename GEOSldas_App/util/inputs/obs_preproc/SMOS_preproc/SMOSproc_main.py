@@ -179,62 +179,6 @@ def main():
         
         # Advance to the next day
         current_date += timedelta(days=1)
-    while current_date < end_time:
-        date_str = current_date.strftime('%Y%m%d')
-        logging.info(f"=== Starting processing for {date_str} ===")
-
-        # Step 1: Convert files to NetCDF
-        try:
-            ncflist = process_ee_to_nc(current_date)
-        except RuntimeError as e:
-            logging.error(f"Halting processing for {date_str} due to error: {e} related to building nc file list")
-
-            if fail_fast:
-                sys.exit(1)
-            else:
-                current_date += timedelta(days=1)
-                continue
-
-        # Step 2: Preprocess NetCDF files into REG
-        for fnc in ncflist:
-            logging.info(f"Preprocessing NC file: {fnc}")
-            try:
-                run_in_isolated_process(preprocess_nc, fnc, config)
-            except RuntimeError as e:
-                if fail_fast:
-                    logging.error(f"Failure in preprocessing of {fnc} due to: {e}. Halting processing")
-                    sys.exit(1)
-                else:
-                    logging.error(f"Skipping {fnc} due to error: {e} in preprocessing of nc files")
-                    continue
-
-            # Move processed file to 'to_delete'
-            dest = os.path.join(TMP_NC_PATH, 'to_delete', os.path.basename(fnc))
-            shutil.move(fnc, dest)
-            logging.info(f"Moved {fnc} to cleanup directory.")
-
-        # Step 3: Run REG to FIT processing for Ascending and Descending
-        next_date = current_date + timedelta(days=1)
-
-        logging.info("Running SCLF1C_reg2fit for Ascending (_A)")
-        try:
-            run_in_isolated_process(SCLF1C_reg2fit, OUT_REG_PATH, current_date, next_date, '_A')
-        except RuntimeError as e:
-            if fail_fast:
-                logging.error(f"SCLF1C_reg2fit failed for Ascending (_A) on {date_str}: {e}. Exiting program.")
-                sys.exit(1)
-            else:
-                logging.error(f"SCLF1C_reg2fit failed for Ascending (_A) on {date_str}: {e}")
-
-        logging.info("Running SCLF1C_reg2fit for Descending (_D)")
-        try:
-            run_in_isolated_process(SCLF1C_reg2fit, OUT_REG_PATH, current_date, next_date, '_D')
-        except RuntimeError as e:
-            if fail_fast:
-                logging.error(f"SCLF1C_reg2fit failed for Descending (_D) on {date_str}: {e}. Exiting program.")
-                sys.exit(1)
-            else:
-                logging.error(f"SCLF1C_reg2fit failed for Descending (_D) on {date_str}: {e}")
 
 
 if __name__ == '__main__':
