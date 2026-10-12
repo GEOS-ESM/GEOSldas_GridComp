@@ -4069,7 +4069,7 @@ contains
               
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
 
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
@@ -4090,12 +4090,15 @@ contains
           ! find observations for catchment n
           
           select_tilenum(1) = l2f(n)
-          
-          call get_ind_obs(                                           &
-               N_obs,            Observations,                        &
-               1,                select_tilenum,                      &
-               N_select_species, select_species(1:N_select_species),  &
-               N_selected_obs,   ind_obs )
+          N_selected_obs = 0
+
+          if (N_select_species > 0) then
+             call get_ind_obs(                                           &
+                  N_obs,            Observations,                        &
+                  1,                select_tilenum,                      &
+                  N_select_species, select_species(1:N_select_species),  &
+                  N_selected_obs,   ind_obs )
+          end if
 
           if (N_selected_obs > 0) then
              
@@ -4141,7 +4144,7 @@ contains
        
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
 
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
@@ -4162,12 +4165,15 @@ contains
           ! find observations for catchment n
           
           select_tilenum(1) = l2f(n)
-          
-          call get_ind_obs(                                           &
-               N_obs,            Observations,                        &
-               1,                select_tilenum,                      &
-               N_select_species, select_species(1:N_select_species),  &
-               N_selected_obs,   ind_obs )
+          N_selected_obs = 0
+
+          if (N_select_species > 0) then
+             call get_ind_obs(                                           &
+                  N_obs,            Observations,                        &
+                  1,                select_tilenum,                      &
+                  N_select_species, select_species(1:N_select_species),  &
+                  N_selected_obs,   ind_obs )
+           end if
 
           if (N_selected_obs > 0) then
              
@@ -4295,7 +4301,7 @@ contains
 
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
        
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
@@ -4324,11 +4330,15 @@ contains
           halo_minlat = max(halo_minlat, -90.)
           halo_maxlat = min(halo_maxlat,  90.)
           
-          call get_ind_obs_lat_lon_box(                               &
-               N_obs,            Observations,                        &
-               halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,    &
-               N_select_species, select_species(1:N_select_species),  &
-               N_selected_obs,   ind_obs )
+          N_selected_obs = 0
+
+          if (N_select_species > 0) then
+             call get_ind_obs_lat_lon_box(                               &
+                  N_obs,            Observations,                        &
+                  halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,    &
+                  N_select_species, select_species(1:N_select_species),  &
+                  N_selected_obs,   ind_obs )
+           end if
           
           if (N_selected_obs>0) then
                           
