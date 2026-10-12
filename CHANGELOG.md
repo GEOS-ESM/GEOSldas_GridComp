@@ -11,13 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added comment to clarify the selection of the tile file ( nc4 or acsii)
+
 ### Changed
 
 ### Fixed
 - Refined ldas_setup restart handling for multiple restart options and surface components
-- Fixed `select_varnames` bounds for EnKF update types 12 and 13 with fewer than three observation species.
-- Fixed per-member initialization of `deltaT` in the freeze/thaw analysis (`update_type=9`).
-- Fixed surface temperature observation selection for EnKF update types 3-5 and 7.
+- Fixed array bounds for EnKF update types 12 and 13.
+- Fixed initialization of temperature increment in freeze/thaw analysis.
+- Fixed surface temperature observation selection for EnKF update types 3, 4, 5 and 7.
+
 ### Removed
 
 ### Deprecated
