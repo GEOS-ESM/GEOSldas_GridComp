@@ -4074,7 +4074,7 @@ contains
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 3
        
        allocate( State_incr(N_state,N_ens) )
@@ -4090,16 +4090,13 @@ contains
           ! find observations for catchment n
           
           select_tilenum(1) = l2f(n)
-          N_selected_obs = 0
-
-          if (N_select_species > 0) then
-             call get_ind_obs(                                           &
-                  N_obs,            Observations,                        &
-                  1,                select_tilenum,                      &
-                  N_select_species, select_species(1:N_select_species),  &
-                  N_selected_obs,   ind_obs )
-          end if
-
+          
+          call get_ind_obs(                                           &
+               N_obs,            Observations,                        &
+               1,                select_tilenum,                      &
+               N_select_species, select_species(1:N_select_species),  &
+               N_selected_obs,   ind_obs )
+          
           if (N_selected_obs > 0) then
              
              ! assemble State_minus
@@ -4122,7 +4119,7 @@ contains
                   fcsterr_inflation_fac=fcsterr_inflation_fac )
              
              ! assemble cat_progn increments
-                          
+             
              cat_progn_incr(n,:)%tc1 = State_incr(1,:)*scale_temp
              cat_progn_incr(n,:)%tc2 = State_incr(2,:)*scale_temp
              cat_progn_incr(n,:)%tc4 = State_incr(3,:)*scale_temp
@@ -4149,7 +4146,7 @@ contains
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 4
        
        allocate( State_incr(N_state,N_ens) )
@@ -4165,15 +4162,12 @@ contains
           ! find observations for catchment n
           
           select_tilenum(1) = l2f(n)
-          N_selected_obs = 0
 
-          if (N_select_species > 0) then
-             call get_ind_obs(                                           &
-                  N_obs,            Observations,                        &
-                  1,                select_tilenum,                      &
-                  N_select_species, select_species(1:N_select_species),  &
-                  N_selected_obs,   ind_obs )
-           end if
+          call get_ind_obs(                                           &
+               N_obs,            Observations,                        &
+               1,                select_tilenum,                      &
+               N_select_species, select_species(1:N_select_species),  &
+               N_selected_obs,   ind_obs )
 
           if (N_selected_obs > 0) then
              
@@ -4306,7 +4300,7 @@ contains
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 4
        
        allocate( State_incr(N_state,N_ens)) 
@@ -4330,15 +4324,11 @@ contains
           halo_minlat = max(halo_minlat, -90.)
           halo_maxlat = min(halo_maxlat,  90.)
           
-          N_selected_obs = 0
-
-          if (N_select_species > 0) then
-             call get_ind_obs_lat_lon_box(                               &
-                  N_obs,            Observations,                        &
-                  halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,    &
-                  N_select_species, select_species(1:N_select_species),  &
-                  N_selected_obs,   ind_obs )
-           end if
+          call get_ind_obs_lat_lon_box(                               &
+               N_obs,            Observations,                        &
+               halo_minlon, halo_maxlon, halo_minlat, halo_maxlat,    &
+               N_select_species, select_species(1:N_select_species),  &
+               N_selected_obs,   ind_obs )
           
           if (N_selected_obs>0) then
                           
