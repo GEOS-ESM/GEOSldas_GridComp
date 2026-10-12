@@ -3714,7 +3714,6 @@ contains
 
     integer, parameter :: N_select_varnames_max = 3
     character(40), dimension(N_select_varnames_max) :: select_varnames ! max number of variable name search keys
-    integer :: N_state_max, N_state, N_selected_obs, N_select_varnames
     
     integer, dimension(:), allocatable    :: select_tilenum
     
@@ -4654,8 +4653,6 @@ contains
              
              do n_e=1,N_ens
 
-                 deltaT = 0.
-                
                 ! TO DO: RESTRICT ANALYSIS TO SITUATIONS WHERE OBS AND MODEL 
                 !        CONTRADICT EACH OTHER
 
@@ -4663,6 +4660,8 @@ contains
                 !        USE ENS AVG OF ASNOW VS. THRESHOLD???
 
                 ! determine target (landscape-average) temperature increment
+                
+                deltaT = 0.
                 
                 if     (tmp_obs <= FT_ANA_FT_THRESHOLD) then                    
                    
@@ -6227,7 +6226,7 @@ contains
     
     ! Convert (horizontal) distance from units of [km] to units of [deg]
     !
-    ! Output zonal distance in units of [deg] depends on latitude
+    ! Output meridional distance in units of [deg] depends on latitude
     
     implicit none
     
