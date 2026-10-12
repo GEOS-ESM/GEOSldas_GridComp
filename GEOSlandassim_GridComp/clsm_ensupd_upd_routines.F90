@@ -3578,8 +3578,8 @@ contains
        ! map from grid to obs
        !
        ! get i/j_ind w.r.t. pert_grid_f and convert to pert_grid_lH with integer offsets;
-       ! using pert_grid_lH directly makes the result layout-dependent because its
-       ! ll_lon/ll_lat (computed from the local obs extent) are subject to roundoff,
+       ! previously, pert_grid_lH was used directly, but this made the result layout-dependent 
+       ! because its ll_lon/ll_lat (computed from the local obs extent) are subject to roundoff,
        ! so an obs near a pert grid cell edge could be mapped to different cells
        ! on different processors (amfox, 24 Sep 2026)
        
