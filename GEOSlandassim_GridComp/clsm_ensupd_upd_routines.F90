@@ -246,8 +246,8 @@ contains
 
     ! frequency range for determining "need_mwRTM_param" 
     
-    real, parameter :: min_freq =  1.e9     ! GHz   ! include L-band (SMOS, SMAP)
-    real, parameter :: max_freq = 10.e9     ! GHz   ! include X-band (TRMM, AMSR-E)
+    real, parameter :: min_freq =  1.e9     ! Hz   ! include L-band (SMOS, SMAP)
+    real, parameter :: max_freq = 10.e9     ! Hz   ! include X-band (TRMM, AMSR-E)
 
     ! tolerance for checking xcorr against FOV (xcorr + tol >= "FOV") 
     
@@ -4933,10 +4933,10 @@ contains
        !
        !   obs             | soil    | N_state | state vector
        !   ----------------------------------------------------------------------
-       !   sfcm/sfds only  | mineral |     2   | srfexc, rzexc
-       !   sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
-       !   sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
-       !   sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       !   sfmc/sfds only  | mineral |     2   | srfexc, rzexc
+       !   sfmc/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
+       !   sfmc/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       !   sfmc/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
        ! amfox+rreichle, Dec 2024
        !
@@ -5350,10 +5350,10 @@ contains
        !
        ! obs             | soil    | N_state | state vector
        ! ----------------------------------------------------------------------
-       ! sfcm/sfds only  | mineral |     2   | srfexc, rzexc
-       ! sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
-       ! sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
-       ! sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       ! sfmc/sfds only  | mineral |     2   | srfexc, rzexc
+       ! sfmc/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
+       ! sfmc/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       ! sfmc/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
        ! amfox+rreichle, 26 Feb 2024
        
@@ -6227,7 +6227,7 @@ contains
     
     ! Convert (horizontal) distance from units of [km] to units of [deg]
     !
-    ! Output meridional distance in units of [deg] depends on latitude
+    ! Output zonal distance in units of [deg] depends on latitude
     
     implicit none
     
