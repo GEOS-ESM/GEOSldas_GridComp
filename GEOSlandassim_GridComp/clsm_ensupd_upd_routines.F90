@@ -4643,6 +4643,8 @@ contains
              ! compute increments
              
              do n_e=1,N_ens
+
+                 deltaT = 0.
                 
                 ! TO DO: RESTRICT ANALYSIS TO SITUATIONS WHERE OBS AND MODEL 
                 !        CONTRADICT EACH OTHER

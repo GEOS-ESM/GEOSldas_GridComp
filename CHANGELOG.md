@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Refined ldas_setup restart handling for multiple restart options and surface components
 - Fixed `select_varnames` bounds for EnKF update types 12 and 13 with fewer than three observation species.
+- Fixed per-member initialization of `deltaT` in the freeze/thaw analysis (`update_type=9`).
 ### Removed
 
 ### Deprecated
