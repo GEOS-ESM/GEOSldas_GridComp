@@ -3409,7 +3409,7 @@ contains
     end if
     
     ! convert indices associated with lat/lon to min/max indices 
-    ! (note that ind_minlon>=ind_maxlon if j_dir==-1)
+    ! (note that ind_minlat>=ind_maxlat if j_dir==-1)
     ! (note that ind_minlon, ind_minlat, etc will be needed again below)
         
     ind_i_min = min( ind_minlon, ind_maxlon)
