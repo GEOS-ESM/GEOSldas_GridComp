@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Refined ldas_setup restart handling for multiple restart options and surface components
+- Fixed `select_varnames` bounds for EnKF update types 12 and 13 with fewer than three observation species.
 ### Removed
 
 ### Deprecated

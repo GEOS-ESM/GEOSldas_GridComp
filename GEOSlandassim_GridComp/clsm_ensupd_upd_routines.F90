@@ -3712,7 +3712,9 @@ contains
     integer,       dimension(N_obs_param) :: select_species                                                ! alloc max possible length
     integer,       dimension(N_obs_param) :: select_species_smTb, select_species_Tb, select_species_asnow  ! alloc max possible length
 
-    character(40), dimension(N_obs_param) :: select_varnames ! alloc max possible length
+    integer, parameter :: N_select_varnames_max = 3
+    character(40), dimension(N_select_varnames_max) :: select_varnames ! max number of variable name search keys
+    integer :: N_state_max, N_state, N_selected_obs, N_select_varnames
     
     integer, dimension(:), allocatable    :: select_tilenum
     
