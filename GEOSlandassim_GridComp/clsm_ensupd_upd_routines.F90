@@ -3685,9 +3685,11 @@ contains
     ! NOT YET USED
     ! - reichle, 14 Oct 2014
 
-    real, parameter :: SWE_threshold = +HUGE(1.) ! = 1.e-4           ! [kg/m2]
+    real,    parameter :: SWE_threshold         = +HUGE(1.)   ! [kg/m2]
     
-    real, parameter :: tp1_threshold = -HUGE(1.) ! = 0.2             ! [CELSIUS]
+    real,    parameter :: tp1_threshold         = -HUGE(1.)   ! [CELSIUS]
+
+    integer, parameter :: N_select_varnames_max = 3           ! max # varname search keys hardwired in update_type options below
 
     integer :: n, n_e, kk, ii, jj
     
@@ -3709,12 +3711,11 @@ contains
     
     real, allocatable, dimension(:)       :: State_lon, State_lat
 
+    character(40), dimension(N_select_varnames_max) :: select_varnames            
+    
     integer,       dimension(N_obs_param) :: select_species                                                ! alloc max possible length
     integer,       dimension(N_obs_param) :: select_species_smTb, select_species_Tb, select_species_asnow  ! alloc max possible length
 
-    integer, parameter :: N_select_varnames_max = 3
-    character(40), dimension(N_select_varnames_max) :: select_varnames ! max number of variable name search keys
-    
     integer, dimension(:), allocatable    :: select_tilenum
     
     integer, dimension(:,:),   pointer    :: N_tile_in_cell_ij      => null()
