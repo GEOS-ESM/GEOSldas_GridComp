@@ -2184,10 +2184,10 @@ contains
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
-    ! Optional thinning (this_obs_param%thin_dist_km>0): after the QC-passing obs
-    ! of the assimilation window are averaged into tile super-obs, the tile
-    ! super-obs are visited in order of latitude, and a tile super-obs is dropped
-    ! if it is closer than thin_dist_km to a tile super-obs kept earlier (see
+    ! Thinning: after the QC-passing obs of the assimilation window are averaged
+    ! into tile super-obs, the tile super-obs are visited in order of latitude,
+    ! and a tile super-obs is dropped if it is closer than thin_dist_km (25 km,
+    ! ~resolution of the product) to a tile super-obs kept earlier (see
     ! subroutine thin_min_dist).
     !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
@@ -2249,6 +2249,10 @@ contains
     real,         parameter :: thr_topo    = 10.                      ! [%]
     real,         parameter :: thr_subsfc  =  5.                      ! [%]
     real,         parameter :: thr_sens    =  1.0                     ! [dB] reject if SSM sensitivity <= 1 dB
+
+    ! thinning: minimum distance between tile super-obs (~resolution of the product)
+
+    real,         parameter :: thin_dist_km = 25.                     ! [km]
 
     integer(1),   parameter :: bsflag_bad_bits = 4_1                  ! noise_out_of_limits
 
@@ -2672,74 +2676,69 @@ contains
 
     ! ----------------------------------------------------------------
     !
-    ! optional thinning of the tile super-obs (this_obs_param%thin_dist_km>0):
-    ! visit tile super-obs in order of latitude; drop a tile super-obs if it is
-    ! closer than thin_dist_km to a tile super-obs kept earlier (see subroutine
-    ! thin_min_dist)
+    ! thinning of the tile super-obs: visit tile super-obs in order of latitude;
+    ! drop a tile super-obs if it is closer than thin_dist_km to a tile super-obs
+    ! kept earlier (see subroutine thin_min_dist)
 
-    if (this_obs_param%thin_dist_km > 0.) then
+    N_tmp = count(N_obs_in_tile > 0)
 
-       N_tmp = count(N_obs_in_tile > 0)
+    if (N_tmp > 0) then
 
-       if (N_tmp > 0) then
+       allocate(ind_tile( N_tmp))
+       allocate(indx(     N_tmp))
+       allocate(tile_lat( N_tmp))
+       allocate(tile_lon( N_tmp))
+       allocate(keep_tile(N_tmp))
 
-          allocate(ind_tile( N_tmp))
-          allocate(indx(     N_tmp))
-          allocate(tile_lat( N_tmp))
-          allocate(tile_lon( N_tmp))
-          allocate(keep_tile(N_tmp))
+       ! collect tiles with obs
 
-          ! collect tiles with obs
+       kk = 0
 
-          kk = 0
+       do ii = 1, N_catd
 
-          do ii = 1, N_catd
+          if (N_obs_in_tile(ii) > 0) then
 
-             if (N_obs_in_tile(ii) > 0) then
+             kk = kk + 1
 
-                kk = kk + 1
+             ind_tile(kk) = ii
+             tile_lat(kk) = ASCAT_lat(ii)
+             tile_lon(kk) = ASCAT_lon(ii)
 
-                ind_tile(kk) = ii
-                tile_lat(kk) = ASCAT_lat(ii)
-                tile_lon(kk) = ASCAT_lon(ii)
+          end if
 
-             end if
+       end do
 
-          end do
+       ! order tile super-obs by latitude
 
-          ! order tile super-obs by latitude
+       call nr_indexx( N_tmp, tile_lat, indx )
 
-          call nr_indexx( N_tmp, tile_lat, indx )
+       call thin_min_dist( N_tmp, tile_lat(indx), tile_lon(indx),           &
+            thin_dist_km, keep_tile, N_kept )
 
-          call thin_min_dist( N_tmp, tile_lat(indx), tile_lon(indx),           &
-               this_obs_param%thin_dist_km, keep_tile, N_kept )
+       ! tile super-obs that are not kept: no obs in tile
 
-          ! tile super-obs that are not kept: no obs in tile
+       do kk = 1, N_tmp
 
-          do kk = 1, N_tmp
+          if (.not. keep_tile(kk)) then
 
-             if (.not. keep_tile(kk)) then
+             ii = ind_tile(indx(kk))
 
-                ii = ind_tile(indx(kk))
+             N_obs_in_tile(ii) = 0
 
-                N_obs_in_tile(ii) = 0
+             ASCAT_sm(  ii)    =      this_obs_param%nodata
+             ASCAT_lon( ii)    =      this_obs_param%nodata
+             ASCAT_lat( ii)    =      this_obs_param%nodata
+             ASCAT_time(ii)    = real(this_obs_param%nodata, kind(0.0D0))
+             ASCAT_sm_std(ii)  =      this_obs_param%nodata
 
-                ASCAT_sm(  ii)    =      this_obs_param%nodata
-                ASCAT_lon( ii)    =      this_obs_param%nodata
-                ASCAT_lat( ii)    =      this_obs_param%nodata
-                ASCAT_time(ii)    = real(this_obs_param%nodata, kind(0.0D0))
-                ASCAT_sm_std(ii)  =      this_obs_param%nodata
+          end if
 
-             end if
+       end do
 
-          end do
+       if (logit) write(logunit,*) trim(Iam)//': tile obs = ', N_tmp,       &
+            ', kept after thinning to ', thin_dist_km, ' km = ', N_kept
 
-          if (logit) write(logunit,*) trim(Iam)//': tile obs = ', N_tmp,       &
-               ', kept after thinning to ', this_obs_param%thin_dist_km, ' km = ', N_kept
-
-          deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
-
-       end if
+       deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
 
     end if
 
@@ -11781,27 +11780,27 @@ contains
     allocate(head(N_lon_bkt,N_lat_bkt))
 
     head   = 0               ! initialize array to 0
-    
+
     ! always keep obs 1, add into bucket (head) and update N_keep acccordingly
-    
+
     i_ind = min( N_lon_bkt, max( 1, floor( (lon(1)+180.)/d_bkt ) + 1 ))
     j_ind = min( N_lat_bkt, max( 1, floor( (lat(1)+ 90.)/d_bkt ) + 1 ))
-    
+
     head(i_ind,j_ind) = 1
-    
+
     N_keep            = 1
-    
+
     ! loop starts with obs 2
-    
+
     do kk=2,N_obs
-       
+
        ! bucket of obs kk
-       
+
        i_ind = min( N_lon_bkt, max( 1, floor( (lon(kk)+180.)/d_bkt ) + 1 ))
        j_ind = min( N_lat_bkt, max( 1, floor( (lat(kk)+ 90.)/d_bkt ) + 1 ))
 
        ! determine longitude search distance in units of grid cells
-       
+
        if (r_x(kk) < 360.) then
           di = ceiling( r_x(kk)/d_bkt ) + 1
        else
@@ -11817,19 +11816,19 @@ contains
              mm = head(ii,jj)
 
              if (mm>0) then
-                
+
                 dx = (lon(mm) - lon(kk)) / r_x(kk)
                 dy = (lat(mm) - lat(kk)) / r_y
-                
+
                 if (dx**2 + dy**2 < 1.) then
-                   
+
                    keep(kk) = .false.
-                   
+
                    exit lat_loop
-                   
+
                 end if
              end if
-                
+
           end do lon_loop
        end do lat_loop
 
@@ -11844,9 +11843,9 @@ contains
        end if
 
     end do
-    
+
     deallocate(r_x, head)
-    
+
   end subroutine thin_min_dist
 
   ! *****************************************************************

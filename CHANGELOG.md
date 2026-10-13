@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added comment to clarify the selection of the tile file ( nc4 or acsii)
-- Added minimum-distance thinning of H-SAF ASCAT soil moisture obs.
+- Added minimum-distance (25 km) thinning of H-SAF ASCAT soil moisture obs (not 0-diff for H-SAF obs).
 
 ### Changed
 
