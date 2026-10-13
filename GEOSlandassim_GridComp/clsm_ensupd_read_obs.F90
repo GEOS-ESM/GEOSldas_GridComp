@@ -2185,9 +2185,10 @@ contains
     ! SM output is degree of saturation as a fraction [0,1].
     !
     ! Optional thinning (this_obs_param%thin_dist_km>0): after the QC-passing obs
-    ! of the assimilation window are averaged per tile, the tile obs are visited
-    ! in order of latitude, and a tile obs is dropped if it is closer than
-    ! thin_dist_km to a tile obs kept earlier (see subroutine thin_min_dist).
+    ! of the assimilation window are averaged into tile super-obs, the tile
+    ! super-obs are visited in order of latitude, and a tile super-obs is dropped
+    ! if it is closer than thin_dist_km to a tile super-obs kept earlier (see
+    ! subroutine thin_min_dist).
     !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
     !             https://hsaf.meteoam.it/
@@ -2644,65 +2645,6 @@ contains
 
     ! ----------------------------------------------------------------
     !
-    ! optional thinning of the tile obs (this_obs_param%thin_dist_km>0):
-    ! visit tile obs in order of latitude; drop a tile obs if it is closer than
-    ! thin_dist_km to a tile obs kept earlier (see subroutine thin_min_dist)
-
-    if (this_obs_param%thin_dist_km > 0.) then
-
-       N_tmp = count(N_obs_in_tile > 0)
-
-       if (N_tmp > 0) then
-
-          allocate(ind_tile( N_tmp))
-          allocate(indx(     N_tmp))
-          allocate(tile_lat( N_tmp))
-          allocate(tile_lon( N_tmp))
-          allocate(keep_tile(N_tmp))
-
-          ! collect tiles with obs; tile obs lat/lon as in normalisation below
-
-          kk = 0
-
-          do ii = 1, N_catd
-
-             if (N_obs_in_tile(ii) > 0) then
-
-                kk = kk + 1
-
-                ind_tile(kk) = ii
-                tile_lat(kk) = ASCAT_lat(ii) / real(N_obs_in_tile(ii))
-                tile_lon(kk) = ASCAT_lon(ii) / real(N_obs_in_tile(ii))
-
-             end if
-
-          end do
-
-          ! order tile obs by latitude
-
-          call nr_indexx( N_tmp, tile_lat, indx )
-
-          call thin_min_dist( N_tmp, tile_lat(indx), tile_lon(indx),           &
-               this_obs_param%thin_dist_km, keep_tile, N_kept )
-
-          ! unpack: tile obs that are not kept become tiles without obs
-          ! (set to nodata below)
-
-          do kk = 1, N_tmp
-             if (.not. keep_tile(kk))  N_obs_in_tile(ind_tile(indx(kk))) = 0
-          end do
-
-          if (logit) write(logunit,*) trim(Iam)//': tile obs = ', N_tmp,       &
-               ', kept after thinning to ', this_obs_param%thin_dist_km, ' km = ', N_kept
-
-          deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
-
-       end if
-
-    end if
-
-    ! ----------------------------------------------------------------
-    !
     ! normalise tile super-obs and set obs error std-dev
 
     do ii = 1, N_catd
@@ -2727,6 +2669,79 @@ contains
        end if
 
     end do
+
+    ! ----------------------------------------------------------------
+    !
+    ! optional thinning of the tile super-obs (this_obs_param%thin_dist_km>0):
+    ! visit tile super-obs in order of latitude; drop a tile super-obs if it is
+    ! closer than thin_dist_km to a tile super-obs kept earlier (see subroutine
+    ! thin_min_dist)
+
+    if (this_obs_param%thin_dist_km > 0.) then
+
+       N_tmp = count(N_obs_in_tile > 0)
+
+       if (N_tmp > 0) then
+
+          allocate(ind_tile( N_tmp))
+          allocate(indx(     N_tmp))
+          allocate(tile_lat( N_tmp))
+          allocate(tile_lon( N_tmp))
+          allocate(keep_tile(N_tmp))
+
+          ! collect tiles with obs
+
+          kk = 0
+
+          do ii = 1, N_catd
+
+             if (N_obs_in_tile(ii) > 0) then
+
+                kk = kk + 1
+
+                ind_tile(kk) = ii
+                tile_lat(kk) = ASCAT_lat(ii)
+                tile_lon(kk) = ASCAT_lon(ii)
+
+             end if
+
+          end do
+
+          ! order tile super-obs by latitude
+
+          call nr_indexx( N_tmp, tile_lat, indx )
+
+          call thin_min_dist( N_tmp, tile_lat(indx), tile_lon(indx),           &
+               this_obs_param%thin_dist_km, keep_tile, N_kept )
+
+          ! tile super-obs that are not kept: no obs in tile
+
+          do kk = 1, N_tmp
+
+             if (.not. keep_tile(kk)) then
+
+                ii = ind_tile(indx(kk))
+
+                N_obs_in_tile(ii) = 0
+
+                ASCAT_sm(  ii)    =      this_obs_param%nodata
+                ASCAT_lon( ii)    =      this_obs_param%nodata
+                ASCAT_lat( ii)    =      this_obs_param%nodata
+                ASCAT_time(ii)    = real(this_obs_param%nodata, kind(0.0D0))
+                ASCAT_sm_std(ii)  =      this_obs_param%nodata
+
+             end if
+
+          end do
+
+          if (logit) write(logunit,*) trim(Iam)//': tile obs = ', N_tmp,       &
+               ', kept after thinning to ', this_obs_param%thin_dist_km, ' km = ', N_kept
+
+          deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
+
+       end if
+
+    end if
 
     if (any(N_obs_in_tile > 0)) found_obs = .true.
 
