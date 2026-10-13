@@ -11,21 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added functionality to simulate lake tiles.
+- Added assimilation of surface soil moisture observations from H-SAF ASCAT H121 CDR v8 and H139 ICDR netcdf products (MetOp-A/B/C).
+- Added peatland QC for sfds and sfmc observations.
+- Added ObsFcstAna postprocessing support for NetCDF4 diagnostics, with fallback to legacy binary ObsFcstAna files.
 - Added support for river routing.
 - Added optional NetCDF4 output mode for ObsFcstAna, including NetCDF metadata and runtime context. Changed namelist variable "out_ObsFcstAna" from logical to integer.
 - Added support for ensemble simulations for routing; for now, landice hardwired to NensLandice=1.
 - Added support for running ISSM (Ice-Sheet and Sea-level System Model). This includes a new collection in GEOSldas_HIST.rc (tavg24_1d_issm_Nt) as well as additions to the landice gridded collection (tavg24_2d_glac_Nx), and small additions to lenkf_j_template.py and ldas.py for handling ISSM boundary conditions and restarts.
+- Added Matlab and python readers for binary Tb scaling parameters files.
+- Added python reader for binary catparam files.
+- Added QC of SMAP L1C_TB using max value for Tb_error.
 
 
 ### Changed
 
+- Replaced legacy HDF4 Fortran interface with a C bridge and `ISO_C_BINDING` module ([PR #194](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/194)).
 - Revised and cleaned up RESTART options:
   - Clarified scope and constraints of RESTART=1 and RESTART=2.
   - Added RESTART=3 (formerly RESTART=G, which had been removed).
   - Cleaned up RESTART=M.
+- Updated Landice ("glc") HISTORY Collection to that of M21C plus key ISSM outputs.
+- Updated CI.
+
 
 ### Fixed
 
+- Fixed `read_obs_param()` parsing for the current obsparam format by reading forecast variable names and units.
 - Fixed crashes in debug mode; including adding an extra mask to work around a compiler bug in "where(elemental)".
 - Fixed string matching for EASE tile file to accommodate new "EASE*-Pfafstetter" tile file for runoff routing purposes.
 - Fixed GEOSlandpert build when MKL is unavailable by enabling MKL-specific code paths only when MKL is detected.
@@ -183,4 +195,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inaugural version.  0-diff vs. GEOSldas v18.0.0.
 
 -----------------------------
-

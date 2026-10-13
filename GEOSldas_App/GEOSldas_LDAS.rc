@@ -44,10 +44,10 @@ LSM_CHOICE: 1
 #
 #    land    : 100 (non-glaciated land)
 #    landice :  20 (    glaciated land)
-#    lake    :  19                        [not yet implemented]
+#    lake    :  19 (             lakes)
 #
 #  For example, include land and landice tiles as follows:
-#    TILE_TYPES: 100 20
+#    TILE_TYPES: 100 19 20
 #
 TILE_TYPES: 100
 
