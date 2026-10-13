@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Refined ldas_setup restart handling for multiple restart options and surface components
+- Fixed update type 12 incorrectly skipping valid soil-moisture analyses when snow-cover observations are not assimilated.
 ### Removed
 
 ### Deprecated
