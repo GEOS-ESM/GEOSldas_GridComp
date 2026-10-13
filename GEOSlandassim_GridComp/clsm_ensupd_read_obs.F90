@@ -11827,7 +11827,7 @@ contains
           end do lon_loop
        end do lat_loop
 
-       if (keep(kk) == .true.) then
+       if (keep(kk) .eqv. .true.) then
           
           ! keep obs kk and add it to its bucket
           
