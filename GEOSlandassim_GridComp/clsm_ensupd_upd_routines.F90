@@ -246,8 +246,8 @@ contains
 
     ! frequency range for determining "need_mwRTM_param" 
     
-    real, parameter :: min_freq =  1.e9     ! GHz   ! include L-band (SMOS, SMAP)
-    real, parameter :: max_freq = 10.e9     ! GHz   ! include X-band (TRMM, AMSR-E)
+    real, parameter :: min_freq =  1.e9     ! Hz   ! include L-band (SMOS, SMAP)
+    real, parameter :: max_freq = 10.e9     ! Hz   ! include X-band (TRMM, AMSR-E)
 
     ! tolerance for checking xcorr against FOV (xcorr + tol >= "FOV") 
     
@@ -3420,7 +3420,7 @@ contains
     end if
     
     ! convert indices associated with lat/lon to min/max indices 
-    ! (note that ind_minlon>=ind_maxlon if j_dir==-1)
+    ! (note that ind_minlat>=ind_maxlat if j_dir==-1)
     ! (note that ind_minlon, ind_minlat, etc will be needed again below)
         
     ind_i_min = min( ind_minlon, ind_maxlon)
@@ -3705,9 +3705,11 @@ contains
     ! NOT YET USED
     ! - reichle, 14 Oct 2014
 
-    real, parameter :: SWE_threshold = +HUGE(1.) ! = 1.e-4           ! [kg/m2]
+    real,    parameter :: SWE_threshold         = +HUGE(1.)   ! [kg/m2]
     
-    real, parameter :: tp1_threshold = -HUGE(1.) ! = 0.2             ! [CELSIUS]
+    real,    parameter :: tp1_threshold         = -HUGE(1.)   ! [CELSIUS]
+
+    integer, parameter :: N_select_varnames_max = 3           ! max # varname search keys hardwired in update_type options below
 
     integer :: n, n_e, kk, ii, jj
     
@@ -3729,11 +3731,11 @@ contains
     
     real, allocatable, dimension(:)       :: State_lon, State_lat
 
+    character(40), dimension(N_select_varnames_max) :: select_varnames            
+    
     integer,       dimension(N_obs_param) :: select_species                                                ! alloc max possible length
     integer,       dimension(N_obs_param) :: select_species_smTb, select_species_Tb, select_species_asnow  ! alloc max possible length
 
-    character(40), dimension(N_obs_param) :: select_varnames ! alloc max possible length
-    
     integer, dimension(:), allocatable    :: select_tilenum
     
     integer, dimension(:,:),   pointer    :: N_tile_in_cell_ij      => null()
@@ -4087,12 +4089,12 @@ contains
               
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
 
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 3
        
        allocate( State_incr(N_state,N_ens) )
@@ -4114,7 +4116,7 @@ contains
                1,                select_tilenum,                      &
                N_select_species, select_species(1:N_select_species),  &
                N_selected_obs,   ind_obs )
-
+          
           if (N_selected_obs > 0) then
              
              ! assemble State_minus
@@ -4137,7 +4139,7 @@ contains
                   fcsterr_inflation_fac=fcsterr_inflation_fac )
              
              ! assemble cat_progn increments
-                          
+             
              cat_progn_incr(n,:)%tc1 = State_incr(1,:)*scale_temp
              cat_progn_incr(n,:)%tc2 = State_incr(2,:)*scale_temp
              cat_progn_incr(n,:)%tc4 = State_incr(3,:)*scale_temp
@@ -4159,12 +4161,12 @@ contains
        
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
 
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 4
        
        allocate( State_incr(N_state,N_ens) )
@@ -4180,7 +4182,7 @@ contains
           ! find observations for catchment n
           
           select_tilenum(1) = l2f(n)
-          
+
           call get_ind_obs(                                           &
                N_obs,            Observations,                        &
                1,                select_tilenum,                      &
@@ -4313,12 +4315,12 @@ contains
 
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
        
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 4
        
        allocate( State_incr(N_state,N_ens)) 
@@ -4661,7 +4663,7 @@ contains
              ! compute increments
              
              do n_e=1,N_ens
-                
+
                 ! TO DO: RESTRICT ANALYSIS TO SITUATIONS WHERE OBS AND MODEL 
                 !        CONTRADICT EACH OTHER
 
@@ -4669,6 +4671,8 @@ contains
                 !        USE ENS AVG OF ASNOW VS. THRESHOLD???
 
                 ! determine target (landscape-average) temperature increment
+                
+                deltaT = 0.
                 
                 if     (tmp_obs <= FT_ANA_FT_THRESHOLD) then                    
                    
@@ -4939,10 +4943,10 @@ contains
        !
        !   obs             | soil    | N_state | state vector
        !   ----------------------------------------------------------------------
-       !   sfcm/sfds only  | mineral |     2   | srfexc, rzexc
-       !   sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
-       !   sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
-       !   sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       !   sfmc/sfds only  | mineral |     2   | srfexc, rzexc
+       !   sfmc/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
+       !   sfmc/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       !   sfmc/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
        ! amfox+rreichle, Dec 2024
        !
@@ -5360,10 +5364,10 @@ contains
        !
        ! obs             | soil    | N_state | state vector
        ! ----------------------------------------------------------------------
-       ! sfcm/sfds only  | mineral |     2   | srfexc, rzexc
-       ! sfcm/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
-       ! sfcm/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
-       ! sfcm/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
+       ! sfmc/sfds only  | mineral |     2   | srfexc, rzexc
+       ! sfmc/sfds only  | peat    |     3   | srfexc, rzexc, catdef, 
+       ! sfmc/sfds & Tb  | mineral |     6   | srfexc, rzexc,         tc[x], ght(1)
+       ! sfmc/sfds & Tb  | peat    |     7   | srfexc, rzexc, catdef, tc[x], ght(1)
        !
        ! amfox+rreichle, 26 Feb 2024
        

@@ -39,6 +39,9 @@
 !       12      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb, SCF
 !               |   & 1d snow analysis (Toure et al. 2018 empirical gain)          | 
 !       13      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb
+!
+! Make sure the "assim" or "getinnov" settings of the obs species below are appropriate
+!   for the selected update_type!
 
 update_type = 0
 
