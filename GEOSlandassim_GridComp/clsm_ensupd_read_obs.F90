@@ -2184,10 +2184,10 @@ contains
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
-    ! Optional thinning (this_obs_param%thin_dist_km>0): the QC-passing obs of
-    ! the assimilation window that are assigned to a tile are thinned so that no
-    ! two kept obs are closer than thin_dist_km (obs visited in file order; see
-    ! subroutine thin_min_dist).
+    ! Optional thinning (this_obs_param%thin_dist_km>0): after the QC-passing obs
+    ! of the assimilation window are averaged per tile, the tile obs are visited
+    ! in order of latitude, and a tile obs is dropped if it is closer than
+    ! thin_dist_km to a tile obs kept earlier (see subroutine thin_min_dist).
     !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
     !             https://hsaf.meteoam.it/
@@ -2267,7 +2267,7 @@ contains
     character(300) :: tmpfname
 
     integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
-    integer :: N_win, N_raw_total, N_kept
+    integer :: N_kept
 
     character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
     character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
@@ -2300,12 +2300,6 @@ contains
     real,       allocatable :: tmp1_lat(:), tmp1_lon(:), tmp1_obs(:)
     real*8,     allocatable :: tmp1_jtime(:)
 
-    ! valid obs of all files in the assimilation window (grown as needed)
-    real,       allocatable :: win_lat(:), win_lon(:), win_obs(:), tmpr(:)
-    real*8,     allocatable :: win_jtime(:), tmpr8(:)
-    logical,    allocatable :: keep(:), keep_elig(:)
-    integer,    allocatable :: ind_elig(:)
-
     ! pointers for get_tile_num_for_obs
     real,    dimension(:), pointer :: tmp_lat, tmp_lon
     real*8,  dimension(:), pointer :: tmp_jtime
@@ -2313,6 +2307,11 @@ contains
 
     ! tile accumulation across all files
     integer, dimension(N_catd)     :: N_obs_in_tile
+
+    ! optional thinning of tile obs
+    integer,    allocatable :: ind_tile(:), indx(:)
+    real,       allocatable :: tile_lat(:), tile_lon(:)
+    logical,    allocatable :: keep_tile(:)
 
     character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
     character(len=400)             :: err_msg
@@ -2456,16 +2455,6 @@ contains
     allocate(tmp1_obs(  max_obs_per_file))
     allocate(tmp1_jtime(max_obs_per_file))
 
-    ! valid obs of all files in the window
-
-    allocate(win_lat(  max_obs_per_file))
-    allocate(win_lon(  max_obs_per_file))
-    allocate(win_obs(  max_obs_per_file))
-    allocate(win_jtime(max_obs_per_file))
-
-    N_win       = 0
-    N_raw_total = 0
-
     ! ----------------------------------------------------------------
     !
     ! loop over files
@@ -2608,101 +2597,34 @@ contains
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
 
-       N_raw_total = N_raw_total + N_obs_file           ! update number of raw obs (incl. QC fails)
-
        if (N_valid == 0) cycle
 
-       ! append this file's valid obs to the window (grow arrays if needed)
+       ! ----------------------------------------------------------------
+       !
+       ! tile matching and accumulation for this file's valid obs
 
-       if (N_win + N_valid > size(win_lat)) then
+       allocate(tmp_lat(        N_valid))
+       allocate(tmp_lon(        N_valid))
+       allocate(tmp_jtime(      N_valid))
+       allocate(tmp_tile_num(   N_valid))
 
-          N_tmp = max( 2*size(win_lat), N_win + N_valid )
-
-          allocate(tmpr( N_tmp)); tmpr( 1:N_win) = win_lat(  1:N_win); call move_alloc(tmpr,  win_lat  )
-          allocate(tmpr( N_tmp)); tmpr( 1:N_win) = win_lon(  1:N_win); call move_alloc(tmpr,  win_lon  )
-          allocate(tmpr( N_tmp)); tmpr( 1:N_win) = win_obs(  1:N_win); call move_alloc(tmpr,  win_obs  )
-          allocate(tmpr8(N_tmp)); tmpr8(1:N_win) = win_jtime(1:N_win); call move_alloc(tmpr8, win_jtime)
-
-       end if
-
-       win_lat(  N_win+1:N_win+N_valid) = tmp1_lat(  1:N_valid)
-       win_lon(  N_win+1:N_win+N_valid) = tmp1_lon(  1:N_valid)
-       win_obs(  N_win+1:N_win+N_valid) = tmp1_obs(  1:N_valid)
-       win_jtime(N_win+1:N_win+N_valid) = tmp1_jtime(1:N_valid)
-
-       N_win = N_win + N_valid
-
-    end do  ! file loop
-
-    deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
-    deallocate(fnames)
-
-    if (logit) write(logunit,*) trim(Iam)//': obs in files, passing QC = ', N_raw_total, N_win
-
-    ! ----------------------------------------------------------------
-    !
-    ! tile matching, optional thinning, and accumulation for the window's valid obs
-
-    if (N_win > 0) then
-
-       allocate(tmp_lat(        N_win))
-       allocate(tmp_lon(        N_win))
-       allocate(tmp_jtime(      N_win))
-       allocate(tmp_tile_num(   N_win))
-
-       tmp_lat   = win_lat(  1:N_win)
-       tmp_lon   = win_lon(  1:N_win)
-       tmp_jtime = win_jtime(1:N_win)
+       tmp_lat   = tmp1_lat(  1:N_valid)
+       tmp_lon   = tmp1_lon(  1:N_valid)
+       tmp_jtime = tmp1_jtime(1:N_valid)
 
        call get_tile_num_for_obs(N_catd, tile_coord,                      &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
-            N_win, tmp_lat, tmp_lon,                                      &
+            N_valid, tmp_lat, tmp_lon,                                    &
             this_obs_param,                                               &
             tmp_tile_num )
 
-       ! only obs assigned to a tile can be assimilated
+       do ii = 1, N_valid
 
-       allocate(keep(N_win))
+          ind = tmp_tile_num(ii)
 
-       keep = (tmp_tile_num > 0)
+          if (ind > 0) then
 
-       ! optional thinning to a minimum distance between obs (across all files
-       ! in the window); restricted to obs assigned to a tile so that obs outside
-       ! the domain or without a tile cannot suppress obs that can be assimilated
-
-       if (this_obs_param%thin_dist_km > 0.) then
-
-          N_tmp  = count(keep)
-          N_kept = 0
-
-          if (N_tmp > 0) then
-
-             allocate(ind_elig( N_tmp))
-             allocate(keep_elig(N_tmp))
-
-             ind_elig = pack( (/ (ii, ii=1,N_win) /), keep )
-
-             call thin_min_dist( N_tmp, tmp_lat(ind_elig), tmp_lon(ind_elig), &
-                  this_obs_param%thin_dist_km, keep_elig, N_kept )
-
-             keep(ind_elig) = keep_elig
-
-             deallocate(ind_elig, keep_elig)
-
-          end if
-
-          if (logit) write(logunit,*) trim(Iam)//': obs assigned to tiles = ', N_tmp, &
-               ', kept after thinning to ', this_obs_param%thin_dist_km, ' km = ', N_kept
-
-       end if
-
-       do ii = 1, N_win
-
-          if (keep(ii)) then
-
-             ind = tmp_tile_num(ii)
-
-             ASCAT_sm(  ind) = ASCAT_sm(  ind) + win_obs(   ii)
+             ASCAT_sm(  ind) = ASCAT_sm(  ind) + tmp1_obs(  ii)
              ASCAT_lon( ind) = ASCAT_lon( ind) + tmp_lon(   ii)
              ASCAT_lat( ind) = ASCAT_lat( ind) + tmp_lat(   ii)
              ASCAT_time(ind) = ASCAT_time(ind) + tmp_jtime( ii)
@@ -2713,11 +2635,71 @@ contains
 
        end do
 
-       deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num, keep)
+       deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
+
+    end do  ! file loop
+
+    deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
+    deallocate(fnames)
+
+    ! ----------------------------------------------------------------
+    !
+    ! optional thinning of the tile obs (this_obs_param%thin_dist_km>0):
+    ! visit tile obs in order of latitude; drop a tile obs if it is closer than
+    ! thin_dist_km to a tile obs kept earlier (see subroutine thin_min_dist)
+
+    if (this_obs_param%thin_dist_km > 0.) then
+
+       N_tmp = count(N_obs_in_tile > 0)
+
+       if (N_tmp > 0) then
+
+          allocate(ind_tile( N_tmp))
+          allocate(indx(     N_tmp))
+          allocate(tile_lat( N_tmp))
+          allocate(tile_lon( N_tmp))
+          allocate(keep_tile(N_tmp))
+
+          ! collect tiles with obs; tile obs lat/lon as in normalisation below
+
+          kk = 0
+
+          do ii = 1, N_catd
+
+             if (N_obs_in_tile(ii) > 0) then
+
+                kk = kk + 1
+
+                ind_tile(kk) = ii
+                tile_lat(kk) = ASCAT_lat(ii) / real(N_obs_in_tile(ii))
+                tile_lon(kk) = ASCAT_lon(ii) / real(N_obs_in_tile(ii))
+
+             end if
+
+          end do
+
+          ! order tile obs by latitude
+
+          call nr_indexx( N_tmp, tile_lat, indx )
+
+          call thin_min_dist( N_tmp, tile_lat(indx), tile_lon(indx),           &
+               this_obs_param%thin_dist_km, keep_tile, N_kept )
+
+          ! unpack: tile obs that are not kept become tiles without obs
+          ! (set to nodata below)
+
+          do kk = 1, N_tmp
+             if (.not. keep_tile(kk))  N_obs_in_tile(ind_tile(indx(kk))) = 0
+          end do
+
+          if (logit) write(logunit,*) trim(Iam)//': tile obs = ', N_tmp,       &
+               ', kept after thinning to ', this_obs_param%thin_dist_km, ' km = ', N_kept
+
+          deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
+
+       end if
 
     end if
-
-    deallocate(win_lat, win_lon, win_obs, win_jtime)
 
     ! ----------------------------------------------------------------
     !

@@ -2566,13 +2566,13 @@ obs_param_nml(55)%adapt          = 0
 !
 ! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
 !
-! To thin the obs spatially, set %thin_dist_km>0: after QC, the obs of the
-! assimilation window that are assigned to a model tile are visited in file
-! order, and an obs is kept unless it is closer than thin_dist_km to an obs
-! kept earlier.  No two kept obs of a species are then closer than
-! thin_dist_km (e.g., 20. keeps ~1/4 of a full swath).
-! Thinning is meant for tiles finer than thin_dist_km (e.g., M09).  On coarser
-! tiles (e.g., M36), the obs are already averaged per tile; do not thin.
+! To thin the obs spatially, set %thin_dist_km>0: after the QC-passing obs of
+! the assimilation window are averaged per tile, the tile obs are visited in
+! order of latitude, and a tile obs is kept unless it is closer than
+! thin_dist_km to a tile obs kept earlier.  No two kept obs of a species are
+! then closer than thin_dist_km (e.g., 25. keeps ~1/5 of a full swath).
+! Thinning is meant for tiles finer than thin_dist_km (e.g., M09, CF0360).  On
+! coarser tiles (e.g., M36), the tile obs are already further apart; do not thin.
 !
 ! ------------------------
 !
