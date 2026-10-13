@@ -11,13 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added comment to clarify the selection of the tile file ( nc4 or acsii)
-- Added optional minimum-distance thinning of H-SAF ASCAT soil moisture obs (namelist variable "thin_dist_km"; default 0 = no thinning).
+- Added minimum-distance thinning of H-SAF ASCAT soil moisture obs.
+
 ### Changed
 
 ### Fixed
-- Refined ldas_setup restart handling for multiple restart options and surface components
+- Refined ldas_setup restart handling for multiple restart options and surface components.
+- Fixed array bounds for EnKF update types 12 and 13.
+- Fixed initialization of temperature increment in freeze/thaw analysis.
+- Fixed surface temperature observation selection for EnKF update types 3, 4, 5 and 7.
 - Made observation perturbation grid-cell lookup independent of the EnKF analysis layout.
 - Fixed update type 12 incorrectly skipping valid soil-moisture analyses when snow-cover observations are not assimilated.
+
 ### Removed
 
 ### Deprecated
