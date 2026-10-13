@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed array bounds for EnKF update types 12 and 13.
 - Fixed initialization of temperature increment in freeze/thaw analysis.
 - Fixed surface temperature observation selection for EnKF update types 3, 4, 5 and 7.
-
+- Fixed update type 12 incorrectly skipping valid soil-moisture analyses when snow-cover observations are not assimilated.
 ### Removed
 
 ### Deprecated
