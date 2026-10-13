@@ -3576,11 +3576,20 @@ contains
     do k=1,N_obs
        
        ! map from grid to obs
+       !
+       ! get i/j_ind w.r.t. pert_grid_f and convert to pert_grid_lH with integer offsets;
+       ! previously, pert_grid_lH was used directly, but this made the result layout-dependent 
+       ! because its ll_lon/ll_lat (computed from the local obs extent) are subject to roundoff,
+       ! so an obs near a pert grid cell edge could be mapped to different cells
+       ! on different processors (amfox, 24 Sep 2026)
        
        this_lon = Observations(k)%lon
        this_lat = Observations(k)%lat
        
-       call get_ij_ind_from_latlon( pert_grid_lH, this_lat, this_lon, lon_ind, lat_ind )
+       call get_ij_ind_from_latlon( pert_grid_f, this_lat, this_lon, lon_ind, lat_ind )
+
+       lon_ind = lon_ind - (pert_grid_lH%i_offg - pert_grid_f%i_offg)
+       lat_ind = lat_ind - (pert_grid_lH%j_offg - pert_grid_f%j_offg)
        
        j = ind_species2obsparam(Observations(k)%species)
        
@@ -4933,6 +4942,13 @@ contains
        ! determine species of assimilated obs associated with snow analysis
        
        call get_select_species(1, 'asnow', N_obs_param, obs_param, N_select_species_asnow, select_species_asnow )
+
+       ! initialize SWE increments to NO CHANGE for all tiles, also when no snow cover obs are assimilated;
+       ! swe_incr_ensavg is used below to decide whether a tile gets a soil moisture/Tb update, and
+       ! uninitialized (e.g., NaN) values would silently skip that update
+
+       swe_incr        = 0.   ! total SWE increment
+       swe_incr_ensavg = 0.   ! total SWE ensemble average increment
        
        if (N_select_species_asnow>0) then
           
@@ -4944,9 +4960,6 @@ contains
           if (SCF_ANA_MAXINCRSWE>WEMIN)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'must use SCF_ANA_MAXINCRSWE<=WEMIN')
           
           allocate(select_tilenum(1))
-          
-          swe_incr        = 0.   ! total SWE increment; initialize to NO CHANGE
-          swe_incr_ensavg = 0.   ! total SWE ensemble average increment; initialize to NO CHANGE
          
           
        end if
