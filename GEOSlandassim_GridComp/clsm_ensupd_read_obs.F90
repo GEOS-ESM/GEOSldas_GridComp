@@ -11728,8 +11728,10 @@ contains
     ! normalized square distance of get_tile_num_in_ellipse().
     ! The dateline is ignored (as in get_tile_num_in_ellipse()).
     !
-    ! Kept obs are stored in "buckets" of a regular lat/lon grid with r_y x r_y [deg]
-    ! cells, so that only the kept obs in nearby buckets need to be checked.
+    ! Kept obs are stored in "buckets" of a regular lat/lon grid with cells of
+    ! 0.5*r_y x 0.5*r_y [deg], so that only the kept obs in nearby buckets need to
+    ! be checked.  Any two obs in the same bucket are too close, so each bucket
+    ! holds at most one kept obs.
     !
     ! Unlike SMAP L1C_TB_E obs (see "L1CE_thinning" in read_obs_SMAP_halforbit_Tb()),
     ! H SAF obs cannot be thinned via their grid indices because the indices
@@ -11748,13 +11750,16 @@ contains
 
     ! local variables
 
-    real    :: r_y, dx, dy
+    real    :: r_y, d_bkt, dx, dy
     integer :: N_lon_bkt, N_lat_bkt, kk, mm, ii, jj, i_ind, j_ind, di
 
     real,    dimension(:),   allocatable :: r_x
     integer, dimension(:,:), allocatable :: head
 
     ! -----------------------------------------------------
+
+    keep   = .true.
+    N_keep = N_obs
 
     if (N_obs < 2 .or. min_dist_km <= 0.) return
 
@@ -11764,25 +11769,26 @@ contains
 
     call dist_km2deg( min_dist_km, N_obs, lat, r_x, r_y )
 
-    ! buckets: obs closer than min_dist_km are in the same or a neighbouring
-    ! bucket in latitude (because |dlat|<r_y), and at most ceiling(r_x/r_y)
-    ! buckets apart in longitude
+    ! buckets of width d_bkt=0.5*r_y: two obs in the same bucket have
+    ! (dlon/r_x)**2 + (dlat/r_y)**2 <= 0.5 and are therefore too close, so each
+    ! bucket holds at most one kept obs (head(i,j), 0 = none); obs closer than
+    ! min_dist_km are at most 2 buckets apart in latitude (because |dlat|<r_y)
+    ! and at most ceiling(r_x/d_bkt) buckets apart in longitude.  Search one
+    ! extra bucket in each direction to allow for roundoff in bucket indices.
 
-    N_lon_bkt = ceiling( 360./r_y )
-    N_lat_bkt = ceiling( 180./r_y )
+    d_bkt     = 0.5*r_y
 
-    ! assume that a new obs in the same bucket that already contains an obs will
-    !   always be too close to the existing obs --> only need 2d array ("head") of kept obs
+    N_lon_bkt = ceiling( 360./d_bkt )
+    N_lat_bkt = ceiling( 180./d_bkt )
 
     allocate(head(N_lon_bkt,N_lat_bkt))
 
     head   = 0               ! initialize array to 0
-    keep   = .true.          ! initialize vector
     
     ! always keep obs 1, add into bucket (head) and update N_keep acccordingly
     
-    i_ind = min( N_lon_bkt, max( 1, floor( (lon(1)+180.)/r_y ) + 1 ))
-    j_ind = min( N_lat_bkt, max( 1, floor( (lat(1)+ 90.)/r_y ) + 1 ))
+    i_ind = min( N_lon_bkt, max( 1, floor( (lon(1)+180.)/d_bkt ) + 1 ))
+    j_ind = min( N_lat_bkt, max( 1, floor( (lat(1)+ 90.)/d_bkt ) + 1 ))
     
     head(i_ind,j_ind) = 1
     
@@ -11794,20 +11800,20 @@ contains
        
        ! bucket of obs kk
        
-       i_ind = min( N_lon_bkt, max( 1, floor( (lon(kk)+180.)/r_y ) + 1 ))
-       j_ind = min( N_lat_bkt, max( 1, floor( (lat(kk)+ 90.)/r_y ) + 1 ))
+       i_ind = min( N_lon_bkt, max( 1, floor( (lon(kk)+180.)/d_bkt ) + 1 ))
+       j_ind = min( N_lat_bkt, max( 1, floor( (lat(kk)+ 90.)/d_bkt ) + 1 ))
 
        ! determine longitude search distance in units of grid cells
        
        if (r_x(kk) < 360.) then
-          di = ceiling( r_x(kk)/r_y )
+          di = ceiling( r_x(kk)/d_bkt ) + 1
        else
           di = N_lon_bkt              ! near the poles
        end if
 
        ! check kept obs in nearby buckets
 
-       lat_loop: do jj=max(1,j_ind-1),min(N_lat_bkt,j_ind+1)
+       lat_loop: do jj=max(1,j_ind-3),min(N_lat_bkt,j_ind+3)
 
           lon_loop: do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)   ! range depends on latitude
 
@@ -11830,7 +11836,7 @@ contains
           end do lon_loop
        end do lat_loop
 
-       if (keep(kk) .eqv. .true.) then
+       if (keep(kk)) then
 
           ! keep obs kk and add it to its bucket
 
