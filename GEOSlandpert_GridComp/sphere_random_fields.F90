@@ -51,13 +51,11 @@ module sphere_random_fields_mod
   use, intrinsic :: iso_c_binding, only : c_double, c_float, c_int32_t, c_int64_t, &
                                           c_double_complex, c_loc,       &
                                           c_f_pointer, c_ptr,            &
-                                          c_sizeof
+                                           c_sizeof
   use mpi
   use nr_ran2_gasdev, only: NRANDSEED, init_randseed, nr_ran2_2d, nr_gasdev
   use smerfs_interface, only: update_cov_f, update_cov_range_f, inverse_f, cholesky_f, &
-                              state_space_f, hyp_llp1_f, hyp_lmz_f, zigg_f, &
-                              cov_legendre_f, cov_legendre_full_f, &
-                              state_space_1_f
+                              state_space_f, hyp_llp1_f, hyp_lmz_f, zigg_f
 #ifdef MKL_AVAILABLE
   use MKL_DFTI
 #endif
@@ -68,13 +66,19 @@ module sphere_random_fields_mod
   public :: sphere_random_fields
   public :: sphere_random_fields_id
 
-  ! Threshold for switching to the direct Legendre covariance path (Mord=1).
-  ! When sqrt(c0/c2) > LEGENDRE_THRESH the SMERFS Mord=2 covariance matrix
-  ! is ill-conditioned (condition number ~ (c0/c2)^2) and hyp_llp1 takes
-  ! O(sqrt(c0/c2)) series terms to converge.  At threshold=100 this covers
-  ! all xcorr < ~5 degrees for typical 0.25-deg grids.
-  real(c_double), parameter :: LEGENDRE_THRESH = 100.0d0
-
+  ! Filter order.  Always 2: the state vector is (g_m, g_m') and the
+  ! covariance comes from the partial-fraction decomposition of the power
+  ! spectrum via the Gauss hypergeometric function.
+  !
+  ! There used to be a fallback to a direct associated-Legendre covariance
+  ! (Mord=1) for short correlation lengths, gated on sqrt(c0/c2) > 100.
+  ! That fallback has been removed: the gate tripped at xcorr ~ 6 degrees,
+   ! whereas the long-double kernels plus the DLMF 15.8.26 H-table
+   ! transformation (see @smerfs/src/smerfs.c) pass the full Mord=2
+   ! covariance/state-space construction down to xcorr ~ 0.75 degree.
+  ! hyp_llp1_f now returns rc /= 0 if significance is actually lost, so the
+  ! failure is reported rather than guessed from a threshold.
+  integer, parameter :: SPHERE_MORD = 2
 
   ! -----------------------------------------------------------------------
   !
@@ -92,25 +96,19 @@ module sphere_random_fields_mod
     integer :: nphi     = 0   ! phi points per ring
     integer :: n_m      = 0   ! nphi/2 + 1  (half-spectrum width)
     integer :: uhalf    = 0   ! nz/2 + 1    (upper hemisphere ring count)
-    integer :: Mord     = 0   ! filter order: 2 (hypergeometric) or 1 (Legendre)
+    integer :: Mord     = SPHERE_MORD   ! filter order (always 2)
 
     ! Power-spectrum coefficients:  C_l = 1 / (c0 + c2*(l*(l+1))^2)
     real(c_double) :: c0 = 1.0d0
     real(c_double) :: c2 = 0.0d0
 
-    ! Pre-computed state-space filter arrays for Mord=2 path (all m-modes):
+    ! Pre-computed state-space filter arrays (all m-modes):
     !   all_innov(Mord, Mord, uhalf,   n_m)
     !   all_trans(Mord, Mord, uhalf-1, n_m)
-    ! (allocated as (sf%Mord, sf%Mord, ...) — only populated when sf%Mord == 2)
     real(c_double), pointer :: all_innov(:,:,:,:) => null()
     real(c_double), pointer :: all_trans(:,:,:,:) => null()
     integer :: win_all_innov = MPI_WIN_NULL
     integer :: win_all_trans = MPI_WIN_NULL
-
-    ! --- Mord=1 (direct Legendre) filter arrays -------------------------
-    ! Full covariance Cholesky factors for each longitudinal mode.
-    real(c_double), pointer :: chol1(:,:,:) => null()  ! (n_m, nz, nz)
-    integer :: win_chol1 = MPI_WIN_NULL
 
     ! cos(theta) at each upper-hemisphere ring (uhalf values, equator first)
     real(c_double), allocatable :: z_pts(:)
@@ -147,7 +145,7 @@ module sphere_random_fields_mod
     type(sphere_filter_type) :: filter
     real(c_double), public :: c0 = 1.0d0
     real(c_double), public :: c2 = 0.0d0
-    integer, public :: Mord = 2   ! filter order passed to build_sphere_filter: 2 (hypergeometric) or 1 (Legendre)
+    integer, public :: Mord = SPHERE_MORD   ! filter order (always 2)
     integer :: output_nlon = 0
     integer :: output_nlat = 0
     integer, public :: nz_sphere = 0
@@ -218,13 +216,6 @@ contains
       call MPI_Bcast(c2_use, 1, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
     rf%c2 = c2_use
-
-    ! Choose filter order: switch to Mord=1 (direct Legendre) when the
-    ! Mord=2 hypergeometric path is ill-conditioned (short correlation lengths).
-    if (rf%Mord == 2 .and. c2_use > 0.0d0 .and. &
-        sqrt(rf%c0 / c2_use) > LEGENDRE_THRESH * (1.0d0 + 1.0d-6)) then
-      rf%Mord = 1
-    end if
 
     if (present(comm)) then
       call build_sphere_filter(rf%filter, rf%nz_sphere, rf%nphi_sphere, rf%c0, rf%c2, rf%Mord, comm)
@@ -358,7 +349,7 @@ contains
   !   nphi  (in)           : number of phi points per ring (even)
   !   c0    (in)           : constant term of power spectrum denominator
   !   c2    (in)           : quartic term of power spectrum denominator
-  !   Mord  (in)           : filter order (1 = Legendre, 2 = hypergeometric)
+  !   Mord  (in)           : filter order (must be 2)
   !   comm  (in, optional) : MPI communicator (global, e.g. mpicomm)
 
   subroutine build_sphere_filter(sf, nz, nphi, c0, c2, Mord, comm)
@@ -380,6 +371,8 @@ contains
     integer(MPI_ADDRESS_KIND) :: win_size
     type(c_ptr) :: base_innov, base_trans
     real(c_double) :: dummy_real
+    real(c_double) :: profile_start, profile_phase
+    logical :: profile
 
     ! Partial fraction decomposition (Mord poles)
     complex(c_double_complex) :: roots_llp1(Mord)
@@ -412,6 +405,8 @@ contains
     uhalf = nz/2 + 1
     n_m   = nphi/2 + 1
     m_max = n_m - 1
+    profile = sphere_profile_enabled()
+    profile_start = MPI_Wtime()
 
     ! Store grid info in sf
     sf%nz    = nz
@@ -447,49 +442,31 @@ contains
     call compute_strip(n_m, sf%node_npes, sf%node_rank, sf%j_lo, sf%j_hi)
 
     ! --- Allocate filter arrays (every rank needs the full tables) ------
-    if (sf%Mord == 1) then
-      ! Mord=1: allocate full north-to-south scalar filter arrays.
-      if (sf%node_comm /= MPI_COMM_NULL) then
-        disp_unit = int(c_sizeof(dummy_real))
-        win_size = 0_MPI_ADDRESS_KIND
-        if (sf%node_rank == 0) win_size = int(n_m, MPI_ADDRESS_KIND) * &
-             int(nz, MPI_ADDRESS_KIND) * int(nz, MPI_ADDRESS_KIND) * &
-             int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
-        call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
-                                     sf%node_comm, base_innov, sf%win_chol1, mpierr)
-        if (sf%node_rank /= 0) &
-          call MPI_Win_shared_query(sf%win_chol1, 0, win_size, disp_unit, base_innov, mpierr)
-        call c_f_pointer(base_innov, sf%chol1, [n_m, nz, nz])
-      else
-        allocate(sf%chol1(n_m, nz, nz))
-      end if
+    if (sf%node_comm /= MPI_COMM_NULL) then
+      disp_unit = int(c_sizeof(dummy_real))
+
+      win_size = 0_MPI_ADDRESS_KIND
+      if (sf%node_rank == 0) win_size = int(Mord, MPI_ADDRESS_KIND) * &
+           int(Mord, MPI_ADDRESS_KIND) * int(uhalf, MPI_ADDRESS_KIND) * &
+           int(n_m, MPI_ADDRESS_KIND) * int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
+      call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
+                                   sf%node_comm, base_innov, sf%win_all_innov, mpierr)
+      if (sf%node_rank /= 0) &
+        call MPI_Win_shared_query(sf%win_all_innov, 0, win_size, disp_unit, base_innov, mpierr)
+      call c_f_pointer(base_innov, sf%all_innov, [Mord, Mord, uhalf, n_m])
+
+      win_size = 0_MPI_ADDRESS_KIND
+      if (sf%node_rank == 0) win_size = int(Mord, MPI_ADDRESS_KIND) * &
+           int(Mord, MPI_ADDRESS_KIND) * int(uhalf-1, MPI_ADDRESS_KIND) * &
+           int(n_m, MPI_ADDRESS_KIND) * int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
+      call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
+                                   sf%node_comm, base_trans, sf%win_all_trans, mpierr)
+      if (sf%node_rank /= 0) &
+        call MPI_Win_shared_query(sf%win_all_trans, 0, win_size, disp_unit, base_trans, mpierr)
+      call c_f_pointer(base_trans, sf%all_trans, [Mord, Mord, uhalf-1, n_m])
     else
-      if (sf%node_comm /= MPI_COMM_NULL) then
-        disp_unit = int(c_sizeof(dummy_real))
-
-        win_size = 0_MPI_ADDRESS_KIND
-        if (sf%node_rank == 0) win_size = int(Mord, MPI_ADDRESS_KIND) * &
-             int(Mord, MPI_ADDRESS_KIND) * int(uhalf, MPI_ADDRESS_KIND) * &
-             int(n_m, MPI_ADDRESS_KIND) * int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
-        call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
-                                     sf%node_comm, base_innov, sf%win_all_innov, mpierr)
-        if (sf%node_rank /= 0) &
-          call MPI_Win_shared_query(sf%win_all_innov, 0, win_size, disp_unit, base_innov, mpierr)
-        call c_f_pointer(base_innov, sf%all_innov, [Mord, Mord, uhalf, n_m])
-
-        win_size = 0_MPI_ADDRESS_KIND
-        if (sf%node_rank == 0) win_size = int(Mord, MPI_ADDRESS_KIND) * &
-             int(Mord, MPI_ADDRESS_KIND) * int(uhalf-1, MPI_ADDRESS_KIND) * &
-             int(n_m, MPI_ADDRESS_KIND) * int(c_sizeof(dummy_real), MPI_ADDRESS_KIND)
-        call MPI_Win_allocate_shared(win_size, disp_unit, MPI_INFO_NULL, &
-                                     sf%node_comm, base_trans, sf%win_all_trans, mpierr)
-        if (sf%node_rank /= 0) &
-          call MPI_Win_shared_query(sf%win_all_trans, 0, win_size, disp_unit, base_trans, mpierr)
-        call c_f_pointer(base_trans, sf%all_trans, [Mord, Mord, uhalf-1, n_m])
-      else
-        allocate(sf%all_innov(Mord, Mord, uhalf,   n_m))
-        allocate(sf%all_trans(Mord, Mord, uhalf-1, n_m))
-      end if
+      allocate(sf%all_innov(Mord, Mord, uhalf,   n_m))
+      allocate(sf%all_trans(Mord, Mord, uhalf-1, n_m))
     end if
 
     ! --- z-points -------------------------------------------------------
@@ -499,70 +476,14 @@ contains
                     (PI / real(nz, c_double))
       sf%z_pts(i) = cos(theta_val)
     end do
+    profile_phase = MPI_Wtime()
+    if (profile) call sphere_profile_report('build setup and windows', &
+                                            profile_phase-profile_start, comm)
   
-    ! --- Only rank 0 (globally) performs the expensive computation ------
-    ! All other ranks wait for the MPI_Bcast below.
-
-    if (global_rank == 0 .or. sf%Mord == 1) then
-
-      if (sf%Mord == 1) then
-        ! ----------------------------------------------------------------
-        ! Legendre path (Mord=1):
-        ! Compute cov and cross_cov via direct Legendre series, then
-        ! build scalar Kalman filter with state_space_1_f.
-        ! ----------------------------------------------------------------
-        block
-          integer, parameter :: lmax_mult = 3
-          integer :: lmax_leg
-          integer :: local_m, local_lo, local_hi
-          real(c_double), allocatable :: z_full(:)
-          real(c_double), allocatable :: cov_full(:)
-          real(c_double), allocatable :: chol_tmp(:,:)
-          integer :: k
-
-          lmax_leg = lmax_mult * nz
-          call compute_strip(n_m, sf%node_npes, sf%node_rank, local_lo, local_hi)
-          local_m = max(0, local_hi - local_lo + 1)
-          allocate(z_full(nz))
-          do k = 1, nz
-            z_full(k) = ring_z(k, sf)
-          end do
-          allocate(cov_full(local_m * nz * nz))
-          allocate(chol_tmp(nz,nz))
-
-          call cov_legendre_full_f(local_lo-1, local_hi-1, nz, lmax_leg, c0, c2, z_full, cov_full, rc)
-          if (rc /= 0) then
-            write(*,'(a,i0)') 'build_sphere_filter: cov_legendre_f failed, rc=', rc
-            stop 1
-          end if
-
-          if (global_rank == 0) &
-            write(*,'(a,f8.1,a)') &
-              'build_sphere_filter: |Im(root)|=', sqrt(c0/c2), &
-              ' > threshold; using direct Legendre covariance (Mord=1, stable)'
-
-          ! Build a full Cholesky factor for each m-mode covariance matrix.
-          do imode = local_lo-1, local_hi-1
-            call cholesky_lower(nz, cov_full((imode-local_lo+2)*nz*nz- nz*nz + 1:), chol_tmp, rc)
-            if (rc /= 0) then
-              write(*,'(a,i0,a,i0)') &
-                'build_sphere_filter: full Legendre Cholesky failed at imode=', imode, ', rc=', rc
-              stop 1
-            end if
-            sf%chol1(imode+1,:,:) = chol_tmp
-          end do
-
-          deallocate(z_full, cov_full, chol_tmp)
-        end block
-
-      end if  ! Mord == 1
-
-    end if  ! global_rank == 0
-
-    ! --- Parallel filter construction for Mord=2 ------------------------
+    ! --- Parallel filter construction -----------------------------------
     ! Each rank builds the full covariance/state-space chain only for its
     ! assigned m-mode range, then all ranks sum sparse filter slices.
-    if (sf%Mord /= 1) then
+    block
       innov_size = Mord * Mord * uhalf * n_m
       trans_size = Mord * Mord * (uhalf-1) * n_m
       if (sf%node_comm /= MPI_COMM_NULL) then
@@ -604,7 +525,7 @@ contains
           roots_llp1(1) = cmplx(0.0d0,  tmp, c_double_complex)
           roots_llp1(2) = cmplx(0.0d0, -tmp, c_double_complex)
         end if
-        do iroot = 1, Mord
+          do iroot = 1, Mord
           norms_pf(iroot) = 1.0d0 / &
             (2.0d0 * cmplx(c2, 0.0d0, c_double_complex) * roots_llp1(iroot))
         end do
@@ -634,30 +555,31 @@ contains
           sin_pi_lam = sin(PI * lam_val)
           norm = -(0.25d0 / PI) * norm * PI / sin_pi_lam
 
-          do im_hyp = build_j_lo - 1, build_j_hi - 1 + Mord
+            do im_hyp = build_j_lo - 1, build_j_hi - 1 + Mord
             call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, &
                             xvals, Fmat(:,im_hyp - (build_j_lo - 1) + 1), rc)
             if (rc /= 0) then
-              write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f F failed at im_hyp=', im_hyp
+              call hyp_failure_report('F', im_hyp, rc, c0, c2)
               stop 1
             end if
             call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, &
                             yvals, Hmat(:,im_hyp - (build_j_lo - 1) + 1), rc)
             if (rc /= 0) then
-              write(*,'(a,i0)') 'build_sphere_filter: hyp_llp1_f H failed at im_hyp=', im_hyp
+              call hyp_failure_report('H', im_hyp, rc, c0, c2)
               stop 1
-            end if
-          end do
+              end if
+            end do
+
 
           call update_cov_range_f(build_j_lo - 1, build_j_hi - 1, uhalf, Mord, &
                                   real(norm,c_double), aimag(norm),            &
                                   llp1_re, llp1_im,                            &
                                   Fmat, Hmat, tau_p, eta_ratio,                &
                                   cov, cross_cov, rc)
-          if (rc /= 0) then
+            if (rc /= 0) then
             write(*,'(a,i0)') 'build_sphere_filter: update_cov_range_f failed, rc=', rc
-            stop 1
-          end if
+              stop 1
+            end if
         end do
 
         do imode = build_j_lo - 1, build_j_hi - 1
@@ -682,15 +604,10 @@ contains
         call MPI_Win_fence(0, sf%win_all_innov, mpierr)
         call MPI_Win_fence(0, sf%win_all_trans, mpierr)
       end if
-    end if
+    end block
 
-    ! --- Broadcast filter tables to all ranks ---------------------------
-    ! Use the global communicator (comm if present, else no-op since
-    ! global_rank == 0 is the only rank).
+    ! --- Broadcast z-points to all ranks --------------------------------
     if (present(comm)) then
-      if (sf%Mord == 1) then
-        call MPI_Win_fence(0, sf%win_chol1, mpierr)
-      end if
       call MPI_Bcast(sf%z_pts, uhalf, MPI_DOUBLE_PRECISION, 0, comm, mpierr)
     end if
 
@@ -747,6 +664,7 @@ contains
 #endif
 
     sf%initialized = .true.
+    if (profile) call sphere_profile_report('build total', MPI_Wtime()-profile_start, comm)
 
   end subroutine build_sphere_filter
 
@@ -821,6 +739,8 @@ contains
     type(c_ptr) :: base_res, base_rf
     complex(c_float) :: dummy_c
     real(c_double)   :: dummy_r
+    real(c_double) :: profile_start, profile_phase
+    logical :: profile
 
     ! --------------------------------------------------------------------
 
@@ -833,6 +753,8 @@ contains
     j_hi  = sf%j_hi
 
     parallel = (sf%node_comm /= MPI_COMM_NULL)
+    profile = sphere_profile_enabled()
+    profile_start = MPI_Wtime()
 
     n_m_local = j_hi - j_lo + 1
     if (n_m_local <= 0) n_m_local = 0   ! edge case: more ranks than modes
@@ -879,6 +801,8 @@ contains
       j_lo = 1 ; j_hi = n_m
       row_lo = 1 ; row_hi = nz ; n_row_local = nz
     end if
+    profile_phase = MPI_Wtime()
+    if (profile) call sphere_profile_report('draw windows', profile_phase-profile_start, sf%node_comm)
 
     ! --- 2. Noise generation for the local m-mode strip -----------------
     ! n_rand_needed for this rank: nz * Mord * n_m_local * 2
@@ -893,6 +817,7 @@ contains
      allocate(fp_fstart(Mord, n_m_local))
      allocate(fp_fprev (Mord, n_m_local))
 
+    profile_phase = MPI_Wtime()
     if (n_m_local > 0) then
       call zigg_f(n_rand_needed_global, n_rand_got, rand_ints, noise_real, rc)
       if (rc /= 0) then
@@ -916,83 +841,60 @@ contains
       ! --- 3. Kalman walk for local m-modes j_lo:j_hi -------------------
       ! Upward walk: equator (ring 1 in sf%z_pts) -> pole (ring uhalf)
 
-      if (sf%Mord == 1) then
-        ! ----------------------------------------------------------------
-        ! Mord=1 full per-m covariance draw.
-        ! fp_f(1,:) holds the scalar state; fp_fstart holds it at equator.
-        ! ----------------------------------------------------------------
-
-        ! Full per-m covariance draw from the lower Cholesky factor.
-        do j = 1, n_m_local
-          do i = 1, nz
-            fp_f(1,j) = cmplx(0.0, 0.0, c_float)
-            do ip = 1, i
-              fp_f(1,j) = fp_f(1,j) + real(sf%chol1(j_lo+j-1,i,ip), c_float) * noise(1,j,ip)
-            end do
-            res_cplx(j_lo+j-1,i) = fp_f(1,j)
+      ! Initialise at ring 1
+      do j = 1, n_m_local
+        do ip = 1, Mord
+          fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
+          do iq = 1, Mord
+            fp_f(ip, j) = fp_f(ip, j) &
+               + real(sf%all_innov(iq, ip, 1, j_lo+j-1), c_float) * noise(iq, j, 1)
           end do
         end do
+      end do
+      fp_fstart = fp_f
+      fp_fprev = fp_f
+      res_cplx(j_lo:j_hi, uhalf) = fp_f(1, :)
 
-      else
-        ! ----------------------------------------------------------------
-        ! Original Mord=2 walk
-        ! ----------------------------------------------------------------
-        ! Initialise at ring 1
+      do i = 1, uhalf-1
         do j = 1, n_m_local
           do ip = 1, Mord
             fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
             do iq = 1, Mord
               fp_f(ip, j) = fp_f(ip, j) &
-                 + real(sf%all_innov(iq, ip, 1, j_lo+j-1), c_float) * noise(iq, j, 1)
+                 + real(sf%all_trans(iq, ip, i,   j_lo+j-1), c_float) * fp_fprev(iq, j) &
+                 + real(sf%all_innov(iq, ip, i+1, j_lo+j-1), c_float) * noise(iq, j, i+1)
             end do
           end do
-        end do
-        fp_fstart = fp_f
-        fp_fprev = fp_f
-        res_cplx(j_lo:j_hi, uhalf) = fp_f(1, :)
-
-        do i = 1, uhalf-1
-          do j = 1, n_m_local
-            do ip = 1, Mord
-              fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
-              do iq = 1, Mord
-                fp_f(ip, j) = fp_f(ip, j) &
-                   + real(sf%all_trans(iq, ip, i,   j_lo+j-1), c_float) * fp_fprev(iq, j) &
-                   + real(sf%all_innov(iq, ip, i+1, j_lo+j-1), c_float) * noise(iq, j, i+1)
-              end do
-            end do
-          end do
-          fp_fprev = fp_f
-          res_cplx(j_lo:j_hi, uhalf - i) = fp_f(1, :)
-        end do
-
-        ! Reflect across the equator
-        do ip = 1, Mord
-          if (mod(ip-1, 2) == 0) then
-            fp_f(ip, :) = fp_fstart(ip, :)
-          else
-            fp_f(ip, :) = -fp_fstart(ip, :)
-          end if
         end do
         fp_fprev = fp_f
-        skip = 1 - mod(nz, 2)
+        res_cplx(j_lo:j_hi, uhalf - i) = fp_f(1, :)
+      end do
 
-        do i = 0, nz - uhalf - 1
-          do j = 1, n_m_local
-            do ip = 1, Mord
-              fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
-              do iq = 1, Mord
-                fp_f(ip, j) = fp_f(ip, j) &
-                    + real(sf%all_trans(iq, ip, i+skip+1, j_lo+j-1), c_float) * fp_fprev(iq, j) &
-                    + real(sf%all_innov(iq, ip, i+skip+2, j_lo+j-1), c_float) * noise(iq, j, uhalf+i+1)
-              end do
+      ! Reflect across the equator
+      do ip = 1, Mord
+        if (mod(ip-1, 2) == 0) then
+          fp_f(ip, :) = fp_fstart(ip, :)
+        else
+          fp_f(ip, :) = -fp_fstart(ip, :)
+        end if
+      end do
+      fp_fprev = fp_f
+      skip = 1 - mod(nz, 2)
+
+      do i = 0, nz - uhalf - 1
+        do j = 1, n_m_local
+          do ip = 1, Mord
+            fp_f(ip, j) = cmplx(0.0, 0.0, c_float)
+            do iq = 1, Mord
+              fp_f(ip, j) = fp_f(ip, j) &
+                  + real(sf%all_trans(iq, ip, i+skip+1, j_lo+j-1), c_float) * fp_fprev(iq, j) &
+                  + real(sf%all_innov(iq, ip, i+skip+2, j_lo+j-1), c_float) * noise(iq, j, uhalf+i+1)
             end do
           end do
-          fp_fprev = fp_f
-          res_cplx(j_lo:j_hi, uhalf + i + 1) = fp_f(1, :)
         end do
-
-      end if  ! Mord == 1
+        fp_fprev = fp_f
+        res_cplx(j_lo:j_hi, uhalf + i + 1) = fp_f(1, :)
+      end do
 
       ! Scale DC mode (m=0, j_lo=1 only on the rank that owns mode 0)
       if (j_lo == 1) then
@@ -1003,10 +905,17 @@ contains
 
     end if  ! n_m_local > 0
 
+    if (profile) call sphere_profile_report('draw noise, packing, and spectral walk', &
+                                            MPI_Wtime()-profile_phase, sf%node_comm)
+    profile_phase = MPI_Wtime()
+
     ! --- 4. Fence: all ranks have written their m-mode strip ------------
     if (parallel) then
       call MPI_Win_fence(0, win_res, mpierr)
     end if
+    if (profile) call sphere_profile_report('draw spectrum fence', &
+                                            MPI_Wtime()-profile_phase, sf%node_comm)
+    profile_phase = MPI_Wtime()
 
     ! --- 5. Distributed IRFFT: each rank transforms its ring strip ------
     ! MKL path: batched 1-D real backward FFT using the pre-built descriptor.
@@ -1059,6 +968,9 @@ contains
 
     ! --- 6. Fence: all ranks have written their ring strip ---------------
     if (parallel) call MPI_Win_fence(0, win_rf, mpierr)
+    if (profile) call sphere_profile_report('draw inverse FFT and fence', &
+                                            MPI_Wtime()-profile_phase, sf%node_comm)
+    profile_phase = MPI_Wtime()
 
     ! --- 7. Normalise to unit variance (global empirical) ----------------
     ! The IRFFT output has a variance that depends on nz, nphi, Mord, and
@@ -1116,6 +1028,8 @@ contains
       if (n_row_local > 0 .and. norm_fac > 0.0d0) &
         rfield_win(:, row_lo:row_hi) = rfield_win(:, row_lo:row_hi) / norm_fac
     end block
+    if (profile) call sphere_profile_report('draw normalization', &
+                                            MPI_Wtime()-profile_phase, sf%node_comm)
 
     ! --- 8. Final fence + copy to caller --------------------------------
     if (parallel) then
@@ -1130,6 +1044,7 @@ contains
     end if
 
      deallocate(noise_real, noise, fp_f, fp_fstart, fp_fprev)
+    if (profile) call sphere_profile_report('draw total', MPI_Wtime()-profile_start, sf%node_comm)
 
   end subroutine draw_sphere_realisation
 
@@ -1154,13 +1069,6 @@ contains
       nullify(sf%all_trans)
     else if (associated(sf%all_trans)) then
       deallocate(sf%all_trans)
-    end if
-    if (sf%win_chol1 /= MPI_WIN_NULL) then
-      call MPI_Win_free(sf%win_chol1, mpierr)
-      sf%win_chol1 = MPI_WIN_NULL
-      nullify(sf%chol1)
-    else if (associated(sf%chol1)) then
-      deallocate(sf%chol1)
     end if
     if (allocated(sf%z_pts))     deallocate(sf%z_pts)
 #ifdef MKL_AVAILABLE
@@ -1500,37 +1408,71 @@ contains
     end if
   end subroutine compute_strip
 
-  subroutine cholesky_lower(n, a, l, rc)
-    integer, intent(in) :: n
-    real(c_double), intent(in) :: a(n,n)
-    real(c_double), intent(out) :: l(n,n)
-    integer, intent(out) :: rc
-    integer :: i, j, k
-    real(c_double) :: value, max_diag, jitter
+  logical function sphere_profile_enabled()
+    character(len=8) :: value
+    integer :: length, status
 
-    l = 0.0d0
-    rc = 0
-    max_diag = maxval([(a(i,i), i=1,n)])
-    jitter = max_diag * 1.0d-10
-    do i = 1, n
-      do j = 1, i
-        value = a(i,j)
-        if (i == j) value = value + jitter
-        do k = 1, j-1
-          value = value - l(i,k) * l(j,k)
-        end do
-        if (i == j) then
-          if (value <= 0.0d0) then
-            rc = i
-            return
-          end if
-          l(i,j) = sqrt(value)
-        else
-          l(i,j) = value / l(j,j)
-        end if
-      end do
-    end do
-  end subroutine cholesky_lower
+    call get_environment_variable('SPHERE_RF_PROFILE', value, length, status)
+    sphere_profile_enabled = status == 0 .and. length > 0 .and. value(1:1) /= '0'
+  end function sphere_profile_enabled
+
+  subroutine sphere_profile_report(label, seconds, comm)
+    character(*), intent(in) :: label
+    real(c_double), intent(in) :: seconds
+    integer, optional, intent(in) :: comm
+    integer :: rank, mpierr
+    real(c_double) :: max_seconds
+
+    if (present(comm)) then
+      call MPI_Reduce(seconds, max_seconds, 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, mpierr)
+      call MPI_Comm_rank(comm, rank, mpierr)
+      if (rank /= 0) return
+    else
+      max_seconds = seconds
+    end if
+    write(*,'(a,a,a,f10.4,a)') 'SPHERE_PROFILE: ', trim(label), ' max=', max_seconds, ' s'
+  end subroutine sphere_profile_report
+
+  ! ======================================================================
+  !
+  ! hyp_failure_report
+  !
+  ! Explain a non-zero rc from hyp_llp1_f.  rc=2 means the Gauss
+  ! hypergeometric series lost too much significance to cancellation,
+  ! which happens when |lambda| ~ sqrt(sqrt(c0/c2)) grows beyond what the
+  ! long double mantissa can absorb -- i.e. the requested correlation
+  ! length is too short for this method, not a coding error.
+
+  subroutine hyp_failure_report(which, m, rc, c0, c2)
+    character(len=*), intent(in) :: which
+    integer,        intent(in) :: m, rc
+    real(c_double), intent(in) :: c0, c2
+
+    real(c_double) :: R, lam_abs
+
+    R = 0.0d0
+    if (c2 > 0.0d0) R = sqrt(c0 / c2)
+    lam_abs = sqrt(max(R, 0.0d0))
+
+    write(*,'(a,a,a,i0,a,i0)') &
+      'build_sphere_filter: hyp_llp1_f ', trim(which), &
+      ' failed at m=', m, ', rc=', rc
+    if (rc == 2) then
+      write(*,'(a)') &
+        '  Cause: loss of significance in the 2F1 series (too much cancellation).'
+      write(*,'(a,es12.4,a,f8.2)') &
+        '  sqrt(c0/c2) =', R, '   |lambda| ~', lam_abs
+      write(*,'(a)') &
+        '  The requested correlation length is too short for the long double'
+      write(*,'(a)') &
+        '  hypergeometric kernels (usable to xcorr ~ 0.8-1.0 deg on a 0.25-deg grid).'
+      write(*,'(a)') &
+        '  Increase xcorr, or widen the kernels to __float128 (see smerfs.c header).'
+    else if (rc == 1) then
+      write(*,'(a)') &
+        '  Cause: series failed to converge within MAX_ITERATIONS.'
+    end if
+  end subroutine hyp_failure_report
 
   ! ======================================================================
   ! Private: native ring z coordinate

@@ -10,15 +10,27 @@ program compare_pert
 
   integer, parameter :: N_LON = 720, N_LAT = 360
   real, parameter :: DLON = 360.0 / real(N_LON), DLAT = 180.0 / real(N_LAT)
-  real, parameter :: XCORR = 2.0, YCORR = 2.0
+  real, parameter :: DEFAULT_XCORR = 2.0
   integer, parameter :: RSEED0 = -777
   integer :: mpierr, rank, npes
   integer :: seed_template(NRANDSEED)
+  real :: xcorr
+  character(len=32) :: argument
 
   call MPI_Init(mpierr)
   call MPI_Comm_rank(MPI_COMM_WORLD, rank, mpierr)
   call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+  xcorr = DEFAULT_XCORR
+  call get_command_argument(1, argument)
+  if (len_trim(argument) > 0) then
+    read(argument, *, iostat=mpierr) xcorr
+    if (mpierr /= 0 .or. xcorr <= 0.0) then
+      if (rank == 0) write(*,'(a)') 'Usage: compare_pert.x [positive_xcorr_degrees]'
+      call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
+    end if
+  end if
   if (rank == 0) write(*,'(a,i0)') '=== compare_pert, MPI ranks: ', npes
+  if (rank == 0) write(*,'(a,f6.2)') '=== xcorr/ycorr (degrees): ', xcorr
 
   ! Initialize one RNG state and give an identical copy to each case.  The
   ! generators consume different numbers of variates internally, so they
@@ -27,15 +39,16 @@ program compare_pert
   seed_template(1) = RSEED0
   call init_randseed(seed_template)
 
-  call run_latlon(MPI_COMM_WORLD, rank, seed_template)
-  call run_sphere(MPI_COMM_WORLD, rank, seed_template)
+  call run_latlon(MPI_COMM_WORLD, rank, seed_template, xcorr)
+  call run_sphere(MPI_COMM_WORLD, rank, seed_template, xcorr)
   call MPI_Finalize(mpierr)
 
 contains
 
-  subroutine run_latlon(comm, rank, seed_template)
+  subroutine run_latlon(comm, rank, seed_template, xcorr)
     integer, intent(in) :: comm, rank
     integer, intent(in) :: seed_template(NRANDSEED)
+    real, intent(in) :: xcorr
     integer :: mpierr, unit
     integer :: rseed(NRANDSEED)
     real :: rfield(N_LON,N_LAT), rfield2(N_LON,N_LAT)
@@ -44,8 +57,8 @@ contains
     type(pert_param_type) :: pp
     type(grid_def_type) :: grid
 
-    pp%xcorr = XCORR
-    pp%ycorr = YCORR
+    pp%xcorr = xcorr
+    pp%ycorr = xcorr
     pp%coarsen = .false.
     grid%N_lon = N_LON; grid%N_lat = N_LAT
     grid%dlon = DLON; grid%dlat = DLAT
@@ -59,7 +72,7 @@ contains
 #endif
     call MPI_Barrier(comm, mpierr); t_init = MPI_Wtime() - t0
     call MPI_Barrier(comm, mpierr); t0 = MPI_Wtime()
-    call rf%generate_2d_Random_field(rseed, rfield, rfield2, XCORR, YCORR, DLON, DLAT)
+    call rf%generate_2d_Random_field(rseed, rfield, rfield2, xcorr, xcorr, DLON, DLAT)
     call MPI_Barrier(comm, mpierr); t_draw = MPI_Wtime() - t0
 
     if (rank == 0) then
@@ -71,9 +84,10 @@ contains
     call rf%finalize()
   end subroutine run_latlon
 
-  subroutine run_sphere(comm, rank, seed_template)
+  subroutine run_sphere(comm, rank, seed_template, xcorr)
     integer, intent(in) :: comm, rank
     integer, intent(in) :: seed_template(NRANDSEED)
+    real, intent(in) :: xcorr
     integer :: mpierr, unit
     integer :: rseed(NRANDSEED)
     real :: rfield(N_LON,N_LAT), rfield2(N_LON,N_LAT)
@@ -82,8 +96,8 @@ contains
     type(pert_param_type) :: pp
     type(grid_def_type) :: grid
 
-    pp%xcorr = XCORR
-    pp%ycorr = YCORR
+    pp%xcorr = xcorr
+    pp%ycorr = xcorr
     grid%N_lon = N_LON; grid%N_lat = N_LAT
     grid%dlon = DLON; grid%dlat = DLAT
     rseed = seed_template
@@ -92,7 +106,7 @@ contains
     sf = sphere_random_fields(pp, grid, comm=comm)
     call MPI_Barrier(comm, mpierr); t_build = MPI_Wtime() - t0
     call MPI_Barrier(comm, mpierr); t0 = MPI_Wtime()
-    call sf%generate_2d_Random_field(rseed, rfield, rfield2, XCORR, YCORR, DLON, DLAT)
+    call sf%generate_2d_Random_field(rseed, rfield, rfield2, xcorr, xcorr, DLON, DLAT)
     call MPI_Barrier(comm, mpierr); t_draw = MPI_Wtime() - t0
 
     if (rank == 0) then

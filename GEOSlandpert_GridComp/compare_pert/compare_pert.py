@@ -12,11 +12,11 @@ of real(4), shape 720 x 360, column-major = lon-fastest), and produce:
   4. Side-by-side global maps (lat-lon pert and sphere pert)
   5. Difference map
 
-Output:  compare_pert.png   (single figure with 5 panels)
-         compare_pert.txt   (plain-text statistics)
+Output:  <output-prefix>.png   (single figure with 9 panels)
+         <output-prefix>.txt   (plain-text statistics)
 
 Usage:
-  python3 compare_pert.py
+  python3 compare_pert.py [xcorr-degrees] [output-prefix]
 
 Requires: numpy, matplotlib (cartopy optional for nicer maps)
 """
@@ -28,7 +28,8 @@ import sys
 # ── parameters matching the Fortran programs ─────────────────────────────────
 N_LON  = 720
 N_LAT  = 360
-XCORR  = 10.0   # [degrees]
+XCORR = float(sys.argv[1]) if len(sys.argv) > 1 else 2.0  # [degrees]
+OUTPUT_PREFIX = sys.argv[2] if len(sys.argv) > 2 else 'compare_pert'
 
 # ── load binary fields ────────────────────────────────────────────────────────
 def load_field(fname):
@@ -69,7 +70,7 @@ d_st = stats(diff, 'diff (ll-sp)')
 lines.append(f"\n{d_st['name']:12s}  {d_st['mean']:10.5f}  {d_st['std']:10.5f}"
              f"  {d_st['min']:10.5f}  {d_st['max']:10.5f}")
 
-with open('compare_pert.txt', 'w') as fh:
+with open(f'{OUTPUT_PREFIX}.txt', 'w') as fh:
     fh.write('\n'.join(lines) + '\n')
 print('\n'.join(lines))
 
@@ -222,5 +223,5 @@ ax9.set_aspect('equal')
 ax9.grid(True, lw=0.3)
 
 plt.tight_layout(rect=[0, 0, 1, 0.95])
-plt.savefig('compare_pert.png', dpi=130, bbox_inches='tight')
-print('\nFigure saved to compare_pert.png')
+plt.savefig(f'{OUTPUT_PREFIX}.png', dpi=130, bbox_inches='tight')
+print(f'\nFigure saved to {OUTPUT_PREFIX}.png')
