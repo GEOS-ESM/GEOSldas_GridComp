@@ -4933,6 +4933,13 @@ contains
        ! determine species of assimilated obs associated with snow analysis
        
        call get_select_species(1, 'asnow', N_obs_param, obs_param, N_select_species_asnow, select_species_asnow )
+
+       ! initialize SWE increments to NO CHANGE for all tiles, also when no snow cover obs are assimilated;
+       ! swe_incr_ensavg is used below to decide whether a tile gets a soil moisture/Tb update, and
+       ! uninitialized (e.g., NaN) values would silently skip that update
+
+       swe_incr        = 0.   ! total SWE increment
+       swe_incr_ensavg = 0.   ! total SWE ensemble average increment
        
        if (N_select_species_asnow>0) then
           
@@ -4944,9 +4951,6 @@ contains
           if (SCF_ANA_MAXINCRSWE>WEMIN)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'must use SCF_ANA_MAXINCRSWE<=WEMIN')
           
           allocate(select_tilenum(1))
-          
-          swe_incr        = 0.   ! total SWE increment; initialize to NO CHANGE
-          swe_incr_ensavg = 0.   ! total SWE ensemble average increment; initialize to NO CHANGE
          
           
        end if
