@@ -2551,7 +2551,7 @@ contains
 
        N_valid = 0
 
-       do ii = 1, N_obs_file
+       do ii = 1, N_obs_file             ! loop through obs in file
 
           ! skip if SSM is fill or out of valid range
           if (ssm_raw(ii) < 0_2 .or. ssm_raw(ii) > 10000_2) cycle
@@ -2586,7 +2586,7 @@ contains
 
           ! passed all QC
 
-          N_valid = N_valid + 1
+          N_valid = N_valid + 1                         ! count obs in file that pass QC
 
           if (N_valid > max_obs_per_file) then
              err_msg = 'Too many obs in one H SAF file - increase max_obs_per_file'
@@ -2608,7 +2608,7 @@ contains
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
 
-       N_raw_total = N_raw_total + N_obs_file
+       N_raw_total = N_raw_total + N_obs_file           ! update number of raw obs (incl. QC fails)
 
        if (N_valid == 0) cycle
 
@@ -11750,7 +11750,6 @@ contains
 
     real    :: r_y, dx, dy
     integer :: N_lon_bkt, N_lat_bkt, kk, mm, ii, jj, i_ind, j_ind, di
-    logical :: too_close
 
     real,    dimension(:),   allocatable :: r_x
     integer, dimension(:),   allocatable :: next
@@ -11803,47 +11802,42 @@ contains
 
        ! check kept obs in nearby buckets
 
-       too_close = .false.
+       lat_loop: do jj=max(1,j_ind-1),min(N_lat_bkt,j_ind+1)
 
-       do jj=max(1,j_ind-1),min(N_lat_bkt,j_ind+1)
-          do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)
+          lon_loop: do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)
 
              mm = head(ii,jj)
 
              do while (mm > 0)
-
+                
                 dx = (lon(mm) - lon(kk)) / r_x(kk)
                 dy = (lat(mm) - lat(kk)) / r_y
-
+                
                 if (dx**2 + dy**2 < 1.) then
-                   too_close = .true.
-                   exit
+
+                   keep(kk) = .false.
+
+                   exit lat_loop
+                   
                 end if
-
+                
                 mm = next(mm)
-
+                
              end do
-
-             if (too_close) exit
           end do
-          if (too_close) exit
        end do
 
-       if (too_close) then
-
-          keep(kk) = .false.
-
-       else
-
+       if (keep(kk) == .true.) then
+          
           ! keep obs kk and add it to its bucket
-
+          
           N_keep = N_keep + 1
-
+          
           next(kk)          = head(i_ind,j_ind)
           head(i_ind,j_ind) = kk
-
+          
        end if
-
+       
     end do
 
     deallocate(r_x, head, next)
