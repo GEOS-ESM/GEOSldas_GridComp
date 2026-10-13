@@ -11752,13 +11752,9 @@ contains
     integer :: N_lon_bkt, N_lat_bkt, kk, mm, ii, jj, i_ind, j_ind, di
 
     real,    dimension(:),   allocatable :: r_x
-    integer, dimension(:),   allocatable :: next
     integer, dimension(:,:), allocatable :: head
 
     ! -----------------------------------------------------
-
-    keep   = .true.
-    N_keep = N_obs
 
     if (N_obs < 2 .or. min_dist_km <= 0.) return
 
@@ -11775,25 +11771,34 @@ contains
     N_lon_bkt = ceiling( 360./r_y )
     N_lat_bkt = ceiling( 180./r_y )
 
-    ! kept obs in each bucket as a linked list:
-    !   head(i,j) = last kept obs in bucket (i,j)         (0 = none)
-    !   next(kk)  = obs kept before kk in the same bucket (0 = none)
+    ! assume that a new obs in the same bucket that already contains an obs will
+    !   always be too close to the existing obs --> only need 2d array ("head") of kept obs
 
     allocate(head(N_lon_bkt,N_lat_bkt))
-    allocate(next(N_obs))
 
-    head   = 0
-    next   = 0
-
-    N_keep = 0
-
-    do kk=1,N_obs
-
+    head   = 0               ! initialize array to 0
+    keep   = .true.          ! initialize vector
+    
+    ! always keep obs 1, add into bucket (head) and update N_keep acccordingly
+    
+    i_ind = min( N_lon_bkt, max( 1, floor( (lon(1)+180.)/r_y ) + 1 ))
+    j_ind = min( N_lat_bkt, max( 1, floor( (lat(1)+ 90.)/r_y ) + 1 ))
+    
+    head(i_ind,j_ind) = 1
+    
+    N_keep            = 1
+    
+    ! loop starts with obs 2
+    
+    do kk=2,N_obs
+       
        ! bucket of obs kk
-
+       
        i_ind = min( N_lon_bkt, max( 1, floor( (lon(kk)+180.)/r_y ) + 1 ))
        j_ind = min( N_lat_bkt, max( 1, floor( (lat(kk)+ 90.)/r_y ) + 1 ))
 
+       ! determine longitude search distance in units of grid cells
+       
        if (r_x(kk) < 360.) then
           di = ceiling( r_x(kk)/r_y )
        else
@@ -11804,44 +11809,41 @@ contains
 
        lat_loop: do jj=max(1,j_ind-1),min(N_lat_bkt,j_ind+1)
 
-          lon_loop: do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)
+          lon_loop: do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)   ! range depends on latitude
 
              mm = head(ii,jj)
 
-             do while (mm > 0)
+             if (mm>0) then
                 
                 dx = (lon(mm) - lon(kk)) / r_x(kk)
                 dy = (lat(mm) - lat(kk)) / r_y
                 
                 if (dx**2 + dy**2 < 1.) then
-
+                   
                    keep(kk) = .false.
-
+                   
                    exit lat_loop
                    
                 end if
+             end if
                 
-                mm = next(mm)
-                
-             end do
           end do lon_loop
        end do lat_loop
 
        if (keep(kk) .eqv. .true.) then
-          
+
           ! keep obs kk and add it to its bucket
-          
+
           N_keep = N_keep + 1
-          
-          next(kk)          = head(i_ind,j_ind)
+
           head(i_ind,j_ind) = kk
-          
+
        end if
-       
+
     end do
-
-    deallocate(r_x, head, next)
-
+    
+    deallocate(r_x, head)
+    
   end subroutine thin_min_dist
 
   ! *****************************************************************
