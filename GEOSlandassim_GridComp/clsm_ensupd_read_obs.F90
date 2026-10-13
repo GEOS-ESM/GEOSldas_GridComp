@@ -11776,7 +11776,7 @@ contains
     N_lat_bkt = ceiling( 180./r_y )
 
     ! kept obs in each bucket as a linked list:
-    !   head(i,j) = last kept obs in bucket (i,j)        (0 = none)
+    !   head(i,j) = last kept obs in bucket (i,j)         (0 = none)
     !   next(kk)  = obs kept before kk in the same bucket (0 = none)
 
     allocate(head(N_lon_bkt,N_lat_bkt))
@@ -11824,8 +11824,8 @@ contains
                 mm = next(mm)
                 
              end do
-          end do
-       end do
+          end do lon_loop
+       end do lat_loop
 
        if (keep(kk) == .true.) then
           
