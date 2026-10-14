@@ -2250,11 +2250,11 @@ contains
     real,         parameter :: thr_subsfc  =  5.                      ! [%]
     real,         parameter :: thr_sens    =  1.0                     ! [dB] reject if SSM sensitivity <= 1 dB
 
+    integer(1),   parameter :: bsflag_bad_bits = 4_1                  ! noise_out_of_limits
+
     ! thinning: minimum distance between tile super-obs (~resolution of the product)
 
     real,         parameter :: thin_dist_km = 25.                     ! [km]
-
-    integer(1),   parameter :: bsflag_bad_bits = 4_1                  ! noise_out_of_limits
 
     ! netCDF variable scale factors (as declared in files)
     
