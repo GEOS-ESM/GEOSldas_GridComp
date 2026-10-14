@@ -2735,8 +2735,8 @@ contains
 
        end do
 
-       if (logit) write(logunit,*) trim(Iam)//': tile obs = ', N_tmp,       &
-            ', kept after thinning to ', thin_dist_km, ' km = ', N_kept
+       if (logit) write(logunit,*) trim(Iam)//': N tile super-obs = ', N_tmp, &
+          ', N after thinning = ', N_kept
 
        deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
 
