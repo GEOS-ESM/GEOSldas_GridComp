@@ -6046,57 +6046,64 @@ contains
                   this_obs_param,                                          &
                   tmp_tile_num, &
                   tmp_shift_lat, tmp_shift_lon )
-             
-             ! make sure center-of-mass of tile that administers obs 
-             !  is within EASEv2 M36 obs grid cell, discard obs otherwise
-             !  (by setting tmp_tile_num to negative value)
-             ! - reichle, 31 Jan 2014
-             !
-             ! It is not 100 percent clear why this piece code had been added
-             !  at the time.
-             ! Chances are that it had to do with land-water mask issues and the
-             !  distortion of EASE grid cells at high latitudes, and/or Gabrielle's
-             !  use of an M36 innovations integration to derive Tb scaling files
-             !  for the M09 (SMAP) system.
-             ! The problem with the piece of code is that it throws out far too many 
-             !  obs (at all latitudes) if the tile space is coarse, e.g., that of the 
-             !  1/2 deg Lat/Lon grids of MERRA or MERRA-2.
-             ! The piece of code may no longer be needed because of improvements in
-             !  the obs readers and in get_obs_pred(), but the impact of removing the
-             !  code on the SMAP L4_SM system is not clear.  At this time, just prior
-             !  to finalizing the L4_SM "validated release", keep the code for the 
-             !  EASEv2 M09 and M36 tile spaces that are relevant for the L4_SM 
-             !  system, but drop it for all other tile spaces.
-             ! - reichle, 3 Feb 2016
-             
-             if   (                                                               &
-                  (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
-                  (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
-                
-                do ii=1,N_obs
-                
-                   if (tmp_tile_num(ii)>0) then
-                      
-                      call MAPL_ease_convert('EASEv2_M36',        &
-                           tile_coord(tmp_tile_num(ii))%com_lat,  &
-                           tile_coord(tmp_tile_num(ii))%com_lon,  &
-                           M36_col_ind_tile, M36_row_ind_tile  )
-                      
-                      call MAPL_ease_convert('EASEv2_M36',        &
-                           tmp_lat(ii),                           &
-                           tmp_lon(ii),                           &
-                           M36_col_ind_obs,  M36_row_ind_obs  )
-                      
-                      if ( (nint(M36_col_ind_tile)/=nint(M36_col_ind_obs))  .or.     &
-                           (nint(M36_row_ind_tile)/=nint(M36_row_ind_obs))        )  &
-                           tmp_tile_num(ii) = -9999
-                      
-                   end if
-                   
-                end do
-             
-             end if
 
+             ! --------------------------------------------------------------------------
+             !
+             ! the following block is no longer necessary, commented out
+             ! - reichle, 14 Oct 2026
+             ! 
+             !  ! make sure center-of-mass of tile that administers obs 
+             !  !  is within EASEv2 M36 obs grid cell, discard obs otherwise
+             !  !  (by setting tmp_tile_num to negative value)
+             !  ! - reichle, 31 Jan 2014
+             !  !
+             !  ! It is not 100 percent clear why this piece code had been added
+             !  !  at the time.
+             !  ! Chances are that it had to do with land-water mask issues and the
+             !  !  distortion of EASE grid cells at high latitudes, and/or Gabrielle's
+             !  !  use of an M36 innovations integration to derive Tb scaling files
+             !  !  for the M09 (SMAP) system.
+             !  ! The problem with the piece of code is that it throws out far too many 
+             !  !  obs (at all latitudes) if the tile space is coarse, e.g., that of the 
+             !  !  1/2 deg Lat/Lon grids of MERRA or MERRA-2.
+             !  ! The piece of code may no longer be needed because of improvements in
+             !  !  the obs readers and in get_obs_pred(), but the impact of removing the
+             !  !  code on the SMAP L4_SM system is not clear.  At this time, just prior
+             !  !  to finalizing the L4_SM "validated release", keep the code for the 
+             !  !  EASEv2 M09 and M36 tile spaces that are relevant for the L4_SM 
+             !  !  system, but drop it for all other tile spaces.
+             !  ! - reichle, 3 Feb 2016
+             !  
+             !  if   (                                                               &
+             !       (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
+             !       (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
+             !     
+             !     do ii=1,N_obs
+             !     
+             !        if (tmp_tile_num(ii)>0) then
+             !           
+             !           call MAPL_ease_convert('EASEv2_M36',        &
+             !                tile_coord(tmp_tile_num(ii))%com_lat,  &
+             !                tile_coord(tmp_tile_num(ii))%com_lon,  &
+             !                M36_col_ind_tile, M36_row_ind_tile  )
+             !           
+             !           call MAPL_ease_convert('EASEv2_M36',        &
+             !                tmp_lat(ii),                           &
+             !                tmp_lon(ii),                           &
+             !                M36_col_ind_obs,  M36_row_ind_obs  )
+             !           
+             !           if ( (nint(M36_col_ind_tile)/=nint(M36_col_ind_obs))  .or.     &
+             !                (nint(M36_row_ind_tile)/=nint(M36_row_ind_obs))        )  &
+             !                tmp_tile_num(ii) = -9999
+             !           
+             !        end if
+             !        
+             !     end do
+             !  
+             !  end if
+             !
+             ! --------------------------------------------------------------------------
+             
              ! compute super-obs for each tile from all obs w/in that tile
              !     (also eliminate observations that are not in domain)
              
@@ -7656,61 +7663,69 @@ contains
                   this_obs_param,                                          &
                   tmp_tile_num )
              
-             ! make sure center-of-mass of tile that administers obs 
-             !  is within EASEv2 M09 obs grid cell, discard obs otherwise
-             !  (by setting tmp_tile_num to negative value)
+             ! --------------------------------------------------------------------------
              !
-             ! this step eliminates SMAP obs that fall outside of the GEOS-5 
-             ! land mask at M09 resolution
+             ! the following block is no longer necessary, commented out
+             ! - reichle, 14 Oct 2026
              !
-             ! not sure what this does if model is run on tile space other than 
-             ! EASEv2_M09 - reichle, 11 Nov 2014
+             !  ! make sure center-of-mass of tile that administers obs 
+             !  !  is within EASEv2 M09 obs grid cell, discard obs otherwise
+             !  !  (by setting tmp_tile_num to negative value)
+             !  !
+             !  ! this step eliminates SMAP obs that fall outside of the GEOS-5 
+             !  ! land mask at M09 resolution
+             !  !
+             !  ! not sure what this does if model is run on tile space other than 
+             !  ! EASEv2_M09 - reichle, 11 Nov 2014
+             !  !
+             !  ! It is not 100 percent clear why this piece code had been added
+             !  !  at the time.
+             !  ! Chances are that it had to do with land-water mask issues and the
+             !  !  distortion of EASE grid cells at high latitudes, and/or Gabrielle's
+             !  !  use of an M36 innovations integration to derive Tb scaling files
+             !  !  for the M09 (SMAP) system.
+             !  ! The problem with the piece of code is that it throws out far too many 
+             !  !  obs (at all latitudes) if the tile space is coarse, e.g., that of the 
+             !  !  1/2 deg Lat/Lon grids of MERRA or MERRA-2.
+             !  ! The piece of code may no longer be needed because of improvements in
+             !  !  the obs readers and in get_obs_pred(), but the impact of removing the
+             !  !  code on the SMAP L4_SM system is not clear.  At this time, just prior
+             !  !  to finalizing the L4_SM "validated release", keep the code for the 
+             !  !  EASEv2 M09 and M36 tile spaces that are relevant for the L4_SM 
+             !  !  system, but drop it for all other tile spaces.
+             !  ! - reichle, 3 Feb 2016
+             !  
+             !  if   (                                                               &
+             !       (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
+             !       (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
+             !     
+             !     do ii=1,N_obs_kept(kk)
+             !        
+             !        if (tmp_tile_num(ii)>0) then
+             !           
+             !           call MAPL_ease_convert('EASEv2_M09',        &
+             !                tile_coord(tmp_tile_num(ii))%com_lat,  &
+             !                tile_coord(tmp_tile_num(ii))%com_lon,  &
+             !                M09_col_ind_tile, M09_row_ind_tile  )
+             !           
+             !           call MAPL_ease_convert('EASEv2_M09',        &
+             !                tmp_lat(ii),                           &
+             !                tmp_lon(ii),                           &
+             !                M09_col_ind_obs,  M09_row_ind_obs  )
+             !           
+             !           if ( (nint(M09_col_ind_tile)/=nint(M09_col_ind_obs))  .or.     &
+             !                (nint(M09_row_ind_tile)/=nint(M09_row_ind_obs))        )  &
+             !                tmp_tile_num(ii) = -9999
+             !           
+             !        end if
+             !        
+             !     end do
              !
-             ! It is not 100 percent clear why this piece code had been added
-             !  at the time.
-             ! Chances are that it had to do with land-water mask issues and the
-             !  distortion of EASE grid cells at high latitudes, and/or Gabrielle's
-             !  use of an M36 innovations integration to derive Tb scaling files
-             !  for the M09 (SMAP) system.
-             ! The problem with the piece of code is that it throws out far too many 
-             !  obs (at all latitudes) if the tile space is coarse, e.g., that of the 
-             !  1/2 deg Lat/Lon grids of MERRA or MERRA-2.
-             ! The piece of code may no longer be needed because of improvements in
-             !  the obs readers and in get_obs_pred(), but the impact of removing the
-             !  code on the SMAP L4_SM system is not clear.  At this time, just prior
-             !  to finalizing the L4_SM "validated release", keep the code for the 
-             !  EASEv2 M09 and M36 tile spaces that are relevant for the L4_SM 
-             !  system, but drop it for all other tile spaces.
-             ! - reichle, 3 Feb 2016
+             ! end if
+             !
+             ! --------------------------------------------------------------------------
+
              
-             if   (                                                               &
-                  (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
-                  (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
-                
-                do ii=1,N_obs_kept(kk)
-                   
-                   if (tmp_tile_num(ii)>0) then
-                      
-                      call MAPL_ease_convert('EASEv2_M09',        &
-                           tile_coord(tmp_tile_num(ii))%com_lat,  &
-                           tile_coord(tmp_tile_num(ii))%com_lon,  &
-                           M09_col_ind_tile, M09_row_ind_tile  )
-                      
-                      call MAPL_ease_convert('EASEv2_M09',        &
-                           tmp_lat(ii),                           &
-                           tmp_lon(ii),                           &
-                           M09_col_ind_obs,  M09_row_ind_obs  )
-                      
-                      if ( (nint(M09_col_ind_tile)/=nint(M09_col_ind_obs))  .or.     &
-                           (nint(M09_row_ind_tile)/=nint(M09_row_ind_obs))        )  &
-                           tmp_tile_num(ii) = -9999
-                      
-                   end if
-                   
-                end do
-
-             end if
-
              ! compute super-obs for each tile from all obs w/in that tile
              !     (also eliminate observations that are not in domain)
              
@@ -8763,65 +8778,73 @@ contains
                 
              end if
              
-             ! make sure center-of-mass of tile that administers obs 
-             !  is within EASEv2 M36 obs grid cell, discard obs otherwise
-             !  (by setting tmp_tile_num to negative value)
+             ! --------------------------------------------------------------------------
              !
-             ! this step eliminates SMAP obs that fall outside of the GEOS-5 
-             ! land mask at M09 resolution
+             ! the following block is no longer necessary, commented out
+             ! - reichle, 14 Oct 2026
+             !  ! 
+             !  ! make sure center-of-mass of tile that administers obs 
+             !  !  is within EASEv2 M36 obs grid cell, discard obs otherwise
+             !  !  (by setting tmp_tile_num to negative value)
+             !  !
+             !  ! this step eliminates SMAP obs that fall outside of the GEOS-5 
+             !  ! land mask at M09 resolution
+             !  !
+             !  ! not sure what this does if model is run on tile space other than 
+             !  ! EASEv2_M09 - reichle, 11 Nov 2014
+             !  !
+             !  ! Bug fix - index used within loop should be "ii" (not "kk").
+             !  ! For global runs the bug should have had only minimal impact.
+             !  ! - reichle, 23 Apr 2015
+             !  !
+             !  ! It is not 100 percent clear why this piece code had been added
+             !  !  at the time.
+             !  ! Chances are that it had to do with land-water mask issues and the
+             !  !  distortion of EASE grid cells at high latitudes, and/or Gabrielle's
+             !  !  use of an M36 innovations integration to derive Tb scaling files
+             !  !  for the M09 (SMAP) system.
+             !  ! The problem with the piece of code is that it throws out far too many 
+             !  !  obs (at all latitudes) if the tile space is coarse, e.g., that of the 
+             !  !  1/2 deg Lat/Lon grids of MERRA or MERRA-2.
+             !  ! The piece of code may no longer be needed because of improvements in
+             !  !  the obs readers and in get_obs_pred(), but the impact of removing the
+             !  !  code on the SMAP L4_SM system is not clear.  At this time, just prior
+             !  !  to finalizing the L4_SM "validated release", keep the code for the 
+             !  !  EASEv2 M09 and M36 tile spaces that are relevant for the L4_SM 
+             !  !  system, but drop it for all other tile spaces.
+             !  ! - reichle, 3 Feb 2016
+             !  
+             !  if   (                                                               &
+             !       (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
+             !       (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
+             !     
+             !     do ii=1,N_obs_kept(kk)
+             !        
+             !        if (tmp_tile_num(ii)>0) then
+             !           
+             !           call MAPL_ease_convert('EASEv2_M36',        &
+             !                tile_coord(tmp_tile_num(ii))%com_lat,  &
+             !                tile_coord(tmp_tile_num(ii))%com_lon,  &
+             !                M36_col_ind_tile, M36_row_ind_tile  )
+             !           
+             !           call MAPL_ease_convert('EASEv2_M36',        &
+             !                tmp_lat(ii),                           &
+             !                tmp_lon(ii),                           &
+             !                M36_col_ind_obs,  M36_row_ind_obs  )
+             !           
+             !           if ( (nint(M36_col_ind_tile)/=nint(M36_col_ind_obs))  .or.     &
+             !                (nint(M36_row_ind_tile)/=nint(M36_row_ind_obs))        )  &
+             !                tmp_tile_num(ii) = -9999
+             !           
+             !        end if
+             !        
+             !     end do
+             !     
+             !  end if
              !
-             ! not sure what this does if model is run on tile space other than 
-             ! EASEv2_M09 - reichle, 11 Nov 2014
-             !
-             ! Bug fix - index used within loop should be "ii" (not "kk").
-             ! For global runs the bug should have had only minimal impact.
-             ! - reichle, 23 Apr 2015
-             !
-             ! It is not 100 percent clear why this piece code had been added
-             !  at the time.
-             ! Chances are that it had to do with land-water mask issues and the
-             !  distortion of EASE grid cells at high latitudes, and/or Gabrielle's
-             !  use of an M36 innovations integration to derive Tb scaling files
-             !  for the M09 (SMAP) system.
-             ! The problem with the piece of code is that it throws out far too many 
-             !  obs (at all latitudes) if the tile space is coarse, e.g., that of the 
-             !  1/2 deg Lat/Lon grids of MERRA or MERRA-2.
-             ! The piece of code may no longer be needed because of improvements in
-             !  the obs readers and in get_obs_pred(), but the impact of removing the
-             !  code on the SMAP L4_SM system is not clear.  At this time, just prior
-             !  to finalizing the L4_SM "validated release", keep the code for the 
-             !  EASEv2 M09 and M36 tile spaces that are relevant for the L4_SM 
-             !  system, but drop it for all other tile spaces.
-             ! - reichle, 3 Feb 2016
+             ! --------------------------------------------------------------------------
              
-             if   (                                                               &
-                  (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
-                  (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
-                
-                do ii=1,N_obs_kept(kk)
-                   
-                   if (tmp_tile_num(ii)>0) then
-                      
-                      call MAPL_ease_convert('EASEv2_M36',        &
-                           tile_coord(tmp_tile_num(ii))%com_lat,  &
-                           tile_coord(tmp_tile_num(ii))%com_lon,  &
-                           M36_col_ind_tile, M36_row_ind_tile  )
-                      
-                      call MAPL_ease_convert('EASEv2_M36',        &
-                           tmp_lat(ii),                           &
-                           tmp_lon(ii),                           &
-                           M36_col_ind_obs,  M36_row_ind_obs  )
-                      
-                      if ( (nint(M36_col_ind_tile)/=nint(M36_col_ind_obs))  .or.     &
-                           (nint(M36_row_ind_tile)/=nint(M36_row_ind_obs))        )  &
-                           tmp_tile_num(ii) = -9999
-                      
-                   end if
-                   
-                end do
-                
-             end if
-
+             
              ! compute super-obs for each tile from all obs w/in that tile
              !     (also eliminate observations that are not in domain)
              
