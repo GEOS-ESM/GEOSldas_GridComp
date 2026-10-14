@@ -1590,34 +1590,34 @@ contains
     
     ! count number of fields that need to be communicated (N_fields), allocate as needed
 
-    call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
+    call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,                           &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH,              &
          get_peat_lH, N_fields)
     
     ! allocate and assemble tile_data_l
 
     if (allocated(tile_data_l))  deallocate(tile_data_l)
     allocate(tile_data_l(N_catl,N_fields,N_ens))
-    call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,          &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
-         get_peat_lH, N_fields,                                                   &
-         option=1, tile_data=tile_data_l,                                        &
-         sfmc=sfmc_l, rzmc=rzmc_l, tsurf=tsurf_l, FT=FT_l, stemp=stemp_l,        &
+    call get_obs_pred_comm_helper( N_catl, N_ens, N_TbuniqFreqAngRTMid,                           &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH,              &
+         get_peat_lH, N_fields,                                                                   &
+         option=1, tile_data=tile_data_l,                                                         &
+         sfmc=sfmc_l, rzmc=rzmc_l, tsurf=tsurf_l, FT=FT_l, stemp=stemp_l,                         &
          Tb_h=Tb_h_l, Tb_v=Tb_v_l, asnow=asnow_l, peat=peat_l )
     
     ! communicate tile_data_l as needed and get tile_data_lH
 
-    call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
-         tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
+    call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,                   &
+         tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                                         &
          N_catlH, tile_data_lH=tile_data_lH )    
     
     ! read out sfmc, rzmc, etc. from tile_data_lH    
 
-    call get_obs_pred_comm_helper( N_catlH, N_ens, N_TbuniqFreqAngRTMid,         &
-         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
-         get_peat_lH, N_fields,                                                   &
-         option=2, tile_data=tile_data_lH,                                       &
-         sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_l, stemp=stemp_lH,    &
+    call get_obs_pred_comm_helper( N_catlH, N_ens, N_TbuniqFreqAngRTMid,                          &
+         get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH,              &
+         get_peat_lH, N_fields,                                                                   &
+         option=2, tile_data=tile_data_lH,                                                        &
+         sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_lH, stemp=stemp_lH,    &
          Tb_h=Tb_h_lH, Tb_v=Tb_v_lH, peat=peat_lH )
     
     ! clean up
