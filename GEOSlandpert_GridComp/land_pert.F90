@@ -196,6 +196,13 @@ contains
     character(len=*), parameter :: Iam = 'get_pert'
     character(len=400) :: err_msg
 
+    ! Biljana Temporary read only clipping diagnostics
+    integer, parameter :: clip_diag_rk = kind(1.0d0)
+    logical :: clip_diag_on
+    integer :: clip_diag_nclipped
+    real(clip_diag_rk), allocatable :: clip_diag_before(:,:)
+    real(clip_diag_rk), allocatable :: clip_diag_after(:,:)    
+
     ! ------------------------------------------------------------------
     !
     ! initialize random seed if necessary
@@ -277,7 +284,25 @@ contains
     ! compute rotated fields to get desired cross-correlations between
     ! different fields, then scale to desired mean and std
 
+   ! do ddm=1,N_pert
+
+    !   do n=1,N_ens
+    ! Biljana add diagnostic
     do m=1,N_pert
+
+       ! Diagnose zero-mean additive fields on the root's local grid.
+       clip_diag_on = root_logit .and. N_ens > 2 .and. &
+            pert_grid_l%N_lon > 0 .and. pert_grid_l%N_lat > 0 .and. &
+            pert_param(m)%zeromean .and. pert_param(m)%typ == 0 .and. &
+            pert_param(m)%std_normal_max > 0.0
+
+       if (clip_diag_on) then
+          allocate(clip_diag_before(pert_grid_l%N_lon, pert_grid_l%N_lat))
+          allocate(clip_diag_after (pert_grid_l%N_lon, pert_grid_l%N_lat))
+          clip_diag_before = 0.0_clip_diag_rk
+          clip_diag_after  = 0.0_clip_diag_rk
+          clip_diag_nclipped = 0
+       end if
 
        do n=1,N_ens
 
@@ -300,8 +325,26 @@ contains
 
           ! scale back freak outliers
 
+       !   call truncate_std_normal( pert_grid_l%N_lon, pert_grid_l%N_lat, &
+       !        pert_param(m)%std_normal_max, tmp_grid )
+          ! Biljana
+          ! Accumulate standardized perturbations BEFORE clipping.
+          if (clip_diag_on) then
+             clip_diag_before = clip_diag_before + real(tmp_grid, clip_diag_rk)
+
+             clip_diag_nclipped = clip_diag_nclipped + &
+                  count(abs(tmp_grid) > pert_param(m)%std_normal_max)
+          end if
+
+          ! Existing clipping operation: leave this call unchanged.
           call truncate_std_normal( pert_grid_l%N_lon, pert_grid_l%N_lat, &
                pert_param(m)%std_normal_max, tmp_grid )
+
+          ! Accumulate standardized perturbations AFTER clipping.
+          if (clip_diag_on) then
+             clip_diag_after = clip_diag_after + real(tmp_grid, clip_diag_rk)
+          end if             
+
 
           ! scale
 
@@ -332,7 +375,25 @@ contains
           end do
 
        end do  ! end loop through ensemble members (1:N_ens)
-    end do     ! end loop through different fields (1:N_pert)
+       ! Biljana 
+       ! All ensemble members have now been accumulated for field m.
+       if (clip_diag_on) then
+          clip_diag_before = clip_diag_before / real(N_ens, clip_diag_rk)
+          clip_diag_after  = clip_diag_after  / real(N_ens, clip_diag_rk)
+
+          write(logunit,'(A,A,A,I0,A,I0,3(A,ES13.5))') &
+               'Biljana PERT_CLIP_DIAG field=', trim(pert_param(m)%descr), &
+               ' N_ens=', N_ens, &
+               ' clipped_values=', clip_diag_nclipped, &
+               ' max_abs_mean_before=', maxval(abs(clip_diag_before)), &
+               ' max_abs_mean_after=',  maxval(abs(clip_diag_after)), &
+               ' max_abs_mean_change=', &
+               maxval(abs(clip_diag_after - clip_diag_before))
+
+          deallocate(clip_diag_before, clip_diag_after)
+       end if
+
+    end do     ! end loop through different fields (1:N_pert)       
 
   end subroutine get_pert
 

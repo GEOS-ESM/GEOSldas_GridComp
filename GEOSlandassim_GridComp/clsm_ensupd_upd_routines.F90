@@ -171,7 +171,196 @@ module clsm_ensupd_upd_routines
   end type halo_type
   
 contains
-  
+  ! Temporary diagnostic helper. Paste inside clsm_ensupd_upd_routines,
+  ! after its CONTAINS and outside all other procedures (e.g. immediately
+  ! after END SUBROUTINE cat_enkf_increments).
+  ! Uses the host module's obs_type, enkf_increments, myid, and scale_*.
+  ! This is for the current Tb-only, noninflated update_type=10 experiment.
+  subroutine diag_tb_obs_mean_impact( &
+       N_state, N_obs, N_ens, Observations, Obs_pred, Obs_err, Obs_cov, &
+       State_forecast, State_live_incr, State_lon, State_lat, &
+       xcompact, ycompact, fcsterr_inflation_fac, tile_id, n_reported )
+
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+    implicit none
+
+    integer, intent(in) :: N_state, N_obs, N_ens, tile_id
+    type(obs_type), intent(in) :: Observations(N_obs)
+    real, intent(in) :: Obs_pred(N_obs,N_ens), Obs_err(N_obs,N_ens)
+    real, intent(in) :: Obs_cov(N_obs,N_obs)
+    real, intent(in) :: State_forecast(N_state,N_ens)
+    real, intent(in) :: State_live_incr(N_state,N_ens)
+    real, intent(in) :: State_lon(N_state), State_lat(N_state)
+    real, intent(in) :: xcompact, ycompact, fcsterr_inflation_fac
+    integer, intent(inout) :: n_reported
+
+    integer, parameter :: diag_rk = kind(1.0d0)
+    ! Sampling threshold, NOT a scientific-importance threshold.
+    real(diag_rk), parameter :: relative_mean_tol = 1.0e-6_diag_rk
+    real(diag_rk) :: obs_mean(N_obs), obs_mean_centered(N_obs)
+    real(diag_rk) :: sigma(N_obs), max_rel_mean, control_difference
+    real(diag_rk) :: baseline_mean, centered_mean, delta_mean, delta_max
+    real(diag_rk) :: state_delta(N_ens), scale_native(7)
+    real :: Obs_centered(N_obs,N_ens), Shadow_incr(N_state,N_ens)
+    character(len=6) :: state_name(7)
+    integer :: i
+    ! This is separate from n_reported. Trace only the first three entries
+    ! per MPI process for the entire run; normal impact reporting is unchanged.
+    integer, save :: trace_calls = 0
+    logical :: trace_this_call
+    character(len=100) :: skip_reason
+
+    trace_this_call = trace_calls < 3
+    if (trace_this_call) then
+       trace_calls = trace_calls + 1
+       write(*,'(A,I0,A,I0,4(A,I0),A,ES12.4)') &
+            'Biljana OBS_MEAN_IMPACT_TRACE enter rank=', myid, &
+            ' tile=', tile_id, ' N_state=', N_state, ' N_obs=', N_obs, &
+            ' N_ens=', N_ens, ' n_reported=', n_reported, &
+            ' inflation=', fcsterr_inflation_fac
+    end if
+
+    skip_reason = ''
+    if (n_reported >= 3) then
+       skip_reason = 'sample_limit_reached'
+    else if (N_obs <= 0) then
+       skip_reason = 'no_selected_observations'
+    else if (N_ens <= 2) then
+       skip_reason = 'ensemble_size_not_supported'
+    else if (N_state /= 6 .and. N_state /= 7) then
+       skip_reason = 'state_size_not_supported'
+    else if (fcsterr_inflation_fac > 0.0) then
+       skip_reason = 'positive_inflation_setting_not_supported'
+    end if
+    if (len_trim(skip_reason) > 0) then
+       if (trace_this_call) write(*,'(A,I0,A,I0,A,A)') &
+            'Biljana OBS_MEAN_IMPACT_TRACE skip rank=', myid, &
+            ' tile=', tile_id, ' reason=', trim(skip_reason)
+       return
+    end if
+
+    ! Do not let the diagnostic silently interpret invalid observations.
+    if (.not. all(ieee_is_finite(Obs_err))) then
+       write(*,'(A,I0,A,I0,A)') 'Biljana OBS_MEAN_IMPACT rank=', myid, &
+            ' tile=', tile_id, ' skipped: nonfinite perturbations'
+       return
+    end if
+    do i=1,N_obs
+       if (.not. ieee_is_finite(Observations(i)%obsvar)) then
+          if (trace_this_call) write(*,'(A,I0,A,I0,A,I0,A)') &
+               'Biljana OBS_MEAN_IMPACT_TRACE skip rank=', myid, &
+               ' tile=', tile_id, ' obs_index=', i, ' reason=nonfinite_obsvar'
+          return
+       end if
+       if (Observations(i)%obsvar <= 0.0) then
+          if (trace_this_call) write(*,'(A,I0,A,I0,A,I0,A,ES12.4)') &
+               'Biljana OBS_MEAN_IMPACT_TRACE skip rank=', myid, &
+               ' tile=', tile_id, ' obs_index=', i, &
+               ' reason=nonpositive_obsvar value=', Observations(i)%obsvar
+          return
+       end if
+       sigma(i) = sqrt(real(Observations(i)%obsvar,diag_rk))
+    end do
+
+    ! These are the *selected*, already scaled perturbations passed to EnKF.
+    obs_mean = sum(real(Obs_err,diag_rk),dim=2) / real(N_ens,diag_rk)
+    max_rel_mean = maxval(abs(obs_mean)/sigma)
+    if (trace_this_call) then
+       write(*,'(A,I0,A,I0,3(A,ES15.7),A,L1)') &
+            'Biljana OBS_MEAN_IMPACT_TRACE selection rank=', myid, &
+            ' tile=', tile_id, ' max_abs_obs_mean_K=', maxval(abs(obs_mean)), &
+            ' max_abs_mean_over_sigma=', max_rel_mean, &
+            ' threshold=', relative_mean_tol, &
+            ' replay_selected=', max_rel_mean > relative_mean_tol
+    end if
+    if (max_rel_mean <= relative_mean_tol) then
+       if (trace_this_call) write(*,'(A,I0,A,I0,A)') &
+            'Biljana OBS_MEAN_IMPACT_TRACE skip rank=', myid, &
+            ' tile=', tile_id, ' reason=mean_below_sampling_threshold'
+       return
+    end if
+
+    ! Count this sampled tile even when the reproducibility control fails.
+    n_reported = n_reported + 1
+
+    ! A/A control: repeating the live calculation with identical inputs
+    ! should reproduce its increments. Reject ambiguous comparisons.
+    Shadow_incr = State_forecast
+    call enkf_increments( &
+         N_state, N_obs, N_ens, Observations, Obs_pred, Obs_err, Obs_cov, &
+         Shadow_incr, State_lon, State_lat, xcompact, ycompact, fcsterr_inflation_fac )
+    if (.not. all(ieee_is_finite(Shadow_incr)) .or. &
+        .not. all(ieee_is_finite(State_live_incr))) then
+       write(*,'(A,I0,A,I0,A)') 'Biljana OBS_MEAN_IMPACT_CONTROL_FAILED rank=', myid, &
+            ' tile=', tile_id, ' reason=nonfinite_live_or_replay_increments'
+       return
+    end if
+    control_difference = maxval(abs(real(Shadow_incr,diag_rk) - &
+                                     real(State_live_incr,diag_rk)))
+    if (control_difference /= 0.0_diag_rk) then
+       write(*,'(A,I0,A,I0,A,ES15.7)') &
+            'Biljana OBS_MEAN_IMPACT_CONTROL_FAILED rank=', myid, &
+            ' tile=', tile_id, ' max_abs_unscaled_incr_difference=', control_difference
+       return
+    end if
+
+    ! Recenter a PRIVATE COPY. Do not reclamp or change the original array.
+    ! This isolates the effect of the finite-ensemble perturbation mean.
+    ! It is NOT a proposed operational perturbation-generation algorithm.
+    do i=1,N_obs
+       Obs_centered(i,:) = real(real(Obs_err(i,:),diag_rk) - obs_mean(i))
+    end do
+    obs_mean_centered = sum(real(Obs_centered,diag_rk),dim=2) / real(N_ens,diag_rk)
+
+    ! enkf_increments overwrites its state argument. Start from the SAVED
+    ! forecast, never from the already computed live increments.
+    Shadow_incr = State_forecast
+    call enkf_increments( &
+         N_state, N_obs, N_ens, Observations, Obs_pred, Obs_centered, Obs_cov, &
+         Shadow_incr, State_lon, State_lat, xcompact, ycompact, fcsterr_inflation_fac )
+
+    write(*,'(A,I0,A,I0,A,I0,A,I0,3(A,ES15.7))') &
+         'Biljana OBS_MEAN_IMPACT rank=', myid, ' tile=', tile_id, &
+         ' sample=', n_reported, ' N_obs=', N_obs, &
+         ' max_abs_obs_mean_K=', maxval(abs(obs_mean)), &
+         ' max_abs_mean_over_sigma=', max_rel_mean, &
+         ' centered_max_abs_obs_mean_K=', maxval(abs(obs_mean_centered))
+    write(*,'(A,I0,A,I0,A)') 'Biljana OBS_MEAN_IMPACT_CONTROL rank=', myid, &
+         ' tile=', tile_id, ' identical_input_replay_zero_diff=T'
+
+    ! Map the type-10 state vector back to native model units.
+    if (N_state == 7) then
+       state_name = [ character(len=6) :: 'srfexc', 'rzexc', 'catdef', &
+                                          'tc1', 'tc2', 'tc4', 'ght1' ]
+       scale_native = real([ scale_srfexc, scale_rzexc, scale_catdef, &
+                             scale_temp, scale_temp, scale_temp, scale_ght1 ],diag_rk)
+    else
+       state_name = [ character(len=6) :: 'srfexc', 'rzexc', 'tc1', &
+                                          'tc2', 'tc4', 'ght1', '' ]
+       scale_native = real([ scale_srfexc, scale_rzexc, scale_temp, &
+                             scale_temp, scale_temp, scale_ght1, 1.0 ],diag_rk)
+    end if
+
+    do i=1,N_state
+       baseline_mean = sum(real(State_live_incr(i,:),diag_rk)) &
+                       / real(N_ens,diag_rk) * scale_native(i)
+       centered_mean = sum(real(Shadow_incr(i,:),diag_rk)) &
+                       / real(N_ens,diag_rk) * scale_native(i)
+       state_delta = (real(State_live_incr(i,:),diag_rk) - &
+                      real(Shadow_incr(i,:),diag_rk)) * scale_native(i)
+       delta_mean = sum(state_delta) / real(N_ens,diag_rk)
+       delta_max = maxval(abs(state_delta))
+       write(*,'(A,I0,A,I0,A,A,4(A,ES15.7))') &
+            'Biljana OBS_MEAN_IMPACT_STATE rank=', myid, ' tile=', tile_id, &
+            ' field=', trim(state_name(i)), &
+            ' live_mean_incr=', baseline_mean, ' centered_mean_incr=', centered_mean, &
+            ' delta_mean_incr=', delta_mean, ' max_abs_member_delta=', delta_max
+    end do
+
+    ! Deliberately no assignment to the live state/increments/perturbations,
+    ! no random-number draws, and no MPI collectives.
+  end subroutine diag_tb_obs_mean_impact  
+
   ! ********************************************************************
  
   subroutine read_ens_upd_inputs(               &    
@@ -3766,6 +3955,9 @@ contains
     real, dimension(N_snow,N_constit)     :: rconstit
 
     logical                               :: found_Tb_obs
+    ! Biljana: temporary, non-applied observation-mean impact check.
+    integer :: pert_impact_count
+    real :: pert_impact_forecast(7,N_ens)    
 
 
 
@@ -4415,7 +4607,8 @@ contains
        allocate( State_incr(N_state_max,N_ens)) 
        allocate( State_lon( N_state_max      ))
        allocate( State_lat( N_state_max      ))
-       
+       ! Biljana
+       pert_impact_count = 0 
        do kk=1,N_catd       
           
           ! compute increments only snow-free and non-frozen tiles
@@ -4493,7 +4686,11 @@ contains
                      Observations(ind_obs(1:N_selected_obs)), Obs_cov )
                 
                 ! EnKF update
-                
+                ! Biljana 
+                if (update_type == 10 .and. pert_impact_count < 3) then
+                   pert_impact_forecast(1:N_state,:) = State_incr(1:N_state,:)
+                end if                
+
                 call enkf_increments(                                        &
                      N_state, N_selected_obs, N_ens,                         &
                      Observations(ind_obs(1:N_selected_obs)),                &
@@ -4505,7 +4702,19 @@ contains
                      State_lat( 1:N_state  ),                                &
                      xcompact, ycompact,                                     &
                      fcsterr_inflation_fac )             
-                
+                ! Biljana   
+                if (update_type == 10 .and. pert_impact_count < 3) then
+                   call diag_tb_obs_mean_impact( &
+                        N_state, N_selected_obs, N_ens, &
+                        Observations(ind_obs(1:N_selected_obs)), &
+                        Obs_pred(ind_obs(1:N_selected_obs),:), &
+                        Obs_pert(ind_obs(1:N_selected_obs),:), Obs_cov, &
+                        pert_impact_forecast(1:N_state,:), State_incr(1:N_state,:), &
+                        State_lon(1:N_state), State_lat(1:N_state), &
+                        xcompact, ycompact, fcsterr_inflation_fac, &
+                        l2f(kk), pert_impact_count )
+                end if                
+
                 deallocate(Obs_cov)
                 
                 ! assemble cat_progn increments
