@@ -5516,15 +5516,13 @@ contains
     
     ! --------------------------------------------------------
 
-    integer              :: ii, i, j, k, n, istat, secs_in_day
+    integer              :: i, j, k, n, istat, secs_in_day
     integer              :: ind_tile, ind_angle, ind_start, ind_end
     integer              :: N_files, N_files_max, N_obs, N_ang
     integer              :: Tb_cnt_min
 
     logical              :: file_exists, SM_files, reg_Tb_files, hpol, keep_data
 
-    real                 :: M36_col_ind_tile, M36_row_ind_tile  
-    real                 :: M36_col_ind_obs,  M36_row_ind_obs
     real                 :: tmpreal, Tb_std_max
     
     type(date_time_type) :: date_time_low, date_time_upp
@@ -7247,8 +7245,6 @@ contains
     integer              :: dset_rank
     integer              :: ind_tile, ind_start, ind_end
 
-    real                 :: M09_col_ind_tile, M09_row_ind_tile  
-    real                 :: M09_col_ind_obs,  M09_row_ind_obs
     real                 :: tmpreal
     
     real*8               :: J2000_seconds_low, J2000_seconds_upp
@@ -7665,7 +7661,12 @@ contains
              
              ! --------------------------------------------------------------------------
              !
-             ! the following block is no longer necessary, commented out
+             ! Commented out the following block.  Similar blocks in the SMOS and SMAP Tb
+             ! readers are no longer necessary.  Unlike the Tb obs, however, the FT obs are 
+             ! on the M09 grid, and when the model is in the M36 grid, the block should 
+             ! alter the result -- although probably not in a desirable way.  But at this 
+             ! time, the reader has never been used for science, and it anyway would need 
+             ! to be reviewed and probably fixed before it is ready for use.
              ! - reichle, 14 Oct 2026
              !
              !  ! make sure center-of-mass of tile that administers obs 
@@ -7960,8 +7961,6 @@ contains
     integer              :: dset_rank
     integer              :: ind_tile, ind_start, ind_end
 
-    real                 :: M36_col_ind_tile, M36_row_ind_tile  
-    real                 :: M36_col_ind_obs,  M36_row_ind_obs
     real                 :: tmpreal
     real                 :: tmp_tb_diff, tmp_tb_diff_Sum, tmp_tb_diff_SumOfSq, tmp_var
 
