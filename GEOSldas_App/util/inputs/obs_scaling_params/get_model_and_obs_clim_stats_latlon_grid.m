@@ -150,7 +150,7 @@ for imonth = 1:length(run_months)
         HHMM = [num2str(hour, '%2.2d'), num2str(minute, '%2.2d')];
         
         % read innov files
-        fname = [inpath, '/ana/ens_avg/', 'Y', YYYYMMDD(1:4), '/', 'M', YYYYMMDD(5:6), '/', exp_run, '.ens_avg.ldas_ObsFcstAna.', YYYYMMDD, '_', HHMM, 'z.bin'];
+        fname = [inpath, '/ana/ens_avg/', 'Y', YYYYMMDD(1:4), '/', 'M', YYYYMMDD(5:6), '/', exp_run, '.ens_avg.ldas_ObsFcstAna.', YYYYMMDD, '_', HHMM, 'z.nc4'];
         ifp = fopen(fname, 'r', 'l');
         
         if (ifp > 0) % Proceed only if file exists
