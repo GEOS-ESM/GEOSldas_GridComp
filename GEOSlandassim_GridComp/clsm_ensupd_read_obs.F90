@@ -2184,6 +2184,12 @@ contains
     !
     ! SM output is degree of saturation as a fraction [0,1].
     !
+    ! Thinning: after the QC-passing obs of the assimilation window are averaged
+    ! into tile super-obs, the tile super-obs are visited in order of latitude,
+    ! and a tile super-obs is dropped if it is closer than thin_dist_km (25 km,
+    ! ~resolution of the product) to a tile super-obs kept earlier (see
+    ! subroutine thin_min_dist).
+    !
     ! References: Hahn et al. 2026, doi:10.5194/essd-18-4393-2026
     !             https://hsaf.meteoam.it/
     !
@@ -2246,6 +2252,10 @@ contains
 
     integer(1),   parameter :: bsflag_bad_bits = 4_1                  ! noise_out_of_limits
 
+    ! thinning: minimum distance between tile super-obs (~resolution of the product)
+
+    real,         parameter :: thin_dist_km = 25.                     ! [km]
+
     ! netCDF variable scale factors (as declared in files)
     
     real*8,       parameter :: latlon_scale = 1.0d-6                  ! lat/lon stored as int * 1e-6
@@ -2262,6 +2272,7 @@ contains
     character(300) :: tmpfname
 
     integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
+    integer :: N_kept
 
     character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
     character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
@@ -2301,6 +2312,11 @@ contains
 
     ! tile accumulation across all files
     integer, dimension(N_catd)     :: N_obs_in_tile
+
+    ! optional thinning of tile obs
+    integer,    allocatable :: ind_tile(:), indx(:)
+    real,       allocatable :: tile_lat(:), tile_lon(:)
+    logical,    allocatable :: keep_tile(:)
 
     character(len=*),  parameter   :: Iam = 'read_obs_sm_ASCAT_HSAF'
     character(len=400)             :: err_msg
@@ -2529,7 +2545,7 @@ contains
 
        N_valid = 0
 
-       do ii = 1, N_obs_file
+       do ii = 1, N_obs_file             ! loop through obs in file
 
           ! skip if SSM is fill or out of valid range
           if (ssm_raw(ii) < 0_2 .or. ssm_raw(ii) > 10000_2) cycle
@@ -2564,7 +2580,7 @@ contains
 
           ! passed all QC
 
-          N_valid = N_valid + 1
+          N_valid = N_valid + 1                         ! count obs in file that pass QC
 
           if (N_valid > max_obs_per_file) then
              err_msg = 'Too many obs in one H SAF file - increase max_obs_per_file'
@@ -2657,6 +2673,74 @@ contains
        end if
 
     end do
+
+    ! ----------------------------------------------------------------
+    !
+    ! thinning of the tile super-obs: visit tile super-obs in order of latitude;
+    ! drop a tile super-obs if it is closer than thin_dist_km to a tile super-obs
+    ! kept earlier (see subroutine thin_min_dist)
+
+    N_tmp = count(N_obs_in_tile > 0)
+
+    if (N_tmp > 0) then
+
+       allocate(ind_tile( N_tmp))
+       allocate(indx(     N_tmp))
+       allocate(tile_lat( N_tmp))
+       allocate(tile_lon( N_tmp))
+       allocate(keep_tile(N_tmp))
+
+       ! collect tiles with obs
+
+       kk = 0
+
+       do ii = 1, N_catd
+
+          if (N_obs_in_tile(ii) > 0) then
+
+             kk = kk + 1
+
+             ind_tile(kk) = ii
+             tile_lat(kk) = ASCAT_lat(ii)
+             tile_lon(kk) = ASCAT_lon(ii)
+
+          end if
+
+       end do
+
+       ! order tile super-obs by latitude
+
+       call nr_indexx( N_tmp, tile_lat, indx )
+
+       call thin_min_dist( N_tmp, tile_lat(indx), tile_lon(indx),           &
+            thin_dist_km, keep_tile, N_kept )
+
+       ! tile super-obs that are not kept: no obs in tile
+
+       do kk = 1, N_tmp
+
+          if (.not. keep_tile(kk)) then
+
+             ii = ind_tile(indx(kk))
+
+             N_obs_in_tile(ii) = 0
+
+             ASCAT_sm(  ii)    =      this_obs_param%nodata
+             ASCAT_lon( ii)    =      this_obs_param%nodata
+             ASCAT_lat( ii)    =      this_obs_param%nodata
+             ASCAT_time(ii)    = real(this_obs_param%nodata, kind(0.0D0))
+             ASCAT_sm_std(ii)  =      this_obs_param%nodata
+
+          end if
+
+       end do
+
+       if (logit) write(logunit,*) trim(Iam)//': N tile super-obs = ', N_tmp, &
+          ', N after thinning = ', N_kept
+
+       deallocate(ind_tile, indx, tile_lat, tile_lon, keep_tile)
+
+    end if
 
     if (any(N_obs_in_tile > 0)) found_obs = .true.
 
@@ -11644,6 +11728,147 @@ contains
 
     
   end subroutine get_tile_num_for_obs
+
+  ! *****************************************************************
+
+  subroutine thin_min_dist( N_obs, lat, lon, min_dist_km, keep, N_keep )
+
+    ! thin obs to a minimum distance between kept obs
+    !
+    ! Obs are visited in the given order.  An obs is kept unless it is closer
+    ! than min_dist_km to an obs that was kept earlier.  Hence no two kept obs
+    ! are closer than min_dist_km, and the result is deterministic.
+    !
+    ! Distances are in [deg] lat/lon, as for the field-of-view (FOV) of the obs
+    ! (see get_tile_num_for_obs() and get_obs_pred()):  min_dist_km is converted
+    ! with dist_km2deg() into r_y (scalar) and r_x (depends on latitude), and an
+    ! obs is too close to a kept obs if (dlon/r_x)**2 + (dlat/r_y)**2 < 1, the
+    ! normalized square distance of get_tile_num_in_ellipse().
+    ! The dateline is ignored (as in get_tile_num_in_ellipse()).
+    !
+    ! Kept obs are stored in "buckets" of a regular lat/lon grid with cells of
+    ! 0.5*r_y x 0.5*r_y [deg], so that only the kept obs in nearby buckets need to
+    ! be checked.  Any two obs in the same bucket are too close, so each bucket
+    ! holds at most one kept obs.
+    !
+    ! Unlike SMAP L1C_TB_E obs (see "L1CE_thinning" in read_obs_SMAP_halforbit_Tb()),
+    ! H SAF obs cannot be thinned via their grid indices because the indices
+    ! (location_id) of the Fibonacci grid are not arranged in lat/lon rows and
+    ! columns, so that thinning via the indices does not give a uniform spacing.
+    !
+    ! amfox, 9 Oct 2026
+
+    implicit none
+
+    integer,                   intent(in)  :: N_obs
+    real,    dimension(N_obs), intent(in)  :: lat, lon         ! [deg]
+    real,                      intent(in)  :: min_dist_km      ! [km]
+    logical, dimension(N_obs), intent(out) :: keep
+    integer,                   intent(out) :: N_keep
+
+    ! local variables
+
+    real    :: r_y, d_bkt, dx, dy
+    integer :: N_lon_bkt, N_lat_bkt, kk, mm, ii, jj, i_ind, j_ind, di
+
+    real,    dimension(:),   allocatable :: r_x
+    integer, dimension(:,:), allocatable :: head
+
+    ! -----------------------------------------------------
+
+    keep   = .true.
+    N_keep = N_obs
+
+    if (N_obs < 2 .or. min_dist_km <= 0.) return
+
+    ! convert min_dist_km to [deg]
+
+    allocate(r_x(N_obs))
+
+    call dist_km2deg( min_dist_km, N_obs, lat, r_x, r_y )
+
+    ! buckets of width d_bkt=0.5*r_y: two obs in the same bucket have
+    ! (dlon/r_x)**2 + (dlat/r_y)**2 <= 0.5 and are therefore too close, so each
+    ! bucket holds at most one kept obs (head(i,j), 0 = none); obs closer than
+    ! min_dist_km are at most 2 buckets apart in latitude (because |dlat|<r_y)
+    ! and at most ceiling(r_x/d_bkt) buckets apart in longitude.  Search one
+    ! extra bucket in each direction to allow for roundoff in bucket indices.
+
+    d_bkt     = 0.5*r_y
+
+    N_lon_bkt = ceiling( 360./d_bkt )
+    N_lat_bkt = ceiling( 180./d_bkt )
+
+    allocate(head(N_lon_bkt,N_lat_bkt))
+
+    head   = 0               ! initialize array to 0
+
+    ! always keep obs 1, add into bucket (head) and update N_keep acccordingly
+
+    i_ind = min( N_lon_bkt, max( 1, floor( (lon(1)+180.)/d_bkt ) + 1 ))
+    j_ind = min( N_lat_bkt, max( 1, floor( (lat(1)+ 90.)/d_bkt ) + 1 ))
+
+    head(i_ind,j_ind) = 1
+
+    N_keep            = 1
+
+    ! loop starts with obs 2
+
+    do kk=2,N_obs
+
+       ! bucket of obs kk
+
+       i_ind = min( N_lon_bkt, max( 1, floor( (lon(kk)+180.)/d_bkt ) + 1 ))
+       j_ind = min( N_lat_bkt, max( 1, floor( (lat(kk)+ 90.)/d_bkt ) + 1 ))
+
+       ! determine longitude search distance in units of grid cells
+
+       if (r_x(kk) < 360.) then
+          di = ceiling( r_x(kk)/d_bkt ) + 1
+       else
+          di = N_lon_bkt              ! near the poles
+       end if
+
+       ! check kept obs in nearby buckets
+
+       lat_loop: do jj=max(1,j_ind-3),min(N_lat_bkt,j_ind+3)
+
+          lon_loop: do ii=max(1,i_ind-di),min(N_lon_bkt,i_ind+di)   ! range depends on latitude
+
+             mm = head(ii,jj)
+
+             if (mm>0) then
+
+                dx = (lon(mm) - lon(kk)) / r_x(kk)
+                dy = (lat(mm) - lat(kk)) / r_y
+
+                if (dx**2 + dy**2 < 1.) then
+
+                   keep(kk) = .false.
+
+                   exit lat_loop
+
+                end if
+             end if
+
+          end do lon_loop
+       end do lat_loop
+
+       if (keep(kk)) then
+
+          ! keep obs kk and add it to its bucket
+
+          N_keep = N_keep + 1
+
+          head(i_ind,j_ind) = kk
+
+       end if
+
+    end do
+
+    deallocate(r_x, head)
+
+  end subroutine thin_min_dist
 
   ! *****************************************************************
 
