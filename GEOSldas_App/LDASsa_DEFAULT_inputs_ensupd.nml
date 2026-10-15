@@ -2567,6 +2567,9 @@ obs_param_nml(55)%adapt          = 0
 !
 ! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
 !
+! The obs reader averages the obs per tile and always thins the resulting
+! tile super-obs to a minimum distance of 25 km (separately for each species).
+!
 ! ------------------------
 !
 !  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A)
