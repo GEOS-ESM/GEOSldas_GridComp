@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added comment to clarify the selection of the tile file ( nc4 or acsii)
 
 ### Changed
-
+  
 ### Fixed
 - Refined ldas_setup restart handling for multiple restart options and surface components
 - Fixed array bounds for EnKF update types 12 and 13.
@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed surface temperature observation selection for EnKF update types 3, 4, 5 and 7.
 - Made observation perturbation grid-cell lookup independent of the EnKF analysis layout.
 - Fixed update type 12 incorrectly skipping valid soil-moisture analyses when snow-cover observations are not assimilated.
+
 ### Removed
+- Removed obsolete check on SMOS/SMAP obs locations w.r.t. EASEv2_M09/M36 tiles.
 
 ### Deprecated
 
