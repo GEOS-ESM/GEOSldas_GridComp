@@ -1413,6 +1413,9 @@ class ldas:
                 if self.with_land :
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
+                   if self.ExeInputs['LAI_TS_FILE'] !='':
+                      bcval.append('../input/lai.MODIS_8-Day')
+                      bckey.append('LAI_TS_FILE')                   
                    if self.ExeInputs['EASE_PFAF_TILE_FILE'] !='':
                       bcval.append('../input/EASE_pfaf_tile_file.nc4')
                       bckey.append('EASE_PFAF_TILE')
