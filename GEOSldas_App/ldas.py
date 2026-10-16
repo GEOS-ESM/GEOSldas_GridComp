@@ -1415,7 +1415,7 @@ class ldas:
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
                    if self.ExeInputs['LAI_TS_FILE'] !='':
                       bcval.append('../input/lai.MODIS_8-Day')
-                      bckey.append('LAI_TS_FILE')                   
+                      bckey.append('LAI_TS')                   
                    if self.ExeInputs['EASE_PFAF_TILE_FILE'] !='':
                       bcval.append('../input/EASE_pfaf_tile_file.nc4')
                       bckey.append('EASE_PFAF_TILE')
@@ -1424,6 +1424,8 @@ class ldas:
                       valn = val+'.data'
                       if '.nc4' in val:
                         valn = val
+                      if key == 'LAI_TS':
+                        valn = val  
                       ldasrcInp[keyn]= valn
 
                    if('catchcn' in self.catch):
