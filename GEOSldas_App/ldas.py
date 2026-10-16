@@ -364,7 +364,9 @@ class ldas:
         self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+land_domain_ )[0]
         self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +land_domain_ )[0]
         if (self.modis_dvg > 0):
-           self.ExeInputs['LAI_TS_FILE']    = glob.glob(inpdir_ + 'clsm/lai.MODIS_8-Day_*'+land_domain_ )[0]
+           self.ExeInputs['LAI_TS_FILE']    = glob.glob(self.bcs_dir_land + 'clsm/lai.MODIS_8-Day_*'+land_domain_ )
+        else:
+           self.ExeInputs['LAI_TS_FILE'] = []
 
         tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+land_domain_)
         if (len(tmp_) ==1) :
@@ -853,8 +855,8 @@ class ldas:
                 self.ExeInputs['NDVI_FILE'],
                 self.ExeInputs['NIRDF_FILE'],
                 self.ExeInputs['VISDF_FILE'] ]
-           if (self.ExeInputs['LAI_TS_FILE'] != ''):
-              bcs += [self.ExeInputs['LAI_TS_FILE']]                
+           if self.ExeInputs['LAI_TS_FILE']:
+              bcs += self.ExeInputs['LAI_TS_FILE']                   
            if (self.ExeInputs['LNFM_FILE'] != ''):
               bcs += [self.ExeInputs['LNFM_FILE']]
            if (self.has_vegopacity):
@@ -882,19 +884,24 @@ class ldas:
            # link BC
            print ("linking bcs...")
            bcnames=['green','lai','ndvi','nirdf','visdf']
-           if (self.ExeInputs['LAI_TS_FILE'] != ''):
-              bcnames += ['.']           
+           if self.ExeInputs['LAI_TS_FILE']:
+              bcnames += ['.'] * len(self.ExeInputs['LAI_TS_FILE'])          
            if (self.ExeInputs['LNFM_FILE'] != ''):
               bcnames += ['lnfm']
            if (self.has_vegopacity):
               bcnames += ['vegopacity']
            if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
               bcnames += ['EASE_pfaf_tile_file.nc4']
-           for bcln,bc in zip(bcnames,bcs) :
-              myBC=self.inpdir+'/'+bcln+'.data'
-              if '.nc4' in bcln or bcln == '.':
-                 myBC=self.inpdir+'/'+bcln
-              os.symlink(bc,myBC)
+           for bcln,bc in zip(bcnames,bcs):
+              if bcln == '.':
+                 myBC = self.inpdir + '/' + os.path.basename(bc)
+              elif '.nc4' in bcln:
+                 myBC = self.inpdir + '/' + bcln
+              else:
+                 myBC = self.inpdir + '/' + bcln + '.data'
+              if os.path.lexists(myBC):
+                 os.remove(myBC)       
+              os.symlink(bc, myBC)
 
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
