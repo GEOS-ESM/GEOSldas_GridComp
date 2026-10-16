@@ -94,11 +94,21 @@ obs_param_fname = [exp_path, '/', exp_run{1}, '/output/', domain, '/rc_out/Y', Y
 
 [N_obs_param, obs_param ] = read_obsparam(obs_param_fname);
 
-species =[];
+% species(i) must be the species ID of species_names(i), because the output
+% files of the separate-species statistics are named with species_names(i)
+
+species = zeros(1, length(species_names));
 
 for i = 1:length(species_names)
-    add_species = obs_param(strcmp(species_names(i),{obs_param.descr})).species;
-    species = union(species,add_species);
+    add_species = [obs_param(strcmp(species_names(i),{obs_param.descr})).species];
+    if length(add_species) ~= 1
+        error(['expected one obsparam entry for species ', char(species_names(i))]);
+    end
+    species(i) = add_species;
+end
+
+if length(unique(species)) ~= length(species)
+    error('duplicate species in species_names');
 end
 
 if combine_species_stats
