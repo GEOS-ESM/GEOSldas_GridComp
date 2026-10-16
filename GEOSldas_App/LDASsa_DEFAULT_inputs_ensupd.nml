@@ -39,6 +39,9 @@
 !       12      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb, SCF
 !               |   & 1d snow analysis (Toure et al. 2018 empirical gain)          | 
 !       13      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb
+!
+! Make sure the "assim" or "getinnov" settings of the obs species below are appropriate
+!   for the selected update_type!
 
 update_type = 0
 
@@ -2563,6 +2566,9 @@ obs_param_nml(55)%adapt          = 0
 ! Hahn et al 2026 doi:10.5194/essd-18-4393-2026
 !
 ! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
+!
+! The obs reader averages the obs per tile and always thins the resulting
+! tile super-obs to a minimum distance of 25 km (separately for each species).
 !
 ! ------------------------
 !
