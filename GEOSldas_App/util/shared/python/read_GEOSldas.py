@@ -17,6 +17,7 @@ import numpy as np
 # reader for GEOSldas obsparam file (ASCII)
 
 def read_obs_param(fname):
+    # string fields are quoted with ' or " (quotes are removed)
     print(f"Reading {fname}")
 
     with open(fname, 'r') as fid:
@@ -25,7 +26,7 @@ def read_obs_param(fname):
         obs_param = []
         for _ in range(N_obs_param):
             param = {}
-            param['descr']          =       fid.readline().strip().strip('"')
+            param['descr']          =       fid.readline().strip().strip('"\'')
             param['species']        = float(fid.readline().strip())
             param['orbit']          = float(fid.readline().strip())
             param['pol']            = float(fid.readline().strip())
@@ -36,7 +37,7 @@ def read_obs_param(fname):
 
             param['freq']           = float(fid.readline().strip())
             param['FOV']            = float(fid.readline().strip())
-            param['FOV_units']      =       fid.readline().strip().strip('"')
+            param['FOV_units']      =       fid.readline().strip().strip('"\'')
             param['assim']          =       fid.readline().strip()
             param['scale']          =       fid.readline().strip()
             param['getinnov']       =       fid.readline().strip()
@@ -45,18 +46,18 @@ def read_obs_param(fname):
             param['bias_trel']      = float(fid.readline().strip())
             param['bias_tcut']      = float(fid.readline().strip())
             param['nodata']         = float(fid.readline().strip())
-            param['varname']        =       fid.readline().strip().strip('"')
-            param['units']          =       fid.readline().strip().strip('"')
-            param['fcstvarname']    =       fid.readline().strip().strip('"')
-            param['fcstunits']      =       fid.readline().strip().strip('"')
-            param['path']           =       fid.readline().strip().strip('"')
-            param['name']           =       fid.readline().strip().strip('"')
-            param['maskpath']       =       fid.readline().strip().strip('"')
-            param['maskname']       =       fid.readline().strip().strip('"')
-            param['scalepath']      =       fid.readline().strip().strip('"')
-            param['scalename']      =       fid.readline().strip().strip('"')
-            param['flistpath']      =       fid.readline().strip().strip('"')
-            param['flistname']      =       fid.readline().strip().strip('"')
+            param['varname']        =       fid.readline().strip().strip('"\'')
+            param['units']          =       fid.readline().strip().strip('"\'')
+            param['fcstvarname']    =       fid.readline().strip().strip('"\'')
+            param['fcstunits']      =       fid.readline().strip().strip('"\'')
+            param['path']           =       fid.readline().strip().strip('"\'')
+            param['name']           =       fid.readline().strip().strip('"\'')
+            param['maskpath']       =       fid.readline().strip().strip('"\'')
+            param['maskname']       =       fid.readline().strip().strip('"\'')
+            param['scalepath']      =       fid.readline().strip().strip('"\'')
+            param['scalename']      =       fid.readline().strip().strip('"\'')
+            param['flistpath']      =       fid.readline().strip().strip('"\'')
+            param['flistname']      =       fid.readline().strip().strip('"\'')
             param['errstd']         = float(fid.readline().strip())
             param['std_normal_max'] = float(fid.readline().strip())
             param['zeromean']       =       fid.readline().strip()
@@ -141,7 +142,7 @@ def read_tilegrids(fname):
             tile_grid = {}
             
             fortran_tag           = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
-            tile_grid['gridtype'] = ifp.read(40).decode('ascii').strip('\x00')
+            tile_grid['gridtype'] = ifp.read(40).decode('ascii').strip('\x00 ')
             tile_grid['ind_base'] = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
             tile_grid['i_dir']    = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
             tile_grid['j_dir']    = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
@@ -279,6 +280,7 @@ def read_ObsFcstAna(fname, isLDASsa=False):
             fortran_tag = struct.unpack(f'{machfmt}i', ifp.read(4))[0]
 
             # No-data check
+            obs_obs[    obs_obs     == nodata] = np.nan
             obs_obsvar[ obs_obsvar  == nodata] = np.nan
             obs_fcst[   obs_fcst    == nodata] = np.nan
             obs_fcstvar[obs_fcstvar == nodata] = np.nan
@@ -375,6 +377,7 @@ def read_ObsFcstAna_nc4(fname):
                     fill_value = getattr(var, '_FillValue', None)
                     if fill_value is not None:
                         data[data == fill_value] = np.nan
+                    data[data == nodata] = np.nan
 
                 return data
 
@@ -383,7 +386,7 @@ def read_ObsFcstAna_nc4(fname):
             obs_tilenum = get_int('tilenum')
             obs_lon     = get_float('lon', mask_nodata=False)
             obs_lat     = get_float('lat', mask_nodata=False)
-            obs_obs     = get_float('obs', mask_nodata=False)
+            obs_obs     = get_float('obs')
             obs_obsvar  = get_float('obsvar')
             obs_fcst    = get_float('fcst')
             obs_fcstvar = get_float('fcstvar')
