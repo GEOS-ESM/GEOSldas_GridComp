@@ -99,6 +99,7 @@ if exist(fname)==2
   %  - in some cases obs_fcst (a.k.a. Obs_pred) is no-data-value,
   %     eg. SMOS Tb when snow is present)
 
+  obs_obs(     obs_obs       == nodata ) = NaN;
   obs_obsvar(  obs_obsvar    == nodata ) = NaN;
 
   obs_fcst(    obs_fcst      == nodata ) = NaN;
