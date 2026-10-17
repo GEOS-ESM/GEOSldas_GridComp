@@ -15,7 +15,6 @@
 
 import os
 import sys;        sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../shared/python'))
-import shutil
 
 import numpy as np
 
@@ -24,7 +23,7 @@ from datetime          import datetime, timedelta
 from read_GEOSldas      import read_ObsFcstAna_nc4, read_tilecoord, read_tilegrids
 from EASEv2            import EASEv2_latlon2ind, EASEv2_ind2latlon
 from obs_scaling_utils import get_ObsFcstAna_fname, get_doy_pentad_range, days_in_month, nodata
-from obs_scaling_utils import count_ObsFcstAna_files
+from obs_scaling_utils import any_ObsFcstAna_file
 
 n_fields = 14
 
@@ -35,15 +34,11 @@ def get_obs_scaling_tb(exp_path, exp_run, domain, obs_param, descr_contains, orb
     # orbit       : 1 (ascending) or 2 (descending)
     # convert_grid: True  = use EASEv2 M36 "administering" tiles (one tile per M36 grid cell)
     #               False = use all model tiles
+    #
+    # The other arguments are checked in run_obs_scaling_params.py.
 
     if orbit not in (1, 2):
         raise ValueError('orbit must be 1 (ascending) or 2 (descending)')
-    if w_days % 5 or w_days % 10 == 0:
-        raise ValueError('w_days must be an odd number of pentads (for example, 75)')
-    if ndata_min < 1:
-        raise ValueError('ndata_min must be at least 1')
-    if len(set(angles)) != len(angles):
-        raise ValueError(f'duplicate angles: {angles}')
 
     inpath  = exp_path + '/' + exp_run + '/output/' + domain
     outpath = inpath + '/stats/' + out_dir
@@ -51,8 +46,7 @@ def get_obs_scaling_tb(exp_path, exp_run, domain, obs_param, descr_contains, orb
     t0_assim = t0_assim % dt_assim
     cycles   = range(t0_assim, 86400, dt_assim)
 
-    n_files = count_ObsFcstAna_files(inpath, exp_run, run_months, first_year, last_year, cycles)
-    if n_files == 0:
+    if not any_ObsFcstAna_file(inpath, exp_run, run_months, first_year, last_year, cycles):
         raise ValueError(f'no ObsFcstAna files for the requested period in {inpath}/ana/ens_avg')
 
     os.makedirs(outpath, exist_ok=True)
@@ -170,19 +164,21 @@ def get_obs_scaling_tb(exp_path, exp_run, domain, obs_param, descr_contains, orb
 
             is_pentad_center = (doy + 2) % 5 == 0
 
-            if print_each_doy or is_pentad_center:
+            fnames_out = []
+            if print_each_doy:
+                fnames_out.append(fname_base_d + f'_DOY{doy:03d}.bin')
+            if is_pentad_center:
+                fnames_out.append(fname_base_p + f'_p{(doy + 2) // 5:02d}.bin')
+
+            if fnames_out:
 
                 data_out = get_window_stats_tb(ring, ndata_min, w_days - w_days//2 - 1)
 
-                fname_doy = fname_base_d + f'_DOY{doy:03d}.bin'
-
                 # 2nd header entry is 0 (as written by the MATLAB scripts), ndata_min is in the file name
-                write_tb_scaling_bin(fname_doy, 1 if orbit == 1 else 0, 0, start_time, end_time, angles,
-                                     tile_coord['com_lon'][out_tiles], tile_coord['com_lat'][out_tiles],
-                                     tile_coord['tile_id'][out_tiles], data_out)
-
-                if is_pentad_center:
-                    shutil.copyfile(fname_doy, fname_base_p + f'_p{(doy + 2) // 5:02d}.bin')
+                for fname_out in fnames_out:
+                    write_tb_scaling_bin(fname_out, 1 if orbit == 1 else 0, 0, start_time, end_time, angles,
+                                         tile_coord['com_lon'][out_tiles], tile_coord['com_lat'][out_tiles],
+                                         tile_coord['tile_id'][out_tiles], data_out)
 
             ring[..., :-1] = ring[..., 1:]
             ring[...,  -1] = 0.
@@ -223,7 +219,9 @@ def tb_species_descr(obs_param, tb_species):
 #
 # statistics over the moving window, (14, N_out, N_ang):
 #
-#   0- 4: H-pol o_mean, o_std, m_mean, m_std, N   (nodata if N < ndata_min)
+#   0- 4: H-pol o_mean, o_std, m_mean, m_std, N   (nodata if N < ndata_min, or, for a
+#                                                  95-day window, if the 31 center days
+#                                                  have fewer than ndata_min/2.5 obs)
 #   5- 9: V-pol o_mean, o_std, m_mean, m_std, N
 #  10-13: H-pol o_mean, m_mean, V-pol o_mean, m_mean for the center day of the window
 
@@ -244,6 +242,9 @@ def get_window_stats_tb(ring, ndata_min, i_center):
         m_std  = np.sqrt(np.maximum(mean(ring[3, ipol].sum(axis=-1)) - m_mean**2, 0.))
 
         valid = N >= ndata_min
+        if ring.shape[-1] == 95:
+            N_inner = ring[4, ipol, :, :, i_center-15:i_center+16].sum(axis=-1)
+            valid  &= N_inner >= ndata_min / 2.5
         for k, value in enumerate((o_mean, o_std, m_mean, m_std, N)):
             data_out[5*ipol + k] = np.where(valid, value, nodata)
 

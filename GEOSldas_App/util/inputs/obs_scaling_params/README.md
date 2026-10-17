@@ -30,7 +30,10 @@ can be run from any directory (`python run_obs_scaling_params.py --help`).
 For each day of the climatological year, the statistics are computed from all
 obs/forecast pairs (both valid) within a moving window of `--window-days` days
 (default 75) over all years of the period, and stored at the center of the
-window.  Cells/tiles with fewer than `--ndata-min` obs (default 20) get no-data.
+window.  `--window-days` must be an odd number of pentads.  Cells/tiles with
+fewer than `--ndata-min` obs (default 20) get no-data.  `--run-months` (default
+1-12 plus the months needed to wrap the window) must be consecutive months; 12
+may be followed by 1.
 Output goes to `<exp-path>/<exp-run>/output/<domain>/stats/<out-dir>/`
 (`--out-dir` default `z_score_clim`).  The `ldas_obsparam` file is read from
 `rc_out/Y<start>/M<start>/` unless `--obsparam` is given.  The run stops with an
@@ -45,6 +48,12 @@ given with `--species` are combined (`_sp_ALL_` in the file name); use
 73 pentads (`--no-all-pentads` to skip), and optionally one file per pentad
 (`--each-pentad`) or per DOY (`--each-doy`).  `--exclude-tiles-csv` drops obs at
 tiles flagged in a CSV file (columns `tilenum` and, by default, `reject`).
+`--grid-resolution` (default 0.25 deg) must divide 180 and 360.
+
+Memory: the moving-window sums and the all-pentads output are held in memory for
+the whole global grid.  At 0.25 deg with the default 75-day window this is about
+8 GiB for the combined species, and about 8 GiB per species with
+`--no-combine-species`.
 
 ```bash
 python run_obs_scaling_params.py --method latlon \
@@ -59,9 +68,10 @@ python run_obs_scaling_params.py --method latlon \
 Selects one H-pol and one V-pol Tb species per angle (`--angles`, default 40)
 for the orbit (`--orbit A|D`) whose descr contains `--descr-contains` (default
 `SMAP_L1C`).  Statistics are computed on EASEv2 M36 "administering" tiles, or on
-all model tiles with `--no-convert-grid`.  One file per pentad (and optionally
-per DOY) in the big-endian Fortran sequential format that GEOSldas and
-`read_Tb_scale_param.py` read.
+all model tiles with `--no-convert-grid`.  As in the MATLAB version, a 95-day
+window also requires at least `--ndata-min`/2.5 obs in the 31 days at its
+center.  One file per pentad (and optionally per DOY) in the big-endian Fortran
+sequential format that GEOSldas and `read_Tb_scale_param.py` read.
 
 ```bash
 python run_obs_scaling_params.py --method tb \

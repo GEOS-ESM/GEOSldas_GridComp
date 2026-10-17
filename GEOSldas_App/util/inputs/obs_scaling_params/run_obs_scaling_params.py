@@ -97,6 +97,24 @@ def parse_args(argv=None):
         p.error(f'--run-months must be comma-separated integers, not {args.run_months}')
     if any(m < 1 or m > 12 for m in args.run_months):
         p.error(f'--run-months must be between 1 and 12: {args.run_months}')
+    # the moving window treats the days of run_months as consecutive days
+    if any(m2 != m1 % 12 + 1 for m1, m2 in zip(args.run_months, args.run_months[1:])):
+        p.error(f'--run-months must be consecutive (12 may be followed by 1): {args.run_months}')
+
+    if args.window_days < 5 or args.window_days % 5 or args.window_days % 10 == 0:
+        p.error(f'--window-days must be an odd number of pentads (for example, 75), not {args.window_days}')
+    if args.ndata_min < 1:
+        p.error(f'--ndata-min must be at least 1, not {args.ndata_min}')
+    if args.dt_assim <= 0 or 86400 % args.dt_assim:
+        p.error(f'--dt-assim must be a positive divisor of 86400, not {args.dt_assim}')
+    if args.t0_assim < 0:
+        p.error(f'--t0-assim must not be negative, not {args.t0_assim}')
+
+    # grid cells must tile the globe exactly, or obs near 180E/90N fall outside the grid
+    res = args.grid_resolution
+    if not (np.isfinite(res) and res > 0. and
+            all(abs(x / res - round(x / res)) < 1e-6 for x in (180., 360.))):
+        p.error(f'--grid-resolution must be positive and divide 180 and 360 (for example, 0.25), not {res}')
 
     args.species = split_list(args.species)
     if args.method == 'latlon' and not args.species:

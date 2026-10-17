@@ -26,19 +26,20 @@ def get_ObsFcstAna_fname(inpath, exp_run, year, month, day, hour, minute):
     return (inpath + '/ana/ens_avg/Y' + f'{year:04d}' + '/M' + f'{month:02d}' + '/' + exp_run +
             '.ens_avg.ldas_ObsFcstAna.' + f'{year:04d}{month:02d}{day:02d}_{hour:02d}{minute:02d}z.nc4')
 
-def count_ObsFcstAna_files(inpath, exp_run, run_months, first_year, last_year, cycles):
+def any_ObsFcstAna_file(inpath, exp_run, run_months, first_year, last_year, cycles):
 
-    # number of ObsFcstAna files that exist for run_months, years and cycles (seconds of day)
+    # True if an ObsFcstAna file exists for run_months, years and cycles (seconds of day);
+    # stops at the first file found
 
-    n = 0
     for imonth, month in enumerate(run_months):
         for day in range(1, days_in_month[month-1] + 1):
             for seconds in cycles:
                 for year in range(first_year[imonth], last_year[imonth] + 1):
                     fname = get_ObsFcstAna_fname(inpath, exp_run, year, month, day,
                                                  seconds // 3600, (seconds % 3600) // 60)
-                    n += os.path.exists(fname)
-    return n
+                    if os.path.exists(fname):
+                        return True
+    return False
 
 def get_year_bounds(run_months, start_year, start_month, end_year, end_month):
 

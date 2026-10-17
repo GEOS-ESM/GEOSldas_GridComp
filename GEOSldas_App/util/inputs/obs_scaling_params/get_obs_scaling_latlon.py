@@ -25,7 +25,7 @@ from netCDF4           import Dataset
 
 from read_GEOSldas      import read_ObsFcstAna_nc4
 from obs_scaling_utils import get_ObsFcstAna_fname, get_doy_pentad_range
-from obs_scaling_utils import days_in_month, days_since_1950, count_ObsFcstAna_files
+from obs_scaling_utils import days_in_month, days_since_1950, any_ObsFcstAna_file
 
 n_fields  = 7      # o_mean, o_std, m_mean, m_std, n_data, m_min, m_max
 n_pentads = 73
@@ -55,8 +55,7 @@ def get_obs_scaling_latlon(exp_path, exp_run, domain, species, species_names, co
     t0_assim = t0_assim % dt_assim
     cycles   = range(t0_assim, 86400, dt_assim)
 
-    n_files = count_ObsFcstAna_files(inpath, exp_run, run_months, first_year, last_year, cycles)
-    if n_files == 0:
+    if not any_ObsFcstAna_file(inpath, exp_run, run_months, first_year, last_year, cycles):
         raise ValueError(f'no ObsFcstAna files for the requested period in {inpath}/ana/ens_avg')
 
     # global lat/lon grid; grid cell index = j*n_lon + i  (i: lon index, j: lat index)
@@ -280,8 +279,12 @@ def write_latlon_nc4(fname, data, pentads, start_time, end_time, grid):
         var[:] = pentads
         var.setncatts({'standard_name': 'pentad', 'long_name': 'pentad', 'units': '1', 'axis': 'T'})
 
-        ncid.createVariable('start_time', 'f8', ('pentad',))[:] = days_since_1950(start_time)
-        ncid.createVariable('end_time',   'f8', ('pentad',))[:] = days_since_1950(end_time)
+        for name, times in (('start_time', start_time), ('end_time', end_time)):
+            long_name = name.replace('_', ' ')
+            var = ncid.createVariable(name, 'f8', ('pentad',))
+            var[:] = days_since_1950(times)
+            var.setncatts({'standard_name': long_name, 'long_name': long_name, 'axis': 'T',
+                           'units': 'days since 1950-01-01 00:00:00.0 +0000'})
 
         obs_units   = 'Degree of saturation (0-1)'
         model_units = 'Surface soil moisture (m^3 m^-3)'
