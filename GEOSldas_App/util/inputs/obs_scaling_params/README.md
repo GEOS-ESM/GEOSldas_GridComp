@@ -95,8 +95,8 @@ tiles flagged in a CSV file (columns `tilenum` and, by default, `reject`).
 
 Memory: the moving-window sums and the all-pentads output are held in memory for
 the whole global grid.  At 0.25 deg with the default 75-day window, the peak
-memory use for the combined species is about 9.5 GB (measured on Discover,
-Oct 2026).  `--no-combine-species` needs about 8.5 GB more for each additional
+memory use for the combined species is about 9 GiB (measured on Discover,
+Oct 2026).  `--no-combine-species` needs about 8 GiB more for each additional
 species.
 
 ```bash
@@ -117,6 +117,12 @@ obs is not on an output tile, if a tile has more than one obs of a species in a
 file, or if the lat/lon of an obs is not close to that of its tile.  One file
 per pentad (and optionally per DOY) in the big-endian Fortran
 sequential format that GEOSldas and `read_Tb_scale_param.py` read.
+
+Memory: the moving-window sums are held in memory for all output tiles, so the
+memory use grows with the number of output tiles, angles and `--window-days`.
+With `--no-convert-grid` on all tiles of a CF0360 domain and one angle, the peak
+memory use is about 14 GiB for a 75-day window and 18 GiB for a 95-day window
+(measured on Discover, Oct 2026).
 
 ```bash
 python run_obs_scaling_params.py --method tb \
