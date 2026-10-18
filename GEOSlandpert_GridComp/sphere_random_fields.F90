@@ -2,7 +2,9 @@
 ! sphere_random_fields.F90
 !
 ! Module for generating isotropic Gaussian random fields directly on the
-! sphere using the SMERFS library (Creasey & Lang 2018).
+! sphere using the SMERFS/Markov construction (Creasey & Lang 2018).
+! Candidate initialization replacement: Riccati logarithmic derivatives.
+! The benchmark's MT/Ziggurat path still depends on the supplied SMERFS library.
 !
 ! Parallel strategy (m-mode distribution):
 !
@@ -16,8 +18,8 @@
 !     m-mode strip j_lo:j_hi and writes the result directly into shared
 !     MPI windows holding all_innov / all_trans.  An MPI_Win_fence then
 !     makes the complete filter visible to every rank.  No broadcast of the
-!     filter tables is needed, and the expensive hypergeometric evaluations
-!     are never duplicated.
+!     filter tables is needed. Covariance integration is distributed within
+!     each node (the full construction is repeated on other nodes).
 !
 !   draw_sphere_realisation:
 !     Each rank walks the Kalman filter for its strip j_lo:j_hi of m-modes
@@ -55,7 +57,8 @@ module sphere_random_fields_mod
                                            c_sizeof
   use mpi
   use nr_ran2_gasdev, only: NRANDSEED, nr_ran2_2d, nr_gasdev
-  use smerfs_interface, only: update_cov_range_f, state_space_f, hyp_llp1_f, zigg_f
+  use smerfs_interface, only: zigg_f
+  use sphere_riccati_init_mod, only: riccati_mode_filter, calibrate_spherical_c2, spherical_mode_cutoff
 #ifdef MKL_AVAILABLE
   use MKL_DFTI
 #endif
@@ -66,10 +69,13 @@ module sphere_random_fields_mod
   public :: sphere_random_fields
   public :: sphere_random_fields_id
 
-  ! Filter order.  The state vector is (g_m, g_m') and the covariance comes
-  ! from the partial-fraction decomposition of the power spectrum via the
-  ! Gauss hypergeometric function, so MORD is always 2.
+  ! Filter order for the quadratic-in-Laplacian inverse spectrum.
+  ! State: [g_m, (1-z*z)*dg_m/dz/kappa_m]. The Riccati initializer
+  ! consistently scales the derivative; latitude reflection still flips its sign.
   integer, parameter :: MORD = 2
+  ! Upper bound on omitted continuous-spectrum point variance (0.1%).
+  ! This controls positive-m cutoff, independently of the output FFT size.
+  real(c_double), parameter :: MODE_TAIL_TOL = 1.0d-3
 
   ! -----------------------------------------------------------------------
   !
@@ -85,7 +91,7 @@ module sphere_random_fields_mod
     ! Grid dimensions
     integer :: nz       = 0   ! total iso-latitude rings  (S.pole to N.pole)
     integer :: nphi     = 0   ! phi points per ring
-    integer :: n_m      = 0   ! nphi/2 + 1  (half-spectrum width)
+    integer :: n_m      = 0   ! positive Fourier modes, including aliases
     integer :: uhalf    = 0   ! nz/2 + 1    (upper hemisphere ring count)
 
     ! Power-spectrum coefficients:  C_l = 1 / (c0 + c2*(l*(l+1))^2)
@@ -120,7 +126,7 @@ module sphere_random_fields_mod
 #ifdef MKL_AVAILABLE
     ! MKL DFTI descriptor for the batched 1-D real backward FFT.
     ! One descriptor per rank, created once in build_sphere_filter.
-    ! Transform: complex CCE half-spectrum (n_m) -> real (nphi),
+    ! Transform: folded complex CCE spectrum (n_fft) -> real (nphi),
     ! batched over n_row_local rings.
     type(DFTI_DESCRIPTOR), pointer :: dfti_irfft => null()
 #endif
@@ -178,12 +184,24 @@ contains
     character(len=:), allocatable :: id_string
     integer :: comm_rank, mpierr
 
+    if (present(rc)) rc = 0
     xcorr_deg = real(pert_param%xcorr, c_double)
     ! Sphere perturbations always use the fine grid; no coarsening is applied.
     rf%nphi_sphere = pert_grid_f%N_lon
     rf%nz_sphere = pert_grid_f%N_lat
     id_string = sphere_random_fields_id(pert_param, pert_grid_f)
     rf%ID_string = id_string
+    if (xcorr_deg <= 0.0d0 .and. pert_param%ycorr <= 0.0) then
+      ! land_pert calls generate_white_field for this case. No filter is needed.
+      rf%filter%nphi = rf%nphi_sphere
+      rf%filter%nz = rf%nz_sphere
+      rf%filter%initialized = .true.
+      return
+    end if
+    if (xcorr_deg <= 0.0d0) error stop 'sphere requires positive xcorr for correlated fields'
+    if (rf%nphi_sphere < 4 .or. mod(rf%nphi_sphere,2) /= 0 .or. rf%nz_sphere < 2) &
+      error stop 'sphere requires even N_lon >= 4 and N_lat >= 2'
+
 
     if (present(comm)) then
       call MPI_Comm_rank(comm, comm_rank, mpierr)
@@ -279,10 +297,10 @@ contains
   ! Parallel strategy:
   !   When comm is supplied it is split into node-local communicators, and
   !   node_comm is stored in sf for reuse in draw_sphere_realisation.  Each
-  !   rank then runs the hyp_llp1_f / update_cov_range_f / state_space_f
+  !   rank then runs the Riccati covariance / state-space
   !   chain only for its own m-mode strip and writes directly into the
-  !   shared all_innov / all_trans windows, so the expensive hypergeometric
-  !   evaluations are never duplicated.  A fence makes the complete filter
+  !   shared all_innov / all_trans windows. Integration is not duplicated
+  !   within a node. A fence makes the complete filter
   !   visible to every rank.
   !
   ! Arguments:
@@ -302,8 +320,8 @@ contains
 
     ! --- local variables ------------------------------------------------
 
-    integer :: uhalf, n_m
-    integer :: i, iroot, imode, im_hyp, rc
+    integer :: uhalf, n_m, m_cut, n_fft
+    integer :: i, imode, rc
     integer :: mpierr
     integer :: n_m_build
     integer :: disp_unit
@@ -313,27 +331,9 @@ contains
     real(c_double) :: profile_start, profile_phase
     logical :: profile
 
-    ! Partial fraction decomposition (MORD poles)
-    complex(c_double_complex) :: roots_llp1(MORD)
-    complex(c_double_complex) :: norms_pf(MORD)
-    complex(c_double_complex) :: norm, llp1_val, lam_val, sin_pi_lam
-    real(c_double)            :: llp1_re, llp1_im
-    real(c_double)            :: disc_re, tmp
-
-    ! z-points and twiddle factors
-    real(c_double), allocatable :: tau_p(:,:)     ! (uhalf, 2*MORD-1)
-    real(c_double), allocatable :: eta_ratio(:)   ! (uhalf-1)
-    real(c_double), allocatable :: xvals(:)       ! (uhalf)
-    real(c_double), allocatable :: yvals(:)       ! (uhalf)
-    real(c_double)              :: theta_val
-
-    ! Hypergeometric tables (local m-mode strip plus MORD lookahead columns)
-    complex(c_double_complex), allocatable :: Fmat(:,:)  ! (uhalf, n_m_build+MORD)
-    complex(c_double_complex), allocatable :: Hmat(:,:)  ! (uhalf, n_m_build+MORD)
-
-    ! Covariance arrays (local m-mode strip)
-    real(c_double), allocatable :: cov(:,:,:,:)        ! (MORD,MORD,uhalf,  n_m_build)
-    real(c_double), allocatable :: cross_cov(:,:,:,:)  ! (MORD,MORD,uhalf-1,n_m_build)
+    ! The new initializer returns the same 2-component storage layout.
+    ! State component 2 is a scaled flux derivative, not an unscaled dg/dz.
+    real(c_double) :: theta_val
 
     ! Temporary per-mode state-space arrays
     real(c_double), allocatable :: innov_m(:,:,:)   ! (MORD,MORD,uhalf)
@@ -342,7 +342,10 @@ contains
     ! --------------------------------------------------------------------
 
     uhalf = nz/2 + 1
-    n_m   = nphi/2 + 1
+    n_fft = nphi/2 + 1
+    call spherical_mode_cutoff(c0, c2, MODE_TAIL_TOL, m_cut, rc)
+    if (rc /= 0) error stop 'invalid spherical mode cutoff'
+    n_m = max(n_fft, m_cut+1)
     profile = sphere_profile_enabled()
     profile_start = MPI_Wtime()
 
@@ -433,101 +436,20 @@ contains
       end if
 
       if (n_m_build > 0) then
-        allocate(tau_p   (uhalf,   2*MORD-1))
-        allocate(eta_ratio(uhalf-1))
-        tau_p(:, MORD)   = 1.0d0
-        tau_p(:, MORD+1) = sqrt((1.0d0 - sf%z_pts) / (1.0d0 + sf%z_pts))
-        tau_p(:, MORD-1) = 1.0d0 / tau_p(:, MORD+1)
-        do i = 1, uhalf-1
-          eta_ratio(i) = tau_p(i+1, MORD+1) * tau_p(i, MORD-1)
-        end do
-
-        allocate(xvals(uhalf))
-        allocate(yvals(uhalf))
-        xvals = 0.5d0 * (1.0d0 - sf%z_pts)
-        yvals = 0.5d0 * (1.0d0 + sf%z_pts)
-
-        disc_re = -4.0d0 * c0 * c2
-        if (disc_re >= 0.0d0) then
-          roots_llp1(1) = cmplx( sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
-          roots_llp1(2) = cmplx(-sqrt(disc_re)/(2.0d0*c2), 0.0d0, c_double_complex)
-        else
-          tmp = sqrt(-disc_re) / (2.0d0*c2)
-          roots_llp1(1) = cmplx(0.0d0,  tmp, c_double_complex)
-          roots_llp1(2) = cmplx(0.0d0, -tmp, c_double_complex)
-        end if
-        do iroot = 1, MORD
-          norms_pf(iroot) = 1.0d0 / &
-            (2.0d0 * cmplx(c2, 0.0d0, c_double_complex) * roots_llp1(iroot))
-        end do
-
-        allocate(cov      (MORD, MORD, uhalf,   n_m_build))
-        allocate(cross_cov(MORD, MORD, uhalf-1, n_m_build))
-        allocate(Fmat(uhalf, n_m_build+MORD))
-        allocate(Hmat(uhalf, n_m_build+MORD))
         allocate(innov_m(MORD, MORD, uhalf))
         allocate(trans_m(MORD, MORD, uhalf-1))
-        cov       = 0.0d0
-        cross_cov = 0.0d0
-
-        do iroot = 1, MORD
-          llp1_val = roots_llp1(iroot)
-          llp1_re  = real(llp1_val, c_double)
-          llp1_im  = aimag(llp1_val)
-          norm     = norms_pf(iroot)
-
-          if (llp1_re < -0.25d0) then
-            lam_val = cmplx(-0.5d0, 0.0d0, c_double_complex) + &
-                      cmplx(0.0d0,  1.0d0, c_double_complex) * sqrt(-0.25d0 - llp1_val)
-          else
-            lam_val = cmplx(-0.5d0, 0.0d0, c_double_complex) - &
-                      sqrt(cmplx(0.25d0, 0.0d0, c_double_complex) + llp1_val)
-          end if
-          sin_pi_lam = sin(PI * lam_val)
-          norm = -(0.25d0 / PI) * norm * PI / sin_pi_lam
-
-          do im_hyp = sf%j_lo - 1, sf%j_hi - 1 + MORD
-            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, &
-                            xvals, Fmat(:,im_hyp - (sf%j_lo - 1) + 1), rc)
-            if (rc /= 0) then
-              call hyp_failure_report('F', im_hyp, rc, c0, c2)
-              stop 1
-            end if
-            call hyp_llp1_f(llp1_re, llp1_im, im_hyp, uhalf, &
-                            yvals, Hmat(:,im_hyp - (sf%j_lo - 1) + 1), rc)
-            if (rc /= 0) then
-              call hyp_failure_report('H', im_hyp, rc, c0, c2)
-              stop 1
-            end if
-          end do
-
-          call update_cov_range_f(sf%j_lo - 1, sf%j_hi - 1, uhalf, MORD, &
-                                  real(norm,c_double), aimag(norm),      &
-                                  llp1_re, llp1_im,                      &
-                                  Fmat, Hmat, tau_p, eta_ratio,          &
-                                  cov, cross_cov, rc)
-          if (rc /= 0) then
-            write(*,'(a,i0)') 'build_sphere_filter: update_cov_range_f failed, rc=', rc
-            stop 1
-          end if
-        end do
-
         do imode = sf%j_lo - 1, sf%j_hi - 1
-          call state_space_f(uhalf, MORD,                              &
-                             cross_cov(:,:,:,imode - (sf%j_lo - 1) + 1), &
-                             cov(:,:,:,imode - (sf%j_lo - 1) + 1),       &
-                             innov_m, trans_m, rc)
+          call riccati_mode_filter(sf%z_pts, imode, c0, c2, innov_m, trans_m, rc)
           if (rc /= 0) then
             write(*,'(a,i0,a,i0)') &
-              'build_sphere_filter: state_space_f failed at imode=', imode, ', rc=', rc
-            stop 1
+              'build_sphere_filter: Riccati initializer failed at m=', imode, ', rc=', rc
+            if (present(comm)) call MPI_Abort(comm, 1, mpierr)
+            error stop 1
           end if
           sf%all_innov(:,:,:,imode+1) = innov_m
           sf%all_trans(:,:,:,imode+1) = trans_m
         end do
-
-        deallocate(tau_p, eta_ratio, xvals, yvals)
-        deallocate(Fmat, Hmat, cov, cross_cov, innov_m, trans_m)
+        deallocate(innov_m, trans_m)
       end if
 
       if (sf%node_comm /= MPI_COMM_NULL) then
@@ -572,8 +494,8 @@ contains
         end if
         dfti_stat = DftiSetValue(sf%dfti_irfft, &
                                  DFTI_NUMBER_OF_TRANSFORMS, sf%n_row_local)
-        dfti_stat = DftiSetValue(sf%dfti_irfft, DFTI_INPUT_DISTANCE,  n_m)
-        dfti_stat = DftiSetValue(sf%dfti_irfft, DFTI_OUTPUT_DISTANCE, 2*n_m)
+        dfti_stat = DftiSetValue(sf%dfti_irfft, DFTI_INPUT_DISTANCE,  n_fft)
+        dfti_stat = DftiSetValue(sf%dfti_irfft, DFTI_OUTPUT_DISTANCE, 2*n_fft)
         dfti_stat = DftiCommitDescriptor(sf%dfti_irfft)
         if (dfti_stat /= DFTI_NO_ERROR) then
           write(*,'(a,i0)') &
@@ -624,16 +546,18 @@ contains
   !   rfield_out   (out) : real(c_double) field (sf%nphi, sf%nz)
   !                        On return every rank holds the complete field.
 
-  subroutine draw_sphere_realisation(sf, rand_ints, n_rand_got, rfield_out)
+  subroutine draw_sphere_realisation(sf, rand_ints, n_rand_got, rfield_out, rseed)
 
     type(sphere_filter_type),            intent(in)  :: sf
     integer,                             intent(in)  :: n_rand_got
     integer(c_int32_t),                  intent(in)  :: rand_ints(n_rand_got)
     real(c_double),                      intent(out) :: rfield_out(sf%nphi, sf%nz)
+    integer, optional, intent(inout) :: rseed(NRANDSEED)
+    real :: gaussian_pair(2)
 
     ! --- local variables ------------------------------------------------
 
-    integer :: uhalf, n_m, nz, nphi
+    integer :: uhalf, n_m, nz, nphi, n_fft
     integer :: j_lo, j_hi, n_m_local           ! m-mode strip for this rank
     integer :: row_lo, row_hi, n_row_local     ! ring strip for IRFFT (from sf)
     integer :: n_rand_needed_global
@@ -672,6 +596,7 @@ contains
     n_m   = sf%n_m
     nz    = sf%nz
     nphi  = sf%nphi
+    n_fft = nphi/2 + 1
     j_lo  = sf%j_lo
     j_hi  = sf%j_hi
 
@@ -739,13 +664,24 @@ contains
     allocate(fp_fprev (MORD, n_m_local))
 
     profile_phase = MPI_Wtime()
-    if (n_m_local > 0) then
+    ! Production: use the existing restartable NR Gaussian generator directly.
+    ! Draw the same global stream on every rank, including ranks with empty strips.
+    if (present(rseed)) then
+      do nn = 1, n_rand_needed_global, 2
+        call nr_gasdev(rseed, gaussian_pair)
+        noise_real(nn:nn+1) = real(gaussian_pair, c_float)
+      end do
+    else
+      ! Raw full-width MT words are retained only for the benchmark interface.
       call zigg_f(n_rand_needed_global, n_rand_got, rand_ints, noise_real, rc)
       if (rc /= 0) then
-        write(*,'(a,i0,a)') &
-          'WARNING draw_sphere_realisation: zigg exhausted, ', rc, ' samples missing'
+        write(*,'(a,i0)') 'draw_sphere_realisation: Gaussian stream exhausted, rc=', rc
+        if (parallel) call MPI_Abort(sf%node_comm, 1, mpierr)
+        error stop 1
       end if
+    end if
 
+    if (n_m_local > 0) then
       ! Pack into complex noise: noise(ip, jlocal, i) = (re + i*im) / sqrt(2)
       ! Loop over all nz rings so south-hemisphere indices (uhalf+1..nz)
       ! are filled from the same noise stream as the reference Python code.
@@ -847,21 +783,21 @@ contains
         ! In-place real backward FFT using the pre-built descriptor.
         ! The work buffer holds n_row_local rings, each padded to 2*n_m
         ! real(c_float) elements (= n_m complex elements).
-        ! MKL reads the complex half-spectrum from the first n_m complex
-        ! positions (= 2*n_m reals) and writes the real output (nphi reals)
+        ! MKL reads the folded half-spectrum from the first n_fft complex
+        ! positions (= 2*n_fft reals) and writes the real output (nphi reals)
         ! starting at the same address.
-        real(c_float), allocatable, target :: work(:)   ! (2*n_m * n_row_local)
+        real(c_float), allocatable, target :: work(:)   ! (2*n_fft * n_row_local)
         type(c_ptr) :: cptr_w
-        complex(c_float), pointer :: cplx_view(:,:)  ! (n_m, n_row_local)
-        real(c_float),    pointer :: real_view(:,:)   ! (2*n_m, n_row_local)
+        complex(c_float), pointer :: cplx_view(:,:)  ! (n_fft, n_row_local)
+        real(c_float),    pointer :: real_view(:,:)   ! (2*n_fft, n_row_local)
         integer :: dfti_stat, row
 
-        allocate(work(2 * n_m * n_row_local))
+        allocate(work(2 * n_fft * n_row_local))
 
         ! Map complex view onto work buffer, copy half-spectrum in
         cptr_w = c_loc(work(1))
-        call c_f_pointer(cptr_w, cplx_view, [n_m, n_row_local])
-        cplx_view = res_cplx(:, row_lo:row_hi)
+        call c_f_pointer(cptr_w, cplx_view, [n_fft, n_row_local])
+        call fold_fourier_modes(res_cplx(:, row_lo:row_hi), nphi, cplx_view)
 
         ! In-place backward FFT
         dfti_stat = DftiComputeBackward(sf%dfti_irfft, work)
@@ -871,8 +807,8 @@ contains
           stop 1
         end if
 
-        ! Real output occupies first nphi reals of each padded row (stride 2*n_m)
-        call c_f_pointer(cptr_w, real_view, [2*n_m, n_row_local])
+        ! Real output occupies first nphi reals of each padded row (stride 2*n_fft)
+        call c_f_pointer(cptr_w, real_view, [2*n_fft, n_row_local])
         do row = 1, n_row_local
           rfield_win(:, row_lo + row - 1) = real(real_view(1:nphi, row), c_double)
         end do
@@ -882,8 +818,13 @@ contains
     end if
 #else
     if (n_row_local > 0) then
-      call irfft_rows(res_cplx(:, row_lo:row_hi), n_row_local, n_m, nphi, &
-                      rfield_win(:, row_lo:row_hi))
+      block
+        complex(c_float), allocatable :: folded(:,:)
+        allocate(folded(n_fft,n_row_local))
+        call fold_fourier_modes(res_cplx(:,row_lo:row_hi), nphi, folded)
+        call irfft_rows(folded, n_row_local, n_fft, nphi, rfield_win(:,row_lo:row_hi))
+        deallocate(folded)
+      end block
     end if
 #endif
 
@@ -1068,121 +1009,33 @@ contains
   ! Derive SMERFS power-spectrum coefficient c2 from a user-supplied
   ! horizontal correlation length xcorr_deg [degrees].
   !
-  ! xcorr_deg is interpreted as the Gaussian sigma of the covariance, i.e.
-  ! the angle at which C(theta) = C(0) * exp(-0.5).  This matches the
-  ! flat-FFT path in random_fields.F90, where the power spectrum amplitude
-  ! is exp(-0.25*(lx*kx)^2), giving covariance C(r) = exp(-r^2/(2*lx^2))
-  ! and Gaussian sigma = lx = xcorr [in whatever units lx and dx share].
-  !
-  ! The true e-folding distance (where C = C(0)/e) is xcorr_deg * sqrt(2).
-  !
-  ! Uses bisection on the analytic Legendre-series covariance evaluated
-  ! directly at theta=xcorr_rad.  This is much faster than scanning all
-  ! theta values for every bisection step.
+  ! Match the flat-FFT path's correlation LEVEL at the requested distance:
+  ! C(xcorr_deg)/C(0) = exp(-0.5). The rational spherical spectrum is not
+  ! a Gaussian distance kernel, so its full curve and e-folding distance
+  ! must NOT be inferred from a Gaussian formula.
+  ! Calibration uses a grid-independent Legendre sum with a tail bound.
 
   subroutine xcorr_deg_to_c2(xcorr_deg, nz, c2_out)
-
-    real(c_double), intent(in)  :: xcorr_deg
-    integer,        intent(in)  :: nz
+    real(c_double), intent(in) :: xcorr_deg
+    integer, intent(in) :: nz  ! Retained for private-call compatibility, not used in calibration.
     real(c_double), intent(out) :: c2_out
-
-    integer,        parameter :: lmax_mult = 3
-    real(c_double), parameter :: tol_ratio = 1.0d-12
-    integer,        parameter :: max_iter = 80
-
-    integer        :: iter, lmax
-    real(c_double) :: c2_lo, c2_hi, c2_mid, ratio_mid, xcorr_rad, z_target
-
-    xcorr_rad = xcorr_deg * MAPL_DEGREES_TO_RADIANS_R8
-    z_target  = cos(xcorr_rad)
-    lmax      = lmax_mult * nz
-
-    ! Bracket: larger c2 -> smoother spectrum (more low-l power) -> LONGER
-    ! correlation.  So c2_lo gives SHORT correlation, c2_hi gives LONG.
-    !
-    ! c2_lo = 1e-12 -> Gaussian sigma ~ 0.1 deg  (very short)
-    ! c2_hi = 1e+2  -> Gaussian sigma ~ 127 deg  (nearly uniform)
-    c2_lo = 1.0d-12
-    c2_hi = 1.0d2
-
-    if (compute_corr_ratio(c2_lo, lmax, z_target) > exp(-0.5d0)) then
-      write(*,'(a,f8.3,a)') 'xcorr_deg_to_c2: xcorr=', xcorr_deg, &
-        ' deg is very small; using c2_lo'
-      c2_out = c2_lo ; return
+    integer :: rc_local, mpierr
+    call calibrate_spherical_c2(xcorr_deg, 1.0d0, c2_out, rc_local)
+    if (rc_local /= 0) then
+      write(*,'(a,f12.6,a,i0)') 'xcorr calibration failed: ', xcorr_deg, ', rc=', rc_local
+      call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
+      error stop 1
     end if
-    if (compute_corr_ratio(c2_hi, lmax, z_target) < exp(-0.5d0)) then
-      write(*,'(a,f8.3,a)') 'xcorr_deg_to_c2: xcorr=', xcorr_deg, &
-        ' deg is very large; using c2_hi'
-      c2_out = c2_hi ; return
-    end if
-
-    ! Bisection: ratio_mid > exp(-0.5) means c2_mid gives too long a scale,
-    ! so move the upper bracket down.
-    c2_mid = c2_lo
-    do iter = 1, max_iter
-      c2_mid    = 0.5d0 * (c2_lo + c2_hi)
-      ratio_mid = compute_corr_ratio(c2_mid, lmax, z_target)
-      if (abs(ratio_mid - exp(-0.5d0)) < tol_ratio) exit
-      if (ratio_mid > exp(-0.5d0)) then
-        c2_hi = c2_mid   ! c2_mid gives too long a scale; reduce c2
-      else
-        c2_lo = c2_mid   ! c2_mid gives too short a scale; increase c2
-      end if
-    end do
-    c2_out = c2_mid
-
-  contains
-
-    real(c_double) function compute_corr_ratio(c2_val, lmax_in, z)
-      real(c_double), intent(in) :: c2_val
-      integer,        intent(in) :: lmax_in
-      real(c_double), intent(in) :: z
-      real(c_double), parameter  :: inv4pi = 0.25d0 / PI
-
-      real(c_double) :: C0_z1, C_z, C_l_val, llp1, P0, P1, P2
-      integer        :: l
-
-      C0_z1 = 0.0d0
-      C_z = 0.0d0 ; P0 = 1.0d0 ; P1 = z
-      do l = 0, lmax_in
-        llp1    = real(l,c_double) * real(l+1,c_double)
-        C_l_val = 1.0d0 / (1.0d0 + c2_val * llp1**2)
-        C0_z1   = C0_z1 + real(2*l+1,c_double) * C_l_val * inv4pi
-        if (l == 0) then
-          C_z = C_z + C_l_val * inv4pi
-        else if (l == 1) then
-          C_z = C_z + C_l_val * 3.0d0 * z * inv4pi
-        else
-          P2 = (real(2*l-1,c_double)*z*P1 - real(l-1,c_double)*P0) / real(l,c_double)
-          C_z = C_z + C_l_val * real(2*l+1,c_double) * P2 * inv4pi
-          P0 = P1 ; P1 = P2
-        end if
-      end do
-      compute_corr_ratio = C_z / C0_z1
-    end function compute_corr_ratio
-
   end subroutine xcorr_deg_to_c2
 
   subroutine generate_2d_random_field_sphere(this, rseed, rfield, rfield2, lx, ly, dx, dy)
     type(sphere_filter_type), intent(in) :: this
     integer, intent(inout) :: rseed(NRANDSEED)
-    real(c_double), intent(out) :: rfield(this%nphi, this%nz)
-    real(c_double), intent(out) :: rfield2(this%nphi, this%nz)
+    real(c_double), intent(out) :: rfield(this%nphi, this%nz), rfield2(this%nphi, this%nz)
     real, intent(in) :: lx, ly, dx, dy
-    integer(c_int32_t), allocatable :: ints(:)
-    real, allocatable :: uniforms(:)
-    integer :: n_needed, n_got
-
-    n_needed = this%nz * MORD * this%n_m * 2
-    n_got = n_needed + n_needed/32 + 64
-    allocate(ints(n_got), uniforms(n_got))
-    call nr_ran2_2d(1, n_got, rseed, uniforms)
-    ints = int(uniforms * 2147483647.0, c_int32_t)
-    call draw_sphere_realisation(this, ints, n_got, rfield)
-    call nr_ran2_2d(1, n_got, rseed, uniforms)
-    ints = int(uniforms * 2147483647.0, c_int32_t)
-    call draw_sphere_realisation(this, ints, n_got, rfield2)
-    deallocate(ints, uniforms)
+    integer(c_int32_t) :: unused_ints(1) = 0
+    call draw_sphere_realisation(this, unused_ints, 1, rfield, rseed=rseed)
+    call draw_sphere_realisation(this, unused_ints, 1, rfield2, rseed=rseed)
   end subroutine generate_2d_random_field_sphere
 
   ! Generate a field using the raw MT19937 stream used by numpy's
@@ -1344,47 +1197,6 @@ contains
   end subroutine sphere_profile_report
 
   ! ======================================================================
-  !
-  ! hyp_failure_report
-  !
-  ! Explain a non-zero rc from hyp_llp1_f.  rc=2 means the Gauss
-  ! hypergeometric series lost too much significance to cancellation,
-  ! which happens when |lambda| ~ sqrt(sqrt(c0/c2)) grows beyond what the
-  ! long double mantissa can absorb -- i.e. the requested correlation
-  ! length is too short for this method, not a coding error.
-
-  subroutine hyp_failure_report(which, m, rc, c0, c2)
-    character(len=*), intent(in) :: which
-    integer,        intent(in) :: m, rc
-    real(c_double), intent(in) :: c0, c2
-
-    real(c_double) :: R, lam_abs
-
-    R = 0.0d0
-    if (c2 > 0.0d0) R = sqrt(c0 / c2)
-    lam_abs = sqrt(max(R, 0.0d0))
-
-    write(*,'(a,a,a,i0,a,i0)') &
-      'build_sphere_filter: hyp_llp1_f ', trim(which), &
-      ' failed at m=', m, ', rc=', rc
-    if (rc == 2) then
-      write(*,'(a)') &
-        '  Cause: loss of significance in the 2F1 series (too much cancellation).'
-      write(*,'(a,es12.4,a,f8.2)') &
-        '  sqrt(c0/c2) =', R, '   |lambda| ~', lam_abs
-      write(*,'(a)') &
-        '  The requested correlation length is too short for the long double'
-      write(*,'(a)') &
-        '  hypergeometric kernels (usable to xcorr ~ 0.8-1.0 deg on a 0.25-deg grid).'
-      write(*,'(a)') &
-        '  Increase xcorr, or widen the kernels to __float128 (see smerfs.c header).'
-    else if (rc == 1) then
-      write(*,'(a)') &
-        '  Cause: series failed to converge within MAX_ITERATIONS.'
-    end if
-  end subroutine hyp_failure_report
-
-  ! ======================================================================
   ! Private: native ring z coordinate
 
   real(c_double) function ring_z(k, sf)
@@ -1394,9 +1206,35 @@ contains
     if (k <= sf%uhalf) then
       ring_z = sf%z_pts(sf%uhalf + 1 - k)
     else
-      ring_z = -sf%z_pts(k - sf%uhalf + 1)
+      ring_z = -sf%z_pts(k - sf%uhalf + 1 + (1 - mod(sf%nz,2)))
     end if
   end function ring_z
+
+  ! Fold positive Fourier modes into the real-FFT bins. Each rank owns
+  ! disjoint output rows, so alias additions require no shared-bin reduction.
+  ! Implements g0 + 2*Re(sum_(m>=1) g_m*exp(i*m*phi)) at output longitudes.
+  subroutine fold_fourier_modes(full, nphi, folded)
+    integer, intent(in) :: nphi
+    complex(c_float), intent(in) :: full(:,:)
+    complex(c_float), intent(out) :: folded(nphi/2+1,size(full,2))
+    integer :: row,m,k
+    folded=cmplx(0.0,0.0,c_float)
+    do row=1,size(full,2)
+      folded(1,row)=cmplx(real(full(1,row)),0.0,c_float)
+      do m=1,size(full,1)-1
+        k=modulo(m,nphi)
+        if(k==0) then
+          folded(1,row)=folded(1,row)+cmplx(2.0*real(full(m+1,row)),0.0,c_float)
+        else if(k==nphi/2) then
+          folded(nphi/2+1,row)=folded(nphi/2+1,row)+cmplx(2.0*real(full(m+1,row)),0.0,c_float)
+        else if(k<nphi/2) then
+          folded(k+1,row)=folded(k+1,row)+full(m+1,row)
+        else
+          folded(nphi-k+1,row)=folded(nphi-k+1,row)+conjg(full(m+1,row))
+        end if
+      end do
+    end do
+  end subroutine fold_fourier_modes
 
   ! ======================================================================
   ! Private: irfft_rows
