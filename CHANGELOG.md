@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added comment to clarify the selection of the tile file ( nc4 or acsii)
 - Added minimum-distance (25 km) thinning of H-SAF ASCAT soil moisture obs (not 0-diff for H-SAF obs).
+- Added Python version of obs scaling scripts.
 
 ### Changed
 - Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files.
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made observation perturbation grid-cell lookup independent of the EnKF analysis layout.
 - Fixed update type 12 incorrectly skipping valid soil-moisture analyses when snow-cover observations are not assimilated.
 - Fixed bugs in MATLAB obs scaling scripts (not 0-diff for lat/lon grid).
+- Fixed string and no-data obs handling in read_GEOSldas.py.
 
 ### Removed
 - Removed obsolete check on SMOS/SMAP obs locations w.r.t. EASEv2_M09/M36 tiles.
