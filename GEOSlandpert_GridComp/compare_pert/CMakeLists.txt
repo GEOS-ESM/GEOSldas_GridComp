@@ -2,7 +2,7 @@
 # compare_pert/CMakeLists.txt
 #
 # Builds the MPI comparison program for flat lat-lon FFT and sphere-native
-# SMERFS perturbations on a 360x180 grid.
+# perturbations. Grid dimensions are specified in each Fortran driver.
 #
 # Executable:
 #   compare_pert.x      - runs both perturbation paths and writes binary output
@@ -11,7 +11,9 @@
 #   compare_pert.py     - reads both .bin outputs, produces comparison figure
 #
 # Both executables link against GEOSlandpert_GridComp, which transitively
-# carries MAPL, ESMF, MKL, smerfs_f, MPI, netCDF, and HDF5.
+# carries MAPL, ESMF, optional MKL, MPI, netCDF, and HDF5.
+# Both supplied drivers use the production NR random-field interface; neither
+# requires the optional legacy SMERFS MT/Ziggurat seeded interface.
 # The MKL_AVAILABLE compile definition must be repeated here because the
 # parent library applies it only as PRIVATE.
 # -----------------------------------------------------------------------
