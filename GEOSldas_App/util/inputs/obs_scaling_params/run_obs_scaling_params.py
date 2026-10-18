@@ -33,7 +33,7 @@ import numpy as np
 from datetime import datetime
 
 from read_GEOSldas           import read_obs_param
-from obs_scaling_utils      import get_year_bounds
+from obs_scaling_utils      import get_year_bounds, days_in_month
 from get_obs_scaling_latlon import get_obs_scaling_latlon
 from get_obs_scaling_tb     import get_obs_scaling_tb
 
@@ -103,6 +103,10 @@ def parse_args(argv=None):
 
     if args.window_days < 5 or args.window_days % 5 or args.window_days % 10 == 0:
         p.error(f'--window-days must be an odd number of pentads (for example, 75), not {args.window_days}')
+    # with fewer days than the window, the window is never full and no files are written
+    n_run_days = sum(days_in_month[m-1] for m in args.run_months)
+    if args.run_months and n_run_days < args.window_days:
+        p.error(f'--run-months {args.run_months} have {n_run_days} days, fewer than --window-days {args.window_days}')
     if args.ndata_min < 1:
         p.error(f'--ndata-min must be at least 1, not {args.ndata_min}')
     if args.dt_assim <= 0 or 86400 % args.dt_assim:

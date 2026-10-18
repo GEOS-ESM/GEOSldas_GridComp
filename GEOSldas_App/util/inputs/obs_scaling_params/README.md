@@ -37,7 +37,8 @@ Both versions use the same method.
   set in the `Run_*.m` scripts).  A window is complete only after `w_days`
   days, so the first pass through the first months only fills the window.  The
   second pass gives the windows that are centered in late December to February.
-  `run_months` must be consecutive (12 may be followed by 1).
+  `run_months` must be consecutive (12 may be followed by 1) and have at least
+  `w_days` days.
 - **Years.**  Each month is read only for the years in which it falls within the
   period.  For example, with a period from 2019-02 to 2020-08, January is read
   for 2020 only, September to December for 2019 only, and February to August for
@@ -93,9 +94,10 @@ tiles flagged in a CSV file (columns `tilenum` and, by default, `reject`).
 `--grid-resolution` (default 0.25 deg) must divide 180 and 360.
 
 Memory: the moving-window sums and the all-pentads output are held in memory for
-the whole global grid.  At 0.25 deg with the default 75-day window this is about
-8 GiB for the combined species, and about 8 GiB per species with
-`--no-combine-species`.
+the whole global grid.  At 0.25 deg with the default 75-day window, the peak
+memory use for the combined species is about 9.5 GB (measured on Discover,
+Oct 2026).  `--no-combine-species` needs about 8.5 GB more for each additional
+species.
 
 ```bash
 python run_obs_scaling_params.py --method latlon \
