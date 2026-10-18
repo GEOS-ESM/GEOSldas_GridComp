@@ -11,7 +11,8 @@ program compare_pert
   integer, parameter :: N_LON = 720, N_LAT = 360
   real, parameter :: DLON = 360.0 / real(N_LON), DLAT = 180.0 / real(N_LAT)
   real, parameter :: DEFAULT_XCORR = 2.0
-  integer, parameter :: RSEED0 = -777
+  integer :: RSEED0 = -777
+  integer :: seed_ios
   integer :: mpierr, rank, npes
   integer :: seed_template(NRANDSEED)
   real :: xcorr
@@ -29,8 +30,20 @@ program compare_pert
       call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
     end if
   end if
+  ! Optional second argument: random seed
+  argument = ''
+  call get_command_argument(2, argument)
+  if (len_trim(argument) > 0) then
+    read(argument, *, iostat=seed_ios) RSEED0
+    if (seed_ios /= 0 .or. RSEED0 >= 0) then
+      if (rank == 0) write(*,'(a)') &
+        'Usage: compare_pert.x [positive_xcorr_degrees] [negative_seed]'
+      call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
+    end if
+  end if  
   if (rank == 0) write(*,'(a,i0)') '=== compare_pert, MPI ranks: ', npes
   if (rank == 0) write(*,'(a,f6.2)') '=== xcorr/ycorr (degrees): ', xcorr
+  if (rank == 0) write(*,'(a,i0)') '=== random seed: ', RSEED0
 
   ! Initialize one RNG state and give an identical copy to each case.  The
   ! generators consume different numbers of variates internally, so they
