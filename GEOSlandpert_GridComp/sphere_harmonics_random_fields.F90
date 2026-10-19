@@ -2,13 +2,11 @@
 ! sphere_harmonics_random_fields.F90
 !
 ! Isotropic Gaussian random fields on the sphere by direct spherical-
-! harmonic (SH) synthesis, with the same power spectrum as the SMERFS
-! implementation in sphere_random_fields.F90:
+! harmonic (SH) synthesis, with power spectrum
 !
 !     C_l = 1 / (c0 + c2 * (l(l+1))^2),   c0 = 1,
 !
-! c2 calibrated from xcorr (Gaussian sigma, degrees) exactly as in
-! sphere_random_fields::xcorr_deg_to_c2.
+! c2 calibrated from xcorr (Gaussian sigma, degrees) by xcorr_deg_to_c2.
 !
 ! Synthesis on the regular lat-lon grid (ring centres theta_j=(j-0.5)*pi/nlat):
 !
@@ -26,7 +24,7 @@
 ! every rank) so the result is independent of the number of ranks and the
 ! rseed is advanced identically everywhere.
 !
-! Public interface (mirrors sphere_random_fields_mod):
+! Public interface:
 !   sphere_harmonics_random_fields    - abstract_random_fields implementation
 !   sphere_harmonics_random_fields_id - cache key for the land_pert generator map
 !
@@ -106,7 +104,7 @@ contains
   end function sphere_harmonics_random_fields_id
 
   ! ----------------------------------------------------------------------
-  ! Constructor.  Same arguments as sphere_random_fields(); the optional
+  ! Constructor.  The optional
   ! use_table (default .false.) selects the precomputed Legendre table
   ! (memory ~ 2*nlat^3 bytes in total) instead of on-the-fly recursion.
   ! The table is not faster: the 4-column DGEMM is memory-bound, so
@@ -563,7 +561,7 @@ contains
   end subroutine normalize_unit_variance
 
   ! ======================================================================
-  ! xcorr_deg_to_c2: identical calibration to sphere_random_fields.
+  ! xcorr_deg_to_c2: calibrate c2 from xcorr.
   ! xcorr is the Gaussian sigma: C(xcorr)/C(0) = exp(-0.5).
 
   subroutine xcorr_deg_to_c2(xcorr_deg, nz, c2_out)

@@ -3,7 +3,7 @@ program compare_pert
   use, intrinsic :: iso_c_binding, only: c_double
   use nr_ran2_gasdev, only: NRANDSEED, init_randseed
   use rectangle_random_fieldsMod, only: rectangle_random_fields
-  use sphere_random_fields_mod, only: sphere_random_fields
+  use sphere_harmonics_random_fields_mod, only: sphere_harmonics_random_fields
   use LDAS_PertTypes, only: pert_param_type
   use LDAS_TileCoordType, only: grid_def_type
   implicit none
@@ -92,7 +92,7 @@ contains
     integer :: rseed(NRANDSEED)
     real :: rfield(N_LON,N_LAT), rfield2(N_LON,N_LAT)
     real(c_double) :: t0, t_build, t_draw
-    type(sphere_random_fields) :: sf
+    type(sphere_harmonics_random_fields) :: sf
     type(pert_param_type) :: pp
     type(grid_def_type) :: grid
 
@@ -103,7 +103,7 @@ contains
     rseed = seed_template
 
     call MPI_Barrier(comm, mpierr); t0 = MPI_Wtime()
-    sf = sphere_random_fields(pp, grid, comm=comm)
+    sf = sphere_harmonics_random_fields(pp, grid, comm=comm)
     call MPI_Barrier(comm, mpierr); t_build = MPI_Wtime() - t0
     call MPI_Barrier(comm, mpierr); t0 = MPI_Wtime()
     call sf%generate_2d_Random_field(rseed, rfield, rfield2, xcorr, xcorr, DLON, DLAT)

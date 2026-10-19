@@ -4,7 +4,7 @@ program pert_statistics
   use nr_ran2_gasdev, only: NRANDSEED
   use abstract_random_fieldsMod, only: abstract_random_fields
   use rectangle_random_fieldsMod, only: rectangle_random_fields
-  use sphere_random_fields_mod, only: sphere_random_fields
+  use sphere_harmonics_random_fields_mod, only: sphere_harmonics_random_fields
   use LDAS_PertTypes, only: pert_param_type
   use LDAS_TileCoordType, only: grid_def_type
   implicit none
@@ -23,7 +23,7 @@ program pert_statistics
   type(pert_param_type) :: pp
   type(grid_def_type) :: grid
   type(rectangle_random_fields) :: rf
-  type(sphere_random_fields) :: sf
+  type(sphere_harmonics_random_fields) :: sf
 
   comm = MPI_COMM_WORLD
   call MPI_Init(mpierr)
@@ -54,8 +54,8 @@ program pert_statistics
      call estimate_xcorr(rf, 'rectangle_random_fields', icase * 10000, TARGET_XCORR(icase))
      call rf%finalize()
 
-     sf = sphere_random_fields(pp, grid, comm=comm)
-     call estimate_xcorr(sf, 'sphere_random_fields', 500000 + icase * 10000, TARGET_XCORR(icase))
+     sf = sphere_harmonics_random_fields(pp, grid, comm=comm)
+     call estimate_xcorr(sf, 'sphere_harmonics_random_fields', 500000 + icase * 10000, TARGET_XCORR(icase))
      call sf%finalize()
   end do
 

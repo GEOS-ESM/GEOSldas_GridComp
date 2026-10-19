@@ -1,8 +1,8 @@
 # -----------------------------------------------------------------------
 # compare_pert/CMakeLists.txt
 #
-# Builds the MPI comparison program for flat lat-lon FFT and sphere-native
-# SMERFS perturbations on a 360x180 grid.
+# Builds the MPI comparison program for flat lat-lon FFT and sphere harmonics
+# perturbations on a 360x180 grid.
 #
 # Executable:
 #   compare_pert.x      - runs both perturbation paths and writes binary output
@@ -11,7 +11,7 @@
 #   compare_pert.py     - reads both .bin outputs, produces comparison figure
 #
 # Both executables link against GEOSlandpert_GridComp, which transitively
-# carries MAPL, ESMF, MKL, smerfs_f, MPI, netCDF, and HDF5.
+# carries MAPL, ESMF, MKL, MPI, netCDF, and HDF5.
 # The MKL_AVAILABLE compile definition must be repeated here because the
 # parent library applies it only as PRIVATE.
 # -----------------------------------------------------------------------
@@ -25,11 +25,6 @@ ecbuild_add_executable(
 ecbuild_add_executable(
   TARGET  pert_statistics.x
   SOURCES pert_statistics.F90
-  LIBS    GEOSlandpert_GridComp MAPL)
-
-ecbuild_add_executable(
-  TARGET  sh_vs_smerfs.x
-  SOURCES sh_vs_smerfs.F90
   LIBS    GEOSlandpert_GridComp MAPL)
 
 ecbuild_add_executable(

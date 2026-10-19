@@ -2,17 +2,15 @@ esma_set_this ()
 
 set (SRCS
   nr_ran2_gasdev.F90 nr_jacobi.F90 nr_fft.F90
-  abstract_random_fields.F90 rectangle_random_fields.F90 sphere_random_fields.F90
+  abstract_random_fields.F90 rectangle_random_fields.F90
   sphere_harmonics_random_fields.F90
   land_pert.F90 force_and_cat_progn_pert_types.F90 LDAS_PertRoutines.F90
   GEOS_LandPertGridComp.F90
   )
 
-esma_add_subdirectory(@smerfs)
-
 esma_add_library (${this}
   SRCS ${SRCS}
-  DEPENDENCIES GEOS_LdasShared GEOSensavg_GridComp GEOSland_GridComp MAPL smerfs_f ${MKL_LIBRARIES}
+  DEPENDENCIES GEOS_LdasShared GEOSensavg_GridComp GEOSland_GridComp MAPL ${MKL_LIBRARIES}
   INCLUDES ${INC_ESMF} ${MKL_INCLUDE_DIRS})
 
 # Enable MKL paths only when MKL was detected and the compiler supports it.
