@@ -1,8 +1,8 @@
 # -----------------------------------------------------------------------
 # compare_pert/CMakeLists.txt
 #
-# Builds the MPI comparison program for flat lat-lon FFT and sphere harmonics
-# perturbations on a 360x180 grid.
+# Builds the MPI comparison program for rectangle_random_fields (flat FFT)
+# and sphere_random_fields (spherical harmonics) on a global lat-lon grid.
 #
 # Executable:
 #   compare_pert.x      - runs both perturbation paths and writes binary output
@@ -47,5 +47,5 @@ endif ()
 
 # ---- Install Python comparison script ----------------------------------
 install(
-  PROGRAMS compare_pert.py plot_sh_vs_rectangle.py
+  PROGRAMS compare_pert.py plot_timing.py run_compare.sh plot_sh_vs_rectangle.py
   DESTINATION bin)
