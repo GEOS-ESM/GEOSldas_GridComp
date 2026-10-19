@@ -103,7 +103,8 @@ progn_pert_dtstep = 10800  ! time step for generation of AR(1) prognostics perts
 
 force_pert_dtstep = 10800  ! time step for generation of AR(1) forcing perts     [s]
 
-! use spherical random fields for both forcing and prognostic perturbations?
+! use sphere_random_fields (.true.) or rectangle_random_fields (.false.)
+! for forcing, prognostic, and observation perturbations
 use_sphere_pert = .false.
 
 ! ---------------------------------------------------------------------

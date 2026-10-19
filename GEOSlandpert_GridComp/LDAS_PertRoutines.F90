@@ -110,6 +110,7 @@ module LDAS_PertRoutinesMod
   private
 
   public :: read_ens_prop_inputs
+  public :: get_use_sphere_pert
   public :: interpolate_pert_to_timestep
   public :: get_pert_grid
   public :: get_progn_pert_param
@@ -333,8 +334,6 @@ contains
 
     root_proc = (myid ==0)
 
-    use_sphere_pert = .false.
-
     ! ---------------------------------------------------------------------
     !
     ! initialize selected name list inputs
@@ -343,6 +342,8 @@ contains
 
     ccorr_progn_pert = nodata_generic
     ccorr_force_pert = nodata_generic
+
+    use_sphere_pert  = .false.   ! remains .false. if not set in namelist files
 
     ! ------------------------------------------------------
     !
@@ -1023,13 +1024,7 @@ contains
 
     root_proc = (myid==0)
 
-    ! USE_SPHERE_PERT (shared by forcing and prognostic perturbations)
-
-    if (root_proc) then
-       call read_ens_prop_inputs(kw_echo=.false., &
-            kw_use_sphere_pert=use_sphere_pert)
-    end if
-    call MPI_Bcast(use_sphere_pert, 1, MPI_LOGICAL, 0, mpicomm, mpierr)
+    use_sphere_pert = get_use_sphere_pert()
 
     ! ---------
     !
@@ -1423,13 +1418,7 @@ contains
 
     root_proc = (myid==0)
 
-    ! USE_SPHERE_PERT (shared by forcing and prognostic perturbations)
-
-    if (root_proc) then
-       call read_ens_prop_inputs(kw_echo=.false., &
-            kw_use_sphere_pert=use_sphere_pert)
-    end if
-    call MPI_Bcast(use_sphere_pert, 1, MPI_LOGICAL, 0, mpicomm, mpierr)
+    use_sphere_pert = get_use_sphere_pert()
 
     ! -------
     !
@@ -2274,6 +2263,26 @@ contains
   end subroutine handle_nc4_stat
 
   ! **********************************************************************
+
+  ! *********************************************************************
+
+  logical function get_use_sphere_pert()
+
+    ! namelist switch use_sphere_pert (forcing, prognostic, and obs perturbations);
+    ! read on root, broadcast, and cached after the first call (collective)
+
+    logical, save :: use_sphere_pert
+    logical, save :: initialized = .false.
+    integer       :: mpierr
+
+    if (.not. initialized) then
+       if (myid==0) call read_ens_prop_inputs(kw_echo=.false., kw_use_sphere_pert=use_sphere_pert)
+       call MPI_Bcast(use_sphere_pert, 1, MPI_LOGICAL, 0, mpicomm, mpierr)
+       initialized = .true.
+    end if
+    get_use_sphere_pert = use_sphere_pert
+
+  end function get_use_sphere_pert
 
 end module LDAS_PertRoutinesMod
 

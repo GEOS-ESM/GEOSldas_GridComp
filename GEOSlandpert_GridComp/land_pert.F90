@@ -927,6 +927,8 @@ contains
     N_forcepert = N_tmp
     
     call allocate_pert_param(N_forcepert, N_x, N_y, forcepert_param)
+
+    forcepert_param(:)%use_sphere_pert = .false.
     
     ! ----------------------------------------
     !
