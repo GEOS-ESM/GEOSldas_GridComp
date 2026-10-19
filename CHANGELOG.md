@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 -----------------------------
+### Changed
+
+- Added support for dashes in post-run filename time formats ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229).  
+-----------------------------
 
 ## [v4.1.0] - 2026-10-15
 
