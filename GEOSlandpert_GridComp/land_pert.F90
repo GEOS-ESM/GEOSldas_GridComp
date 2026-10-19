@@ -38,7 +38,7 @@ module land_pert_routines
        init_randseed
 
   use rectangle_random_fieldsMod
-  use sphere_harmonics_random_fields_mod, only: sphere_harmonics_random_fields, &
+  use sphere_random_fields_mod, only: sphere_harmonics_random_fields, &
                                                 sphere_harmonics_random_fields_id
   use StringAbstractRandom_fieldsMapMod
   use abstract_random_fieldsMod, only: abstract_random_fields

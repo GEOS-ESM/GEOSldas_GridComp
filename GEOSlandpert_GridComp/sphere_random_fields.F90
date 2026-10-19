@@ -1,5 +1,5 @@
 !
-! sphere_harmonics_random_fields.F90
+! sphere_random_fields.F90
 !
 ! Isotropic Gaussian random fields on the sphere by direct spherical-
 ! harmonic (SH) synthesis, with power spectrum
@@ -30,7 +30,7 @@
 !
 ! -----------------------------------------------------------------------
 
-module sphere_harmonics_random_fields_mod
+module sphere_random_fields_mod
   use abstract_random_fieldsMod, only: abstract_random_fields
   use LDAS_PertTypes, only: pert_param_type
   use LDAS_TileCoordType, only: grid_def_type
@@ -616,4 +616,4 @@ contains
     end function ratio
   end subroutine xcorr_deg_to_c2
 
-end module sphere_harmonics_random_fields_mod
+end module sphere_random_fields_mod

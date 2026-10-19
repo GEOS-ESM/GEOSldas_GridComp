@@ -3,7 +3,7 @@ program compare_pert
   use, intrinsic :: iso_c_binding, only: c_double
   use nr_ran2_gasdev, only: NRANDSEED, init_randseed
   use rectangle_random_fieldsMod, only: rectangle_random_fields
-  use sphere_harmonics_random_fields_mod, only: sphere_harmonics_random_fields
+  use sphere_random_fields_mod, only: sphere_harmonics_random_fields
   use LDAS_PertTypes, only: pert_param_type
   use LDAS_TileCoordType, only: grid_def_type
   implicit none
