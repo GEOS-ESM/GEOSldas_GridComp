@@ -27,6 +27,16 @@ ecbuild_add_executable(
   SOURCES pert_statistics.F90
   LIBS    GEOSlandpert_GridComp MAPL)
 
+ecbuild_add_executable(
+  TARGET  sh_vs_smerfs.x
+  SOURCES sh_vs_smerfs.F90
+  LIBS    GEOSlandpert_GridComp MAPL)
+
+ecbuild_add_executable(
+  TARGET  sh_vs_rectangle.x
+  SOURCES sh_vs_rectangle.F90
+  LIBS    GEOSlandpert_GridComp MAPL)
+
 #ecbuild_add_executable(
 #  TARGET  compare_timing.x
 #  SOURCES compare_timing.F90
@@ -36,10 +46,11 @@ ecbuild_add_executable(
 if (MKL_FOUND AND NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
   target_compile_definitions(compare_pert.x PRIVATE MKL_AVAILABLE)
   target_compile_definitions(pert_statistics.x PRIVATE MKL_AVAILABLE)
+  target_compile_definitions(sh_vs_rectangle.x PRIVATE MKL_AVAILABLE)
 #  target_compile_definitions(compare_timing.x PRIVATE MKL_AVAILABLE)
 endif ()
 
 # ---- Install Python comparison script ----------------------------------
 install(
-  PROGRAMS compare_pert.py
+  PROGRAMS compare_pert.py plot_sh_vs_rectangle.py
   DESTINATION bin)

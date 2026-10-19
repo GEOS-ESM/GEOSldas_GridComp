@@ -1772,7 +1772,7 @@ contains
     type(pert_param_type), dimension(:), pointer :: pert_param ! output
 
     ! Optional sphere-pert arguments:
-    !   use_sphere_pert : .true. => use SMERFS for all selected fields in this call
+    !   use_sphere_pert : .true. => use spherical-harmonic synthesis (sphere_harmonics_random_fields) for all selected fields in this call
      logical,                        intent(in), optional :: use_sphere_pert
 
     ! --------------------------

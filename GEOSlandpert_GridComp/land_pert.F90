@@ -38,7 +38,8 @@ module land_pert_routines
        init_randseed
 
   use rectangle_random_fieldsMod
-  use sphere_random_fields_mod, only: sphere_random_fields, sphere_random_fields_id
+  use sphere_harmonics_random_fields_mod, only: sphere_harmonics_random_fields, &
+                                                sphere_harmonics_random_fields_id
   use StringAbstractRandom_fieldsMapMod
   use abstract_random_fieldsMod, only: abstract_random_fields
 
@@ -1241,10 +1242,10 @@ contains
     type(StringAbstractRandom_fieldsMapIterator) :: iter
     character(len=:), allocatable :: id_string
     type(rectangle_random_fields) :: rf_tmp
-    type(sphere_random_fields) :: sf_tmp
+    type(sphere_harmonics_random_fields) :: sf_tmp
 
     if (pert_param%use_sphere_pert) then
-       id_string = sphere_random_fields_id(pert_param, pert_grid_f)
+       id_string = sphere_harmonics_random_fields_id(pert_param, pert_grid_f)
     else
        id_string = rectangle_random_fields_id(pert_param, pert_grid_f)
     end if
@@ -1252,9 +1253,9 @@ contains
     if (iter == random_fieldsMap%end() ) then
        if (pert_param%use_sphere_pert) then
           if (present(comm)) then
-             sf_tmp = sphere_random_fields(pert_param, pert_grid_f, comm=comm)
+             sf_tmp = sphere_harmonics_random_fields(pert_param, pert_grid_f, comm=comm)
           else
-             sf_tmp = sphere_random_fields(pert_param, pert_grid_f)
+             sf_tmp = sphere_harmonics_random_fields(pert_param, pert_grid_f)
           end if
           call random_fieldsMap%insert(id_string, sf_tmp)
        else
