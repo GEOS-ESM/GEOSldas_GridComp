@@ -56,18 +56,18 @@ module rectangle_random_fieldsMod
 
   implicit none
   
-   private
-   public :: rectangle_random_fields_id
+  private
+  public :: rectangle_random_fields_id
 
-   real, parameter :: TWO_PI = 2.*3.14159265
-   real, parameter :: SQRT2 = sqrt(2.0)
+  real, parameter :: TWO_PI = 2.*3.14159265
+  real, parameter :: SQRT2 = sqrt(2.0)
   
-   type, public, extends(abstract_random_fields) :: rectangle_random_fields
+  type, public, extends(abstract_random_fields) :: rectangle_random_fields
      private
-     integer, public :: N_x, N_y
-     integer, public :: N_x_fft, N_y_fft
-     integer, public :: xStride, yStride
-     real, public :: rdlon, rdlat, xCorr, yCorr
+     integer :: N_x, N_y
+     integer :: N_x_fft, N_y_fft
+     integer, public :: xStride, yStride  ! coarsening strides
+     real,    public :: rdlon, rdlat      ! grid spacing of the (coarsened) grid
      real, allocatable :: field1_fft(:,:), field2_fft(:,:)
      integer :: fft_lens(2) ! length of each dim for 2D transform
 #ifdef MKL_AVAILABLE
@@ -94,87 +94,86 @@ module rectangle_random_fieldsMod
      procedure, private :: win_allocate
      procedure, private :: win_deallocate
 #endif
-   end type rectangle_random_fields
+  end type rectangle_random_fields
 
-   interface rectangle_random_fields
-      module procedure new_rectangle_random_fields
-   end interface rectangle_random_fields
+  interface rectangle_random_fields
+     module procedure new_rectangle_random_fields
+  end interface rectangle_random_fields
   
 contains
 
-   function rectangle_random_fields_id(pert_param, pert_grid_f) result(id_string)
-     type(pert_param_type), intent(in) :: pert_param
-     type(grid_def_type), intent(in) :: pert_grid_f
-     character(len=:), allocatable :: id_string
-     integer :: nx, ny, nx_fft, ny_fft, xstride, ystride
-     real :: rdlon, rdlat
-     character(len=256) :: id
-     real, parameter :: mult_of_xcorr = 2.
-     real, parameter :: mult_of_ycorr = 2.
-     real, parameter :: coarsen_param = 0.8
+  ! grid of (possibly coarsened) random field and FFT grid (powers of two)
 
-     xstride = 1
-     ystride = 1
-     if (pert_param%coarsen) then
-        xstride = max(1, floor(coarsen_param * pert_param%xcorr / pert_grid_f%dlon))
-        ystride = max(1, floor(coarsen_param * pert_param%ycorr / pert_grid_f%dlat))
-     endif
-     rdlon = real(xstride) * pert_grid_f%dlon
-     rdlat = real(ystride) * pert_grid_f%dlat
-     nx = (pert_grid_f%N_lon + xstride - 1) / xstride
-     ny = (pert_grid_f%N_lat + ystride - 1) / ystride
-     nx_fft = 2**ceiling(log(real(nx + ceiling(mult_of_xcorr*pert_param%xcorr/rdlon)))/log(2.))
-     ny_fft = 2**ceiling(log(real(ny + ceiling(mult_of_ycorr*pert_param%ycorr/rdlat)))/log(2.))
-     write(id,'(i0,":",i0,":",i0,":",i0,":",i0,":",i0,":",es16.8,":",es16.8)') &
-          nx, ny, nx_fft, ny_fft, xstride, ystride, pert_param%xcorr, pert_param%ycorr
-     id_string = trim(id)
-   end function rectangle_random_fields_id
+  subroutine calc_fft_grid(pert_param, pert_grid_f, Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, rdlon, rdlat)
+
+    type(pert_param_type), intent(in)  :: pert_param
+    type(grid_def_type),   intent(in)  :: pert_grid_f
+    integer,               intent(out) :: Nx, Ny, Nx_fft, Ny_fft, xStride, yStride
+    real,                  intent(out) :: rdlon, rdlat
+
+    real, parameter :: mult_of_xcorr = 2.
+    real, parameter :: mult_of_ycorr = 2.
+    real, parameter :: coarsen_param = 0.8
+
+    xStride = 1
+    yStride = 1
+    if (pert_param%coarsen) then
+       xStride = max( 1, floor(coarsen_param * pert_param%xcorr / pert_grid_f%dlon) )
+       yStride = max( 1, floor(coarsen_param * pert_param%ycorr / pert_grid_f%dlat) )
+    endif
+    rdlon = real(xStride)*pert_grid_f%dlon
+    rdlat = real(yStride)*pert_grid_f%dlat
+
+    ! NOTE: number of grid cells of coarsened grid might not evenly divide
+    ! that of pert_grid_f
+    Nx = (pert_grid_f%N_lon + xStride - 1) / xStride
+    Ny = (pert_grid_f%N_lat + yStride - 1) / yStride
+
+    ! add minimum required correlation lengths, ensure powers of two
+    Nx_fft = 2**ceiling(log(real(Nx + ceiling(mult_of_xcorr*pert_param%xcorr/rdlon)))/log(2.))
+    Ny_fft = 2**ceiling(log(real(Ny + ceiling(mult_of_ycorr*pert_param%ycorr/rdlat)))/log(2.))
+
+  end subroutine calc_fft_grid
+
+  ! key for caching random field instances
+
+  function rectangle_random_fields_id(pert_param, pert_grid_f) result(id_string)
+
+    type(pert_param_type), intent(in) :: pert_param
+    type(grid_def_type),   intent(in) :: pert_grid_f
+    character(len=:), allocatable     :: id_string
+
+    integer            :: Nx, Ny, Nx_fft, Ny_fft, xStride, yStride
+    real               :: rdlon, rdlat
+    character(len=256) :: id
+
+    call calc_fft_grid(pert_param, pert_grid_f, Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, rdlon, rdlat)
+    write(id,'(i0,":",i0,":",i0,":",i0,":",i0,":",i0,":",es16.8,":",es16.8)') &
+         Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, pert_param%xcorr, pert_param%ycorr
+    id_string = trim(id)
+
+  end function rectangle_random_fields_id
 
   ! constructor (set parameter values), allocate memory
-    function new_rectangle_random_fields(pert_param, pert_grid_f, comm, rc) result (rf)
+  function new_rectangle_random_fields(pert_param, pert_grid_f, comm, rc) result (rf)
     
-     ! input/output variables [NEED class(rectangle_random_fields)
-     !   instead of type(rectangle_random_fields)] - F2003 quirk?!?
-    type(rectangle_random_fields)  :: rf
-     type(pert_param_type), intent(in) :: pert_param
-     type(grid_def_type), intent(in) :: pert_grid_f
+    ! input/output variables [NEED class(rectangle_random_fields)
+    !   instead of type(rectangle_random_fields)] - F2003 quirk?!?
+    type(rectangle_random_fields)     :: rf
+    type(pert_param_type), intent(in) :: pert_param
+    type(grid_def_type),   intent(in) :: pert_grid_f
     integer, optional, intent(in)  :: comm
     integer, optional, intent(out) :: rc 
     
     ! local variables
     integer :: status, ierror
     integer :: rank, npes, local_dim1, local_dim2, remainder
-     integer :: Stride(2), Nx_fft, Ny_fft
-     real, parameter :: mult_of_xcorr = 2.
-     real, parameter :: mult_of_ycorr = 2.
-     real, parameter :: coarsen_param = 0.8
-     character(len=256) :: id_string
+    integer :: Stride(2)
     
     ! set obj param vals
-     rf%xCorr = pert_param%xcorr
-     rf%yCorr = pert_param%ycorr
-     rf%xStride = 1
-     rf%yStride = 1
-     if (pert_param%coarsen) then
-        rf%xStride = max(1, floor(coarsen_param * rf%xCorr / pert_grid_f%dlon))
-        rf%yStride = max(1, floor(coarsen_param * rf%yCorr / pert_grid_f%dlat))
-     endif
-     rf%rdlon = real(rf%xStride) * pert_grid_f%dlon
-     rf%rdlat = real(rf%yStride) * pert_grid_f%dlat
-     rf%N_x = pert_grid_f%N_lon / rf%xStride
-     rf%N_y = pert_grid_f%N_lat / rf%yStride
-     if (mod(pert_grid_f%N_lon,rf%xStride)>0) rf%N_x = rf%N_x + 1
-     if (mod(pert_grid_f%N_lat,rf%yStride)>0) rf%N_y = rf%N_y + 1
-
-     ! ensure N_x_fft, N_y_fft are powers of two
-     Nx_fft = rf%N_x + ceiling(mult_of_xcorr*rf%xCorr/rf%rdlon)
-     Ny_fft = rf%N_y + ceiling(mult_of_ycorr*rf%yCorr/rf%rdlat)
-     rf%N_x_fft = 2**ceiling(log(real(Nx_fft))/log(2.))
-     rf%N_y_fft = 2**ceiling(log(real(Ny_fft))/log(2.))
-     write(id_string,'(i0,":",i0,":",i0,":",i0,":",i0,":",i0,":",es16.8,":",es16.8)') &
-          rf%N_x, rf%N_y, rf%N_x_fft, rf%N_y_fft, rf%xStride, rf%yStride, rf%xCorr, rf%yCorr
-     rf%ID_string = trim(id_string)
-
+    call calc_fft_grid(pert_param, pert_grid_f, rf%N_x, rf%N_y, rf%N_x_fft, rf%N_y_fft, &
+         rf%xStride, rf%yStride, rf%rdlon, rf%rdlat)
+    rf%ID_string = rectangle_random_fields_id(pert_param, pert_grid_f)
 
     ! allocate memory
     allocate(rf%field1_fft(rf%N_x_fft, rf%N_y_fft))
@@ -188,42 +187,42 @@ contains
        call MPI_Comm_size(rf%Node_Comm, npes, ierror)
        call MPI_Comm_rank(rf%Node_Comm, rank, ierror)
        
-       if (npes > minval([Nx_fft, Ny_fft]) ) then
+       if (npes > minval([rf%N_x_fft, rf%N_y_fft]) ) then
           print*, " Two many processors are acquired  in a node for parallel FFT"
-          print*, " The number of processors acquired in a node should be smaller than or equal to FFT grid size: ", minval([Nx_fft, Ny_fft]) 
+          print*, " The number of processors acquired in a node should be smaller than or equal to FFT grid size: ", minval([rf%N_x_fft, rf%N_y_fft]) 
           _FAIL('Parallel FFT failed')
        endif
 
-        call rf%win_allocate(rf%N_x_fft, rf%N_y_fft, _RC)
+       call rf%win_allocate(rf%N_x_fft, rf%N_y_fft, _RC)
 
        ! distribution of the grid for fft
        allocate(rf%dim1_counts(npes),rf%dim2_counts(npes))
-        local_dim1 = rf%N_x_fft/npes
+       local_dim1 = rf%N_x_fft/npes
        rf%dim1_counts = local_dim1
-        remainder = mod(rf%N_x_fft, npes)
+       remainder = mod(rf%N_x_fft, npes)
        rf%dim1_counts(1:remainder) = local_dim1 + 1
        local_dim1 = rf%dim1_counts(rank+1) 
 
-        local_dim2 = rf%N_y_fft/npes
+       local_dim2 = rf%N_y_fft/npes
        rf%dim2_counts = local_dim2
-        remainder = mod(rf%N_y_fft, npes)
+       remainder = mod(rf%N_y_fft, npes)
        rf%dim2_counts(1:remainder) = local_dim2 + 1
        local_dim2 = rf%dim2_counts(rank+1)
 
 
        status = DftiCreateDescriptor(rf%Desc_Handle_Dim1, DFTI_SINGLE,&
-                                 DFTI_COMPLEX, 1, rf%N_x_fft )
+                                DFTI_COMPLEX, 1, rf%N_x_fft )
        _VERIFY(status)
        status = DftiCreateDescriptor(rf%Desc_Handle_Dim2, DFTI_SINGLE,&
-                                 DFTI_COMPLEX, 1, rf%N_y_fft )
+                                DFTI_COMPLEX, 1, rf%N_y_fft )
        _VERIFY(status)
 
        ! perform local_dim2 one-dimensional transforms along 1st dimension
        status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_NUMBER_OF_TRANSFORMS, local_dim2 )
        _VERIFY(status)
-        status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_INPUT_DISTANCE, rf%N_x_fft )
+       status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_INPUT_DISTANCE, rf%N_x_fft )
        _VERIFY(status)
-        status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_OUTPUT_DISTANCE, rf%N_x_fft )
+       status = DftiSetValue( rf%Desc_Handle_Dim1, DFTI_OUTPUT_DISTANCE, rf%N_x_fft )
        _VERIFY(status)
        status = DftiCommitDescriptor( rf%Desc_Handle_Dim1 )
        _VERIFY(status)
@@ -246,7 +245,7 @@ contains
     else
        rf%comm = MPI_COMM_NULL
        ! allocate mem and init mkl dft
-        status = DftiCreateDescriptor(rf%Desc_Handle, DFTI_SINGLE, DFTI_COMPLEX, 2, [rf%N_x_fft, rf%N_y_fft])
+       status = DftiCreateDescriptor(rf%Desc_Handle, DFTI_SINGLE, DFTI_COMPLEX, 2, [rf%N_x_fft, rf%N_y_fft])
        _VERIFY(status)
 
        ! initialize for actual dft computation
@@ -255,7 +254,7 @@ contains
     endif
 #endif
     _RETURN(_SUCCESS)
-   end function new_rectangle_random_fields
+  end function new_rectangle_random_fields
   
   ! **************************************************************************
   
@@ -387,7 +386,7 @@ contains
   
   ! ----------------------------------------------------------------------
   !
-   ! subroutine generate_2d_Random_field()
+  ! subroutine generate_2d_Random_field()
   !  
   ! generate a pair of 2d zero-mean random fields using FFT method
   ! (so far only Gaussian covariance implemented)
@@ -409,7 +408,7 @@ contains
   !       generated on a grid that is two correlation lenghts bigger
   !       than the field on which the grid is desired. Then cut out
   !       fields of the necessary size.
-   !       This procedure is included in generate_2d_Random_field().
+  !       This procedure is included in generate_2d_Random_field().
   !
   ! NOTE: The variance specified as input is the theoretical variance of 
   !       the complex field that is obtained from the inverse fft of the 
@@ -438,12 +437,12 @@ contains
   !       The individual sample variances within each pair vary from 
   !       realization to realization.
   
-   subroutine generate_2d_Random_field(this, rseed, rfield, rfield2, lx, ly, dx, dy)
+  subroutine generate_2d_Random_field(this, rseed, rfield, rfield2, lx, ly, dx, dy)
     
     ! input/output variables
     class(rectangle_random_fields),        intent(inout) :: this ! ffield*_fft is modified
     integer,                               intent(inout) :: rseed(NRANDSEED) ! nr_ran2 modifies rseed
-     real,    dimension(:,:), intent(out)   :: rfield, rfield2
+    real,    dimension(:,:),               intent(out)   :: rfield, rfield2
     real,                                  intent(in)    :: lx, ly, dx, dy
 
     ! local variables
@@ -622,7 +621,7 @@ contains
     rfield  = SQRT2*N_xy_fft_real*this%field1_fft(1:this%N_x,1:this%N_y)
     rfield2 = SQRT2*N_xy_fft_real*this%field2_fft(1:this%N_x,1:this%N_y)
     
-   end subroutine generate_2d_Random_field
+  end subroutine generate_2d_Random_field
   
   
   
@@ -642,7 +641,7 @@ contains
     implicit none
 
     ! input/output variables
-     class(rectangle_random_fields), intent(inout) :: this
+    class(rectangle_random_fields), intent(inout) :: this
     integer, intent(inout) :: rseed(NRANDSEED) ! nr_gasdev modifies rseed
     real, dimension(:,:), intent(out), target :: rfield
     

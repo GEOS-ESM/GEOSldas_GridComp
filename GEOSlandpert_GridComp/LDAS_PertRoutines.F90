@@ -163,8 +163,8 @@ contains
        kw_xcorr_force_pert,          &
        kw_ycorr_force_pert,          &
        kw_tcorr_force_pert,          &
-         kw_ccorr_force_pert,          &
-         kw_use_sphere_pert            &
+       kw_ccorr_force_pert,          &
+       kw_use_sphere_pert            &
        )
 
     ! read ensemble propagation inputs from namelist file
@@ -244,7 +244,6 @@ contains
     type(force_pert_ccor_type), intent(out), optional :: &
          kw_ccorr_force_pert
 
-    ! Sphere-pert optional keyword output
     logical, intent(out), optional :: kw_use_sphere_pert
 
     ! ------------------------
@@ -290,7 +289,6 @@ contains
 
     type(force_pert_ccor_type) :: ccorr_force_pert
 
-    ! Sphere-pert local variable
     logical :: use_sphere_pert
 
     ! Errlong variables
@@ -335,7 +333,6 @@ contains
 
     root_proc = (myid ==0)
 
-    ! Initialize sphere-pert default (safe: flat-FFT path is the default)
     use_sphere_pert = .false.
 
     ! ---------------------------------------------------------------------
@@ -499,7 +496,6 @@ contains
 
     if (present(kw_ccorr_force_pert)) kw_ccorr_force_pert = ccorr_force_pert
 
-    ! sphere-pert keyword
     if (present(kw_use_sphere_pert)) kw_use_sphere_pert = use_sphere_pert
 
     ! ------------------------------------------------------------------
@@ -818,7 +814,6 @@ contains
 
     integer, dimension(N_progn_pert_max)  :: progn_pert_select
 
-    ! Sphere-pert parameter for prognostic perturbations
     logical :: use_sphere_pert
 
     ! ---------------------------------------------------------------
@@ -827,7 +822,7 @@ contains
          descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
          std_normal_max_progn_pert, std_progn_pert,                        &
          xcorr_progn_pert, ycorr_progn_pert,                               &
-         tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert,              &
+         tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert,       &
          use_sphere_pert )
 
     call get_pert_select( N_progn_pert_max, pert_grid_l, std_progn_pert,   &
@@ -845,8 +840,7 @@ contains
             std_normal_max_progn_pert,                                        &
             std_progn_pert, xcorr_progn_pert, ycorr_progn_pert,               &
             tcorr_progn_pert, typ_progn_pert, ccorr_progn_pert,               &
-             progn_pert_select, progn_pert_param,                             &
-             use_sphere_pert=use_sphere_pert )
+            progn_pert_select, progn_pert_param, use_sphere_pert )
 
     end if
 
@@ -891,7 +885,6 @@ contains
 
     integer, dimension(N_force_pert_max)  :: force_pert_select
 
-    ! Shared sphere-pert parameter for forcing perturbations
     logical :: use_sphere_pert
 
     ! ---------------------------------------------------------------
@@ -900,7 +893,7 @@ contains
          descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
          std_normal_max_force_pert, std_force_pert,                        &
          xcorr_force_pert, ycorr_force_pert,                               &
-         tcorr_force_pert, typ_force_pert,   ccorr_force_pert,               &
+         tcorr_force_pert, typ_force_pert,   ccorr_force_pert,       &
          use_sphere_pert )
 
     call get_pert_select( N_force_pert_max, pert_grid_l, std_force_pert,   &
@@ -917,8 +910,7 @@ contains
             std_normal_max_force_pert,                                        &
             std_force_pert, xcorr_force_pert, ycorr_force_pert,               &
             tcorr_force_pert, typ_force_pert, ccorr_force_pert,               &
-            force_pert_select, force_pert_param,                              &
-            use_sphere_pert=use_sphere_pert )
+            force_pert_select, force_pert_param, use_sphere_pert )
 
     end if
 
@@ -930,7 +922,7 @@ contains
        descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
        std_normal_max_force_pert, std_force_pert,                        &
        xcorr_force_pert, ycorr_force_pert,                               &
-       tcorr_force_pert, typ_force_pert,   ccorr_force_pert,               &
+       tcorr_force_pert, typ_force_pert,   ccorr_force_pert,      &
        use_sphere_pert       )
 
     ! get inputs for forcing perturbations for ALL forcing
@@ -984,7 +976,7 @@ contains
          typ_force_pert
 
     real, dimension(N_force_pert_max,N_force_pert_max), intent(out) :: &
-          ccorr_force_pert
+         ccorr_force_pert
 
     logical, intent(out) :: use_sphere_pert
 
@@ -1031,7 +1023,8 @@ contains
 
     root_proc = (myid==0)
 
-    ! Read the shared sphere-pert option for forcing perturbations.
+    ! USE_SPHERE_PERT (shared by forcing and prognostic perturbations)
+
     if (root_proc) then
        call read_ens_prop_inputs(kw_echo=.false., &
             kw_use_sphere_pert=use_sphere_pert)
@@ -1331,7 +1324,7 @@ contains
        descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
        std_normal_max_progn_pert, std_progn_pert,                        &
        xcorr_progn_pert, ycorr_progn_pert,                               &
-       tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert,               &
+       tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert,      &
        use_sphere_pert       )
 
     ! get inputs for perturbations to prognostic variables for ALL prognostic
@@ -1383,7 +1376,7 @@ contains
          typ_progn_pert
 
     real, dimension(N_progn_pert_max,N_progn_pert_max), intent(out) :: &
-          ccorr_progn_pert
+         ccorr_progn_pert
 
     logical, intent(out) :: use_sphere_pert
 
@@ -1430,7 +1423,8 @@ contains
 
     root_proc = (myid==0)
 
-    ! Read the shared sphere-pert option for prognostic perturbations.
+    ! USE_SPHERE_PERT (shared by forcing and prognostic perturbations)
+
     if (root_proc) then
        call read_ens_prop_inputs(kw_echo=.false., &
             kw_use_sphere_pert=use_sphere_pert)
@@ -1730,15 +1724,14 @@ contains
        std_normal_max_pert,                                      &
        std_pert, xcorr_pert, ycorr_pert, tcorr_pert, typ_pert,   &
        ccorr_pert,                                               &
-       pert_select, pert_param,                                  &
-        use_sphere_pert )
+       pert_select, pert_param, use_sphere_pert )
 
     ! assemble perturbation parameters for the prognostics or forcings
     !  that have been selected to be subject to perturbations
     !
     ! reichle, 30 Nov 2001
     ! reichle, 27 May 2005 - redesign
-    ! wjiang,  2026-07 - added optional sphere-pert arguments
+    ! wjiang,  2026-07 - added use_sphere_pert
     !
     ! -----------------------------------------------------------------
 
@@ -1771,9 +1764,7 @@ contains
 
     type(pert_param_type), dimension(:), pointer :: pert_param ! output
 
-    ! Optional sphere-pert arguments:
-    !   use_sphere_pert : .true. => use spherical-harmonic synthesis (sphere_harmonics_random_fields) for all selected fields in this call
-     logical,                        intent(in), optional :: use_sphere_pert
+    logical, intent(in) :: use_sphere_pert  ! .true. => sphere_random_fields
 
     ! --------------------------
 
@@ -1788,13 +1779,7 @@ contains
     character(len=400) :: err_msg
     character(len=*), parameter :: Iam = 'assemble_pert_param'
 
-    logical :: do_sphere_pert
-
     ! -----------------------------------------------------------------
-
-    ! Determine whether sphere-pert is requested for this call
-    do_sphere_pert = .false.
-    if (present(use_sphere_pert)) do_sphere_pert = use_sphere_pert
 
     ! extract info into pert_param of length N_pert
     ! (only those states listed in pert_select are affected by perturbations)
@@ -1821,10 +1806,9 @@ contains
           pert_param(m)%tcorr = tcorr_pert(k)
           pert_param(m)%typ   = nint(typ_pert(k))
 
-           ! Sphere-pert fields (safe defaults ensure flat-FFT when not requested)
-           pert_param(m)%use_sphere_pert = do_sphere_pert
+          pert_param(m)%use_sphere_pert = use_sphere_pert
 
-           n = 0
+          n = 0
 
           do l=1,N_pert_max
 

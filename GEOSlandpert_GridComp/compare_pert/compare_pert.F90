@@ -21,7 +21,7 @@ program compare_pert
   use nr_ran2_gasdev, only: NRANDSEED, init_randseed
   use abstract_random_fieldsMod, only: abstract_random_fields
   use rectangle_random_fieldsMod, only: rectangle_random_fields
-  use sphere_random_fields_mod, only: sphere_harmonics_random_fields
+  use sphere_random_fields_mod, only: sphere_random_fields
   use LDAS_PertTypes, only: pert_param_type
   use LDAS_TileCoordType, only: grid_def_type
   implicit none
@@ -93,7 +93,7 @@ contains
       allocate(gen, source=rectangle_random_fields(pp, grid))
 #endif
     case (2)
-      allocate(gen, source=sphere_harmonics_random_fields(pp, grid, comm=MPI_COMM_WORLD))
+      allocate(gen, source=sphere_random_fields(pp, grid, comm=MPI_COMM_WORLD))
     end select
     call MPI_Barrier(MPI_COMM_WORLD, mpierr); t_init = MPI_Wtime() - t0
 

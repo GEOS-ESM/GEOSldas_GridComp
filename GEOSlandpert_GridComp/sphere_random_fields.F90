@@ -4,7 +4,7 @@
 ! Isotropic Gaussian random fields on the sphere by direct spherical-
 ! harmonic (SH) synthesis, with power spectrum
 !
-!     C_l = 1 / (c0 + c2 * (l(l+1))^2),   c0 = 1,
+!     C_l = 1 / (1 + c2 * (l(l+1))^2)
 !
 ! c2 calibrated from xcorr (Gaussian sigma, degrees) by xcorr_deg_to_c2.
 !
@@ -13,10 +13,10 @@
 !   f(theta,phi) = sum_l [ a_l0 Y_l0 + 2 Re sum_{m>0} a_lm Y_lm ]
 !   a_l0 ~ N(0,C_l),  Re/Im a_lm ~ N(0,C_l/2),  l,m <= L = nlat-1
 !
-! Build (constructor): c2, sqrt(C_l), and (optionally) the table of
-!   normalised associated Legendre functions Pbar_lm(cos theta_j) for the
-!   north-hemisphere rings and the m's owned by this rank (snake order).
-! Draw: random a_lm -> per-m DGEMM against Pbar (even/odd l split gives both
+! Build (constructor): c2, sqrt(C_l) and the m's owned by this rank
+!   (snake order).
+! Draw: random a_lm -> per-m normalised associated Legendre functions
+!   Pbar_lm(cos theta_j) (north rings) -> DGEMM (even/odd l split gives both
 !   hemispheres) -> MPI_Reduce_scatter to ring blocks -> batched inverse
 !   real FFT -> MPI_Allgatherv.  Two fields are drawn per call.
 !
@@ -25,8 +25,8 @@
 ! rseed is advanced identically everywhere.
 !
 ! Public interface:
-!   sphere_harmonics_random_fields    - abstract_random_fields implementation
-!   sphere_harmonics_random_fields_id - cache key for the land_pert generator map
+!   sphere_random_fields    - abstract_random_fields implementation
+!   sphere_random_fields_id - cache key for the land_pert generator map
 !
 ! -----------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ module sphere_random_fields_mod
   use MAPL_MathConstantsMod, only: PI => MAPL_PI_R8, MAPL_DEGREES_TO_RADIANS_R8
   use, intrinsic :: iso_fortran_env, only: REAL64, INT64
   use mpi
-  use nr_ran2_gasdev, only: NRANDSEED, nr_ran2_2d, nr_gasdev, init_randseed
+  use nr_ran2_gasdev, only: NRANDSEED, nr_ran2_2d, nr_gasdev
 #ifdef MKL_AVAILABLE
   use MKL_DFTI
 #endif
@@ -45,25 +45,24 @@ module sphere_random_fields_mod
   implicit none
   private
 
-  public :: sphere_harmonics_random_fields
-  public :: sphere_harmonics_random_fields_id
+  public :: sphere_random_fields
+  public :: sphere_random_fields_id
 
-  type, extends(abstract_random_fields) :: sphere_harmonics_random_fields
+  type, extends(abstract_random_fields) :: sphere_random_fields
     private
     ! MPI context (comm == MPI_COMM_NULL -> serial)
     integer :: comm = MPI_COMM_NULL
     integer :: rank = 0, npes = 1
     ! Grid / truncation
+    integer :: nlon = 0, nlat = 0
     integer :: L = 0, nh = 0, nm = 0
-    logical :: use_table = .false.
+    real(REAL64) :: c2 = 0.0d0
     real(REAL64) :: scale = 1.0d0
-    ! m-modes owned by this rank and their offsets
+    ! m-modes owned by this rank
     integer :: nmloc = 0
     integer,    allocatable :: mloc(:)
-    integer(INT64), allocatable :: off(:)        ! offsets into ptab
     integer(INT64), allocatable :: coff(:)       ! global coefficient offset per m (0:L)
     integer(INT64) :: ncoef = 0                  ! total (l,m) pairs, m<=l<=L
-    real(REAL64), allocatable :: ptab(:)
     real(REAL64), allocatable :: sqrtC(:), lfac(:), x(:), logs(:)
     ! Ring distribution
     integer, allocatable :: rcount(:), rdispl(:)
@@ -71,28 +70,19 @@ module sphere_random_fields_mod
 #ifdef MKL_AVAILABLE
     type(DFTI_DESCRIPTOR), pointer :: desc => null()
 #endif
-    logical :: is_initialized = .false.
-
-    real(REAL64), public :: c0 = 1.0d0
-    real(REAL64), public :: c2 = 0.0d0
-    integer, public :: nz_sphere = 0
-    integer, public :: nphi_sphere = 0
-    integer(INT64), public :: table_bytes = 0    ! global Legendre table size
   contains
     procedure, public :: generate_2d_Random_field
     procedure, public :: generate_white_field
-    procedure, public :: generate_2d_Random_field_seeded
     procedure, public :: finalize
-    procedure, public :: initialized
-  end type sphere_harmonics_random_fields
+  end type sphere_random_fields
 
-  interface sphere_harmonics_random_fields
-    module procedure new_sphere_harmonics_random_fields
-  end interface sphere_harmonics_random_fields
+  interface sphere_random_fields
+    module procedure new_sphere_random_fields
+  end interface sphere_random_fields
 
 contains
 
-  function sphere_harmonics_random_fields_id(pert_param, pert_grid_f) result(id_string)
+  function sphere_random_fields_id(pert_param, pert_grid_f) result(id_string)
     type(pert_param_type), intent(in) :: pert_param
     type(grid_def_type), intent(in) :: pert_grid_f
     character(len=:), allocatable :: id_string
@@ -101,35 +91,26 @@ contains
     write(id,'(a,":",i0,":",i0,":",es16.8)') 'sphere_sh', &
          pert_grid_f%N_lat, pert_grid_f%N_lon, pert_param%xcorr
     id_string = trim(id)
-  end function sphere_harmonics_random_fields_id
+  end function sphere_random_fields_id
 
   ! ----------------------------------------------------------------------
-  ! Constructor.  The optional
-  ! use_table (default .false.) selects the precomputed Legendre table
-  ! (memory ~ 2*nlat^3 bytes in total) instead of on-the-fly recursion.
-  ! The table is not faster: the 4-column DGEMM is memory-bound, so
-  ! streaming the table costs more than recomputing Pbar in cache.
 
-  function new_sphere_harmonics_random_fields(pert_param, pert_grid_f, comm, rc, use_table) result(rf)
-    type(sphere_harmonics_random_fields) :: rf
+  function new_sphere_random_fields(pert_param, pert_grid_f, comm, rc) result(rf)
+    type(sphere_random_fields) :: rf
     type(pert_param_type), intent(in) :: pert_param
     type(grid_def_type), intent(in) :: pert_grid_f
     integer, optional, intent(in) :: comm
     integer, optional, intent(out) :: rc
-    logical, optional, intent(in) :: use_table
 
-    integer :: ierr, i, m, r, l, nl, nlat, nlon
-    integer(INT64) :: tot
+    integer :: ierr, i, m, r, l, nlat, nlon
     real(REAL64) :: xcorr_deg, var, th, llp1, c2_use
 
     if (present(rc)) rc = 0
     nlon = pert_grid_f%N_lon
     nlat = pert_grid_f%N_lat
-    rf%nphi_sphere = nlon
-    rf%nz_sphere   = nlat
-    rf%ID_string   = sphere_harmonics_random_fields_id(pert_param, pert_grid_f)
-    rf%use_table   = .false.
-    if (present(use_table)) rf%use_table = use_table
+    rf%nlon = nlon
+    rf%nlat = nlat
+    rf%ID_string = sphere_random_fields_id(pert_param, pert_grid_f)
 
     if (present(comm)) then
       call MPI_Comm_dup(comm, rf%comm, ierr)
@@ -146,7 +127,7 @@ contains
     rf%nm = nlon / 2 + 1
     if (mod(nlat, 2) /= 0 .or. mod(nlon, 2) /= 0 .or. rf%nm < rf%L + 1) then
       if (rf%rank == 0) write(*,'(a,i0,a,i0,a)') &
-        'sphere_harmonics_random_fields: need even nlat, nlon >= 2*nlat-2 (got ', &
+        'sphere_random_fields: need even nlat, nlon >= 2*nlat-2 (got ', &
         nlon, 'x', nlat, ')'
       if (present(rc)) then
         rc = 1; return
@@ -171,7 +152,7 @@ contains
     var = 0.0d0
     do l = 0, rf%L
       llp1 = real(l,REAL64)*real(l+1,REAL64)
-      rf%sqrtC(l) = sqrt(1.0d0 / (rf%c0 + rf%c2*llp1**2))
+      rf%sqrtC(l) = sqrt(1.0d0 / (1.0d0 + rf%c2*llp1**2))
       var = var + real(2*l+1,REAL64) * rf%sqrtC(l)**2 / (4.0d0*PI)
     end do
     rf%scale = 1.0d0 / sqrt(var)
@@ -208,27 +189,6 @@ contains
       end if
     end do
 
-    ! --- Legendre table -------------------------------------------------
-    allocate(rf%off(rf%nmloc + 1))
-    rf%off(1) = 1
-    do i = 1, rf%nmloc
-      nl = rf%L - rf%mloc(i) + 1
-      rf%off(i+1) = rf%off(i) + int(rf%nh,INT64)*int(nl,INT64)
-    end do
-    rf%table_bytes = 0
-    if (rf%use_table) then
-      allocate(rf%ptab(rf%off(rf%nmloc+1) - 1))
-      do i = 1, rf%nmloc
-        nl = rf%L - rf%mloc(i) + 1
-        call plm_block(rf, rf%mloc(i), nl, rf%ptab(rf%off(i):rf%off(i+1)-1))
-      end do
-      rf%table_bytes = 8_INT64 * (rf%off(rf%nmloc+1) - 1)
-    end if
-    tot = rf%table_bytes
-    if (rf%comm /= MPI_COMM_NULL) &
-      call MPI_Allreduce(MPI_IN_PLACE, tot, 1, MPI_INTEGER8, MPI_SUM, rf%comm, ierr)
-    rf%table_bytes = tot
-
     ! --- ring distribution ---------------------------------------------
     allocate(rf%rcount(rf%npes), rf%rdispl(rf%npes))
     do r = 0, rf%npes-1
@@ -251,7 +211,7 @@ contains
       st = DftiSetValue(rf%desc, DFTI_OUTPUT_DISTANCE, nlon)
       st = DftiCommitDescriptor(rf%desc)
       if (st /= DFTI_NO_ERROR) then
-        write(*,'(a,i0)') 'sphere_harmonics_random_fields: DFTI commit failed ', st
+        write(*,'(a,i0)') 'sphere_random_fields: DFTI commit failed ', st
         if (present(rc)) then
           rc = st; return
         end if
@@ -259,29 +219,27 @@ contains
       end if
     end block
 #endif
-
-    rf%is_initialized = .true.
-  end function new_sphere_harmonics_random_fields
+  end function new_sphere_random_fields
 
   ! ----------------------------------------------------------------------
 
   subroutine generate_2d_Random_field(this, rseed, rfield, rfield2, lx, ly, dx, dy)
-    class(sphere_harmonics_random_fields), intent(inout) :: this
+    class(sphere_random_fields), intent(inout) :: this
     integer, intent(inout) :: rseed(NRANDSEED)
     real, intent(out) :: rfield(:,:), rfield2(:,:)
-    real, intent(in) :: lx, ly, dx, dy
-    real, allocatable :: f1(:,:), f2(:,:)
+    real, intent(in) :: lx, ly, dx, dy   ! unused: spectrum is set at construction
 
-    allocate(f1(this%nphi_sphere, this%nz_sphere), f2(this%nphi_sphere, this%nz_sphere))
-    call sh_draw(this, rseed, f1, f2)
-    call remap_latlon(f1, rfield)
-    call remap_latlon(f2, rfield2)
+    if (size(rfield,1) /= this%nlon .or. size(rfield,2) /= this%nlat) then
+      write(*,'(a)') 'sphere_random_fields: output grid differs from constructor grid'
+      stop 1
+    end if
+    call sh_draw(this, rseed, rfield, rfield2)
     call normalize_unit_variance(rfield)
     call normalize_unit_variance(rfield2)
   end subroutine generate_2d_Random_field
 
   subroutine generate_white_field(this, rseed, rfield)
-    class(sphere_harmonics_random_fields), intent(inout) :: this
+    class(sphere_random_fields), intent(inout) :: this
     integer, intent(inout) :: rseed(NRANDSEED)
     real, target, intent(out) :: rfield(:,:)
     real :: values(2)
@@ -296,22 +254,8 @@ contains
     end do
   end subroutine generate_white_field
 
-  ! Integer-seeded variant: initialise a private ran2 stream from seed.
-  subroutine generate_2d_Random_field_seeded(this, seed, rfield, rfield2, lx, ly, dx, dy)
-    class(sphere_harmonics_random_fields), intent(inout) :: this
-    integer, intent(in) :: seed
-    real, intent(out) :: rfield(:,:), rfield2(:,:)
-    real, intent(in) :: lx, ly, dx, dy
-    integer :: rseed(NRANDSEED)
-
-    rseed = 0
-    rseed(1) = -max(abs(seed), 1)
-    call init_randseed(rseed)
-    call this%generate_2d_Random_field(rseed, rfield, rfield2, lx, ly, dx, dy)
-  end subroutine generate_2d_Random_field_seeded
-
   subroutine finalize(this, rc)
-    class(sphere_harmonics_random_fields), intent(inout) :: this
+    class(sphere_random_fields), intent(inout) :: this
     integer, optional, intent(out) :: rc
     integer :: ierr
 #ifdef MKL_AVAILABLE
@@ -320,9 +264,7 @@ contains
       nullify(this%desc)
     end if
 #endif
-    if (allocated(this%ptab))   deallocate(this%ptab)
     if (allocated(this%mloc))   deallocate(this%mloc)
-    if (allocated(this%off))    deallocate(this%off)
     if (allocated(this%coff))   deallocate(this%coff)
     if (allocated(this%sqrtC))  deallocate(this%sqrtC)
     if (allocated(this%lfac))   deallocate(this%lfac)
@@ -334,20 +276,14 @@ contains
       call MPI_Comm_free(this%comm, ierr)
       this%comm = MPI_COMM_NULL
     end if
-    this%is_initialized = .false.
     if (present(rc)) rc = 0
   end subroutine finalize
-
-  logical function initialized(this)
-    class(sphere_harmonics_random_fields), intent(in) :: this
-    initialized = this%is_initialized
-  end function initialized
 
   ! ======================================================================
   ! Pbar_lm(x_j) for l = m..L, north rings j = 1..nh, stored P(nh, nl).
 
   subroutine plm_block(sh, m, nl, P)
-    type(sphere_harmonics_random_fields), intent(in) :: sh
+    type(sphere_random_fields), intent(in) :: sh
     integer, intent(in) :: m, nl
     real(REAL64), intent(out) :: P(sh%nh, nl)
     integer :: j, l, k
@@ -377,9 +313,9 @@ contains
   ! (lat index 1 = southernmost ring).  Every rank returns the full fields.
 
   subroutine sh_draw(sh, rseed, f1, f2)
-    type(sphere_harmonics_random_fields), intent(inout) :: sh
+    type(sphere_random_fields), intent(inout) :: sh
     integer, intent(inout) :: rseed(NRANDSEED)
-    real, intent(out) :: f1(sh%nphi_sphere, sh%nz_sphere), f2(sh%nphi_sphere, sh%nz_sphere)
+    real, intent(out) :: f1(sh%nlon, sh%nlat), f2(sh%nlon, sh%nlat)
 
     complex(REAL64), allocatable :: G(:,:,:), Gl(:)
     real(REAL64), allocatable :: Pw(:), Be(:,:), Bo(:,:), E(:,:), O(:,:), gz(:,:), rout(:)
@@ -389,7 +325,7 @@ contains
     integer(INT64) :: n0
     real(REAL64) :: fac, r1, r2
 
-    nlat = sh%nz_sphere; nlon = sh%nphi_sphere
+    nlat = sh%nlat; nlon = sh%nlon
 
     ! --- global uniform stream: 4 normals per (l,m), Box-Muller pairs ----
     nu = int(4_INT64*sh%ncoef)
@@ -399,7 +335,7 @@ contains
     allocate(G(sh%nm, 2, nlat)); G = (0.0d0, 0.0d0)
     allocate(Be((sh%L+2)/2, 4), Bo((sh%L+2)/2, 4), E(sh%nh,4), O(sh%nh,4))
     allocate(gz(sh%L+1, 4))
-    if (.not. sh%use_table) allocate(Pw(int(sh%nh,INT64)*int(sh%L+1,INT64)))
+    allocate(Pw(int(sh%nh,INT64)*int(sh%L+1,INT64)))
 
     do i = 1, sh%nmloc
       m  = sh%mloc(i)
@@ -423,25 +359,15 @@ contains
       Be(1:ne,:) = gz(1:nl:2,:)
       if (no > 0) Bo(1:no,:) = gz(2:nl:2,:)
 
-      if (sh%use_table) then
-        call dgemm('N','N', sh%nh, 4, ne, 1.0d0, sh%ptab(sh%off(i)), 2*sh%nh, &
-                   Be, size(Be,1), 0.0d0, E, sh%nh)
-        if (no > 0) then
-          call dgemm('N','N', sh%nh, 4, no, 1.0d0, sh%ptab(sh%off(i)+sh%nh), 2*sh%nh, &
-                     Bo, size(Bo,1), 0.0d0, O, sh%nh)
-        else
-          O = 0.0d0
-        end if
+      ! even/odd l rows of Pbar are interleaved: leading dimension 2*nh
+      call plm_block(sh, m, nl, Pw(1:int(sh%nh,INT64)*nl))
+      call dgemm('N','N', sh%nh, 4, ne, 1.0d0, Pw(1), 2*sh%nh, &
+                 Be, size(Be,1), 0.0d0, E, sh%nh)
+      if (no > 0) then
+        call dgemm('N','N', sh%nh, 4, no, 1.0d0, Pw(1+sh%nh), 2*sh%nh, &
+                   Bo, size(Bo,1), 0.0d0, O, sh%nh)
       else
-        call plm_block(sh, m, nl, Pw(1:int(sh%nh,INT64)*nl))
-        call dgemm('N','N', sh%nh, 4, ne, 1.0d0, Pw(1), 2*sh%nh, &
-                   Be, size(Be,1), 0.0d0, E, sh%nh)
-        if (no > 0) then
-          call dgemm('N','N', sh%nh, 4, no, 1.0d0, Pw(1+sh%nh), 2*sh%nh, &
-                     Bo, size(Bo,1), 0.0d0, O, sh%nh)
-        else
-          O = 0.0d0
-        end if
+        O = 0.0d0
       end if
 
       ! north ring j (theta_j) -> lat index nlat+1-j ; south mirror -> j
@@ -514,40 +440,6 @@ contains
     end do
   end subroutine irfft_rows
 #endif
-
-  ! ======================================================================
-  ! Copy, or bilinearly remap (periodic in lon, cell-centred lat) the native
-  ! (nphi, nz) field onto an arbitrary (N_lon, N_lat) cell-centred grid.
-
-  subroutine remap_latlon(src, dst)
-    real, intent(in)  :: src(:,:)
-    real, intent(out) :: dst(:,:)
-    integer :: ns, nzs, nd, nzd, i, j, p1, p2, k1, k2
-    real(REAL64) :: pos, wp, wz, v1, v2
-
-    ns = size(src,1); nzs = size(src,2)
-    nd = size(dst,1); nzd = size(dst,2)
-    if (ns == nd .and. nzs == nzd) then
-      dst = src
-      return
-    end if
-    do j = 1, nzd
-      pos = 0.5d0 + (real(j,REAL64) - 0.5d0) * real(nzs,REAL64) / real(nzd,REAL64)
-      k1 = max(1, min(nzs, floor(pos)))
-      k2 = max(1, min(nzs, k1 + 1))
-      wz = max(0.0d0, min(1.0d0, pos - real(k1,REAL64)))
-      do i = 1, nd
-        pos = 0.5d0 + (real(i,REAL64) - 0.5d0) * real(ns,REAL64) / real(nd,REAL64)
-        p1 = floor(pos)
-        wp = pos - real(p1,REAL64)
-        p1 = modulo(p1 - 1, ns) + 1
-        p2 = modulo(p1, ns) + 1
-        v1 = (1.0d0-wz)*src(p1,k1) + wz*src(p1,k2)
-        v2 = (1.0d0-wz)*src(p2,k1) + wz*src(p2,k2)
-        dst(i,j) = real((1.0d0-wp)*v1 + wp*v2)
-      end do
-    end do
-  end subroutine remap_latlon
 
   subroutine normalize_unit_variance(field)
     real, intent(inout) :: field(:,:)
