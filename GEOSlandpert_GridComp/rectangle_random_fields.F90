@@ -647,26 +647,35 @@ contains
     
     ! local variables
     integer :: Nxy, index
-    real, pointer :: ptr2rfield(:)
+    real, allocatable :: buf(:)
     logical :: NxyIsOdd
     real :: tmp_real(2)
 
     Nxy = this%N_x*this%N_y
-    
-    ptr2rfield(1:Nxy) => rfield(:,:) ! ptr rank remapping
 
-    NxyIsOdd = .false.
-    if (mod(Nxy,2)==1) NxyIsOdd = .true.
+    if (size(rfield,1) < this%N_x .or. size(rfield,2) < this%N_y) &
+         call quit('generate_white_field: rfield too small')
+
+    ! fill a contiguous 1d buffer, then copy into rfield (which may be
+    ! non-contiguous, e.g. an array section; pointer rank remapping
+    ! onto rfield would be invalid in that case)
+    allocate(buf(Nxy))
+
+    NxyIsOdd = (mod(Nxy,2)==1)
 
     do index=1,Nxy-1,2
        call nr_gasdev(rseed, tmp_real)
-       ptr2rfield(index) = tmp_real(1)
-       ptr2rfield(index+1) = tmp_real(2)
+       buf(index)   = tmp_real(1)
+       buf(index+1) = tmp_real(2)
     end do
     if (NxyIsOdd) then
        call nr_gasdev(rseed, tmp_real)
-       ptr2rfield(Nxy) = tmp_real(1)
+       buf(Nxy) = tmp_real(1)
     end if
+
+    rfield(1:this%N_x,1:this%N_y) = reshape(buf, [this%N_x, this%N_y])
+
+    deallocate(buf)
 
   end subroutine generate_white_field
 
