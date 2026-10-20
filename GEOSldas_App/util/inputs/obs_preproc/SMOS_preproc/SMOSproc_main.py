@@ -127,10 +127,11 @@ def main():
         try:
             ncflist = process_ee_to_nc(current_date)
         except RuntimeError as e:
-            logging.error(f"Halting processing for {date_str} due to error: {e} related to building nc file list")
             if fail_fast:
+                logging.error(f"Halting processing for {date_str} due to error: {e} related to building nc file list")
                 sys.exit(1) 
             else:
+                logging.error(f"Skipping processing for {date_str} due to error: {e} related to building nc file list")
                 current_date += timedelta(days=1)
                 continue
 
