@@ -24,9 +24,7 @@ module enkf_types
   ! reichle,28 Feb 2024: added "%maskpath"  and "%maskname"  to "obs_param_type"
   !
   ! -------------------------------------------------------------------
-
-  use LDAS_ensdrv_Globals,  ONLY: nodata_generic
-
+  
   implicit none
 
   save
@@ -183,7 +181,7 @@ contains
     
     ! local variables
 
-    integer :: i, N_tmp
+    integer :: i
     
     ! --------------------------------------------------------------------
 
@@ -196,13 +194,9 @@ contains
        write (unitnumber,       *) obs_param(i)%orbit     
        write (unitnumber,       *) obs_param(i)%pol       
        write (unitnumber,       *) obs_param(i)%N_ang     
-
-       if (obs_param(i)%N_ang>0) then
-          write (unitnumber,    *) obs_param(i)%ang(1:obs_param(i)%N_ang)       
-       else
-          write (unitnumber,    *) nodata_generic           
-       end if
-
+       
+       write (unitnumber,       *) obs_param(i)%ang(1:obs_param(i)%N_ang)       
+       
        write (unitnumber,       *) obs_param(i)%freq      
        write (unitnumber,       *) obs_param(i)%FOV
        write (unitnumber, '(42A)') "'" // trim(obs_param(i)%FOV_units) // "'"       
