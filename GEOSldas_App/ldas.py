@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import glob
-import linecache
 import shutil
 import fileinput
-import time
 import subprocess as sp
 import shlex
 import tempfile
-import netCDF4
-from dateutil                     import rrule
 from datetime                     import datetime
 from datetime                     import timedelta
 from collections                  import OrderedDict
 from dateutil.relativedelta       import relativedelta
-from remap_utils                  import *
-from remap_other_restarts         import *
-from remap_catchANDcn             import *
-from lenkf_j_template             import *
-from setup_utils                  import *
+from remap_utils                  import STRETCH_GRID, init_merra2, get_config_from_answers
+from remap_other_restarts         import other_restarts
+from remap_catchANDcn             import catchANDcn
+from lenkf_j_template             import job_directive, job_body
+from setup_utils                  import (parseInputFile, printDictionary, hours_to_hhmmss,
+                                          getExeKeys, getResourceKeys, read_gridname)
 
 """
 ldas class is used by ldas_setup
@@ -209,7 +205,6 @@ class ldas:
 
             # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
             _beg_date                                  = datetime.strptime( self.ExeInputs['BEG_DATE'], "%Y%m%d %H%M%S")
-            _hours                                     = int(self.ExeInputs['JOB_SGMT'][ 9:11])
             _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60)
             self.ExeInputs['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S")
 
@@ -369,21 +364,9 @@ class ldas:
         self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +land_domain_ )[0]
         self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +land_domain_ )[0]
 
-        # assigning Gridname
+        # assigning Gridname (read_gridname handles *.til, *.nc4, and trailing '.domain')
         if 'GRIDNAME' not in self.ExeInputs :
-           tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
-           extension = os.path.splitext(tmptile)[1]
-           if extension == '.domain':
-             extension = os.path.splitext(tmptile)[0]
-           gridname_ =''
-           if extension == '.til':
-              gridname_ = linecache.getline(tmptile, 3).strip()
-           else:
-              nc_file = netCDF4.Dataset(tmptile,'r')
-              gridname_ = nc_file.getncattr('Grid_Name')
-           # in case it is an old name: SMAP-EASEvx-Mxx
-           gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
-           self.ExeInputs['GRIDNAME']  = gridname_
+           self.ExeInputs['GRIDNAME'] = read_gridname(self.ExeInputs['TILING_FILE'])
 
         # to run routing on standard EASE tile space, need EASE_PFAF_TILE_FILE
         if (self.run_route > 0 and 'EASE' in self.ExeInputs['GRIDNAME']):
@@ -395,22 +378,6 @@ class ldas:
         domain_      = None
         land_domain_ = None
         inpgeom_     = None
-
-        # assigning Gridname
-        if 'GRIDNAME' not in self.ExeInputs :
-            tmptile = os.path.realpath(self.ExeInputs['TILING_FILE'])
-            extension = os.path.splitext(tmptile)[1]
-            if extension == '.domain':
-              extension = os.path.splitext(os.path.splitext(tmptile)[0])[1]
-            gridname_ =''
-            if extension == '.til':
-               gridname_ = linecache.getline(tmptile, 3).strip()
-            else:
-               nc_file = netCDF4.Dataset(tmptile,'r')
-               gridname_ = nc_file.getncattr('Grid_Name')
-            # in case it is an old name: SMAP-EASEvx-Mxx
-            gridname_ = gridname_.replace('SMAP-','').replace('-M','_M')
-            self.ExeInputs['GRIDNAME']  = gridname_
 
         if 'POSTPROC_HIST' not in self.ExeInputs:
             self.ExeInputs['POSTPROC_HIST'] = 0
@@ -515,9 +482,7 @@ class ldas:
 
         # print rm inputs
         if self.verbose:
-            print ('\n\nRequired inputs for resource manager:')
-            printDictionary(self.RmInputs)
-            print ('\n\nOptional inputs for resource manager:')
+            print ('\n\nInputs for resource manager:')
             printDictionary(self.RmInputs)
             print ('\n\n')
 
@@ -658,9 +623,6 @@ class ldas:
         """
 
         status = False
-
-        # shorthands
-        _nens = self.nens
 
         # run/inp/wrk dirs
         os.makedirs(self.exphome+'/'+self.ExeInputs['EXP_ID'], exist_ok=True)
@@ -1237,7 +1199,6 @@ class ldas:
             ## exe inp file
             exefilename = self.exeinpfile.rstrip('/').split('/')[-1]
             newfilename = exefilename
-            _nens = self.nens
             ctr = 0
             while os.path.isfile(self.rundir+'/'+newfilename):
                 ctr += 1
@@ -1542,9 +1503,7 @@ class ldas:
         os.chdir(self.rundir)
         fout =open(self.rundir+'/ldas_batchrun.j','w')
         fout.write("#!/bin/bash -f\n")
-        jobid = None
         SBATCHQSUB = 'sbatch'
-        expid = self.ExeInputs['EXP_ID']
         if self.GEOS_SITE == 'NAS':
           SBATCHQSUB = 'qsub'
         fout.write("\nsed -i 's/if($capdate<$enddate) "+SBATCHQSUB+"/#if($capdate<$enddate) "+SBATCHQSUB+"/g' lenkf.j\n\n")
@@ -1554,30 +1513,6 @@ class ldas:
                 fout.write("jobid%d=$(echo $(sbatch lenkf.j) | cut -d' ' -f 4)\n"%(iseg))
                 fout.write("echo $jobid%d\n"%iseg )
             else :
-                _start = self.begDates[iseg]
-                myDateTime = '%04d%02d%02d_%02d%02dz' % \
-                   (_start.year, _start.month, _start.day,_start.hour,_start.minute)
-                _logfile = os.path.relpath(
-                   '/'.join([
-                        self.outdir,
-                        self.ExeInputs['EXP_DOMAIN'],
-                        'rc_out',
-                        'Y%04d' % _start.year,
-                        'M%02d' % _start.month,
-                        '.'.join([expid, 'ldas_log', myDateTime, 'txt']),
-                        ]),
-                    self.rundir)
-                _errfile = os.path.relpath(
-                   '/'.join([
-                        self.outdir,
-                        self.ExeInputs['EXP_DOMAIN'],
-                        'rc_out',
-                        'Y%04d' % _start.year,
-                        'M%02d' % _start.month,
-                        '.'.join([expid, 'ldas_err', myDateTime, 'txt']),
-                        ]),
-                    self.rundir)
-
                 #fout.write("jobid%d=$(echo $(sbatch --dependency=afterany:$jobid%d --output=%s --error=%s lenkf.j) | cut -d' ' -f 4)\n"%(iseg,iseg-1,_logfile, _errfile))
                 fout.write("jobid%d=$(echo $(sbatch --dependency=afterok:$jobid%d lenkf.j) | cut -d' ' -f 4)\n"%(iseg,iseg-1))
                 fout.write("echo $jobid%d\n"%iseg )
