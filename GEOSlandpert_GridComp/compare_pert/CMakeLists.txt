@@ -13,4 +13,5 @@ endif ()
 
 install(
   PROGRAMS compare_pert.py plot_timing.py run_compare.sh
+           xcorr_stats.py plot_xcorr_stats.py pole_check.py run_xcorr_stats.sh
   DESTINATION bin)
