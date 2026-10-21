@@ -1,4 +1,4 @@
-function [ N_obs_param, obs_param ] = read_obs_param( fname )
+function [ N_obs_param, obs_param ] = read_obsparam( fname )
  
 % Get observation parameters
 % Format as in module enkf_types, subroutine write_obs_param
