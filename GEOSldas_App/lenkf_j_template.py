@@ -511,7 +511,12 @@ while ( $counter <= ${{NUM_SGMT}} )
    foreach ofile ( $outfiles )
       set ThisTime = `echo $ofile | rev | cut -d'.' -f2 | rev`
       set TY = `echo $ThisTime | cut -c1-4`
-      set TM = `echo $ThisTime | cut -c5-6`
+      set C5 = `echo $ThisTime | cut -c5`
+      if ("$C5" == "-") then
+         set TM = `echo $ThisTime | cut -c6-7`
+      else
+         set TM = `echo $ThisTime | cut -c5-6`
+      endif
       if ($NENS == 1) then
          set THISDIR = $EXPDIR/output/$EXPDOMAIN/diag/ens0000/Y${{TY}}/M${{TM}}/
       else
