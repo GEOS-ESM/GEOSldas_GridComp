@@ -150,16 +150,17 @@ for imonth = 1:length(run_months)
         HHMM = [num2str(hour, '%2.2d'), num2str(minute, '%2.2d')];
         
         % read innov files
-        fname = [inpath, '/ana/ens_avg/', 'Y', YYYYMMDD(1:4), '/', 'M', YYYYMMDD(5:6), '/', exp_run, '.ens_avg.ldas_ObsFcstAna.', YYYYMMDD, '_', HHMM, 'z.bin'];
+        fname = [inpath, '/ana/ens_avg/', 'Y', YYYYMMDD(1:4), '/', 'M', YYYYMMDD(5:6), '/', exp_run, '.ens_avg.ldas_ObsFcstAna.', YYYYMMDD, '_', HHMM, 'z.nc4'];
         ifp = fopen(fname, 'r', 'l');
         
         if (ifp > 0) % Proceed only if file exists
           fclose(ifp);
           [date_time, obs_assim, obs_species, obs_tilenum, obs_lon, obs_lat, obs_obs, obs_obsvar, obs_fcst, obs_fcstvar, obs_ana, obs_anavar] = read_ObsFcstAna(fname);
           
-          % remove tiles where obs_fcst is no-data (note: read_ObsFcstAna() returns NaN)
+          % remove obs where obs_obs or obs_fcst is no-data (note: read_ObsFcstAna() returns NaN),
+          % so that obs and model statistics use the same obs/fcst pairs
             
-          idx = isnan(obs_fcst);
+          idx = isnan(obs_fcst) | isnan(obs_obs);
 
           obs_assim(  idx) = [];
           obs_species(idx) = [];
@@ -198,19 +199,41 @@ for imonth = 1:length(run_months)
                 error('multiple obs of the same species at one location? - only last one in line is used');
               end
               
-              % Put obs lat/lon on our grid and figure out obsnum/grid index
-              i_idx = floor((obs_lon_i - ll_lon) / d_lon) + 1;
-              j_idx = floor((obs_lat_i - ll_lat) / d_lat) + 1;
-              [~, obs_idx] = ismember([i_idx, j_idx], [i_out, j_out], 'rows');
-              obs_i = obsnum(obs_idx);
-              
-              o_data_sum( scnt, obs_i, count) = sum([o_data_sum( scnt, obs_i, count); obs_obs_i'         ], "omitnan");
-              m_data_sum( scnt, obs_i, count) = sum([m_data_sum( scnt, obs_i, count); obs_fcst_i'        ], "omitnan");
-              o_data_sum2(scnt, obs_i, count) = sum([o_data_sum2(scnt, obs_i, count); obs_obs_i'.^2      ], "omitnan");
-              m_data_sum2(scnt, obs_i, count) = sum([m_data_sum2(scnt, obs_i, count); obs_fcst_i'.^2     ], "omitnan");
-              m_data_min( scnt, obs_i, count) = min([m_data_min( scnt, obs_i, count); obs_fcst_i'        ]           );
-              m_data_max( scnt, obs_i, count) = max([m_data_max( scnt, obs_i, count); obs_fcst_i'        ]           );
-              N_data(     scnt, obs_i, count) = sum([N_data(     scnt, obs_i, count); ~isnan(obs_obs_i)' ], "omitnan");
+              % Put obs lat/lon on our grid and figure out obsnum/grid index.
+              % Use ceil() in single precision, consistent with the lookup of
+              % the scaling parameters in GEOSldas (scale_obs_sfmc_zscore),
+              % so that obs on a cell edge go into the cell that GEOSldas
+              % reads; drop obs outside the grid.
+              % obsnum = (j-1)*n_lon + i (see ind2sub above).
+              i_idx  = double( ceil((single(obs_lon_i) - single(ll_lon)) / single(d_lon)) );
+              j_idx  = double( ceil((single(obs_lat_i) - single(ll_lat)) / single(d_lat)) );
+              inside = i_idx >= 1 & i_idx <= n_lon & j_idx >= 1 & j_idx <= n_lat;
+              obs_i  = (j_idx(inside)-1)*n_lon + i_idx(inside);
+              obs_o  = obs_obs_i( inside);
+              obs_f  = obs_fcst_i(inside);
+
+              % Loop over obs so that all obs in the same grid cell are
+              % added (vectorized assignment with repeated indices would
+              % keep only the last obs in each cell).
+              for k = 1:length(obs_i)
+                c = obs_i(k);
+                if ~isnan(obs_o(k))
+                  if isnan(o_data_sum( scnt, c, count)), o_data_sum( scnt, c, count) = 0; end
+                  if isnan(o_data_sum2(scnt, c, count)), o_data_sum2(scnt, c, count) = 0; end
+                  if isnan(N_data(     scnt, c, count)), N_data(     scnt, c, count) = 0; end
+                  o_data_sum( scnt, c, count) = o_data_sum( scnt, c, count) + obs_o(k);
+                  o_data_sum2(scnt, c, count) = o_data_sum2(scnt, c, count) + obs_o(k)^2;
+                  N_data(     scnt, c, count) = N_data(     scnt, c, count) + 1;
+                end
+                if ~isnan(obs_f(k))
+                  if isnan(m_data_sum( scnt, c, count)), m_data_sum( scnt, c, count) = 0; end
+                  if isnan(m_data_sum2(scnt, c, count)), m_data_sum2(scnt, c, count) = 0; end
+                  m_data_sum( scnt, c, count) = m_data_sum( scnt, c, count) + obs_f(k);
+                  m_data_sum2(scnt, c, count) = m_data_sum2(scnt, c, count) + obs_f(k)^2;
+                  m_data_min( scnt, c, count) = min(m_data_min(scnt, c, count), obs_f(k));
+                  m_data_max( scnt, c, count) = max(m_data_max(scnt, c, count), obs_f(k));
+                end
+              end
             end
           end
         end
