@@ -110,20 +110,6 @@ else
     obs_ana      = double( ncread( fname, 'ana'        ) );
     obs_anavar   = double( ncread( fname, 'anavar'     ) );
     
-    % no-data check (ncread() already returns NaN for _FillValue)
-    %  - single ensemble member integrations yield obs_obsvar==nodata)
-    %  - in some cases obs_fcst (a.k.a. Obs_pred) is no-data-value,
-    %     eg. SMOS Tb when snow is present)
-    
-    obs_obs(     obs_obs       == nodata ) = NaN;
-    obs_obsvar(  obs_obsvar    == nodata ) = NaN;
-    
-    obs_fcst(    obs_fcst      == nodata ) = NaN;
-    obs_fcstvar( obs_fcstvar   == nodata ) = NaN;
-    
-    obs_ana(     obs_ana       == nodata ) = NaN;
-    obs_anavar(  obs_anavar    == nodata ) = NaN;
-
   else
 
     % read binary file
@@ -231,27 +217,28 @@ else
     obs_anavar   = fread( ifp, [N_obs 1], float_precision );
     fortran_tag  = fread( ifp, 1, int_precision );	
     
-    
-    % no-data check 
-    %  - single ensemble member integrations yield obs_obsvar==nodata)  
-    %  - in some cases obs_fcst (a.k.a. Obs_pred) is no-data-value, 
-    %     eg. SMOS Tb when snow is present)
-    
-    obs_obsvar(  obs_obsvar    == nodata ) = NaN;	  
-    
-    obs_fcst(    obs_fcst      == nodata ) = NaN;	  
-    obs_fcstvar( obs_fcstvar   == nodata ) = NaN;	  
-    
-    obs_ana(     obs_ana       == nodata ) = NaN;	  
-    obs_anavar(  obs_anavar    == nodata ) = NaN;	  
-    
-    
     % close file  
     
     fclose(ifp);
 
   end      % is_nc4?
- 
+
+  
+  % no-data check:
+  %  - nc4: ncread() already returns NaN for _FillValue
+  %  - single ensemble member integrations yield obs_obsvar==nodata)
+  %  - in some cases obs_fcst (a.k.a. Obs_pred) is no-data-value,
+  %     eg. SMOS Tb when snow is present)
+  
+  obs_obs(     obs_obs       == nodata ) = NaN;
+  obs_obsvar(  obs_obsvar    == nodata ) = NaN;
+  
+  obs_fcst(    obs_fcst      == nodata ) = NaN;
+  obs_fcstvar( obs_fcstvar   == nodata ) = NaN;
+  
+  obs_ana(     obs_ana       == nodata ) = NaN;
+  obs_anavar(  obs_anavar    == nodata ) = NaN;
+  
 end        % file exists?
 
 
