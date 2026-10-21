@@ -10,17 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-
+- Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
+- Improved error handling in preprocessor for SMOS obs ([PR #212](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/212)).
+ 
 ### Changed
-- Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files.
+- Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 
 ### Fixed
-- Fixed bugs in MATLAB obs scaling scripts (not 0-diff for lat/lon grid).
-
+- Fixed bugs in MATLAB obs scaling parameter scripts (not 0-diff for lat/lon grid) ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
+- Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
+- Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
+  
 ### Removed
 
 ### Deprecated
-
+ 
 -----------------------------
 
 ## [v4.1.0] - 2026-10-15
