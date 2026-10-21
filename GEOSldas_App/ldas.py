@@ -37,7 +37,7 @@ class ldas:
         # - keywords that are not in exeinp file but are in LDAS.rc file
         self.NoneLDASrcKeys=['EXP_ID', 'EXP_DOMAIN',
             'BEG_DATE', 'END_DATE','RESTART','RESTART_PATH',
-            'RESTART_DOMAIN','RESTART_ID','BCS_PATH','TILING_FILE','GRN_FILE','LAI_FILE','LNFM_FILE','NIRDF_FILE',
+            'RESTART_DOMAIN','RESTART_ID','BCS_PATH','TILING_FILE','GRN_FILE','LAI_FILE','LAI_TS_FILE','LNFM_FILE','NIRDF_FILE',
             'VISDF_FILE','CATCH_DEF_FILE','NDVI_FILE', 'EASE_PFAF_TILE_FILE',
             'NML_INPUT_PATH','HISTRC_FILE','RST_FROM_GLOBAL','JOB_SGMT','NUM_SGMT','POSTPROC_HIST',
             'MINLON','MAXLON','MINLAT','MAXLAT','EXCLUDE_FILE','INCLUDE_FILE','MWRTM_PATH','GRIDNAME',
@@ -110,6 +110,7 @@ class ldas:
         self.with_lake          = False
         self.with_landice       = False
         self.run_route          = 0
+        self.modis_dvg          = 0
         self.with_issm          = False
         self.adas_expdir        = ''
 
@@ -250,6 +251,7 @@ class ldas:
                 self.with_issm = True
 
         self.run_route = int(self.ExeInputs.get('RUN_ROUTE',0))
+        self.modis_dvg = int(self.ExeInputs.get('MODIS_DVG',0))
 
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
@@ -361,6 +363,11 @@ class ldas:
 
         self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+land_domain_ )[0]
         self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +land_domain_ )[0]
+        if (self.modis_dvg > 0):
+           self.ExeInputs['LAI_TS_FILE']    = glob.glob(self.bcs_dir_land + 'clsm/lai.MODIS_8-Day_*'+land_domain_ )
+        else:
+           self.ExeInputs['LAI_TS_FILE'] = []
+
         tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+land_domain_)
         if (len(tmp_) ==1) :
            self.ExeInputs['LNFM_FILE'] = tmp_[0]
@@ -848,6 +855,8 @@ class ldas:
                 self.ExeInputs['NDVI_FILE'],
                 self.ExeInputs['NIRDF_FILE'],
                 self.ExeInputs['VISDF_FILE'] ]
+           if self.ExeInputs['LAI_TS_FILE']:
+              bcs += self.ExeInputs['LAI_TS_FILE']                   
            if (self.ExeInputs['LNFM_FILE'] != ''):
               bcs += [self.ExeInputs['LNFM_FILE']]
            if (self.has_vegopacity):
@@ -875,17 +884,24 @@ class ldas:
            # link BC
            print ("linking bcs...")
            bcnames=['green','lai','ndvi','nirdf','visdf']
+           if self.ExeInputs['LAI_TS_FILE']:
+              bcnames += ['.'] * len(self.ExeInputs['LAI_TS_FILE'])          
            if (self.ExeInputs['LNFM_FILE'] != ''):
               bcnames += ['lnfm']
            if (self.has_vegopacity):
               bcnames += ['vegopacity']
            if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
               bcnames += ['EASE_pfaf_tile_file.nc4']
-           for bcln,bc in zip(bcnames,bcs) :
-              myBC=self.inpdir+'/'+bcln+'.data'
-              if '.nc4' in bcln:
-                 myBC=self.inpdir+'/'+bcln
-              os.symlink(bc,myBC)
+           for bcln,bc in zip(bcnames,bcs):
+              if bcln == '.':
+                 myBC = self.inpdir + '/' + os.path.basename(bc)
+              elif '.nc4' in bcln:
+                 myBC = self.inpdir + '/' + bcln
+              else:
+                 myBC = self.inpdir + '/' + bcln + '.data'
+              if os.path.lexists(myBC):
+                 os.remove(myBC)       
+              os.symlink(bc, myBC)
 
            if ("catchcn" in self.catch):
               os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
@@ -1397,6 +1413,9 @@ class ldas:
                 if self.with_land :
                    bcval=['../input/green','../input/lai','../input/lnfm','../input/ndvi','../input/nirdf','../input/visdf']
                    bckey=['GREEN','LAI','LNFM','NDVI','NIRDF','VISDF']
+                   if self.ExeInputs['LAI_TS_FILE'] !='':
+                      bcval.append('../input/lai.MODIS_8-Day')
+                      bckey.append('LAI_TS')                   
                    if self.ExeInputs['EASE_PFAF_TILE_FILE'] !='':
                       bcval.append('../input/EASE_pfaf_tile_file.nc4')
                       bckey.append('EASE_PFAF_TILE')
@@ -1405,6 +1424,8 @@ class ldas:
                       valn = val+'.data'
                       if '.nc4' in val:
                         valn = val
+                      if key == 'LAI_TS':
+                        valn = val  
                       ldasrcInp[keyn]= valn
 
                    if('catchcn' in self.catch):
