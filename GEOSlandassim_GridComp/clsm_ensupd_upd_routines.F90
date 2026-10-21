@@ -482,15 +482,15 @@ contains
              
              j = j + 1
              
-             obs_param(j)         = obs_param_nml(i)         ! inherit everything
+             obs_param(j)                                    = obs_param_nml(i)                   ! inherit everything
              
-             obs_param(j)%species = j                        ! provide unique species ID
+             obs_param(j)%species                            = j                                  ! provide unique species ID
              
-             obs_param(j)%N_ang   = 1                        ! overwrite N_ang
-             
-             obs_param(j)%ang(1)  = obs_param_nml(i)%ang(k)  ! overwrite ang(1)
-             
-             obs_param(j)%ang(2:N_obs_ang_max) = nodata_generic  ! fill rest with nodata
+             obs_param(j)%N_ang                              = min( 1, obs_param_nml(i)%N_ang )   ! overwrite N_ang with either 0 or 1
+              
+             obs_param(j)%ang(1:N_obs_ang_max)               = nodata_generic                     ! fill all angles with nodata
+
+             if (obs_param(j)%N_ang>0)  obs_param(j)%ang(1)  = obs_param_nml(i)%ang(k)            ! fill first angle with appropriate value
 
           end do
           
