@@ -110,6 +110,7 @@ module LDAS_PertRoutinesMod
   private
 
   public :: read_ens_prop_inputs
+  public :: get_use_sphere_pert
   public :: interpolate_pert_to_timestep
   public :: get_pert_grid
   public :: get_progn_pert_param
@@ -163,7 +164,8 @@ contains
        kw_xcorr_force_pert,          &
        kw_ycorr_force_pert,          &
        kw_tcorr_force_pert,          &
-       kw_ccorr_force_pert           &
+       kw_ccorr_force_pert,          &
+       kw_use_sphere_pert            &
        )
 
     ! read ensemble propagation inputs from namelist file
@@ -243,6 +245,8 @@ contains
     type(force_pert_ccor_type), intent(out), optional :: &
          kw_ccorr_force_pert
 
+    logical, intent(out), optional :: kw_use_sphere_pert
+
     ! ------------------------
 
     ! locals
@@ -286,6 +290,8 @@ contains
 
     type(force_pert_ccor_type) :: ccorr_force_pert
 
+    logical :: use_sphere_pert
+
     ! Errlong variables
     character(len=*), parameter :: Iam = 'read_ens_prop_inputs'
 
@@ -322,7 +328,8 @@ contains
          xcorr_force_pert,           &
          ycorr_force_pert,           &
          tcorr_force_pert,           &
-         ccorr_force_pert
+         ccorr_force_pert,           &
+         use_sphere_pert
 
 
     root_proc = (myid ==0)
@@ -335,6 +342,8 @@ contains
 
     ccorr_progn_pert = nodata_generic
     ccorr_force_pert = nodata_generic
+
+    use_sphere_pert  = .false.   ! remains .false. if not set in namelist files
 
     ! ------------------------------------------------------
     !
@@ -487,6 +496,8 @@ contains
     if (present(kw_typ_force_pert  )) kw_typ_force_pert   = typ_force_pert
 
     if (present(kw_ccorr_force_pert)) kw_ccorr_force_pert = ccorr_force_pert
+
+    if (present(kw_use_sphere_pert)) kw_use_sphere_pert = use_sphere_pert
 
     ! ------------------------------------------------------------------
     !
@@ -804,13 +815,16 @@ contains
 
     integer, dimension(N_progn_pert_max)  :: progn_pert_select
 
+    logical :: use_sphere_pert
+
     ! ---------------------------------------------------------------
 
     call get_progn_pert_inputs( pert_grid_l,                               &
          descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
          std_normal_max_progn_pert, std_progn_pert,                        &
          xcorr_progn_pert, ycorr_progn_pert,                               &
-         tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert        )
+         tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert,       &
+         use_sphere_pert )
 
     call get_pert_select( N_progn_pert_max, pert_grid_l, std_progn_pert,   &
          N_progn_pert, progn_pert_select )
@@ -827,7 +841,7 @@ contains
             std_normal_max_progn_pert,                                        &
             std_progn_pert, xcorr_progn_pert, ycorr_progn_pert,               &
             tcorr_progn_pert, typ_progn_pert, ccorr_progn_pert,               &
-            progn_pert_select, progn_pert_param )
+            progn_pert_select, progn_pert_param, use_sphere_pert )
 
     end if
 
@@ -872,13 +886,16 @@ contains
 
     integer, dimension(N_force_pert_max)  :: force_pert_select
 
+    logical :: use_sphere_pert
+
     ! ---------------------------------------------------------------
 
     call get_force_pert_inputs( pert_grid_l,                               &
          descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
          std_normal_max_force_pert, std_force_pert,                        &
          xcorr_force_pert, ycorr_force_pert,                               &
-         tcorr_force_pert, typ_force_pert,   ccorr_force_pert        )
+         tcorr_force_pert, typ_force_pert,   ccorr_force_pert,       &
+         use_sphere_pert )
 
     call get_pert_select( N_force_pert_max, pert_grid_l, std_force_pert,   &
          N_force_pert, force_pert_select )
@@ -894,7 +911,7 @@ contains
             std_normal_max_force_pert,                                        &
             std_force_pert, xcorr_force_pert, ycorr_force_pert,               &
             tcorr_force_pert, typ_force_pert, ccorr_force_pert,               &
-            force_pert_select, force_pert_param )
+            force_pert_select, force_pert_param, use_sphere_pert )
 
     end if
 
@@ -906,7 +923,8 @@ contains
        descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
        std_normal_max_force_pert, std_force_pert,                        &
        xcorr_force_pert, ycorr_force_pert,                               &
-       tcorr_force_pert, typ_force_pert,   ccorr_force_pert       )
+       tcorr_force_pert, typ_force_pert,   ccorr_force_pert,      &
+       use_sphere_pert       )
 
     ! get inputs for forcing perturbations for ALL forcing
     ! variables (including zero standard deviations) on a grid (typically,
@@ -961,6 +979,8 @@ contains
     real, dimension(N_force_pert_max,N_force_pert_max), intent(out) :: &
          ccorr_force_pert
 
+    logical, intent(out) :: use_sphere_pert
+
     ! ---------------------------------------------------------------
     !
     ! local variables
@@ -1003,6 +1023,8 @@ contains
     ! -----------------------------------------------------------------
 
     root_proc = (myid==0)
+
+    use_sphere_pert = get_use_sphere_pert()
 
     ! ---------
     !
@@ -1297,7 +1319,8 @@ contains
        descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
        std_normal_max_progn_pert, std_progn_pert,                        &
        xcorr_progn_pert, ycorr_progn_pert,                               &
-       tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert       )
+       tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert,      &
+       use_sphere_pert       )
 
     ! get inputs for perturbations to prognostic variables for ALL prognostic
     ! variables (including zero standard deviations) on a grid (typically,
@@ -1350,6 +1373,8 @@ contains
     real, dimension(N_progn_pert_max,N_progn_pert_max), intent(out) :: &
          ccorr_progn_pert
 
+    logical, intent(out) :: use_sphere_pert
+
     ! ---------------------------------------------------------------
     !
     ! local variables
@@ -1392,6 +1417,8 @@ contains
     ! -----------------------------------------------------------------
 
     root_proc = (myid==0)
+
+    use_sphere_pert = get_use_sphere_pert()
 
     ! -------
     !
@@ -1686,13 +1713,14 @@ contains
        std_normal_max_pert,                                      &
        std_pert, xcorr_pert, ycorr_pert, tcorr_pert, typ_pert,   &
        ccorr_pert,                                               &
-       pert_select, pert_param )
+       pert_select, pert_param, use_sphere_pert )
 
     ! assemble perturbation parameters for the prognostics or forcings
     !  that have been selected to be subject to perturbations
     !
     ! reichle, 30 Nov 2001
     ! reichle, 27 May 2005 - redesign
+    ! wjiang,  2026-07 - added use_sphere_pert
     !
     ! -----------------------------------------------------------------
 
@@ -1724,6 +1752,8 @@ contains
     integer, dimension(N_pert_max), intent(in) :: pert_select
 
     type(pert_param_type), dimension(:), pointer :: pert_param ! output
+
+    logical, intent(in) :: use_sphere_pert  ! .true. => sphere_random_fields
 
     ! --------------------------
 
@@ -1765,6 +1795,7 @@ contains
           pert_param(m)%tcorr = tcorr_pert(k)
           pert_param(m)%typ   = nint(typ_pert(k))
 
+          pert_param(m)%use_sphere_pert = use_sphere_pert
 
           n = 0
 
@@ -2232,6 +2263,26 @@ contains
   end subroutine handle_nc4_stat
 
   ! **********************************************************************
+
+  ! *********************************************************************
+
+  logical function get_use_sphere_pert()
+
+    ! namelist switch use_sphere_pert (forcing, prognostic, and obs perturbations);
+    ! read on root, broadcast, and cached after the first call (collective)
+
+    logical, save :: use_sphere_pert
+    logical, save :: initialized = .false.
+    integer       :: mpierr
+
+    if (.not. initialized) then
+       if (myid==0) call read_ens_prop_inputs(kw_echo=.false., kw_use_sphere_pert=use_sphere_pert)
+       call MPI_Bcast(use_sphere_pert, 1, MPI_LOGICAL, 0, mpicomm, mpierr)
+       initialized = .true.
+    end if
+    get_use_sphere_pert = use_sphere_pert
+
+  end function get_use_sphere_pert
 
 end module LDAS_PertRoutinesMod
 

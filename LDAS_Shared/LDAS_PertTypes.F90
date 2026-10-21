@@ -83,6 +83,9 @@ module LDAS_PertTypes
      real             :: xcorr  ! correlation length along latitudes   [deg]
      real             :: ycorr  ! correlation length along longitudes  [deg]
      real             :: tcorr  ! temporal correlation length          [s]
+
+     logical          :: use_sphere_pert           ! .true.  => sphere_random_fields
+                                                   ! .false. => rectangle_random_fields
      
   end type pert_param_type
   

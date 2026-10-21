@@ -93,6 +93,9 @@ module clsm_ensupd_upd_routines
   use land_pert_routines,               ONLY:     &
        get_pert
 
+  use LDAS_PertRoutinesMod,             ONLY:     &
+       get_use_sphere_pert
+
   use mwRTM_routines,                   ONLY:     &
        mwRTM_get_Tb,                              &
        catch2mwRTM_vars
@@ -3543,6 +3546,8 @@ contains
        obs_pert_param(j)%xcorr           = obs_param(i)%xcorr
        obs_pert_param(j)%ycorr           = obs_param(i)%ycorr         
        obs_pert_param(j)%tcorr           = 0
+
+       obs_pert_param(j)%use_sphere_pert = get_use_sphere_pert()
        
     end do
     
