@@ -2608,8 +2608,8 @@ obs_param_nml(56)%errstd         = 9.
 obs_param_nml(56)%std_normal_max = 2.5
 obs_param_nml(56)%zeromean       = .true.
 obs_param_nml(56)%coarsen_pert   = .true.
-obs_param_nml(56)%xcorr          = 0.3125
-obs_param_nml(56)%ycorr          = 0.3125
+obs_param_nml(56)%xcorr          = 0.2
+obs_param_nml(56)%ycorr          = 0.2
 obs_param_nml(56)%adapt          = 0
 
 ! ------------------------
@@ -2651,8 +2651,8 @@ obs_param_nml(57)%errstd         = 9.
 obs_param_nml(57)%std_normal_max = 2.5
 obs_param_nml(57)%zeromean       = .true.
 obs_param_nml(57)%coarsen_pert   = .true.
-obs_param_nml(57)%xcorr          = 0.3125
-obs_param_nml(57)%ycorr          = 0.3125
+obs_param_nml(57)%xcorr          = 0.2
+obs_param_nml(57)%ycorr          = 0.2
 obs_param_nml(57)%adapt          = 0
 
 ! ------------------------
@@ -2694,8 +2694,8 @@ obs_param_nml(58)%errstd         = 9.
 obs_param_nml(58)%std_normal_max = 2.5
 obs_param_nml(58)%zeromean       = .true.
 obs_param_nml(58)%coarsen_pert   = .true.
-obs_param_nml(58)%xcorr          = 0.3125
-obs_param_nml(58)%ycorr          = 0.3125
+obs_param_nml(58)%xcorr          = 0.2
+obs_param_nml(58)%ycorr          = 0.2
 obs_param_nml(58)%adapt          = 0
 
 ! --------------------------------------------------------------------
