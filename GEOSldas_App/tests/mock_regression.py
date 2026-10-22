@@ -5,7 +5,7 @@ Local end-to-end regression harness for ldas_setup (no Discover / no build neede
 It builds two fake installations ("ref" from a git commit, "new" from the working
 tree), a fake BCS / restart / met-forcing data tree, and runs `ldas_setup setup`
 for a set of cases with both installations.  The resulting experiment directories
-are compared with compare_exp.py.
+and captured setup logs are compared; paths specific to each fake run are normalized.
 
 Faked pieces:
   - preprocess_ldas.x : python stub (c_f2g, zoomin_*, optimize, correctease)
@@ -22,8 +22,9 @@ usage (from GEOSldas_App):
 Default reference commit: REF_COMMIT below.
 Exit status: 0 if every case matches its expectation, 1 otherwise.
 
-NOT covered: coupled land-atm DAS (ladas_cpl>0; uses hard-wired /discover paths),
-NAS site, real Fortran preprocessing (zoom, optimize), real restart remapping.
+Covered dry setups include coupled land-atm DAS (with redirected fake /discover
+data) and both NCCS and NAS site configurations.
+NOT covered: real Fortran preprocessing (zoom, optimize) and real restart remapping.
 """
 
 import os
@@ -32,6 +33,8 @@ import shutil
 import subprocess as sp
 import tempfile
 import textwrap
+import difflib
+import re
 
 HERE    = os.path.dirname(os.path.abspath(__file__))
 APPDIR  = os.path.dirname(HERE)                       # GEOSldas_App
@@ -358,6 +361,26 @@ def _last_error(exphome):
     return (errs or log or [''])[-1]
 
 
+def compare_logs(ref_log, new_log, same=(), out=sys.stdout):
+    """Compare setup output, ignoring per-run roots and temporary file names."""
+    pairs = [(os.path.abspath(ref), os.path.abspath(new)) for ref, new in same]
+
+    def normalize(log, which):
+        for i, (ref, new) in enumerate(pairs):
+            log = log.replace((ref, new)[which], '<SAME%d>' % i)
+        return re.sub(r'/tmp/tmp[^\s/]*', '<TMP>', log).splitlines()
+
+    with open(ref_log, errors='replace') as f:
+        ref_lines = normalize(f.read(), 0)
+    with open(new_log, errors='replace') as f:
+        new_lines = normalize(f.read(), 1)
+    if ref_lines == new_lines:
+        return 0
+    for line in difflib.unified_diff(ref_lines, new_lines, 'ref/setup.log', 'new/setup.log', lineterm=''):
+        out.write('   ' + line + '\n')
+    return 1
+
+
 def run_case(bindir, exphome, case, verbose, quiet=False):
     os.makedirs(exphome)
     exeinp = os.path.join(exphome, 'exeinp.txt')
@@ -441,11 +464,19 @@ def main(argv):
                 continue
             import io
             buf = io.StringIO()
+            logdir = 'ldas' if case['cpl'] else ''
+            log_diff = compare_logs(os.path.join(work, 'ref', name, logdir, 'setup.log'),
+                                    os.path.join(work, 'new', name, logdir, 'setup.log'),
+                                    same=[(os.path.dirname(inst('ref', case['site'])),
+                                           os.path.dirname(inst('new', case['site']))),
+                                          (os.path.join(work, 'ref', name), os.path.join(work, 'new', name))],
+                                    out=buf)
             nd = compare(expdir('ref', name), expdir('new', name),
-                         same=[(os.path.dirname(inst('ref', case['site'])),
-                                os.path.dirname(inst('new', case['site']))),
-                               (os.path.join(work, 'ref', name), os.path.join(work, 'new', name))],
-                         out=buf)
+                          same=[(os.path.dirname(inst('ref', case['site'])),
+                                 os.path.dirname(inst('new', case['site']))),
+                                 (os.path.join(work, 'ref', name), os.path.join(work, 'new', name))],
+                          out=buf)
+            nd += log_diff
             if nd == 0:
                 print('IDENTICAL' + ('  (WARNING: a difference was expected)' if expect == 'diff' else ''))
             else:
