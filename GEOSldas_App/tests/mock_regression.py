@@ -340,6 +340,7 @@ def cases(D):
     add('nas_single', site='NAS')
     add('B3_route_merra2', {'RESTART': 'M', 'RUN_ROUTE': '1'}, expect='new_fails')
     add('B5_bad_lsm_choice', {'LSM_CHOICE': '7'}, expect='new_fails')
+    add('unknown_site', site='OTHER', expect='new_fails')            # phase 6: early GEOS_SITE check
     return C
 
 

@@ -3,7 +3,6 @@
 import os
 import glob
 import shutil
-import subprocess as sp
 import tempfile
 from datetime                     import datetime
 from datetime                     import timedelta
@@ -31,6 +30,15 @@ LADAS_BCS_PATH   = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/
 LADAS_MWRTM_PATH = "/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/"
 ROUTE_RST_DIR    = "/discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/"
 
+# Site-dependent settings for the job scripts (GEOS_SITE is set by cmake configure_file)
+#   submit     : batch submit command
+#   qos        : default quality-of-service
+#   constraint : default node constraint
+SITE_CONFIG = {
+    'NCCS': {'submit': 'sbatch', 'qos': 'allnccs', 'constraint': '"[mil|cas]"'},
+    'NAS' : {'submit': 'qsub',   'qos': 'normal',  'constraint': 'cas_ait'    },
+}
+
 # LSM_CHOICE -> name of land model (Catchment) gridded component / restart prefix
 LSM_CHOICE_TO_CATCH = {1: 'catch', 2: 'catchcnclm40', 3: 'catchcnclm45', 4: 'catchcnclm51'}
 
@@ -57,6 +65,9 @@ class ldas:
             'ADAS_EXPDIR', 'BCS_RESOLUTION', 'TILE_FILE_FORMAT' ]
 
         self.GEOS_SITE = "@GEOS_SITE@"
+        require(self.GEOS_SITE in SITE_CONFIG,
+                'GEOS_SITE [%s] is not supported; must be one of %s' % (self.GEOS_SITE, sorted(SITE_CONFIG)))
+        self.site = SITE_CONFIG[self.GEOS_SITE]
 
         self._init_attributes(cmdLineArgs)
         self._check_ladas_cmdline(cmdLineArgs)
@@ -466,41 +477,28 @@ class ldas:
         """ make sure the restart files to be used exist (RESTART=1,2,3) """
         RESTART_str = self.restart
 
-        if RESTART_str in ['1','2','3']:
-           y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
-           y4m2d2_h2m2='%4d%02d%02d_%02d%02d' % (self.begDates[0].year, self.begDates[0].month,
-                                                  self.begDates[0].day,self.begDates[0].hour,self.begDates[0].minute)
-           self.in_rstdir = self.ExeInputs['RESTART_PATH']+'/'.join([self.ExeInputs['RESTART_ID'],'output',
-                                                                   self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0],y4m2])
-           if self.with_land:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-              catchRstFile=self.in_rstdir+'/'+tmpFile
-              require(os.path.isfile(catchRstFile), self.catch+'_internal_rst file [%s] does not exist!' %(catchRstFile))
-              if RESTART_str == '1':
-                 tmpFile=self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
-                 landpertRstFile=self.in_rstdir+'/'+tmpFile
-                 if ( os.path.isfile(landpertRstFile)) :
-                    self.has_geos_pert = True
+        if RESTART_str not in ['1','2','3']:
+           return
+        rstid = self.ExeInputs['RESTART_ID']
+        stamp = ymd_hm(self.begDates[0])
+        self.in_rstdir = self.ExeInputs['RESTART_PATH']+'/'.join([rstid,'output',
+                                                                self.ExeInputs['RESTART_DOMAIN'],'rs',self.ensdirs[0],
+                                                                ym_dir(self.begDates[0])])
+        def _rst_file(comp):
+           return self.in_rstdir+'/'+rstid+'.'+comp+'_internal_rst.'+stamp
 
-           if self.with_lake:
-             tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
-             lakeRstFile=self.in_rstdir+'/'+tmpFile
-             require(os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile))
+        required = []
+        if self.with_land     : required.append(self.catch)
+        if self.with_lake     : required.append('lake')
+        if self.with_landice  : required.append('landice')
+        if self.run_route > 0 : required.append('route')
+        if self.with_issm     : required.append('issm')
+        for comp in required:
+           require(os.path.isfile(_rst_file(comp)), comp+'_internal_rst file [%s] does not exist!' % _rst_file(comp))
 
-           if self.with_landice:
-             tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-             landiceRstFile=self.in_rstdir+'/'+tmpFile
-             require(os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile))
-
-           if self.run_route > 0:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
-              routeRstFile=self.in_rstdir+'/'+tmpFile
-              require(os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile))
-
-           if self.with_issm:
-              tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
-              issmRstFile=self.in_rstdir+'/'+tmpFile
-              require(os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile))
+        # use landpert restarts if available (RESTART=1 only)
+        if self.with_land and RESTART_str == '1' and os.path.isfile(_rst_file('landpert')):
+           self.has_geos_pert = True
 
     # -----------------------------------------------------------------------------------
     def _set_mwrtm(self):
@@ -604,28 +602,15 @@ class ldas:
        for key in ResourceInputs:
          require(key in allKeys, '"%s" in batinp file is not recognized' % key)
 
-    # ---------------------
-    # calculate JobSegments
-    # ---------------------
+    # -----------------------------------------------------------------------------------
     def _calculateJobSegments(self):
-        ## convert date-time strings to datetime object
-        ## start/end_time are converted to lists
-        ## ensure end>start
-
-        self.begDates=[]
-        self.endDates=[]
-        self.begDates.append(
-                datetime.strptime(
-                    self.ExeInputs['BEG_DATE'],
-                    '%Y%m%d %H%M%S'
-                    )
-                )
-        self.endDates.append(
-                datetime.strptime(
-                    self.ExeInputs['END_DATE'],
-                    '%Y%m%d %H%M%S'
-                    )
-                )
+        """
+        begDates/endDates: start/end of each job segment; nSegments; job_sgmt (CAP.rc line).
+        NOTE: one job segment = NUM_SGMT * JOB_SGMT, where JOB_SGMT is converted with
+              1 month = 30 days and 1 year = 365 days (intended; see REFACTOR_PLAN.md B7).
+        """
+        self.begDates = [datetime.strptime(self.ExeInputs['BEG_DATE'], '%Y%m%d %H%M%S')]
+        self.endDates = [datetime.strptime(self.ExeInputs['END_DATE'], '%Y%m%d %H%M%S')]
 
         require(self.endDates[0]>self.begDates[0], 'END_DATE <= BEG_DATE')
 
@@ -665,13 +650,11 @@ class ldas:
             self.endDates.insert(-1,_d)
             _d = _d+ _difftime
 
+    # -----------------------------------------------------------------------------------
     def createDirStructure(self):
         """
         Create required dir structure
         """
-
-        status = False
-
         # run/inp/wrk dirs
         os.makedirs(self.exphome+'/'+self.ExeInputs['EXP_ID'], exist_ok=True)
         os.makedirs(self.rundir, exist_ok=True)
@@ -702,10 +685,10 @@ class ldas:
 
             # Yyyyy/Mmm between StartDateTime and EndDateTime
             newDate = _start
-            y4m2_list = [('Y%4d/M%02d' % (newDate.year, newDate.month))]
+            y4m2_list = [ym_dir(newDate)]
             while newDate<_end:
                 newDate += relativedelta(months=1)
-                y4m2_list.append('Y%4d/M%02d' % (newDate.year, newDate.month))
+                y4m2_list.append(ym_dir(newDate))
 
             # ExpDomain/ana/, /diag/ directories
             for ensdir in self.ensdirs_avg:
@@ -725,9 +708,6 @@ class ldas:
 
         # output dir: create link from ./cat to ./diag for backward compatibility
         os.symlink(_getDirName('', '', 'diag'), _getDirName('', '', 'cat'))
-
-        status = True
-        return status
 
 
     # -----------------------------------------------------------------------------------
@@ -793,7 +773,6 @@ class ldas:
             for f in [self.domain_def.name, tmp_f2g_file.name]:
                 if os.path.exists(f):
                     os.remove(f)
-        return True
 
     # -----------------------------------------------------------------------------------
     def _zoom_or_copy(self, zoom_op, src, dst, f2g_file):
@@ -1145,7 +1124,6 @@ class ldas:
 
         with open(self.rundir+'/'+'cap_restart','w') as fout:
             fout.write(self.begDates[0].strftime('%Y%m%d %H%M%S'))
-        return True
 
     # -----------------------------------------------------------------------------------
     def _copy_nml(self, etcdir):
@@ -1336,94 +1314,46 @@ class ldas:
         return ldasrcInp
 
     # -----------------------------------------------------------------------------------
+    # job scripts
+    # -----------------------------------------------------------------------------------
 
     def createBatchRun(self):
         """
+        ldas_batchrun.j: submit all job segments at once, each depending on the previous one
+        (the automatic re-submission at the end of lenkf.j is commented out while submitting).
         """
-
-        status = False
-
-        os.chdir(self.rundir)
-        fout =open(self.rundir+'/ldas_batchrun.j','w')
-        fout.write("#!/bin/bash -f\n")
-        SBATCHQSUB = 'sbatch'
-        if self.GEOS_SITE == 'NAS':
-          SBATCHQSUB = 'qsub'
-        fout.write("\nsed -i 's/if($capdate<$enddate) "+SBATCHQSUB+"/#if($capdate<$enddate) "+SBATCHQSUB+"/g' lenkf.j\n\n")
-        nSegments = self.nSegments
-        for iseg in range(nSegments):
+        submit = self.site['submit']
+        lines  = ["#!/bin/bash -f", "",
+                  "sed -i 's/if($capdate<$enddate) "+submit+"/#if($capdate<$enddate) "+submit+"/g' lenkf.j", ""]
+        for iseg in range(self.nSegments):
             if self.GEOS_SITE == 'NAS':
                 # PBS: qsub prints the job id only
-                if iseg ==0 :
-                    fout.write("jobid%d=$(qsub lenkf.j)\n"%(iseg))
-                else :
-                    fout.write("jobid%d=$(qsub -W depend=afterok:$jobid%d lenkf.j)\n"%(iseg,iseg-1))
-                fout.write("echo $jobid%d\n"%iseg )
-                continue
-            if iseg ==0 :
-                fout.write("jobid%d=$(echo $(sbatch lenkf.j) | cut -d' ' -f 4)\n"%(iseg))
-                fout.write("echo $jobid%d\n"%iseg )
-            else :
-                #fout.write("jobid%d=$(echo $(sbatch --dependency=afterany:$jobid%d --output=%s --error=%s lenkf.j) | cut -d' ' -f 4)\n"%(iseg,iseg-1,_logfile, _errfile))
-                fout.write("jobid%d=$(echo $(sbatch --dependency=afterok:$jobid%d lenkf.j) | cut -d' ' -f 4)\n"%(iseg,iseg-1))
-                fout.write("echo $jobid%d\n"%iseg )
-        fout.write("\nsed -i 's/#if($capdate<$enddate) "+SBATCHQSUB+"/if($capdate<$enddate) "+SBATCHQSUB+"/g' lenkf.j\n\n")
-        fout.close()
+                dep = '' if iseg == 0 else '-W depend=afterok:$jobid%d ' % (iseg-1)
+                lines.append("jobid%d=$(qsub %slenkf.j)" % (iseg, dep))
+            else:
+                dep = '' if iseg == 0 else '--dependency=afterok:$jobid%d ' % (iseg-1)
+                lines.append("jobid%d=$(echo $(sbatch %slenkf.j) | cut -d' ' -f 4)" % (iseg, dep))
+            lines.append("echo $jobid%d" % iseg)
+        lines += ["", "sed -i 's/#if($capdate<$enddate) "+submit+"/if($capdate<$enddate) "+submit+"/g' lenkf.j", "", ""]
 
-        sp.call(['chmod', '755', self.rundir+'/ldas_batchrun.j'])
-        status = True
-        return status
+        batchrun = self.rundir+'/ldas_batchrun.j'
+        with open(batchrun, 'w') as fout:
+            fout.write('\n'.join(lines))
+        os.chmod(batchrun, 0o755)
 
     # -----------------------------------------------------------------------------------
-
     def createRunScripts(self):
-        """
-        """
-
-        status = False
-
-        os.chdir(self.rundir)
-
-        my_qos='allnccs'
-        if self.GEOS_SITE == 'NAS': my_qos = 'normal'
-        if 'qos' in self.RmInputs :
-            my_qos = self.RmInputs['qos']
-
-        my_job=self.ExeInputs['EXP_ID']
-        if 'job_name' in self.RmInputs :
-            my_job = self.RmInputs['job_name']
+        """ lenkf.j: job script (from lenkf_j_template.py) """
+        my_qos     = self.RmInputs.get('qos',        self.site['qos'])
+        my_job     = self.RmInputs.get('job_name',   self.ExeInputs['EXP_ID'])
+        constraint = self.RmInputs.get('constraint', self.site['constraint'])
 
         start = self.begDates[0]
         expid = self.ExeInputs['EXP_ID']
-        myDateTime = '%04d%02d%02d_%02d%02dz' % \
-                (start.year, start.month, start.day,start.hour,start.minute)
-        my_logfile = os.path.relpath(
-                '/'.join([
-                        self.outdir,
-                        self.ExeInputs['EXP_DOMAIN'],
-                        'rc_out',
-                        'Y%04d' % start.year,
-                        'M%02d' % start.month,
-                        '.'.join([expid, 'ldas_log', myDateTime, 'txt']),
-                        ]),
-                self.rundir)
-        my_errfile = os.path.relpath(
-                '/'.join([
-                        self.outdir,
-                        self.ExeInputs['EXP_DOMAIN'],
-                        'rc_out',
-                        'Y%04d' % start.year,
-                        'M%02d' % start.month,
-                        '.'.join([expid, 'ldas_err', myDateTime, 'txt']),
-                        ]),
-                self.rundir)
-
-        constraint = '"[mil|cas]"'
-        if self.GEOS_SITE == "NAS" :
-            constraint = 'cas_ait'
-
-        if 'constraint' in self.RmInputs:
-            constraint = self.RmInputs['constraint']
+        def _rc_out_txt(kind):
+            # e.g., ../output/GLOBAL/rc_out/Y2020/M01/expid.ldas_log.20200101_0000z.txt (relative to rundir)
+            return os.path.relpath('/'.join([self.outdir, self.ExeInputs['EXP_DOMAIN'], 'rc_out', ym_dir(start),
+                                             '.'.join([expid, kind, ymd_hm(start)+'z', 'txt'])]), self.rundir)
 
         my_nodes=''
         if 'ntasks-per-node' in self.RmInputs:
@@ -1435,15 +1365,8 @@ class ldas:
            if (ntasks_per_node > 46):
               require(constraint != 'cas', "Make sure constraint is compatible with ntasks-per-node")
 
-        SBATCHQSUB = 'sbatch'
-        if self.GEOS_SITE == 'NAS':
-            SBATCHQSUB = 'qsub'
-
-        DETECTED_MPI_STACK = "@MPI_STACK@"
-
-        job_head = job_directive[self.GEOS_SITE]
-        lenkf_str= (job_head+job_body).format(
-                  SBATCHQSUB         = SBATCHQSUB,
+        lenkf_str= (job_directive[self.GEOS_SITE]+job_body).format(
+                  SBATCHQSUB         = self.site['submit'],
                   MY_ACCOUNT         = self.RmInputs['account'],
                   MY_WALLTIME        = self.RmInputs['walltime'],
                   MY_NTASKS_MODEL    = str(self.RmInputs['ntasks_model']),
@@ -1453,10 +1376,10 @@ class ldas:
                   MY_WRITERS_NPES    = str(self.RmInputs['writers-per-node']),
                   MY_QOS             = my_qos,
                   MY_JOB             = my_job,
-                  MY_EXPID           = self.ExeInputs['EXP_ID'],
+                  MY_EXPID           = expid,
                   MY_EXPDOMAIN       = self.ExeInputs['EXP_DOMAIN'],
-                  MY_LOGFILE         = my_logfile,
-                  MY_ERRFILE         = my_errfile,
+                  MY_LOGFILE         = _rc_out_txt('ldas_log'),
+                  MY_ERRFILE         = _rc_out_txt('ldas_err'),
                   MY_LANDMODEL       = self.catch,
                   MY_POSTPROC_HIST   = str(self.ExeInputs['POSTPROC_HIST']),
                   MY_FIRST_ENS_ID    = str(self.first_ens_id),
@@ -1464,14 +1387,13 @@ class ldas:
                   MY_ENSEMBLE_FORCING= self.ExeInputs.get('ENSEMBLE_FORCING', 'NO').upper(),
                   MY_ADAS_EXPDIR     = self.adas_expdir,
                   MY_EXPDIR          = self.expdir,
-                  DETECTED_MPI_STACK = DETECTED_MPI_STACK,
+                  DETECTED_MPI_STACK = "@MPI_STACK@",
                   )
 
-        with open('lenkf.j','wt') as fout :
+        lenkf = self.rundir+'/lenkf.j'
+        with open(lenkf,'wt') as fout :
            fout.write(lenkf_str)
-        sp.call(['chmod', '755', 'lenkf.j'])
+        os.chmod(lenkf, 0o755)
 
         print ('\nExperiment directory: %s' % self.expdir)
         print ()
-        status = True
-        return status

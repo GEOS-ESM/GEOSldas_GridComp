@@ -33,7 +33,7 @@ expect, and record that diff in the bug entry below.
 | 3     | Split `ldas.__init__`                          | DONE          | see Log |
 | 4     | Table-driven restart staging (`createLnRstBc`) | DONE          | see Log |
 | 5     | rc file generation (`createRCFiles`)           | DONE          | see Log |
-| 6     | Job scripts, site config, small helpers        | TODO          | |
+| 6     | Job scripts, site config, small helpers        | DONE          | see Log |
 | 7     | (optional) Split into modules                  | TODO          | |
 
 ### Phase 0 details (DONE)
@@ -176,10 +176,17 @@ GRIDNAME, Pfafstetter) -> `_set_exe_defaults` -> `_check_restart_files` -> `_set
 - The `<CFnnnn>` edit of the coupled-mode SPECIAL ensupd nml is now done in Python (exact replacement, as
   `sed` did. Note: `replace_in_file` would strip trailing whitespace, so it is not used for nml files).
 
-**Phase 6: job scripts and helpers**
-- Date helpers `y4m2(dt)` -> 'Yyyyy/Mmm', `stamp(dt)` -> 'yyyymmdd_hhmm' (used 5+ times).
-- `SITE = {'NCCS': {...qos, constraint, submit, dependency syntax}, 'NAS': {...}}`.
-- `createBatchRun` uses the site config (fixes B6 if not already done).
+**Phase 6 (DONE): job scripts, site config, helpers**
+- `SITE_CONFIG` (top of ldas.py) holds the submit command, default qos, and default constraint
+  for NCCS and NAS; `self.site`. An unsupported GEOS_SITE now fails right away in `__init__` (it used
+  to fail with a KeyError in createRunScripts, after the exp dirs had already been created).
+  [harness: unknown_site]
+- `createBatchRun` / `createRunScripts`: no more `os.chdir`, files are written to rundir paths,
+  `os.chmod` is used instead of `chmod` subprocesses, and the log/err file names come from one helper.
+- `_check_restart_files` is now a loop over the required components. `_calculateJobSegments`
+  is tidied (B7 semantics are kept and documented in its docstring). `createDirStructure` uses `ym_dir`.
+- Removed the leftover `status` variables and the unused `subprocess` import from ldas.py.
+- mock_regression: 28/28 PASS (identical to 2ec60a8).
 
 **Phase 7 (optional): modules**: `ldas_config.py`, `ldas_restarts.py`, `ldas_rc.py`,
 with `ldas.py` as the orchestrator. Remember to:
@@ -227,3 +234,4 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
 - 2026-10-22: Phase 4 done (createLnRstBc split, table-driven restarts). mock_regression 27/27 PASS.
 - 2026-10-22: Phase 5 done (createRCFiles split, B11 fix, B9 order). mock_regression PASS
   (3 expected ISSM order diffs vs ed23aa6).
+- 2026-10-22: Phase 6 done (site config, job scripts, helpers). mock_regression PASS.
