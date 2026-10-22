@@ -254,3 +254,5 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
 - 2026-10-22: Phase 6 done (site config, job scripts, helpers). mock_regression PASS.
 - 2026-10-22: Phase 7 done (mixin modules, CMake scripts list, harness checks `sample`). All phases done;
   remaining: run the comparison on Discover (see "Remaining TODO").
+- 2026-10-22: Removed the `__pycache__/` that was accidentally committed in phases 2/3/7; added `.gitignore`.
+  Final check: unit tests 16 OK; mock_regression 28 cases + sample PASS (vs 2ec60a8).
