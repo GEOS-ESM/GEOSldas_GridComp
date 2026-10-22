@@ -3,9 +3,7 @@
 import os
 import glob
 import shutil
-import fileinput
 import subprocess as sp
-import shlex
 import tempfile
 from datetime                     import datetime
 from datetime                     import timedelta
@@ -16,7 +14,9 @@ from remap_other_restarts         import other_restarts
 from remap_catchANDcn             import catchANDcn
 from lenkf_j_template             import job_directive, job_body
 from setup_utils                  import (parseInputFile, printDictionary, hours_to_hhmmss,
-                                          getExeKeys, getResourceKeys, read_gridname)
+                                          getExeKeys, getResourceKeys, read_gridname,
+                                          LdasSetupError, require, run_cmd, glob_first,
+                                          bcs_version_from_path, replace_in_file)
 
 """
 ldas class is used by ldas_setup
@@ -50,7 +50,7 @@ class ldas:
         self.exeinpfile         = cmdLineArgs['exeinpfile']
         self.batinpfile         = cmdLineArgs['batinpfile']
         exphome_                = cmdLineArgs['exphome'].rstrip('/')
-        assert os.path.isdir(exphome_)                                   # exphome should exist
+        require(os.path.isdir(exphome_), 'exphome [%s] does not exist' % exphome_)
         self.exphome            = os.path.abspath(exphome_)
         self.verbose            = cmdLineArgs['verbose']
 
@@ -112,16 +112,13 @@ class ldas:
         # assert necessary optional arguments in command line if exeinp file does not exsit
         if not os.path.exists(cmdLineArgs['exeinpfile']):
            # make sure all necessary command line arguments were supplied
-           assert self.ladas_cpl     is not None, "Error. Must have command line arg ladas_cpl   for coupled land-atm DAS.\n"
+           require(self.ladas_cpl is not None,
+                   "exeinpfile [%s] does not exist (allowed only for coupled land-atm DAS with --ladas_cpl)" % cmdLineArgs['exeinpfile'])
            self.ladas_cpl = int(self.ladas_cpl)
-           assert self.ladas_cpl > 0,             "Error. If not ladas coupling, exeinpfile must be provided.\n"
-           assert self.nymdb         is not None, "Error. Must have command line arg nymdb       for coupled land-atm DAS.\n"
-           assert self.nhmsb         is not None, "Error. Must have command line arg nhmsb       for coupled land-atm DAS.\n"
-           assert self.agcm_res      is not None, "Error. Must have command line arg agcm_res    for coupled land-atm DAS.\n"
-           assert self.bcs_version   is not None, "Error. Must have command line arg bcs_version for coupled land-atm DAS.\n"
-           assert self.rstloc        is not None, "Error. Must have command line arg rstloc      for coupled land-atm DAS.\n"
-           assert self.varwindow     is not None, "Error. Must have command line arg varwindow   for coupled land-atm DAS.\n"
-           assert self.nens          is not None, "Error. Must have command line arg nens        for coupled land-atm DAS (ens component).\n"
+           require(self.ladas_cpl > 0, "If not ladas coupling, exeinpfile must be provided.")
+           for name_ in ['nymdb', 'nhmsb', 'agcm_res', 'bcs_version', 'rstloc', 'varwindow', 'nens']:
+              require(getattr(self, name_) is not None,
+                      "Must have command line arg --%s for coupled land-atm DAS." % name_)
            self.ladas_cpl = int(self.ladas_cpl)
         else:
            self.ladas_cpl = 0
@@ -136,7 +133,7 @@ class ldas:
             self.ExeInputs['RESTART'] = "1"
 
         RESTART_str  = str(self.ExeInputs['RESTART'])
-        assert RESTART_str in ["1", "2", "3", "M"], "RESTART must be 1, 2, 3, or M"
+        require(RESTART_str in ["1", "2", "3", "M"], "RESTART must be 1, 2, 3, or M")
 
         if RESTART_str == 'M':
             # use archived MERRA-2 restarts, no need for RESTART_ID/DOMAIN/PATH
@@ -148,7 +145,7 @@ class ldas:
         if self.ladas_cpl > 0 :
             self.ExeInputs['BEG_DATE']                 = f"{self.nymdb} {self.nhmsb}"
             rstloc_                                    = self.rstloc.rstrip('/')                  # remove trailing '/'
-            assert os.path.isdir(rstloc_)                                                         # make sure rstloc_ is a valid directory
+            require(os.path.isdir(rstloc_), 'rstloc [%s] is not a directory' % rstloc_)
             self.rstloc                                = os.path.abspath(rstloc_)
             self.ExeInputs['RESTART_PATH']             = os.path.dirname( self.rstloc)
             self.ExeInputs['RESTART_ID']               = os.path.basename(self.rstloc)
@@ -168,7 +165,7 @@ class ldas:
                 self.ExeInputs['MET_PATH']             = self.adas_expdir + '/atmens/mem'
                 self.ExeInputs['ENSEMBLE_FORCING']     = 'YES'
             else :
-                exit("Error. Unknown value of self.ladas_cpl.\n")
+                raise LdasSetupError("Unknown value of ladas_cpl: %s" % self.ladas_cpl)
 
             self.ExeInputs['NUM_LDAS_ENSEMBLE']        = self.nens                                # fvsetup finds Nens by counting restart files
             self.first_ens_id                          = 1                                        # match ADAS convention
@@ -195,7 +192,7 @@ class ldas:
             if int(self.varwindow) % (self.landassim_dt/60) == 0 :
                 self.ExeInputs['LANDASSIM_DT']         = self.landassim_dt
             else :
-                exit("Error. LANDASSIM_DT is inconsistent with ADAS analysis window.\n")
+                raise LdasSetupError("LANDASSIM_DT is inconsistent with ADAS analysis window.")
             self.ExeInputs['LANDASSIM_T0']             = "013000"                                 # HHMMSS
             jsgmt1                                     = "00000000"
             jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)  # convert minutes to HHMMSS
@@ -232,7 +229,7 @@ class ldas:
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
             self.with_land = True
-            assert int(self.ExeInputs['LSM_CHOICE']) <= 2, "\nLSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)"
+            require(int(self.ExeInputs['LSM_CHOICE']) <= 2, "LSM_CHOICE=3 (Catchment-CN4.5) is no longer supported. Please set LSM_CHOICE to 1 (Catchment) or 2 (Catchment-CN4.0)")
 
         if "19" in self.tile_types :
             self.with_lake = True
@@ -283,7 +280,7 @@ class ldas:
         if 'CATCH_DEF_FILE' not in self.ExeInputs :
            self.ExeInputs['CATCH_DEF_FILE']= self.bcs_dir_land + 'clsm/catchment.def'
         if self.with_land :
-           assert os.path.isfile(self.ExeInputs['CATCH_DEF_FILE']),"[%s] file does not exist " % self.ExeInputs['CATCH_DEF_FILE']
+           require(os.path.isfile(self.ExeInputs['CATCH_DEF_FILE']), "CATCH_DEF_FILE [%s] does not exist" % self.ExeInputs['CATCH_DEF_FILE'])
 
         # assigning BC files
         self.ExeInputs['LNFM_FILE'] = ''
@@ -308,13 +305,9 @@ class ldas:
               print("Warning: BCS_info.txt not found for restart experiment. User is responsible for ensuring consistency of restart and experiment BCS.")
            elif len(BCS_txt)== 1:
               BCS_tmp   = parseInputFile(BCS_txt[0])
-              # get BCS_VERSION (trailing dir name of BCS_PATH)
-              bcs_path_ = self.ExeInputs['BCS_PATH']
-              while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
-              bcs_version_ = os.path.basename(bcs_path_)
-
-              assert bcs_version_ == BCS_tmp['BCS_VERSION'], "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bcs_version_ + ")"
-              assert self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")"
+              bcs_version_ = bcs_version_from_path(self.ExeInputs['BCS_PATH'])
+              require(bcs_version_ == BCS_tmp['BCS_VERSION'], "BCS version (=trailing dir of BCS_PATH) does not match version from restart dir ("  + bcs_version_ + ")")
+              require(self.ExeInputs['BCS_RESOLUTION'] == BCS_tmp['BCS_RESOLUTION'], "BCS_RESOLUTION does not match resolution from restart dir (" + BCS_tmp['BCS_RESOLUTION'] + ")")
 
            # Any reduced tile type produces a .domain tile file
            txt_tile = glob.glob(inp_ + '*.domain')
@@ -328,12 +321,13 @@ class ldas:
 
         elif RESTART_str == '2':
            txt_tile = glob.glob(inp_ + '*.domain')
-           assert len(txt_tile) == 0, "For RESTART=2, must restart from and run on global domain"
+           require(len(txt_tile) == 0, "For RESTART=2, must restart from and run on global domain")
            in_tilefiles_ = glob.glob(inp_+'MAPL_*.til')
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.nc4')
            if len(in_tilefiles_) == 0 :
               in_tilefiles_ = glob.glob(inp_+'/*.til')
+           require(len(in_tilefiles_) > 0, "For RESTART=2, cannot find tile file (MAPL_*.til, *.nc4, *.til) in [%s]" % inp_)
            # for EASE tile space, pick "standard" tile file (one tile per grid cell) and not "-Pfafstetter" tile file
            if 'EASEv' in in_tilefiles_[0]:
               in_tilefiles_ = [ item_ for item_ in in_tilefiles_ if '-Pfafstetter' not in item_ ]
@@ -351,18 +345,21 @@ class ldas:
         if len(nc4_tile) > 0:
            if 'EASEv' in nc4_tile[0]:
              nc4_tile = [ item_ for item_ in nc4_tile if '-Pfafstetter' not in item_ ]
-        if tile_file_format.upper() == 'TXT'     : self.ExeInputs['TILING_FILE'] =  txt_tile[0]
+        require(len(txt_tile + nc4_tile) > 0, "Cannot find tile file (*.til, *.nc4) in [%s]" % inpgeom_)
+        if tile_file_format.upper() == 'TXT'     :
+           require(len(txt_tile) > 0, "TILE_FILE_FORMAT=TXT but no *.til file in [%s]" % inpgeom_)
+           self.ExeInputs['TILING_FILE'] =  txt_tile[0]
         if tile_file_format.upper() == 'DEFAULT' : self.ExeInputs['TILING_FILE'] = (txt_tile+nc4_tile)[-1]
 
-        self.ExeInputs['GRN_FILE']    = glob.glob(inpdir_ + 'green_clim_*.data'+land_domain_ )[0]
-        self.ExeInputs['LAI_FILE']    = glob.glob(inpdir_ + 'lai_clim_*.data'  +land_domain_ )[0]
+        self.ExeInputs['GRN_FILE']    = glob_first(inpdir_ + 'green_clim_*.data'+land_domain_ , 'GRN_FILE')
+        self.ExeInputs['LAI_FILE']    = glob_first(inpdir_ + 'lai_clim_*.data'  +land_domain_ , 'LAI_FILE')
         tmp_ = glob.glob(inpdir_ + 'lnfm_clim_*.data'+land_domain_)
         if (len(tmp_) ==1) :
            self.ExeInputs['LNFM_FILE'] = tmp_[0]
 
-        self.ExeInputs['NDVI_FILE']   = glob.glob(inpdir_ + 'ndvi_clim_*.data'+land_domain_ )[0]
-        self.ExeInputs['NIRDF_FILE']  = glob.glob(inpdir_ + 'nirdf_*.dat'     +land_domain_ )[0]
-        self.ExeInputs['VISDF_FILE']  = glob.glob(inpdir_ + 'visdf_*.dat'     +land_domain_ )[0]
+        self.ExeInputs['NDVI_FILE']   = glob_first(inpdir_ + 'ndvi_clim_*.data'+land_domain_ , 'NDVI_FILE')
+        self.ExeInputs['NIRDF_FILE']  = glob_first(inpdir_ + 'nirdf_*.dat'     +land_domain_ , 'NIRDF_FILE')
+        self.ExeInputs['VISDF_FILE']  = glob_first(inpdir_ + 'visdf_*.dat'     +land_domain_ , 'VISDF_FILE')
 
         # assigning Gridname (read_gridname handles *.til, *.nc4, and trailing '.domain')
         if 'GRIDNAME' not in self.ExeInputs :
@@ -422,7 +419,7 @@ class ldas:
            if self.with_land:
               tmpFile=self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
               catchRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(catchRstFile), self.catch+'_internal_rst file [%s] does not exist!' %(catchRstFile)
+              require(os.path.isfile(catchRstFile), self.catch+'_internal_rst file [%s] does not exist!' %(catchRstFile))
               if RESTART_str == '1':
                  tmpFile=self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
                  landpertRstFile=self.in_rstdir+'/'+tmpFile
@@ -432,22 +429,22 @@ class ldas:
            if self.with_lake:
              tmpFile=self.ExeInputs['RESTART_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
              lakeRstFile=self.in_rstdir+'/'+tmpFile
-             assert os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile)
+             require(os.path.isfile(lakeRstFile), 'lake_internal_rst file [%s] does not exist!' %(lakeRstFile))
 
            if self.with_landice:
              tmpFile=self.ExeInputs['RESTART_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
              landiceRstFile=self.in_rstdir+'/'+tmpFile
-             assert os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile)
+             require(os.path.isfile(landiceRstFile), 'landice_internal_rst file [%s] does not exist!' %(landiceRstFile))
 
            if self.run_route > 0:
               tmpFile=self.ExeInputs['RESTART_ID']+'.route_internal_rst.'+y4m2d2_h2m2
               routeRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile)
+              require(os.path.isfile(routeRstFile), 'route_internal_rst file [%s] does not exist!' %(routeRstFile))
 
            if self.with_issm:
               tmpFile=self.ExeInputs['RESTART_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
               issmRstFile=self.in_rstdir+'/'+tmpFile
-              assert os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile)
+              require(os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile))
 
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
@@ -460,7 +457,8 @@ class ldas:
               self.has_mwrtm = True
               self.mwrtm_file = mwrtm_param_file_
            else :
-              assert not mwrtm_param_file_.strip(),  ' MWRTM_PATH: %s should contain mwRTM_param.nc4'% self.ExeInputs['MWRTM_PATH']
+              # NOTE: condition below is always False (path is never empty) -> see REFACTOR_PLAN.md bug B2
+              require(not mwrtm_param_file_.strip(),  ' MWRTM_PATH: %s should contain mwRTM_param.nc4'% self.ExeInputs['MWRTM_PATH'])
               del self.ExeInputs['MWRTM_PATH']
            if os.path.isfile(vegopacity_file_) :
               self.has_vegopacity = True
@@ -497,8 +495,7 @@ class ldas:
         self.blddir     = self.bindir.rsplit('/',1)[0]
         exefyl          = '/bin/GEOSldas.x'
         tmp_execfyl     = self.blddir   + exefyl
-        assert os.path.isfile(tmp_execfyl),\
-            'Executable [%s] does not exist!' % tmp_execfyl
+        require(os.path.isfile(tmp_execfyl), 'Executable [%s] does not exist!' % tmp_execfyl)
         self.expdir     = self.exphome  + '/' + self.ExeInputs['EXP_ID']
         self.rundir     = self.expdir   + '/run'
         self.inpdir     = self.expdir   + '/input'
@@ -530,14 +527,14 @@ class ldas:
 
        rqdExeInpKeys = getExeKeys(option)
        for key in rqdExeInpKeys:
-          assert key in ExeInputs,' "%s" is required in the inputs ( from exeinpfile or command line) ' % (key)
+          require(key in ExeInputs, '"%s" is required in the inputs (from exeinpfile or command line)' % (key))
 
        _mydir = self.exphome + '/' + self.ExeInputs['EXP_ID']
-       assert not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir
+       require(not os.path.isdir(_mydir), 'Dir [%s] already exists!' % _mydir)
        _mydir = None
 
        # nens is an integer and =1 for model run
-       assert self.nens>0, 'NUM_LDAS_ENSEMBLE [%d] <= 0' % self.nens
+       require(self.nens>0, 'NUM_LDAS_ENSEMBLE [%d] <= 0' % self.nens)
     # -----------------------------------------------------------------------------------
     def _verifyResourceInputs(self):
        #-----
@@ -548,10 +545,10 @@ class ldas:
        optSlurmInpKeys = getResourceKeys('optional')
        allKeys = rqdRmInpKeys + optSlurmInpKeys
        for key in rqdRmInpKeys:
-         assert key in ResourceInputs,' "%s" is required in the inputs ( from batinpfile or command line) ' % (key)
+         require(key in ResourceInputs, '"%s" is required in the inputs (from batinpfile or command line)' % (key))
 
        for key in ResourceInputs:
-         assert key in allKeys, ' "%s" is not recognized ' % key
+         require(key in allKeys, '"%s" in batinp file is not recognized' % key)
 
     # ---------------------
     # calculate JobSegments
@@ -576,8 +573,7 @@ class ldas:
                     )
                 )
 
-        assert self.endDates[0]>self.begDates[0], \
-            'END_DATE <= BEG_DATE'
+        require(self.endDates[0]>self.begDates[0], 'END_DATE <= BEG_DATE')
 
         self.job_sgmt = []
         if 'JOB_SGMT' in self.ExeInputs:
@@ -598,7 +594,7 @@ class ldas:
         _years  = int(self.ExeInputs['JOB_SGMT'][ 0: 4])
         _months = int(self.ExeInputs['JOB_SGMT'][ 4: 6])
         _days   = int(self.ExeInputs['JOB_SGMT'][ 6: 8])
-        assert self.ExeInputs['JOB_SGMT'][8] == ' ' and self.ExeInputs['JOB_SGMT'][9] != ' ', "JOB_SGMT format is not right"
+        require(self.ExeInputs['JOB_SGMT'][8] == ' ' and self.ExeInputs['JOB_SGMT'][9] != ' ', "JOB_SGMT format is not right (expected 'yyyymmdd hhmmss')")
         _hours  = int(self.ExeInputs['JOB_SGMT'][ 9:11])
         _mins   = int(self.ExeInputs['JOB_SGMT'][11:13])
         _seconds= int(self.ExeInputs['JOB_SGMT'][13:15])
@@ -723,9 +719,7 @@ class ldas:
         print ('\nCorrect the tile file if it is an old EASE tile format... \n')
         EASEtile=self.rc_out+'/MAPL_'+short_tile
         cmd = self.bindir + '/preprocess_ldas.x correctease  '+ tile + ' '+ EASEtile
-        print ("cmd:   " + cmd)
-
-        sp.call(shlex.split(cmd))
+        run_cmd(cmd)
 
         if os.path.isfile(EASEtile) :
             #update tile file name
@@ -755,8 +749,7 @@ class ldas:
         cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name + ' ' + '_'.join(self.tile_types)
 
         print ('Creating f2g file if necessary: '+ tmp_f2g_file.name +'....\n')
-        print ("cmd:   " + cmd)
-        sp.call(shlex.split(cmd))
+        run_cmd(cmd)
 
         # Check whether the simulation domain differs from the input domain, and determine which tile types are affected.
         if os.path.getsize(tmp_f2g_file.name) != 0:
@@ -767,9 +760,8 @@ class ldas:
                 n_tiles_r    = [int(x) for x in f.readline().split()]
                 n_tiles_f    = [int(x) for x in f.readline().split()]
 
-            assert len(tile_types) == n_types
-            assert len(n_tiles_r)  == n_types
-            assert len(n_tiles_f)  == n_types
+            require(len(tile_types) == n_types and len(n_tiles_r) == n_types and len(n_tiles_f) == n_types,
+                    "Inconsistent f2g file [%s]" % tmp_f2g_file.name)
 
             zoom_by_type = {
                 tile_type: (nr != nf)
@@ -785,10 +777,10 @@ class ldas:
 
         # if running routing, make sure domain is global
         if self.run_route > 0 and self.isZoomInLand:
-            exit(f"Must have global domain to run routing model, RUN_ROUTE={self.run_route}")
+            raise LdasSetupError(f"Must have global domain to run routing model, RUN_ROUTE={self.run_route}")
         # if running ISSM, make sure domain is global
         if self.with_issm and self.isZoomInLandice:
-            exit( "Must have global domain to run ISSM (DO_ISSM: 1)")
+            raise LdasSetupError("Must have global domain to run ISSM (DO_ISSM: 1)")
 
         # update tile domain
         if self.isZoomIn:
@@ -796,8 +788,7 @@ class ldas:
             print ("\nCreating local tile file :"+ newZoominTile)
             print ("\nAdding 1000 to type of tiles to be excluded from domain...\n")
             cmd = self.bindir +'/preprocess_ldas.x zoomin_tile ' + tile + ' ' + newZoominTile + ' '+ tmp_f2g_file.name
-            print ("cmd:   " + cmd)
-            sp.call(shlex.split(cmd))
+            run_cmd(cmd)
             short_tile=short_tile +'.domain'
             tile = newZoominTile
 
@@ -828,8 +819,7 @@ class ldas:
               bcs_tmp=[]
               for bcf in bcs :
                   cmd = self.bindir +'/preprocess_ldas.x zoomin_bc ' + bcf + ' '+ bcf+'.domain' + ' '+ tmp_f2g_file.name
-                  print ("cmd:   " + cmd)
-                  sp.call(shlex.split(cmd))
+                  run_cmd(cmd)
                   bcs_tmp=bcs_tmp+[bcf+'.domain']
               bcs=bcs_tmp
 
@@ -892,13 +882,11 @@ class ldas:
 
         # MERRA-2 cannot provide ISSM restart
         if (RESTART_str=='M' and self.with_issm):
-           exit("RESTART=M does not support DO_ISSM=1. Please provide a compatible ISSM restart and use RESTART=2.")
+           raise LdasSetupError("RESTART=M does not support DO_ISSM=1. Please provide a compatible ISSM restart and use RESTART=2.")
 
         if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):
-           bcs_path = self.ExeInputs['BCS_PATH']
-           while bcs_path[-1] == '/' : bcs_path = bcs_path[0:-1]
-           bc_base    = os.path.dirname(bcs_path)
-           bc_version = os.path.basename(bcs_path)
+           bc_base    = os.path.dirname(self.ExeInputs['BCS_PATH'].rstrip('/'))
+           bc_version = bcs_version_from_path(self.ExeInputs['BCS_PATH'])
            answers={}
            if RESTART_str == 'M' :
               answers['input:shared:MERRA-2']   = True
@@ -962,13 +950,13 @@ class ldas:
             if self.with_land :
 
                if RESTART_str in ['2', 'M']: # remap_restart has generated the file in mk_restarts directory
-                    vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
-                    catchRstFile  = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*'+self.catch+'_internal_rst.'+YYYYMMDD+'*')[0]
+                    vegdynRstFile = glob_first(self.bcs_dir_land + 'vegdyn_*.dat', 'vegdyn BCS file')
+                    catchRstFile  = glob_first(mk_outdir+'*'+self.catch+'_internal_rst.'+YYYYMMDD+'*', 'remapped '+self.catch+' restart in mk_restarts')
                if RESTART_str in ['1', '3']:
                     catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
                     vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
                     if RESTART_str == '3':
-                       vegdynRstFile = glob.glob(self.bcs_dir_land + 'vegdyn_*.dat')[0]
+                       vegdynRstFile = glob_first(self.bcs_dir_land + 'vegdyn_*.dat', 'vegdyn BCS file')
 
                # catchment restart file
                if os.path.isfile(catchRstFile) :
@@ -976,8 +964,7 @@ class ldas:
                    if self.isZoomInLand:
                        print( "Creating local catchment restart file... \n")
                        cmd=self.bindir +'/preprocess_ldas.x zoomin_catchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
-                       print ("cmd:  "+cmd)
-                       sp.call(shlex.split(cmd))
+                       run_cmd(cmd)
                    else :
                        shutil.copy(catchRstFile,catchLocal)
 
@@ -994,8 +981,7 @@ class ldas:
                    if self.isZoomInLand:
                        print ("Creating the local veg restart file... \n")
                        cmd=self.bindir + '/preprocess_ldas.x zoomin_vegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
-                       print ("cmd:   " + cmd)
-                       sp.call(shlex.split(cmd))
+                       run_cmd(cmd)
                    else :
                        shutil.copy(vegdynRstFile,vegdynLocal)
 
@@ -1012,21 +998,14 @@ class ldas:
                     lakeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'lake_internal_rst.'+y4m2d2_h2m2
 
                 if RESTART_str in ['2', 'M']:
-                    lakeRstFiles = glob.glob(
-                        self.exphome+'/'+exp_id+'/mk_restarts/*'+'lake_internal_rst.'+YYYYMMDD+'*')
-
-                    if len(lakeRstFiles) == 0:
-                        exit("Expected a lake restart in ./mk_restarts, but none was found.")
-
-                    lakeRstFile = lakeRstFiles[0]
+                    lakeRstFile = glob_first(mk_outdir+'*lake_internal_rst.'+YYYYMMDD+'*', 'lake restart in mk_restarts')
 
                 if os.path.isfile(lakeRstFile):
                     lakeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
                     if self.isZoomInLake:
                         print ("Creating zoom-in of lake restart file... \n")
                         cmd=self.bindir + '/preprocess_ldas.x zoomin_lakerst '+ lakeRstFile +' ' + lakeLocal + ' '+ tmp_f2g_file.name
-                        print ("cmd: " + cmd)
-                        sp.call(shlex.split(cmd))
+                        run_cmd(cmd)
                     else:
                         shutil.copy(lakeRstFile,lakeLocal)
 
@@ -1044,23 +1023,10 @@ class ldas:
                         issmRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
 
                 if RESTART_str in ['2', 'M']:
-                    landiceRstFiles = glob.glob(
-                        self.exphome+'/'+exp_id+'/mk_restarts/*'+'landice_internal_rst.'+YYYYMMDD+'*')
-
-                    if len(landiceRstFiles) == 0:
-                        exit("Expected a landice restart in ./mk_restarts, but none was found.")
-
-                    landiceRstFile = landiceRstFiles[0]
+                    landiceRstFile = glob_first(mk_outdir+'*landice_internal_rst.'+YYYYMMDD+'*', 'landice restart in mk_restarts')
 
                     if self.with_issm and RESTART_str == '2':
-                        issmRstFiles = glob.glob(
-                            self.exphome+'/'+exp_id+'/mk_restarts/*'+'issm_internal_rst.'+YYYYMMDD+'*')
-
-                        if len(issmRstFiles) == 0:
-                            exit("RESTART=2 with DO_ISSM=1 expects an ISSM restart in "
-                                 "./mk_restarts, but none was found.")
-
-                        issmRstFile = issmRstFiles[0]
+                        issmRstFile = glob_first(mk_outdir+'*issm_internal_rst.'+YYYYMMDD+'*', 'ISSM restart in mk_restarts (RESTART=2 with DO_ISSM=1)')
 
                 if os.path.isfile(landiceRstFile):
                     landiceLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
@@ -1068,8 +1034,7 @@ class ldas:
                     if self.isZoomInLandice:
                         print("Creating zoom-in of landice restart file... \n")
                         cmd = self.bindir + '/preprocess_ldas.x zoomin_landicerst ' + landiceRstFile + ' ' + landiceLocal + ' ' + tmp_f2g_file.name
-                        print("cmd:   " + cmd)
-                        sp.call(shlex.split(cmd))
+                        run_cmd(cmd)
                     else:
                         shutil.copy(landiceRstFile, landiceLocal)
 
@@ -1086,16 +1051,13 @@ class ldas:
                if RESTART_str in ['1', '3'] :
                   routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
                if RESTART_str == '2':
-                  routeRstFiles = glob.glob(self.exphome+'/'+exp_id+'/mk_restarts/*route_internal_rst.'+YYYYMMDD+'*')
-                  if len(routeRstFiles) == 0:
-                     exit("Expected a route restart in ./mk_restarts, but none was found.")
-                  routeRstFile = routeRstFiles[0]
+                  routeRstFile = glob_first(mk_outdir+'*route_internal_rst.'+YYYYMMDD+'*', 'route restart in mk_restarts')
 
                if iens == 0 and not os.path.isfile(routeRstFile):
-                     exit("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
+                     raise LdasSetupError("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
                             to " + routeRstFile)
                if RESTART_str  == 'M':
-                  exit(" RUN_ROUTE does not support MERRA 2 option")
+                  raise LdasSetupError("RUN_ROUTE does not support MERRA-2 option (RESTART=M)")
 
                if os.path.isfile(routeRstFile) :
                   routeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.route_internal_rst.'+y4m2d2_h2m2
@@ -1144,7 +1106,7 @@ class ldas:
         # catch_param restar file
         catch_param_file = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
         if self.with_land:
-           assert os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file
+           require(os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file)
 
         if self.has_mwrtm :
            mwRTMRstFile = self.mwrtm_file
@@ -1153,8 +1115,7 @@ class ldas:
               print ("Creating the local mwRTM restart file... \n")
               cmd= self.bindir +'/preprocess_ldas.x zoomin_mwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
 
-              print ("cmd:   " + cmd)
-              sp.call(shlex.split(cmd))
+              run_cmd(cmd)
            else :
               shutil.copy(mwRTMRstFile,mwRTMLocal)
 
@@ -1164,10 +1125,7 @@ class ldas:
 
         # create BCS_info.txt (facilitates BCS consistency check when exp is later used as restart for another exp)
         with open(self.rc_out+'/BCS_info.txt','wt') as fout :
-           # get BCS_VERSION (trailing dir name of BCS_PATH)
-           bcs_path_ = self.ExeInputs['BCS_PATH']
-           while bcs_path_[-1] == '/' : bcs_path_ = bcs_path_[0:-1]
-           bc_version_ = os.path.basename(bcs_path_)
+           bc_version_ = bcs_version_from_path(self.ExeInputs['BCS_PATH'])
 
            fout.write("BCS_VERSION: "    + bc_version_ + '\n')
            fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
@@ -1189,8 +1147,7 @@ class ldas:
         status = False
 
         for mydir in [self.blddirLn, self.rundir]:
-            assert os.path.isdir(mydir), \
-                'dir [%s] does not exist!' % mydir
+            require(os.path.isdir(mydir), 'dir [%s] does not exist!' % mydir)
 
         if self.ladas_cpl == 0:
             # copy ldas_setup exeinp and batinp input files to rundir (for the record)
@@ -1242,9 +1199,8 @@ class ldas:
         optimized_distribution_file = tempfile.NamedTemporaryFile(delete=False)
         print  ("Optimizing... decomposition of processes.... \n")
         cmd = self.bindir + '/preprocess_ldas.x optimize '+ self.inpdir+'/tile.data '+ str(self.RmInputs['ntasks_model']) + ' ' + optimized_distribution_file.name + ' ' + self.rundir + ' ' + '_'.join(self.tile_types)
-        print ("cmd:   " + cmd)
         print ("IMS.rc or JMS.rc would be generated on " + self.rundir)
-        sp.call(shlex.split(cmd))
+        run_cmd(cmd)
         optinxny = parseInputFile(optimized_distribution_file.name)
         if (int(optinxny['NX']) == 1):
             if int(optinxny['NY']) != int(self.RmInputs['ntasks_model']):
@@ -1256,7 +1212,7 @@ class ldas:
 
         # DEFAULT rc files
         default_rc = glob.glob(etcdir+'/GEOSldas_*.rc')
-        assert len(default_rc)==6
+        require(len(default_rc)==6, 'Expected 6 GEOSldas_*.rc files in [%s], found %d' % (etcdir, len(default_rc)))
         print (default_rc)
         for rcfile in default_rc:
             shortfile=rcfile.rsplit('GEOSldas_',1)[1]
@@ -1271,7 +1227,7 @@ class ldas:
                     if(os.path.isfile(_tmpfile)) :
                         _file_found = True
                     else :
-                        assert not _tmpfile.strip(), "HISTRC_FILE: %s is NOT a file. " %_tmpfile
+                        require(not _tmpfile.strip(), "HISTRC_FILE: %s is NOT a file. " %_tmpfile)
 
                 if _file_found :
                     histrc_file = self.ExeInputs['HISTRC_FILE']
@@ -1291,21 +1247,16 @@ class ldas:
                         + str(self.ExeInputs['RUN_IRRIG'])          + ' ' \
                         + str(self.nens)                            + ' ' \
                         + str(self.ExeInputs['DO_ISSM'])
-                    print(cmd)
-                    #os.system(cmd)
-                    sp.call(shlex.split(cmd))
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('GEOSldas_expid',self.ExeInputs['EXP_ID']))
+                    run_cmd(cmd)
+                replace_in_file(tmprcfile, 'GEOSldas_expid', self.ExeInputs['EXP_ID'])
 
             # if coupled land-atm DAS, always use either GEOSldas_HISTdet.rc or GEOSldas_HISTens.rc (depending on ladas_cpl)
             if ( shortfile =='HISTdet.rc' and self.ladas_cpl == 1 ) or ( shortfile =='HISTens.rc' and self.ladas_cpl == 2 ):
                 tmprcfile=self.rundir+'/HISTORY.rc'
                 histrc_file=rcfile
                 shutil.copy2(rcfile, tmprcfile)
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('GEOSldas_expid',self.ExeInputs['EXP_ID']))
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('GRIDNAME',self.ExeInputs['GRIDNAME']))
+                replace_in_file(tmprcfile, 'GEOSldas_expid', self.ExeInputs['EXP_ID'])
+                replace_in_file(tmprcfile, 'GRIDNAME',       self.ExeInputs['GRIDNAME'])
 
             # just copy an empty ExtData.rc
             if shortfile=='ExtData.rc' :
@@ -1317,14 +1268,10 @@ class ldas:
 
                 _num_sgmt = int(self.ExeInputs['NUM_SGMT'])
 
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('JOB_SGMT:',self.job_sgmt[0]))
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('NUM_SGMT:','NUM_SGMT: %d'% _num_sgmt))
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('BEG_DATE:',self.begDates[ 0].strftime('BEG_DATE: %Y%m%d %H%M%S')))
-                for line in fileinput.input(tmprcfile,inplace=True):
-                    print (line.rstrip().replace('END_DATE:',self.endDates[-1].strftime('END_DATE: %Y%m%d %H%M%S')))
+                replace_in_file(tmprcfile, 'JOB_SGMT:', self.job_sgmt[0])
+                replace_in_file(tmprcfile, 'NUM_SGMT:', 'NUM_SGMT: %d'% _num_sgmt)
+                replace_in_file(tmprcfile, 'BEG_DATE:', self.begDates[ 0].strftime('BEG_DATE: %Y%m%d %H%M%S'))
+                replace_in_file(tmprcfile, 'END_DATE:', self.endDates[-1].strftime('END_DATE: %Y%m%d %H%M%S'))
 
             if shortfile == 'LDAS.rc' :
                 ldasrcInp = OrderedDict()
@@ -1578,11 +1525,11 @@ class ldas:
         if 'ntasks-per-node' in self.RmInputs:
            ntasks_per_node = int(self.RmInputs['ntasks-per-node'])
            ntasks          = int(self.RmInputs['ntasks_model'])
-           assert ntasks%ntasks_per_node == 0, 'Please make ntasks_model a multiple of ntasks-per-node'
+           require(ntasks%ntasks_per_node == 0, 'Please make ntasks_model a multiple of ntasks-per-node')
            nodes           = ntasks//ntasks_per_node
            my_nodes  = '#SBATCH --nodes=' + str(nodes) +' --ntasks-per-node=' + str(ntasks_per_node)
            if (ntasks_per_node > 46):
-              assert constraint != 'cas', "Make sure constraint is compataible with ntasks-per-node"
+              require(constraint != 'cas', "Make sure constraint is compatible with ntasks-per-node")
 
         SBATCHQSUB = 'sbatch'
         if self.GEOS_SITE == 'NAS':
