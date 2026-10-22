@@ -30,7 +30,7 @@ expect, and record that diff in the bug entry below.
 | 2     | Fix the known bugs (B1-B3, B5, B6, B8-B10; B4/B7 are not bugs) | DONE | see Log |
 | 3     | Split `ldas.__init__`                          | DONE          | see Log |
 | 4     | Table-driven restart staging (`createLnRstBc`) | DONE          | see Log |
-| 5     | rc file generation (`createRCFiles`)           | TODO          | |
+| 5     | rc file generation (`createRCFiles`)           | DONE          | see Log |
 | 6     | Job scripts, site config, small helpers        | TODO          | |
 | 7     | (optional) Split into modules                  | TODO          | |
 
@@ -159,10 +159,20 @@ GRIDNAME, Pfafstetter) -> `_set_exe_defaults` -> `_check_restart_files` -> `_set
 - Harness: added 5 cases (r3_ens3_fallback, r1_ens2_all_types, r2_ens2_all_types,
   r1_lake_only_zoom, rM_lake); the route remap stub now writes a route restart. 27/27 PASS.
 
-**Phase 5: `createRCFiles`**
-- `_archive_inputs()` (copy-with-suffix helper), `_copy_nml()`, `_optimize_layout()`,
-  `_write_history_rc()`, `_write_cap_rc()`, `_write_ldas_rc()`.
-- `_build_ldas_rc_dict()` should be a pure function (no file I/O) with unit tests.
+**Phase 5 (DONE): `createRCFiles`** is now a driver plus:
+`copy_with_suffix` (setup_utils; archives exeinp/batinp) -> `_copy_nml` -> `_optimize_layout`
+(returns NX/NY, temp file removed) -> `_write_history_rc` -> ExtData.rc copy -> `_write_cap_rc` ->
+`_write_ldas_rc` (I/O) which uses `_ldas_rc_dict(surf_defaults, ldas_defaults)` (no file I/O).
+- It checks that all 6 GEOSldas_*.rc templates exist, instead of looping over `glob()` results.
+- **B11 (FIXED, latent):** HISTORY.rc in coupled mode depended on the unsorted `glob()` order of
+  GEOSldas_*.rc. It was correct only if HIST.rc was processed before HISTdet/HISTens.rc. Coupled mode
+  now uses HISTdet.rc (ladas_cpl=1) or HISTens.rc (ladas_cpl=2) directly, and process_hist.csh is
+  no longer run in coupled mode. No output change in the harness.
+- B9 finished: the ISSM_INTERNAL_CHECKPOINT_FILE special case was removed. The generic restart-key loop
+  writes the same key and value, so the **only output change** is its position in LDAS.rc (now right
+  after ISSM_INTERNAL_RESTART_FILE). [r1_issm, r1_ens2_all_types, r2_ens2_all_types: expected diff]
+- The `<CFnnnn>` edit of the coupled-mode SPECIAL ensupd nml is now done in Python (exact replacement, as
+  `sed` did. Note: `replace_in_file` would strip trailing whitespace, so it is not used for nml files).
 
 **Phase 6: job scripts and helpers**
 - Date helpers `y4m2(dt)` -> 'Yyyyy/Mmm', `stamp(dt)` -> 'yyyymmdd_hhmm' (used 5+ times).
@@ -213,3 +223,5 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
   Important: B1 means coupled mode crashed in 0f6155f.
 - 2026-10-22: Phase 3 done (split __init__). mock_regression PASS.
 - 2026-10-22: Phase 4 done (createLnRstBc split, table-driven restarts). mock_regression 27/27 PASS.
+- 2026-10-22: Phase 5 done (createRCFiles split, B11 fix, B9 order). mock_regression PASS
+  (3 expected ISSM order diffs vs ed23aa6).

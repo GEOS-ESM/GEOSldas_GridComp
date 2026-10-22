@@ -8,6 +8,7 @@ import os
 import sys
 import glob
 import shlex
+import shutil
 import linecache
 import subprocess as sp
 
@@ -90,6 +91,21 @@ def read_gridname(tilefile):
          gridname = nc_file.getncattr('Grid_Name')
    # in case it is an old name: SMAP-EASEvx-Mxx
    return gridname.replace('SMAP-','').replace('-M','_M')
+
+def copy_with_suffix(srcfile, dstdir):
+   """
+    Copy srcfile into dstdir.  If a file with the same name already exists in dstdir,
+    append .1, .2, ... to the file name.  Returns the path of the copy.
+   """
+   basename = os.path.basename(srcfile.rstrip('/'))
+   newname  = basename
+   ctr = 0
+   while os.path.isfile(os.path.join(dstdir, newname)):
+      ctr += 1
+      newname = basename + '.%d' % ctr
+   dst = dstdir + '/' + newname
+   shutil.copy(srcfile, dst)
+   return dst
 
 def replace_in_file(filename, old, new):
    """

@@ -80,6 +80,14 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(su.ym_dir(dt), 'Y2020/M03')
         self.assertEqual(su.ymd_hm(dt), '20200305_2130')
 
+    # copy_with_suffix ------------------------------------------------------
+    def test_copy_with_suffix(self):
+        src = _write(self.d, 'exeinp', 'a\n')
+        dst = os.path.join(self.d, 'run'); os.makedirs(dst)
+        self.assertTrue(su.copy_with_suffix(src, dst).endswith('/run/exeinp'))
+        self.assertTrue(su.copy_with_suffix(src, dst).endswith('/run/exeinp.1'))
+        self.assertTrue(su.copy_with_suffix(src, dst).endswith('/run/exeinp.2'))
+
     # run_cmd ---------------------------------------------------------------
     def test_run_cmd(self):
         self.assertEqual(su.run_cmd('true'), 0)

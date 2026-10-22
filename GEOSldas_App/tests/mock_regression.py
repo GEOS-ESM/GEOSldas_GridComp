@@ -304,7 +304,7 @@ def cases(D):
     add('r3_catchcn', {'RESTART': '3', 'LSM_CHOICE': '2'})
     add('r1_lake_landice_route', {'TILE_TYPES': '100 19 20', 'RUN_ROUTE': '1'})
     add('r1_lake_landice_zoom', {'TILE_TYPES': '100 19 20', 'MINLAT': '20.'})
-    add('r1_issm', {'TILE_TYPES': '100 20', 'DO_ISSM': '1'})
+    add('r1_issm', {'TILE_TYPES': '100 20', 'DO_ISSM': '1'}, expect='diff')   # phase 5: ISSM key order
     add('r2_remap', {'RESTART': '2', 'TILE_TYPES': '100 19 20'})
     add('rM_merra2', {'RESTART': 'M'})
     add('multi_sgmt', {'END_DATE': '20200501 000000', 'JOB_SGMT': '00000100 000000', 'NUM_SGMT': '1'})
@@ -317,9 +317,9 @@ def cases(D):
     # restart staging edge cases (phase 4)
     add('r3_ens3_fallback', {'RESTART': '3', 'NUM_LDAS_ENSEMBLE': '3'})          # no ens0002 -> member-0 files
     add('r1_ens2_all_types', {'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20', 'DO_ISSM': '1',
-                              'RUN_ROUTE': '1'})
+                              'RUN_ROUTE': '1'}, expect='diff')   # phase 5: ISSM key order
     add('r2_ens2_all_types', {'RESTART': '2', 'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20',
-                              'DO_ISSM': '1', 'RUN_ROUTE': '1'})
+                              'DO_ISSM': '1', 'RUN_ROUTE': '1'}, expect='diff')   # phase 5: ISSM key order
     add('r1_lake_only_zoom', {'TILE_TYPES': '19', 'MINLAT': '20.'})
     add('rM_lake', {'RESTART': 'M', 'TILE_TYPES': '100 19'})
     # coupled land-atm DAS: exeinp/batinp are dummy (non-existing) files
