@@ -19,7 +19,7 @@ Real pieces: ldas_setup, ldas.py, setup_utils.py, lenkf_j_template.py,
 usage (from GEOSldas_App):
    python3 tests/mock_regression.py [--ref COMMIT] [--keep] [--case NAME ...] [-v]
 
-Default reference commit: REF_COMMIT below (code before the refactor).
+Default reference commit: REF_COMMIT below (end of phase 2).
 Exit status: 0 if every case matches its expectation, 1 otherwise.
 
 NOT covered: coupled land-atm DAS (ladas_cpl>0; uses hard-wired /discover paths),
@@ -40,7 +40,8 @@ SURF_RC = os.path.join(REPO, '..', '@GEOSgcm_GridComp', 'GEOSagcm_GridComp',
                        'GEOSphysics_GridComp', 'GEOSsurface_GridComp', 'Shared',
                        'GEOS_SurfaceGridComp.rc')
 
-REF_COMMIT = '0f6155f'            # phase 1 (pre-refactor behaviour)
+REF_COMMIT = 'ed23aa6'            # end of phase 2 (bug fixes); phases 3+ must be identical to it
+# (use --ref 0f6155f to compare against the original pre-refactor code)
 
 sys.path.insert(0, HERE)
 from compare_exp import compare  # noqa: E402
@@ -314,9 +315,8 @@ def cases(D):
                 'oserver_nodes': '1', 'writers-per-node': '3'})
     add('tile_txt', {'TILE_FILE_FORMAT': 'TXT'})
     # coupled land-atm DAS: exeinp/batinp are dummy (non-existing) files
-    # (ref 0f6155f crashes in coupled mode with KeyError DO_ISSM -> bug B1)
     for lc, nens in [('1', '1'), ('2', '2')]:
-        add('ladas_cpl' + lc, expect='ref_fails', cpl=['--ladas_cpl', lc, '--account', 's1234', '--nymdb', '20200101',
+        add('ladas_cpl' + lc, cpl=['--ladas_cpl', lc, '--account', 's1234', '--nymdb', '20200101',
                                    '--nhmsb', '210000', '--agcm_res', '0012', '--bcs_version', BCS_VERSION,
                                    '--rstloc', D['rstloc'], '--varwindow', '360', '--nens', nens])
     add('B2_mwrtm_missing', {'MWRTM_PATH': os.path.join(D['root'], 'nomwrtm')}, expect='new_fails')
@@ -325,10 +325,10 @@ def cases(D):
     #         'ref_fails' -> ref setup fails (bug), new must succeed
     #         'new_fails' -> new setup must fail (input error detected); ref result ignored
     # Phase 2 bug fixes:
-    add('B1_no_do_issm', {'TILE_TYPES': '100 20'}, drop=['DO_ISSM'], expect='ref_fails')
+    add('B1_no_do_issm', {'TILE_TYPES': '100 20'}, drop=['DO_ISSM'])
     add('B6_nas_multi_sgmt', {'END_DATE': '20200501 000000', 'JOB_SGMT': '00000100 000000'},
-        site='NAS', expect='diff')
-    add('nas_single', site='NAS', expect='diff')   # 2 segments (30-day month, see B7)
+        site='NAS')
+    add('nas_single', site='NAS')
     add('B3_route_merra2', {'RESTART': 'M', 'RUN_ROUTE': '1'}, expect='new_fails')
     add('B5_bad_lsm_choice', {'LSM_CHOICE': '7'}, expect='new_fails')
     return C
@@ -425,7 +425,8 @@ def main(argv):
             buf = io.StringIO()
             nd = compare(expdir('ref', name), expdir('new', name),
                          same=[(os.path.dirname(inst('ref', case['site'])),
-                                os.path.dirname(inst('new', case['site'])))],
+                                os.path.dirname(inst('new', case['site']))),
+                               (os.path.join(work, 'ref', name), os.path.join(work, 'new', name))],
                          out=buf)
             if nd == 0:
                 print('IDENTICAL' + ('  (WARNING: a difference was expected)' if expect == 'diff' else ''))
