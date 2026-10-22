@@ -37,6 +37,11 @@ class ldas:
 
     def __init__(self, cmdLineArgs):
         """
+        Read and verify all inputs (command line, exeinp file, batinp file), derive
+        settings, and locate input files.  Nothing is created on disk here.
+
+        The order of the steps matters: ExeInputs is an OrderedDict and the order in
+        which keys are added determines the order of entries in LDAS.rc.
         """
         # List of keywords, including:
         # - keywords that are excluded from LDAS.rc (i.e., only needed in pre- or post-processing)
@@ -52,12 +57,34 @@ class ldas:
 
         self.GEOS_SITE = "@GEOS_SITE@"
 
-        # ===============================================================================================
-        #
-        # ------
-        # ./ldas_setup setup ...
-        # ------
-        # Instance variables
+        self._init_attributes(cmdLineArgs)
+        self._check_ladas_cmdline(cmdLineArgs)
+
+        # read exeinp file (empty dict for coupled land-atm DAS)
+        self.ExeInputs = parseInputFile(cmdLineArgs['exeinpfile'], ladas_cpl = self.ladas_cpl )
+
+        self._set_restart_option()
+        if self.ladas_cpl > 0 :
+            self._apply_ladas_coupling()
+
+        if self.verbose:
+            print ('\nInputs from exeinp file:\n')
+            printDictionary(self.ExeInputs)
+
+        self._set_model_options()
+        self._verifyExeInputs()
+        self._calculateJobSegments()
+        self._resolve_bcs_files()
+        self._set_exe_defaults()
+        self._check_restart_files()
+        self._set_mwrtm()
+        self._read_resource_inputs(cmdLineArgs)
+        self._set_paths()
+        self._set_oserver()
+
+    # -----------------------------------------------------------------------------------
+    def _init_attributes(self, cmdLineArgs):
+        """ copy command line args and initialize all instance variables """
         self.exeinpfile         = cmdLineArgs['exeinpfile']
         self.batinpfile         = cmdLineArgs['batinpfile']
         exphome_                = cmdLineArgs['exphome'].rstrip('/')
@@ -119,8 +146,16 @@ class ldas:
         self.run_route          = 0
         self.with_issm          = False
         self.adas_expdir        = ''
+        self.do_issm            = 0
+        self.restart            = None                 # RESTART option as string: '1', '2', '3', or 'M'
 
-        # assert necessary optional arguments in command line if exeinp file does not exsit
+    # -----------------------------------------------------------------------------------
+    def _check_ladas_cmdline(self, cmdLineArgs):
+        """
+        Set self.ladas_cpl.  If the exeinp file does not exist, this must be a coupled
+        land-atm DAS setup and all coupled-mode command line args are required.
+        If the exeinp file exists, ladas_cpl=0 (--ladas_cpl is ignored; intended).
+        """
         if not os.path.exists(cmdLineArgs['exeinpfile']):
            # make sure all necessary command line arguments were supplied
            require(self.ladas_cpl is not None,
@@ -133,17 +168,15 @@ class ldas:
         else:
            self.ladas_cpl = 0
 
-        # ------
-        # Read exe input file which is required to set up the dir
-        # ------
-        self.ExeInputs = parseInputFile(cmdLineArgs['exeinpfile'], ladas_cpl = self.ladas_cpl )
-
-        # verifing the required input
+    # -----------------------------------------------------------------------------------
+    def _set_restart_option(self):
+        """ RESTART option (default 1); for RESTART=M no restart exp is needed """
         if 'RESTART' not in self.ExeInputs :
             self.ExeInputs['RESTART'] = "1"
 
         RESTART_str  = str(self.ExeInputs['RESTART'])
         require(RESTART_str in ["1", "2", "3", "M"], "RESTART must be 1, 2, 3, or M")
+        self.restart = RESTART_str
 
         if RESTART_str == 'M':
             # use archived MERRA-2 restarts, no need for RESTART_ID/DOMAIN/PATH
@@ -151,77 +184,78 @@ class ldas:
             self.ExeInputs['RESTART_DOMAIN'] = 'None'
             self.ExeInputs['RESTART_PATH']   = 'None'
 
-        ### check if ldas is coupled to adas; if so, set/overwrite input parameters accordingly
-        if self.ladas_cpl > 0 :
-            self.ExeInputs['BEG_DATE']                 = f"{self.nymdb} {self.nhmsb}"
-            rstloc_                                    = self.rstloc.rstrip('/')                  # remove trailing '/'
-            require(os.path.isdir(rstloc_), 'rstloc [%s] is not a directory' % rstloc_)
-            self.rstloc                                = os.path.abspath(rstloc_)
-            self.ExeInputs['RESTART_PATH']             = os.path.dirname( self.rstloc)
-            self.ExeInputs['RESTART_ID']               = os.path.basename(self.rstloc)
-            self.adas_expdir                           = os.path.dirname( self.exphome)
-            self.ExeInputs['ADAS_EXPDIR']              = self.adas_expdir
-            self.adas_expid                            = os.path.basename(self.adas_expdir)
-            self.ExeInputs['MET_TAG']                  = self.adas_expid + '__bkg'
+    # -----------------------------------------------------------------------------------
+    def _apply_ladas_coupling(self):
+        """
+        Coupled land-atm DAS (ladas_cpl > 0): set/overwrite ExeInputs from the command
+        line args and hard-wired values.
+        """
+        self.ExeInputs['BEG_DATE']                 = f"{self.nymdb} {self.nhmsb}"
+        rstloc_                                    = self.rstloc.rstrip('/')                  # remove trailing '/'
+        require(os.path.isdir(rstloc_), 'rstloc [%s] is not a directory' % rstloc_)
+        self.rstloc                                = os.path.abspath(rstloc_)
+        self.ExeInputs['RESTART_PATH']             = os.path.dirname( self.rstloc)
+        self.ExeInputs['RESTART_ID']               = os.path.basename(self.rstloc)
+        self.adas_expdir                           = os.path.dirname( self.exphome)
+        self.ExeInputs['ADAS_EXPDIR']              = self.adas_expdir
+        self.adas_expid                            = os.path.basename(self.adas_expdir)
+        self.ExeInputs['MET_TAG']                  = self.adas_expid + '__bkg'
 
-            if   self.ladas_cpl == 1 :
-                # ldas coupled with determistic component of ADAS
-                self.ExeInputs['EXP_ID']               = self.adas_expid  + '_LDAS'
-                self.ExeInputs['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
-                self.ExeInputs['ENSEMBLE_FORCING']     = 'NO'
-            elif self.ladas_cpl == 2 :
-                # ldas coupled with ensemble component of ADAS
-                self.ExeInputs['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
-                self.ExeInputs['MET_PATH']             = self.adas_expdir + '/atmens/mem'
-                self.ExeInputs['ENSEMBLE_FORCING']     = 'YES'
-            else :
-                raise LdasSetupError("Unknown value of ladas_cpl: %s" % self.ladas_cpl)
+        if   self.ladas_cpl == 1 :
+            # ldas coupled with determistic component of ADAS
+            self.ExeInputs['EXP_ID']               = self.adas_expid  + '_LDAS'
+            self.ExeInputs['MET_PATH']             = self.adas_expdir + '/recycle/holdpredout'
+            self.ExeInputs['ENSEMBLE_FORCING']     = 'NO'
+        elif self.ladas_cpl == 2 :
+            # ldas coupled with ensemble component of ADAS
+            self.ExeInputs['EXP_ID']               = self.adas_expid  + '_LDAS4ens'
+            self.ExeInputs['MET_PATH']             = self.adas_expdir + '/atmens/mem'
+            self.ExeInputs['ENSEMBLE_FORCING']     = 'YES'
+        else :
+            raise LdasSetupError("Unknown value of ladas_cpl: %s" % self.ladas_cpl)
 
-            self.ExeInputs['NUM_LDAS_ENSEMBLE']        = self.nens                                # fvsetup finds Nens by counting restart files
-            self.first_ens_id                          = 1                                        # match ADAS convention
-            self.ExeInputs['FIRST_ENS_ID']             = self.first_ens_id
+        self.ExeInputs['NUM_LDAS_ENSEMBLE']        = self.nens                                # fvsetup finds Nens by counting restart files
+        self.first_ens_id                          = 1                                        # match ADAS convention
+        self.ExeInputs['FIRST_ENS_ID']             = self.first_ens_id
 
-            self.agcm_res                              = 'CF' + self.agcm_res                     # change format to "CFnnnn"
-            self.ExeInputs['EXP_DOMAIN']               = self.agcm_res +'x6C_GLOBAL'
+        self.agcm_res                              = 'CF' + self.agcm_res                     # change format to "CFnnnn"
+        self.ExeInputs['EXP_DOMAIN']               = self.agcm_res +'x6C_GLOBAL'
 
-            # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info
-            # hard-wired BCS_PATH for now
-            self.ExeInputs['BCS_PATH']                 = LADAS_BCS_PATH
-            self.ExeInputs['BCS_PATH']                 = self.ExeInputs['BCS_PATH'].rstrip('/') + '/' + self.bcs_version
-            if self.bcs_version == "Icarus-NLv3" :
-                self.ExeInputs['BCS_PATH']             = self.ExeInputs['BCS_PATH']  + '_new_layout'
-            self.ExeInputs['BCS_RESOLUTION']           = self.agcm_res +'x6C_'       + self.agcm_res +'x6C'
-            self.ExeInputs['RESTART_DOMAIN']           = self.agcm_res +'x6C_GLOBAL'
+        # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info
+        # hard-wired BCS_PATH for now
+        self.ExeInputs['BCS_PATH']                 = LADAS_BCS_PATH
+        self.ExeInputs['BCS_PATH']                 = self.ExeInputs['BCS_PATH'].rstrip('/') + '/' + self.bcs_version
+        if self.bcs_version == "Icarus-NLv3" :
+            self.ExeInputs['BCS_PATH']             = self.ExeInputs['BCS_PATH']  + '_new_layout'
+        self.ExeInputs['BCS_RESOLUTION']           = self.agcm_res +'x6C_'       + self.agcm_res +'x6C'
+        self.ExeInputs['RESTART_DOMAIN']           = self.agcm_res +'x6C_GLOBAL'
 
-            # the following are not in default ExeInputs list; hardwire for now
-            self.ExeInputs['MWRTM_PATH']               = LADAS_MWRTM_PATH
-            self.ExeInputs['LAND_ASSIM']               = "YES"
-            self.ExeInputs['MET_HINTERP']              = 0
-            self.landassim_dt                          = 10800                                    # seconds
-            # make sure ADAS analysis window [minutes] is multiple of LANDASSIM_DT [seconds]
-            if int(self.varwindow) % (self.landassim_dt/60) == 0 :
-                self.ExeInputs['LANDASSIM_DT']         = self.landassim_dt
-            else :
-                raise LdasSetupError("LANDASSIM_DT is inconsistent with ADAS analysis window.")
-            self.ExeInputs['LANDASSIM_T0']             = "013000"                                 # HHMMSS
-            jsgmt1                                     = "00000000"
-            jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)  # convert minutes to HHMMSS
-            self.ExeInputs['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
-            self.ExeInputs['NUM_SGMT']                 = 1
-            self.ExeInputs['FORCE_DTSTEP']             = 3600
+        # the following are not in default ExeInputs list; hardwire for now
+        self.ExeInputs['MWRTM_PATH']               = LADAS_MWRTM_PATH
+        self.ExeInputs['LAND_ASSIM']               = "YES"
+        self.ExeInputs['MET_HINTERP']              = 0
+        self.landassim_dt                          = 10800                                    # seconds
+        # make sure ADAS analysis window [minutes] is multiple of LANDASSIM_DT [seconds]
+        if int(self.varwindow) % (self.landassim_dt/60) == 0 :
+            self.ExeInputs['LANDASSIM_DT']         = self.landassim_dt
+        else :
+            raise LdasSetupError("LANDASSIM_DT is inconsistent with ADAS analysis window.")
+        self.ExeInputs['LANDASSIM_T0']             = "013000"                                 # HHMMSS
+        jsgmt1                                     = "00000000"
+        jsgmt2                                     = hours_to_hhmmss(int(self.varwindow)/60)  # convert minutes to HHMMSS
+        self.ExeInputs['JOB_SGMT']                 = f"{jsgmt1} {jsgmt2}"
+        self.ExeInputs['NUM_SGMT']                 = 1
+        self.ExeInputs['FORCE_DTSTEP']             = 3600
 
-            # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
-            _beg_date                                  = datetime.strptime( self.ExeInputs['BEG_DATE'], "%Y%m%d %H%M%S")
-            _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60)
-            self.ExeInputs['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S")
+        # determine END_DATE = BEG_DATE + TIME_STEP_OF_ADAS_CYCLE
+        _beg_date                                  = datetime.strptime( self.ExeInputs['BEG_DATE'], "%Y%m%d %H%M%S")
+        _end_date                                  = _beg_date + timedelta(hours=int(self.varwindow)/60)
+        self.ExeInputs['END_DATE']                 = _end_date.strftime("%Y%m%d %H%M%S")
 
-            # end if self.ladas_cpl > 0 -----------------------------------------------------------------------------------------
-
-
-        # print exe inputs
-        if self.verbose:
-            print ('\nInputs from exeinp file:\n')
-            printDictionary(self.ExeInputs)
+    # -----------------------------------------------------------------------------------
+    def _set_model_options(self):
+        """ land model, tile types, ISSM, routing, ensemble members/ids """
+        RESTART_str = self.restart
 
         if 'LSM_CHOICE' not in self.ExeInputs:
             self.ExeInputs['LSM_CHOICE'] = 1
@@ -229,7 +263,6 @@ class ldas:
         require(_lsm_choice_int in LSM_CHOICE_TO_CATCH,
                 "Unknown LSM_CHOICE=%d; must be 1 (Catchment) or 2 (Catchment-CN4.0)" % _lsm_choice_int)
         self.catch = LSM_CHOICE_TO_CATCH[_lsm_choice_int]
-        _lsm_choice_int = None
 
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
         if "100" in self.tile_types :
@@ -272,9 +305,13 @@ class ldas:
         else :
             self.ensdirs_avg = self.ensdirs + ['ens_avg']
 
-        self._verifyExeInputs()
-
-        self._calculateJobSegments()
+    # -----------------------------------------------------------------------------------
+    def _resolve_bcs_files(self):
+        """
+        BCS directories, catchment.def, tile file, land BC files, GRIDNAME, EASE Pfafstetter tile file.
+        For RESTART=1, tile and BC files are taken from the rc_out dir of the restart exp.
+        """
+        RESTART_str = self.restart
 
         # assemble bcs sub-directories
         self.bcs_dir_land       = self.ExeInputs['BCS_PATH']+ '/land/'       + self.ExeInputs['BCS_RESOLUTION']+'/'
@@ -384,11 +421,8 @@ class ldas:
            if (len(tmp_) > 0) :
               self.ExeInputs['EASE_PFAF_TILE_FILE'] = tmp_[0]
 
-        inpdir_      = None
-        domain_      = None
-        land_domain_ = None
-        inpgeom_     = None
-
+    # -----------------------------------------------------------------------------------
+    def _set_exe_defaults(self):
         if 'POSTPROC_HIST' not in self.ExeInputs:
             self.ExeInputs['POSTPROC_HIST'] = 0
 
@@ -398,6 +432,9 @@ class ldas:
         if 'AEROSOL_DEPOSITION' not in self.ExeInputs:
             self.ExeInputs['AEROSOL_DEPOSITION'] = 0
 
+    # -----------------------------------------------------------------------------------
+    def _write_domain_def(self):
+        """ write simulation domain namelist (&domain_inputs) to a temporary file for preprocess_ldas.x """
         # default is global
         _domain_dic=OrderedDict()
         _domain_dic['MINLON']=-180.
@@ -422,6 +459,11 @@ class ldas:
                self.domain_def.write(keyn+ valn +'\n')
         self.domain_def.write('/\n')
         self.domain_def.close()
+
+    # -----------------------------------------------------------------------------------
+    def _check_restart_files(self):
+        """ make sure the restart files to be used exist (RESTART=1,2,3) """
+        RESTART_str = self.restart
 
         if RESTART_str in ['1','2','3']:
            y4m2='Y%4d/M%02d' % (self.begDates[0].year, self.begDates[0].month)
@@ -459,6 +501,9 @@ class ldas:
               issmRstFile=self.in_rstdir+'/'+tmpFile
               require(os.path.isfile(issmRstFile), 'issm_internal_rst file [%s] does not exist!' %(issmRstFile))
 
+    # -----------------------------------------------------------------------------------
+    def _set_mwrtm(self):
+        """ land assimilation flag; mwRTM parameter and vegopacity files """
         # DEAL WITH mwRTM input from exec
         self.assim = True if self.ExeInputs.get('LAND_ASSIM', 'NO').upper() == 'YES' and self.with_land else False
         # verify mwrtm file
@@ -475,11 +520,9 @@ class ldas:
               self.has_vegopacity = True
               self.ExeInputs['VEGOPACITY_FILE'] = vegopacity_file_
 
-
-        # ------------------
-        # Read resource manager (rm) input file
-        # ------------------
-
+    # -----------------------------------------------------------------------------------
+    def _read_resource_inputs(self, cmdLineArgs):
+        """ resource manager (SLURM/PBS) inputs: batinp file, or defaults for coupled land-atm DAS """
         if self.ladas_cpl == 0 :
            self.RmInputs  = parseInputFile(cmdLineArgs['batinpfile'])
         else :
@@ -495,13 +538,9 @@ class ldas:
             printDictionary(self.RmInputs)
             print ('\n\n')
 
-        # ------
-        # set top level directories
-        #     rundir, inpdir, outdir, blddir
-        # executable
-        #     exefyl
-        # ------
-
+    # -----------------------------------------------------------------------------------
+    def _set_paths(self):
+        """ installation (bindir, blddir, executable) and experiment directories """
         self.bindir     = os.path.dirname(os.path.realpath(__file__))
         self.blddir     = self.bindir.rsplit('/',1)[0]
         exefyl          = '/bin/GEOSldas.x'
@@ -518,6 +557,9 @@ class ldas:
         self.rstdir     = self.outdir   + '/'+self.ExeInputs['EXP_DOMAIN']+'/rs/'
         self.exefyl     = self.blddirLn + exefyl
 
+    # -----------------------------------------------------------------------------------
+    def _set_oserver(self):
+        """ output server defaults """
         # default is set to 0 ( no output server)
         if 'oserver_nodes' not in self.RmInputs :
            self.RmInputs['oserver_nodes'] = 0
@@ -691,6 +733,8 @@ class ldas:
     def createLnRstBc(self) :
         # link bld dir
         status = False
+
+        self._write_domain_def()
 
         _nens = self.nens
 

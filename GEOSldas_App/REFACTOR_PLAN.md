@@ -28,7 +28,7 @@ expect, and record that diff in the bug entry below.
 | 0     | Safety net: unit tests, diff tool, mock e2e harness | DONE (Discover run still recommended) | see Log |
 | 1b    | Use the helpers in ldas.py / ldas_setup        | DONE          | see Log |
 | 2     | Fix the known bugs (B1-B3, B5, B6, B8-B10; B4/B7 are not bugs) | DONE | see Log |
-| 3     | Split `ldas.__init__`                          | TODO          | |
+| 3     | Split `ldas.__init__`                          | DONE          | see Log |
 | 4     | Table-driven restart staging (`createLnRstBc`) | TODO          | |
 | 5     | rc file generation (`createRCFiles`)           | TODO          | |
 | 6     | Job scripts, site config, small helpers        | TODO          | |
@@ -127,12 +127,20 @@ deleted; `os.chdir(self.rundir)` side effects in createRunScripts/createBatchRun
 
 ## Phases 3-7 (design)
 
-**Phase 3: split `__init__` (~500 lines)** into ordered private steps:
-`_read_cmdline()`, `_apply_ladas_coupling()`, `_set_defaults()`,
-`_set_model_options()` (LSM/catch, tile types, ensemble ids), `_calculateJobSegments()`,
-`_resolve_bcs_files()` (tile + BC globbing), `_check_restart_inputs()`,
-`_read_resource_inputs()`, `_set_paths()`. Move the domain-namelist temp file into
-`createLnRstBc`. Put the coupled-mode constants in one block at the top of the module.
+**Phase 3 (DONE): split `__init__`** (~500 lines) into a short driver plus ordered steps:
+`_init_attributes` -> `_check_ladas_cmdline` -> parseInputFile -> `_set_restart_option`
+(sets `self.restart`) -> `_apply_ladas_coupling` (only if ladas_cpl>0) -> `_set_model_options`
+(LSM/catch, tile types, ISSM, route, early option checks, ensemble ids) -> `_verifyExeInputs`
+-> `_calculateJobSegments` -> `_resolve_bcs_files` (BCS dirs, catchment.def, tile + BC files,
+GRIDNAME, Pfafstetter) -> `_set_exe_defaults` -> `_check_restart_files` -> `_set_mwrtm` ->
+`_read_resource_inputs` -> `_set_paths` -> `_set_oserver`.
+- The domain namelist temp file is now written by `_write_domain_def()` at the start of
+  `createLnRstBc` (it was written in `__init__`).
+- IMPORTANT for later changes: ExeInputs is an OrderedDict and its key insertion order decides the
+  LDAS.rc entry order, so the order of the steps must not change.
+- New attributes: `self.restart` (RESTART as a string) and `self.do_issm`. (Phase 2 constants
+  are at the top of the module.)
+- mock_regression: 22/22 PASS (identical to ed23aa6).
 
 **Phase 4: `createLnRstBc` (~490 lines)**
 - `_link_met_forcing()`, `_stage_tile_file()`, `_compute_zoom()` (f2g -> zoom-by-type dict),
@@ -198,3 +206,4 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
   passes 14/14 IDENTICAL against 0f6155f. Committed Phase 0 + 1b.
 - 2026-10-22: Phase 2 done (B1-B3, B5, B6, B8-B10 + B4/B7 cleanups). Harness: 22 cases, PASS.
   Important: B1 means coupled mode crashed in 0f6155f.
+- 2026-10-22: Phase 3 done (split __init__). mock_regression PASS.
