@@ -73,6 +73,13 @@ class TestHelpers(unittest.TestCase):
         f = _write(self.d, 'a.til.domain', 'l1\nl2\nPE720x4320-CF\n')
         self.assertEqual(su.read_gridname(f), 'PE720x4320-CF')
 
+    # date helpers ----------------------------------------------------------
+    def test_date_helpers(self):
+        from datetime import datetime
+        dt = datetime(2020, 3, 5, 21, 30)
+        self.assertEqual(su.ym_dir(dt), 'Y2020/M03')
+        self.assertEqual(su.ymd_hm(dt), '20200305_2130')
+
     # run_cmd ---------------------------------------------------------------
     def test_run_cmd(self):
         self.assertEqual(su.run_cmd('true'), 0)

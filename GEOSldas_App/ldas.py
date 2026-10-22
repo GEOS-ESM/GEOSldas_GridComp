@@ -16,7 +16,7 @@ from lenkf_j_template             import job_directive, job_body
 from setup_utils                  import (parseInputFile, printDictionary, hours_to_hhmmss,
                                           getExeKeys, getResourceKeys, read_gridname,
                                           LdasSetupError, require, run_cmd, glob_first,
-                                          bcs_version_from_path, replace_in_file)
+                                          bcs_version_from_path, replace_in_file, ym_dir, ymd_hm)
 
 """
 ldas class is used by ldas_setup
@@ -729,18 +729,83 @@ class ldas:
         return status
 
 
-    # create links to BCs, restarts, met forcing, ...
+    # -----------------------------------------------------------------------------------
+    # createLnRstBc: link/copy build dir, met forcing, tile file, BCs, and restarts
+    # -----------------------------------------------------------------------------------
+
     def createLnRstBc(self) :
-        # link bld dir
-        status = False
-
+        """
+        Create links to build dir, met forcing, tile file, BCs, and restarts in input/;
+        copy (and zoom in, if necessary) tile/BC files to rc_out/ and restarts to rs/.
+        """
         self._write_domain_def()
+        tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False)
+        tmp_f2g_file.close()
+        try:
+            os.symlink(self.blddir, self.blddirLn)
 
+            self._link_met_forcing()
+
+            dzsf      = self.ExeInputs.get('SURFLAY',   '50.0')
+            # These are dummy values for *cold* restart:
+            wemin_in  = self.ExeInputs.get('WEMIN_IN',  '13')    #  WEmin input/output for scale_catch(cn)
+            wemin_out = self.ExeInputs.get('WEMIN_OUT', '13')
+
+            tile = self._stage_tile_file(tmp_f2g_file.name, dzsf)
+
+            myTile=self.inpdir+'/tile.data'
+            os.symlink(tile,myTile)
+
+            if self.with_land:
+               self._stage_land_bcs(tmp_f2g_file.name)
+
+            if self.with_issm:
+               self._link_issm_bcs()
+
+            # create and link restart
+            print ("Creating and linking restart...")
+            myRstDir  = self.inpdir + '/restart/'
+            mk_outdir = self.exphome+'/'+self.ExeInputs['EXP_ID']+'/mk_restarts/'
+
+            self._copy_landassim_seeds(myRstDir)
+
+            # (RESTART=M with DO_ISSM=1 or RUN_ROUTE>0 is rejected in __init__)
+            if (self.restart in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):
+               self._remap_restarts(mk_outdir, dzsf, wemin_in, wemin_out)
+
+            self._stage_restarts(myRstDir, mk_outdir, tmp_f2g_file.name)
+
+            # catch_param restart file (created by preprocess_ldas.x c_f2g)
+            catch_param_file = self.rc_out+'/'+ ym_dir(self.begDates[0])+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+ymd_hm(self.begDates[0])+'z.bin'
+            if self.with_land:
+               require(os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file)
+
+            if self.has_mwrtm :
+               self._stage_mwrtm(myRstDir, tmp_f2g_file.name)
+
+            self._write_bcs_info()
+
+            # update 'restart_path' to use relative path from outdir
+            print ("Updating restart path...")
+            self.ExeInputs['RESTART_PATH'] = myRstDir
+        finally:
+            for f in [self.domain_def.name, tmp_f2g_file.name]:
+                if os.path.exists(f):
+                    os.remove(f)
+        return True
+
+    # -----------------------------------------------------------------------------------
+    def _zoom_or_copy(self, zoom_op, src, dst, f2g_file):
+        """ zoom_op = preprocess_ldas.x sub-command (e.g., 'zoomin_catchrst') or None (plain copy) """
+        if zoom_op:
+            run_cmd(self.bindir + '/preprocess_ldas.x ' + zoom_op + ' ' + src + ' ' + dst + ' ' + f2g_file)
+        else:
+            shutil.copy(src, dst)
+
+    # -----------------------------------------------------------------------------------
+    def _link_met_forcing(self):
+        """ link met forcing dir(s) into input/met_forcing; MET_PATH becomes relative to rundir """
         _nens = self.nens
-
-        os.symlink(self.blddir, self.blddirLn)
-
-        # met forcing dir
         self.ensemble_forcing = True if self.ExeInputs.get('ENSEMBLE_FORCING', 'NO').upper() == 'YES' else False
 
         myMetPath =''
@@ -752,7 +817,6 @@ class ldas:
            myMetDir = self.inpdir + '/met_forcing'
            myMetPath = myMetDir + '/' + metpath.split('/')[-1]
            os.symlink(metpath, myMetPath)
-           # update 'met_path' to use relative path from outdir
            if ( not self.ensemble_forcing):
               break
         if ( _nens !=1 and self.ensemble_forcing) :
@@ -761,427 +825,290 @@ class ldas:
         else:
            self.ExeInputs['MET_PATH'] = os.path.relpath(myMetPath, self.rundir)
 
-        # update tile file
-        tile= self.ExeInputs['TILING_FILE']
-        short_tile= os.path.basename(self.ExeInputs['TILING_FILE'])
-        newtile = self.rc_out+'/'+short_tile
+    # -----------------------------------------------------------------------------------
+    def _stage_tile_file(self, f2g_file, dzsf):
+        """
+        Copy tile file to rc_out (correcting old EASE format), run c_f2g to determine the
+        simulation domain (sets isZoomIn*), and create the domain tile file if needed.
+        Returns path of tile file to be used.
+        """
+        tile       = self.ExeInputs['TILING_FILE']
+        short_tile = os.path.basename(tile)
+        newtile    = self.rc_out+'/'+short_tile
         shutil.copy(tile, newtile)
-        tile=newtile
-        # if three extra lines exist, remove them and save it to inputdir
+        tile       = newtile
 
         print ('\nCorrect the tile file if it is an old EASE tile format... \n')
         EASEtile=self.rc_out+'/MAPL_'+short_tile
-        cmd = self.bindir + '/preprocess_ldas.x correctease  '+ tile + ' '+ EASEtile
-        run_cmd(cmd)
-
+        run_cmd(self.bindir + '/preprocess_ldas.x correctease  '+ tile + ' '+ EASEtile)
         if os.path.isfile(EASEtile) :
-            #update tile file name
-            short_tile ='MAPL_'+short_tile
             tile=EASEtile
-        # setup BC files
 
-        catchment_def = self.ExeInputs['CATCH_DEF_FILE']
-        exp_id = self.ExeInputs['EXP_ID']
-
-        _start = self.begDates[0]
-        _y4m2d2h2m2 ='%4d%02d%02d%02d%02d' % (_start.year, _start.month,_start.day,_start.hour,_start.minute)
-
-        dzsf = '50.0'
-        if 'SURFLAY' in self.ExeInputs :
-           dzsf = self.ExeInputs['SURFLAY']
-
-        # These are dummy values for *cold* restart:
-        wemin_in  = '13'  #  WEmin input/output for scale_catch(cn),
-        wemin_out = '13'  #
-        if 'WEMIN_IN' in self.ExeInputs :
-           wemin_in = self.ExeInputs['WEMIN_IN']
-        if 'WEMIN_OUT' in self.ExeInputs :
-           wemin_out = self.ExeInputs['WEMIN_OUT']
-
-        tmp_f2g_file = tempfile.NamedTemporaryFile(delete=False)
-        cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' + catchment_def + ' ' + exp_id + ' ' + _y4m2d2h2m2 + ' '+ dzsf + ' ' + tmp_f2g_file.name + ' ' + '_'.join(self.tile_types)
-
-        print ('Creating f2g file if necessary: '+ tmp_f2g_file.name +'....\n')
+        cmd = self.bindir +'/preprocess_ldas.x c_f2g ' + tile + ' ' + self.domain_def.name + ' '+ self.out_path + ' ' \
+            + self.ExeInputs['CATCH_DEF_FILE'] + ' ' + self.ExeInputs['EXP_ID'] + ' ' \
+            + self.begDates[0].strftime('%Y%m%d%H%M') + ' '+ dzsf + ' ' + f2g_file + ' ' + '_'.join(self.tile_types)
+        print ('Creating f2g file if necessary: '+ f2g_file +'....\n')
         run_cmd(cmd)
 
-        # Check whether the simulation domain differs from the input domain, and determine which tile types are affected.
-        if os.path.getsize(tmp_f2g_file.name) != 0:
+        self._read_zoom_info(f2g_file)
 
-            with open(tmp_f2g_file.name, 'r') as f:
-                n_types      = int(f.readline().split()[0])
-                tile_types   = [int(x) for x in f.readline().split()]
-                n_tiles_r    = [int(x) for x in f.readline().split()]
-                n_tiles_f    = [int(x) for x in f.readline().split()]
-
-            require(len(tile_types) == n_types and len(n_tiles_r) == n_types and len(n_tiles_f) == n_types,
-                    "Inconsistent f2g file [%s]" % tmp_f2g_file.name)
-
-            zoom_by_type = {
-                tile_type: (nr != nf)
-                for tile_type, nr, nf in zip(tile_types, n_tiles_r, n_tiles_f)
-            }
-
-            self.isZoomInLand    = zoom_by_type.get(100, False)
-            self.isZoomInLake    = zoom_by_type.get(19,  False)
-            self.isZoomInLandice = zoom_by_type.get(20,  False)
-
-            self.isZoomIn = any(zoom_by_type.values())
-
-
-        # if running routing, make sure domain is global
+        # if running routing or ISSM, make sure domain is global
         if self.run_route > 0 and self.isZoomInLand:
             raise LdasSetupError(f"Must have global domain to run routing model, RUN_ROUTE={self.run_route}")
-        # if running ISSM, make sure domain is global
         if self.with_issm and self.isZoomInLandice:
             raise LdasSetupError("Must have global domain to run ISSM (DO_ISSM: 1)")
 
-        # update tile domain
         if self.isZoomIn:
             newZoominTile = tile+'.domain'
             print ("\nCreating local tile file :"+ newZoominTile)
             print ("\nAdding 1000 to type of tiles to be excluded from domain...\n")
-            cmd = self.bindir +'/preprocess_ldas.x zoomin_tile ' + tile + ' ' + newZoominTile + ' '+ tmp_f2g_file.name
-            run_cmd(cmd)
-            short_tile=short_tile +'.domain'
+            self._zoom_or_copy('zoomin_tile', tile, newZoominTile, f2g_file)
             tile = newZoominTile
+        return tile
 
-        myTile=self.inpdir+'/tile.data'
-        os.symlink(tile,myTile)
+    # -----------------------------------------------------------------------------------
+    def _read_zoom_info(self, f2g_file):
+        """
+        The f2g file is empty if the simulation domain equals the input domain.  Otherwise
+        its header lists, for each tile type, the number of tiles in the reduced (simulation)
+        and full domains.  Sets isZoomIn, isZoomInLand, isZoomInLake, isZoomInLandice.
+        """
+        if os.path.getsize(f2g_file) == 0:
+            return
+        with open(f2g_file, 'r') as f:
+            n_types      = int(f.readline().split()[0])
+            tile_types   = [int(x) for x in f.readline().split()]
+            n_tiles_r    = [int(x) for x in f.readline().split()]
+            n_tiles_f    = [int(x) for x in f.readline().split()]
 
-        if self.with_land:
-           bcs=[self.ExeInputs['GRN_FILE'],
-                self.ExeInputs['LAI_FILE'],
-                self.ExeInputs['NDVI_FILE'],
-                self.ExeInputs['NIRDF_FILE'],
-                self.ExeInputs['VISDF_FILE'] ]
-           if (self.ExeInputs['LNFM_FILE'] != ''):
-              bcs += [self.ExeInputs['LNFM_FILE']]
-           if (self.has_vegopacity):
-              bcs += [self.ExeInputs['VEGOPACITY_FILE']]
-           if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
-              bcs += [self.ExeInputs['EASE_PFAF_TILE_FILE']]
+        require(len(tile_types) == n_types and len(n_tiles_r) == n_types and len(n_tiles_f) == n_types,
+                "Inconsistent f2g file [%s]" % f2g_file)
 
-           bcstmp=[]
-           for bcf in bcs :
-               shutil.copy(bcf, self.rc_out+'/')
-               bcstmp=bcstmp+[self.rc_out+'/'+os.path.basename(bcf)]
-           bcs=bcstmp
+        zoom_by_type = { tile_type: (nr != nf) for tile_type, nr, nf in zip(tile_types, n_tiles_r, n_tiles_f) }
 
+        self.isZoomInLand    = zoom_by_type.get(100, False)
+        self.isZoomInLake    = zoom_by_type.get(19,  False)
+        self.isZoomInLandice = zoom_by_type.get(20,  False)
+        self.isZoomIn        = any(zoom_by_type.values())
+
+    # -----------------------------------------------------------------------------------
+    def _stage_land_bcs(self, f2g_file):
+        """ copy land BC files to rc_out (zoom in if needed) and link them into input/ """
+        # (link name, ExeInputs key); optional files only if present
+        bcs = [('green', 'GRN_FILE'), ('lai', 'LAI_FILE'), ('ndvi', 'NDVI_FILE'),
+               ('nirdf', 'NIRDF_FILE'), ('visdf', 'VISDF_FILE')]
+        if self.ExeInputs['LNFM_FILE'] != '':
+           bcs.append(('lnfm', 'LNFM_FILE'))
+        if self.has_vegopacity:
+           bcs.append(('vegopacity', 'VEGOPACITY_FILE'))
+        if self.ExeInputs['EASE_PFAF_TILE_FILE'] != '':
+           bcs.append(('EASE_pfaf_tile_file.nc4', 'EASE_PFAF_TILE_FILE'))
+
+        if self.isZoomInLand:
+           print ("Creating the boundary files for the simulation domain...\n")
+        staged = []
+        for bcln, key in bcs:
+           bcf = self.rc_out+'/'+os.path.basename(self.ExeInputs[key])
+           shutil.copy(self.ExeInputs[key], self.rc_out+'/')
            if self.isZoomInLand:
-              print ("Creating the boundary files for the simulation domain...\n")
-              bcs_tmp=[]
-              for bcf in bcs :
-                  cmd = self.bindir +'/preprocess_ldas.x zoomin_bc ' + bcf + ' '+ bcf+'.domain' + ' '+ tmp_f2g_file.name
-                  run_cmd(cmd)
-                  bcs_tmp=bcs_tmp+[bcf+'.domain']
-              bcs=bcs_tmp
+              self._zoom_or_copy('zoomin_bc', bcf, bcf+'.domain', f2g_file)
+              bcf = bcf+'.domain'
+           staged.append((bcln, bcf))
 
+        print ("linking bcs...")
+        for bcln, bc in staged:
+           myBC = self.inpdir+'/'+bcln if '.nc4' in bcln else self.inpdir+'/'+bcln+'.data'
+           os.symlink(bc,myBC)
 
-           # link BC
-           print ("linking bcs...")
-           bcnames=['green','lai','ndvi','nirdf','visdf']
-           if (self.ExeInputs['LNFM_FILE'] != ''):
-              bcnames += ['lnfm']
-           if (self.has_vegopacity):
-              bcnames += ['vegopacity']
-           if (self.ExeInputs['EASE_PFAF_TILE_FILE'] != ''):
-              bcnames += ['EASE_pfaf_tile_file.nc4']
-           for bcln,bc in zip(bcnames,bcs) :
-              myBC=self.inpdir+'/'+bcln+'.data'
-              if '.nc4' in bcln:
-                 myBC=self.inpdir+'/'+bcln
-              os.symlink(bc,myBC)
+        if ("catchcn" in self.catch):
+           os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
+                      self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
 
-           if ("catchcn" in self.catch):
-              os.symlink(self.bcs_dir_landshared + 'CO2_MonthlyMean_DiurnalCycle.nc4', \
-                          self.inpdir+'/CO2_MonthlyMean_DiurnalCycle.nc4')
+    # -----------------------------------------------------------------------------------
+    def _link_issm_bcs(self):
+        for pattern in ('*.bin', '*.toolkits', '*.nc*'):
+           for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
+              os.symlink(issmbc, self.inpdir+'/'+os.path.basename(issmbc))
 
-        if self.with_issm:
-           for pattern in ('*.bin', '*.toolkits', '*.nc*'):
-              for issmbc in glob.glob(self.bcs_dir_landiceshared + pattern):
-                 myISSMBC = self.inpdir+'/'+os.path.basename(issmbc)
-                 os.symlink(issmbc, myISSMBC)
+    # -----------------------------------------------------------------------------------
+    def _rst_src_dir(self):
+        """ rs/ dir of the restart experiment (with trailing '/') """
+        return self.ExeInputs['RESTART_PATH'] + self.ExeInputs['RESTART_ID'] + '/output/'+ self.ExeInputs['RESTART_DOMAIN'] + '/rs/'
 
-        # create and link restart
-        print ("Creating and linking restart...")
-        _start = self.begDates[0]
-
-        y4m2='Y%4d/M%02d'%(_start.year, _start.month)
-        y4m2d2_h2m2 ='%4d%02d%02d_%02d%02d' % (_start.year, _start.month,_start.day,_start.hour,_start.minute)
-
-        myRstDir = self.inpdir + '/restart/'
-
-        # pass into remap_config_ldas
-        exp_id    = self.ExeInputs['EXP_ID']
-        RESTART_str  = str(self.ExeInputs['RESTART'])
-        YYYYMMDD  = '%4d%02d%02d' % (_start.year, _start.month,_start.day)
-        YYYYMMDDHH= '%4d%02d%02d%02d' % (_start.year, _start.month,_start.day, _start.hour)
-        rstid     = self.ExeInputs['RESTART_ID']
-        rstdomain = self.ExeInputs['RESTART_DOMAIN']
-        rstpath0  = self.ExeInputs['RESTART_PATH']
-        rstpath   = rstpath0 + rstid + '/output/'+ rstdomain + '/rs/'
-
-        # just copy the landassim pert seed if it exists
+    # -----------------------------------------------------------------------------------
+    def _copy_landassim_seeds(self, myRstDir):
+        """ copy the landassim obs perturbation seed restarts if they exist (and LAND_ASSIM) """
+        start   = self.begDates[0]
+        rstid   = self.ExeInputs['RESTART_ID']
+        exp_id  = self.ExeInputs['EXP_ID']
+        rstpath = self._rst_src_dir()
         for iens in range(self.nens) :
            _ensdir = self.ensdirs[iens]
            _ensid  = self.ensids[iens]
-           landassim_seeds = rstpath + _ensdir + '/' + y4m2+'/' + rstid + '.landassim_obspertrseed_rst.'+y4m2d2_h2m2
+           landassim_seeds = rstpath + _ensdir + '/' + ym_dir(start)+'/' + rstid + '.landassim_obspertrseed_rst.'+ymd_hm(start)
            if os.path.isfile(landassim_seeds) and self.assim :
-               _seeds = self.rstdir + _ensdir + '/' + y4m2+'/' + exp_id + '.landassim_obspertrseed_rst.'+y4m2d2_h2m2
+               _seeds = self.rstdir + _ensdir + '/' + ym_dir(start)+'/' + exp_id + '.landassim_obspertrseed_rst.'+ymd_hm(start)
                shutil.copy(landassim_seeds, _seeds)
                os.symlink(_seeds, myRstDir+ '/landassim_obspertrseed'+ _ensid +'_rst')
                self.has_landassim_seed = True
-        mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        # (RESTART=M with DO_ISSM=1 is rejected in __init__)
+    # -----------------------------------------------------------------------------------
+    def _remap_restarts(self, mk_outdir, dzsf, wemin_in, wemin_out):
+        """ RESTART=2 or M: remap restarts into mk_outdir (uses remap_restarts package) """
+        RESTART_str = self.restart
+        YYYYMMDDHH  = self.begDates[0].strftime('%Y%m%d%H')
+        bc_base     = os.path.dirname(self.ExeInputs['BCS_PATH'].rstrip('/'))
+        bc_version  = bcs_version_from_path(self.ExeInputs['BCS_PATH'])
+        answers={}
+        if RESTART_str == 'M' :
+           answers['input:shared:MERRA-2']   = True
+           answers['input:shared:yyyymmddhh']= YYYYMMDDHH
+           answers['output:shared:out_dir']  = mk_outdir
+           init_merra2(answers)
+        config = get_config_from_answers(answers, config_tpl = True)
 
-        if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):
-           bc_base    = os.path.dirname(self.ExeInputs['BCS_PATH'].rstrip('/'))
-           bc_version = bcs_version_from_path(self.ExeInputs['BCS_PATH'])
-           answers={}
-           if RESTART_str == 'M' :
-              answers['input:shared:MERRA-2']   = True
-              answers['input:shared:yyyymmddhh']= YYYYMMDDHH
-              answers['output:shared:out_dir']  = mk_outdir
-              init_merra2(answers)
-           config = get_config_from_answers(answers, config_tpl = True)
+        config['slurm_pbs']['account'] = self.RmInputs['account']
+        config['slurm_pbs']['qos'] = 'debug'
 
-           config['slurm_pbs']['account'] = self.RmInputs['account']
-           config['slurm_pbs']['qos'] = 'debug'
+        if RESTART_str == '2' :
+           config['input']['surface']['catch_tilefile']  = self.in_tilefile
+           config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
+           config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
+           config['input']['shared']['rst_dir']          = self.in_rstdir
+           config['input']['surface']['wemin']           = wemin_in
+           config['input']['surface']['catch_model']     = self.catch
 
-           if RESTART_str == '2' :
-              config['input']['surface']['catch_tilefile']  = self.in_tilefile
-              config['input']['shared']['expid']            = self.ExeInputs['RESTART_ID']
-              config['input']['shared']['yyyymmddhh']       = YYYYMMDDHH
-              config['input']['shared']['rst_dir']          = self.in_rstdir
-              config['input']['surface']['wemin']           = wemin_in
-              config['input']['surface']['catch_model']     = self.catch
+        config['output']['shared']['out_dir']         = mk_outdir
+        config['output']['surface']['catch_remap']    = True
+        config['output']['surface']['catch_tilefile'] = self.ExeInputs['TILING_FILE']
+        config['output']['shared']['bc_base']         = bc_base
+        config['output']['shared']['bc_version']      = bc_version
+        config['output']['surface']['EASE_grid']      = self.ExeInputs['BCS_RESOLUTION']
 
-           config['output']['shared']['out_dir']         = mk_outdir
-           config['output']['surface']['catch_remap']    = True
-           config['output']['surface']['catch_tilefile'] = self.ExeInputs['TILING_FILE']
-           config['output']['shared']['bc_base']         = bc_base
-           config['output']['shared']['bc_version']      = bc_version
-           config['output']['surface']['EASE_grid']      = self.ExeInputs['BCS_RESOLUTION']
+        config['output']['shared']['expid']           = self.ExeInputs['EXP_ID']
+        config['output']['surface']['surflay']        = dzsf
+        config['output']['surface']['wemin']          = wemin_out
 
-           config['output']['shared']['expid']           = self.ExeInputs['EXP_ID']
-           config['output']['surface']['surflay']        = dzsf
-           config['output']['surface']['wemin']          = wemin_out
-
-           if self.with_land:
-             catch_obj = catchANDcn(config_obj = config)
-             catch_obj.remap()
-           if self.with_lake or self.with_landice:
-               config['output']['surface']['remap_water'] = True
-               config['input']['surface']['zoom'] = '2'
-               other_rst_obj = other_restarts(config_obj = config)
-               other_rst_obj.remap()
-
-        #for ens in self.ensdirs :
-        catchRstFile0  = ''
-        vegdynRstFile0 = ''
-        routeRstFile0  = ''
-
-        for iens in range(self.nens) :
-            ensdir   = self.ensdirs[iens]
-            ensid    = self.ensids[iens]
-            myCatchRst   = myRstDir+'/'+ self.catch +ensid +'_internal_rst'
-            myLakeRst    = myRstDir+'/'+ 'lake'     +ensid +'_internal_rst'
-            myLandiceRst = myRstDir+'/'+ 'landice'  +ensid +'_internal_rst'
-            myIssmRst    = myRstDir+'/'+ 'issm'     +ensid +'_internal_rst'
-            myVegRst     = myRstDir+'/'+ 'vegdyn'   +ensid +'_internal_rst'
-            myPertRst    = myRstDir+'/'+ 'landpert' +ensid +'_internal_rst'
-            myRouteRst   = myRstDir+'/'+ 'route'    +ensid +'_internal_rst'
-
-            catchRstFile  = ''
-            vegdynRstFile = ''
-            pertRstFile   = ''
-            print ("restart: " + RESTART_str)
-
-            if self.with_land :
-
-               if RESTART_str in ['2', 'M']: # remap_restart has generated the file in mk_restarts directory
-                    vegdynRstFile = glob_first(self.bcs_dir_land + 'vegdyn_*.dat', 'vegdyn BCS file')
-                    catchRstFile  = glob_first(mk_outdir+'*'+self.catch+'_internal_rst.'+YYYYMMDD+'*', 'remapped '+self.catch+' restart in mk_restarts')
-               if RESTART_str in ['1', '3']:
-                    catchRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                    vegdynRstFile= rstpath+ensdir +'/'+self.ExeInputs['RESTART_ID']+ '.vegdyn_internal_rst'
-                    if RESTART_str == '3':
-                       vegdynRstFile = glob_first(self.bcs_dir_land + 'vegdyn_*.dat', 'vegdyn BCS file')
-
-               # catchment restart file
-               if os.path.isfile(catchRstFile) :
-                   catchLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.'+self.catch+'_internal_rst.'+y4m2d2_h2m2
-                   if self.isZoomInLand:
-                       print( "Creating local catchment restart file... \n")
-                       cmd=self.bindir +'/preprocess_ldas.x zoomin_catchrst '+ catchRstFile +' ' + catchLocal + ' '+ tmp_f2g_file.name
-                       run_cmd(cmd)
-                   else :
-                       shutil.copy(catchRstFile,catchLocal)
-
-                   catchRstFile = catchLocal
-
-                   if ensdir == self.ensdirs[0] :
-                       catchRstFile0 = catchRstFile
-               else : # re-use 0000 catch file
-                   catchRstFile = catchRstFile0
-
-               # vegdyn restart file
-               if os.path.isfile(vegdynRstFile) :
-                   vegdynLocal = self.rstdir+ensdir +'/'+self.ExeInputs['EXP_ID']+'.vegdyn_internal_rst'
-                   if self.isZoomInLand:
-                       print ("Creating the local veg restart file... \n")
-                       cmd=self.bindir + '/preprocess_ldas.x zoomin_vegrst '+ vegdynRstFile +' ' + vegdynLocal + ' '+ tmp_f2g_file.name
-                       run_cmd(cmd)
-                   else :
-                       shutil.copy(vegdynRstFile,vegdynLocal)
-
-                   vegdynRstFile = vegdynLocal
-
-                   if ensdir == self.ensdirs[0]:
-                       vegdynRstFile0 = vegdynRstFile
-               else :
-                   vegdynRstFile = vegdynRstFile0
-
-            lakeRstFile = ''
-            if self.with_lake and iens == 0:
-                if RESTART_str in ['1', '3']:
-                    lakeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'lake_internal_rst.'+y4m2d2_h2m2
-
-                if RESTART_str in ['2', 'M']:
-                    lakeRstFile = glob_first(mk_outdir+'*lake_internal_rst.'+YYYYMMDD+'*', 'lake restart in mk_restarts')
-
-                if os.path.isfile(lakeRstFile):
-                    lakeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.lake_internal_rst.'+y4m2d2_h2m2
-                    if self.isZoomInLake:
-                        print ("Creating zoom-in of lake restart file... \n")
-                        cmd=self.bindir + '/preprocess_ldas.x zoomin_lakerst '+ lakeRstFile +' ' + lakeLocal + ' '+ tmp_f2g_file.name
-                        run_cmd(cmd)
-                    else:
-                        shutil.copy(lakeRstFile,lakeLocal)
-
-                    lakeRstFile = lakeLocal
-
-            landiceRstFile = ''
-            issmRstFile    = ''
-
-            if self.with_landice and iens == 0:
-
-                if RESTART_str in ['1', '3']:
-                    landiceRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'landice_internal_rst.'+y4m2d2_h2m2
-
-                    if self.with_issm:
-                        issmRstFile = rstpath+ensdir+'/'+y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'issm_internal_rst.'+y4m2d2_h2m2
-
-                if RESTART_str in ['2', 'M']:
-                    landiceRstFile = glob_first(mk_outdir+'*landice_internal_rst.'+YYYYMMDD+'*', 'landice restart in mk_restarts')
-
-                    if self.with_issm and RESTART_str == '2':
-                        issmRstFile = glob_first(mk_outdir+'*issm_internal_rst.'+YYYYMMDD+'*', 'ISSM restart in mk_restarts (RESTART=2 with DO_ISSM=1)')
-
-                if os.path.isfile(landiceRstFile):
-                    landiceLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.landice_internal_rst.'+y4m2d2_h2m2
-
-                    if self.isZoomInLandice:
-                        print("Creating zoom-in of landice restart file... \n")
-                        cmd = self.bindir + '/preprocess_ldas.x zoomin_landicerst ' + landiceRstFile + ' ' + landiceLocal + ' ' + tmp_f2g_file.name
-                        run_cmd(cmd)
-                    else:
-                        shutil.copy(landiceRstFile, landiceLocal)
-
-                    landiceRstFile = landiceLocal
-
-                if self.with_issm:
-                    if os.path.isfile(issmRstFile):
-                        issmLocal = self.rstdir+ensdir+'/'+y4m2+'/'+self.ExeInputs['EXP_ID']+'.issm_internal_rst.'+y4m2d2_h2m2
-                        shutil.copy(issmRstFile, issmLocal)
-                        issmRstFile = issmLocal
-
-            routeRstFile  = ''
-            if self.run_route > 0 :
-               if RESTART_str in ['1', '3'] :
-                  routeRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.'+'route_internal_rst.'+y4m2d2_h2m2
-               if RESTART_str == '2':
-                  routeRstFile = glob_first(mk_outdir+'*route_internal_rst.'+YYYYMMDD+'*', 'route restart in mk_restarts')
-
-               if iens == 0 and not os.path.isfile(routeRstFile):
-                     raise LdasSetupError("Please copy a route restart from " + ROUTE_RST_DIR + " to " + routeRstFile)
-
-               if os.path.isfile(routeRstFile) :
-                  routeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.route_internal_rst.'+y4m2d2_h2m2
-                  shutil.copy(routeRstFile,routeLocal)
-                  # WY note: after the copy, depending on in_bc and out_bc version,
-                  # the routeLocal can be changed here
-                  routeRstFile = routeLocal
-
-                  if ensdir == self.ensdirs[0] :
-                     routeRstFile0 = routeRstFile
-               else :
-                   routeRstFile = routeRstFile0
-
-            if (self.has_geos_pert and self.perturb == 1) :
-                pertRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
-                pertLocal   = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
-                shutil.copy(pertRstFile,pertLocal)
-                pertRstFile = pertLocal
-
-            if self.with_land :
-               print ('catchRstFile: '  +  catchRstFile)
-               print ('vegdynRstFile: ' +  vegdynRstFile)
-               os.symlink(catchRstFile,   myCatchRst)
-               os.symlink(vegdynRstFile,  myVegRst)
-
-            if self.with_lake and iens == 0:
-                print("link lake restart: " + myLakeRst)
-                os.symlink(lakeRstFile, myLakeRst)
-
-            if self.with_landice and iens == 0:
-                print("link landice restart: " + myLandiceRst)
-                os.symlink(landiceRstFile, myLandiceRst)
-
-            if self.run_route > 0 :
-               print("link route restart: " + myRouteRst)
-               os.symlink(routeRstFile, myRouteRst)
-
-            if self.with_issm and iens == 0:
-               if RESTART_str in ['1', '2', '3']:
-                  print("link issm restart: " + myIssmRst)
-                  os.symlink(issmRstFile, myIssmRst)
-
-            if ( self.has_geos_pert and  self.perturb == 1 ):
-               os.symlink(pertRstFile,    myPertRst)
-
-        # catch_param restar file
-        catch_param_file = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_catparam.'+y4m2d2_h2m2+'z.bin'
         if self.with_land:
-           require(os.path.isfile(catch_param_file), "need catch_param file %s" % catch_param_file)
+          catch_obj = catchANDcn(config_obj = config)
+          catch_obj.remap()
+        if self.with_lake or self.with_landice:
+            config['output']['surface']['remap_water'] = True
+            config['input']['surface']['zoom'] = '2'
+            other_rst_obj = other_restarts(config_obj = config)
+            other_rst_obj.remap()
 
-        if self.has_mwrtm :
-           mwRTMRstFile = self.mwrtm_file
-           mwRTMLocal = self.rc_out+'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+y4m2d2_h2m2+'z.nc4'
-           if self.isZoomInLand:
-              print ("Creating the local mwRTM restart file... \n")
-              cmd= self.bindir +'/preprocess_ldas.x zoomin_mwrtmrst '+ mwRTMRstFile +' ' + mwRTMLocal + ' '+ tmp_f2g_file.name
+    # -----------------------------------------------------------------------------------
+    def _restart_components(self, mk_outdir):
+        """
+        Table of restart components to be staged (in this order) for each ensemble member.
 
-              run_cmd(cmd)
-           else :
-              shutil.copy(mwRTMRstFile,mwRTMLocal)
+        Keys:
+          name      : component name; link is input/restart/<name><ensid>_internal_rst
+          src       : function(ensdir) -> source file (restart exp, mk_restarts, or BCS)
+          local     : function(ensdir) -> local copy in output/.../rs/
+          zoom      : preprocess_ldas.x zoom sub-command, or None (plain copy)
+          first_only: only for first ensemble member (single-member components)
+          fallback0 : if source is missing, re-use local file of first member
+          required0 : source must exist for first member (else error)
+          always    : copy without checking that the source exists
+          link      : create the link
+        If the source does not exist (and no fallback0), the link points to the source path.
+        """
+        R      = self.restart
+        start  = self.begDates[0]
+        y4m2   = ym_dir(start)
+        stamp  = ymd_hm(start)
+        rstid  = self.ExeInputs['RESTART_ID']
+        exp_id = self.ExeInputs['EXP_ID']
+        rstpath= self._rst_src_dir()
+        YYYYMMDD = start.strftime('%Y%m%d')
 
-           mwRTMRstFile = mwRTMLocal
-           mymwRTMRst = myRstDir+'/mwrtm_param_rst'
-           os.symlink(mwRTMRstFile,  mymwRTMRst)
+        def src_rs(comp):
+            return lambda ensdir: rstpath+ensdir+'/'+y4m2+'/'+rstid+'.'+comp+'_internal_rst.'+stamp
+        def local_rs(comp):
+            return lambda ensdir: self.rstdir+ensdir+'/'+y4m2+'/'+exp_id+'.'+comp+'_internal_rst.'+stamp
+        def mk(comp, what):
+            return lambda ensdir: glob_first(mk_outdir+'*'+comp+'_internal_rst.'+YYYYMMDD+'*', what)
+        def vegdyn_bcs(ensdir):
+            return glob_first(self.bcs_dir_land + 'vegdyn_*.dat', 'vegdyn BCS file')
+        def nofile(ensdir):
+            return ''
 
-        # create BCS_info.txt (facilitates BCS consistency check when exp is later used as restart for another exp)
+        def comp(name, src, local=None, zoom=None, first_only=False, fallback0=False,
+                 required0=False, always=False, link=True):
+            return dict(name=name, src=src, local=local or local_rs(name), zoom=zoom,
+                        first_only=first_only, fallback0=fallback0, required0=required0,
+                        always=always, link=link)
+
+        C = []
+        if self.with_land:
+            C.append(comp(self.catch,
+                          mk(self.catch, 'remapped '+self.catch+' restart in mk_restarts') if R in ['2','M'] else src_rs(self.catch),
+                          zoom='zoomin_catchrst' if self.isZoomInLand else None, fallback0=True))
+            C.append(comp('vegdyn',
+                          vegdyn_bcs if R in ['2','M','3'] else (lambda ensdir: rstpath+ensdir+'/'+rstid+'.vegdyn_internal_rst'),
+                          local=lambda ensdir: self.rstdir+ensdir+'/'+exp_id+'.vegdyn_internal_rst',
+                          zoom='zoomin_vegrst' if self.isZoomInLand else None, fallback0=True))
+        if self.with_lake:
+            C.append(comp('lake', mk('lake', 'lake restart in mk_restarts') if R in ['2','M'] else src_rs('lake'),
+                          zoom='zoomin_lakerst' if self.isZoomInLake else None, first_only=True))
+        if self.with_landice:
+            C.append(comp('landice', mk('landice', 'landice restart in mk_restarts') if R in ['2','M'] else src_rs('landice'),
+                          zoom='zoomin_landicerst' if self.isZoomInLandice else None, first_only=True))
+        if self.with_issm:
+            issm_src = {'1': src_rs('issm'), '3': src_rs('issm'), 'M': nofile,
+                        '2': mk('issm', 'ISSM restart in mk_restarts (RESTART=2 with DO_ISSM=1)')}[R]
+            C.append(comp('issm', issm_src, first_only=True, link=(R in ['1','2','3'])))
+        if self.run_route > 0:
+            C.append(comp('route', mk('route', 'route restart in mk_restarts') if R == '2' else src_rs('route'),
+                          fallback0=True, required0=True))
+        if self.has_geos_pert and self.perturb == 1:
+            C.append(comp('landpert', src_rs('landpert'), always=True))
+        return C
+
+    # -----------------------------------------------------------------------------------
+    def _stage_restarts(self, myRstDir, mk_outdir, f2g_file):
+        """ copy (or zoom in) restarts to output/.../rs/ and link them into input/restart/ """
+        print ("restart: " + self.restart)
+        member0 = {}                                   # name -> local file of first member
+        for C in self._restart_components(mk_outdir):
+            for iens in range(self.nens) :
+                if C['first_only'] and iens > 0:
+                    break
+                ensdir = self.ensdirs[iens]
+                src    = C['src'](ensdir)
+                if C['required0'] and iens == 0 and not os.path.isfile(src):
+                    raise LdasSetupError("Please copy a " + C['name'] + " restart (e.g., from " + ROUTE_RST_DIR + ") to " + src)
+                if C['always'] or os.path.isfile(src):
+                    target = C['local'](ensdir)
+                    self._zoom_or_copy(C['zoom'], src, target, f2g_file)
+                    if iens == 0:
+                        member0[C['name']] = target
+                elif C['fallback0']:
+                    target = member0.get(C['name'], '')
+                else:
+                    target = src
+                if C['link']:
+                    link = myRstDir+'/'+ C['name'] + self.ensids[iens] +'_internal_rst'
+                    print ("link " + C['name'] + " restart: " + link + " -> " + target)
+                    os.symlink(target, link)
+
+    # -----------------------------------------------------------------------------------
+    def _stage_mwrtm(self, myRstDir, f2g_file):
+        start = self.begDates[0]
+        mwRTMLocal = self.rc_out+'/'+ ym_dir(start)+'/'+self.ExeInputs['EXP_ID']+'.ldas_mwRTMparam.'+ymd_hm(start)+'z.nc4'
+        if self.isZoomInLand:
+           print ("Creating the local mwRTM restart file... \n")
+        self._zoom_or_copy('zoomin_mwrtmrst' if self.isZoomInLand else None, self.mwrtm_file, mwRTMLocal, f2g_file)
+        os.symlink(mwRTMLocal, myRstDir+'/mwrtm_param_rst')
+
+    # -----------------------------------------------------------------------------------
+    def _write_bcs_info(self):
+        """ BCS_info.txt facilitates BCS consistency check when exp is later used as restart for another exp """
         with open(self.rc_out+'/BCS_info.txt','wt') as fout :
-           bc_version_ = bcs_version_from_path(self.ExeInputs['BCS_PATH'])
-
-           fout.write("BCS_VERSION: "    + bc_version_ + '\n')
+           fout.write("BCS_VERSION: "    + bcs_version_from_path(self.ExeInputs['BCS_PATH']) + '\n')
            fout.write("BCS_RESOLUTION: " + self.ExeInputs['BCS_RESOLUTION'])
-        # update 'restart_path' to use relative path from outdir
-        print ("Updating restart path...")
-        self.ExeInputs['RESTART_PATH'] = myRstDir
-        status = True
-        return status
 
     # -----------------------------------------------------------------------------------
 

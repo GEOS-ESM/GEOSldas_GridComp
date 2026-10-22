@@ -29,7 +29,7 @@ expect, and record that diff in the bug entry below.
 | 1b    | Use the helpers in ldas.py / ldas_setup        | DONE          | see Log |
 | 2     | Fix the known bugs (B1-B3, B5, B6, B8-B10; B4/B7 are not bugs) | DONE | see Log |
 | 3     | Split `ldas.__init__`                          | DONE          | see Log |
-| 4     | Table-driven restart staging (`createLnRstBc`) | TODO          | |
+| 4     | Table-driven restart staging (`createLnRstBc`) | DONE          | see Log |
 | 5     | rc file generation (`createRCFiles`)           | TODO          | |
 | 6     | Job scripts, site config, small helpers        | TODO          | |
 | 7     | (optional) Split into modules                  | TODO          | |
@@ -142,17 +142,22 @@ GRIDNAME, Pfafstetter) -> `_set_exe_defaults` -> `_check_restart_files` -> `_set
   are at the top of the module.)
 - mock_regression: 22/22 PASS (identical to ed23aa6).
 
-**Phase 4: `createLnRstBc` (~490 lines)**
-- `_link_met_forcing()`, `_stage_tile_file()`, `_compute_zoom()` (f2g -> zoom-by-type dict),
-  `_stage_bcs()`, `_link_issm_bcs()`, `_copy_landassim_seeds()`, `_remap_restarts()`,
-  `_stage_restarts()`, `_stage_mwrtm()`, `_write_bcs_info()`.
-- Component table that drives `_stage_restarts`, roughly:
-  `name, enabled, all_members?, src(RESTART 1/3), mk_restarts pattern(2/M), zoom subcmd, link name`
-  for catch/vegdyn/lake/landice/issm/route/landpert. One generic
-  `locate -> zoom-or-copy -> link` routine. Keep these special cases:
-  members after 0 fall back to member-0 files (catch/vegdyn/route), lake/landice/issm only
-  for iens==0, and vegdyn is not under Yyyyy/Mmm.
-- This phase is the highest risk: run **all** baseline cases.
+**Phase 4 (DONE): `createLnRstBc`** (~450 lines) is now a short driver plus steps:
+`_write_domain_def` -> `_link_met_forcing` -> `_stage_tile_file` (copy, correctease, c_f2g,
+`_read_zoom_info`, global-domain checks for route/ISSM, zoomin_tile) -> link tile.data ->
+`_stage_land_bcs` -> `_link_issm_bcs` -> `_copy_landassim_seeds` -> `_remap_restarts`
+(RESTART 2/M) -> `_stage_restarts` -> catch_param check -> `_stage_mwrtm` -> `_write_bcs_info`.
+- `_restart_components()` returns a table (catch, vegdyn, lake, landice, issm, route,
+  landpert). Each entry has name, src(ensdir), local(ensdir), zoom sub-command, first_only,
+  fallback0, required0, always, and link. One generic loop in `_stage_restarts` does the
+  zoom-or-copy and the linking, and keeps all the old special cases (see the docstring).
+  Link targets are the same strings as before.
+- `_zoom_or_copy(zoom_op, src, dst, f2g)` is the single place that calls `preprocess_ldas.x zoomin_*`.
+- The temp files (domain_def, f2g) are now deleted at the end of createLnRstBc (try/finally).
+- New helpers in setup_utils: `ym_dir(dt)` -> 'Yyyyy/Mmm', `ymd_hm(dt)` -> 'yyyymmdd_hhmm'.
+- The error message for a missing route restart is now generic ("Please copy a route restart (e.g., from ...)").
+- Harness: added 5 cases (r3_ens3_fallback, r1_ens2_all_types, r2_ens2_all_types,
+  r1_lake_only_zoom, rM_lake); the route remap stub now writes a route restart. 27/27 PASS.
 
 **Phase 5: `createRCFiles`**
 - `_archive_inputs()` (copy-with-suffix helper), `_copy_nml()`, `_optimize_layout()`,
@@ -207,3 +212,4 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
 - 2026-10-22: Phase 2 done (B1-B3, B5, B6, B8-B10 + B4/B7 cleanups). Harness: 22 cases, PASS.
   Important: B1 means coupled mode crashed in 0f6155f.
 - 2026-10-22: Phase 3 done (split __init__). mock_regression PASS.
+- 2026-10-22: Phase 4 done (createLnRstBc split, table-driven restarts). mock_regression 27/27 PASS.

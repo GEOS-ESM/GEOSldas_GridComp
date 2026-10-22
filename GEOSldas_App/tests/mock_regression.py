@@ -126,7 +126,7 @@ class other_restarts:
         inp = self.c['input']['shared']
         ymdh = inp.get('yyyymmddhh') or inp.get('input:shared:yyyymmddhh')
         os.makedirs(o['out_dir'], exist_ok=True)
-        for t in ['lake', 'landice', 'issm']:
+        for t in ['lake', 'landice', 'issm', 'route']:
             fn = os.path.join(o['out_dir'], o['expid'] + '.' + t + '_internal_rst.' + ymdh[0:8] + '_' + ymdh[8:10] + 'z.nc4')
             open(fn, 'w').write('remapped ' + t + '\\n')
 '''
@@ -314,6 +314,14 @@ def cases(D):
         batinp={'qos': 'debug', 'job_name': 'myjob', 'ntasks-per-node': '42', 'constraint': 'mil',
                 'oserver_nodes': '1', 'writers-per-node': '3'})
     add('tile_txt', {'TILE_FILE_FORMAT': 'TXT'})
+    # restart staging edge cases (phase 4)
+    add('r3_ens3_fallback', {'RESTART': '3', 'NUM_LDAS_ENSEMBLE': '3'})          # no ens0002 -> member-0 files
+    add('r1_ens2_all_types', {'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20', 'DO_ISSM': '1',
+                              'RUN_ROUTE': '1'})
+    add('r2_ens2_all_types', {'RESTART': '2', 'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20',
+                              'DO_ISSM': '1', 'RUN_ROUTE': '1'})
+    add('r1_lake_only_zoom', {'TILE_TYPES': '19', 'MINLAT': '20.'})
+    add('rM_lake', {'RESTART': 'M', 'TILE_TYPES': '100 19'})
     # coupled land-atm DAS: exeinp/batinp are dummy (non-existing) files
     for lc, nens in [('1', '1'), ('2', '2')]:
         add('ladas_cpl' + lc, cpl=['--ladas_cpl', lc, '--account', 's1234', '--nymdb', '20200101',

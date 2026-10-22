@@ -62,6 +62,18 @@ def bcs_version_from_path(bcs_path):
    """
    return os.path.basename(bcs_path.rstrip('/'))
 
+def ym_dir(dt):
+   """
+    'Yyyyy/Mmm' sub-directory for datetime dt (as used in output/*/rs, ana, diag, rc_out)
+   """
+   return 'Y%4d/M%02d' % (dt.year, dt.month)
+
+def ymd_hm(dt):
+   """
+    'yyyymmdd_hhmm' time stamp for datetime dt (as used in restart file names)
+   """
+   return '%4d%02d%02d_%02d%02d' % (dt.year, dt.month, dt.day, dt.hour, dt.minute)
+
 def read_gridname(tilefile):
    """
     Read the grid name from a tile file (*.til or *.nc4, optionally with trailing '.domain').
