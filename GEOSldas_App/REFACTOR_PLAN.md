@@ -34,7 +34,7 @@ expect, and record that diff in the bug entry below.
 | 4     | Table-driven restart staging (`createLnRstBc`) | DONE          | see Log |
 | 5     | rc file generation (`createRCFiles`)           | DONE          | see Log |
 | 6     | Job scripts, site config, small helpers        | DONE          | see Log |
-| 7     | (optional) Split into modules                  | TODO          | |
+| 7     | Split into modules                             | DONE          | see Log |
 
 ### Phase 0 details (DONE)
 - `tests/test_setup_utils.py`: stdlib `unittest` (pytest is not available locally; python 3.6).
@@ -188,11 +188,28 @@ GRIDNAME, Pfafstetter) -> `_set_exe_defaults` -> `_check_restart_files` -> `_set
 - Removed the leftover `status` variables and the unused `subprocess` import from ldas.py.
 - mock_regression: 28/28 PASS (identical to 2ec60a8).
 
-**Phase 7 (optional): modules**: `ldas_config.py`, `ldas_restarts.py`, `ldas_rc.py`,
-with `ldas.py` as the orchestrator. Remember to:
-- add new .py files to `scripts` in `CMakeLists.txt`
-- only `ldas.py` goes through `configure_file` (`@GEOS_SITE@`, `@MPI_STACK@`). Keep those
-  placeholders in a single small module and pass them to the other modules.
+**Phase 7 (DONE): modules.** `class ldas(LdasConfig, LdasStaging, LdasRc)` uses mixins:
+
+| file | content |
+|------|---------|
+| `ldas.py` (configured by cmake) | `SITE_CONFIG`, `ldas.__init__` driver, `createRunScripts`, `createBatchRun`; the only file with `@GEOS_SITE@` / `@MPI_STACK@` |
+| `ldas_config.py` | `LdasConfig`: input steps called by `__init__`, `_verify*`, `_calculateJobSegments`; constants `LADAS_BCS_PATH`, `LADAS_MWRTM_PATH`, `ROUTE_RST_DIR`, `LSM_CHOICE_TO_CATCH` |
+| `ldas_staging.py` | `LdasStaging`: `createDirStructure`, `createLnRstBc` and helpers (`_write_domain_def`, restart table, ...) |
+| `ldas_rc.py` | `LdasRc`: `createRCFiles` and helpers (`_ldas_rc_dict`, ...) |
+| `setup_utils.py` | helpers, input file parsing, sample files |
+
+- The new modules are added to `scripts` in `CMakeLists.txt` (installed to bin/ next to ldas.py;
+  `_set_paths` uses `__file__` of ldas_config.py, which is in the same bin/ dir).
+- pyflakes is clean for all modules (`python3 -m pyflakes ldas.py ldas_*.py setup_utils.py`).
+- The harness also compares the `ldas_setup sample --exeinp/--batinp` output. 28 cases + 2 sample checks PASS.
+
+## Remaining TODO / ideas (not started)
+- Run real cases on Discover (including `--ladas_cpl 1/2` from fvsetup) with the old and new installs and
+  compare them with `tests/compare_exp.py`. **This must be done before merging.** In particular, check:
+  B1 (coupled mode works again), B6 (NAS qsub syntax, on NAS), and the CMake install of the new modules.
+- B8 follow-up: once the exit codes of preprocess_ldas.x are confirmed, use `run_cmd(..., check=True)`.
+- Optional: move the sample-file text in setup_utils.printExeInputSampleFile into a data file.
+- Optional: rename camelCase methods/attributes (ExeInputs, RmInputs, createXxx) to snake_case.
 
 ---------------------------------------------------------------------------------------
 
@@ -235,3 +252,5 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
 - 2026-10-22: Phase 5 done (createRCFiles split, B11 fix, B9 order). mock_regression PASS
   (3 expected ISSM order diffs vs ed23aa6).
 - 2026-10-22: Phase 6 done (site config, job scripts, helpers). mock_regression PASS.
+- 2026-10-22: Phase 7 done (mixin modules, CMake scripts list, harness checks `sample`). All phases done;
+  remaining: run the comparison on Discover (see "Remaining TODO").

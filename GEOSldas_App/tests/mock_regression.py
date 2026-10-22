@@ -407,6 +407,14 @@ def main(argv):
                 return os.path.join(work, which, name, 'ldas', name + '_LDAS' + ('4ens' if C[name]['cpl'][1] == '2' else ''))
             return os.path.join(work, which, name, 'testexp')
         names = o.case or list(C)
+        if not o.case:
+            # 'ldas_setup sample' output must be identical
+            for opt in ['--exeinp', '--batinp']:
+                outs = [sp.run([sys.executable, os.path.join(inst(w, 'NCCS'), 'ldas_setup'), 'sample', opt],
+                               stdout=sp.PIPE, stderr=sp.STDOUT).stdout for w in ['ref', 'new']]
+                same = outs[0] == outs[1] and len(outs[0]) > 1000 if opt == '--exeinp' else outs[0] == outs[1]
+                print('== %-24s %s' % ('sample ' + opt, 'IDENTICAL' if same else 'DIFFERS'))
+                ok = ok and same
         for name in names:
             case = C[name]
             expect = case['expect']
