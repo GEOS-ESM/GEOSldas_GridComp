@@ -179,6 +179,8 @@ def make_install(dest, commit, site='NCCS', data_root=None):
                       ('remap_utils.py', REMAP_UTILS_STUB),
                       ('remap_catchANDcn.py', REMAP_CATCH_STUB),
                       ('remap_other_restarts.py', REMAP_OTHER_STUB),
+                      # Text tile files do not use netCDF4, but develop imports it at startup.
+                      ('netCDF4.py', ''),
                       ('GEOSldas.x', '')]:
         with open(os.path.join(bindir, name), 'w') as fo:
             fo.write(txt)
