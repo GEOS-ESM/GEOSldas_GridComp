@@ -19,7 +19,7 @@ Real pieces: ldas_setup, ldas.py, setup_utils.py, lenkf_j_template.py,
 usage (from GEOSldas_App):
    python3 tests/mock_regression.py [--ref COMMIT] [--keep] [--case NAME ...] [-v]
 
-Default reference commit: REF_COMMIT below (end of phase 2).
+Default reference commit: REF_COMMIT below.
 Exit status: 0 if every case matches its expectation, 1 otherwise.
 
 NOT covered: coupled land-atm DAS (ladas_cpl>0; uses hard-wired /discover paths),
@@ -40,7 +40,8 @@ SURF_RC = os.path.join(REPO, '..', '@GEOSgcm_GridComp', 'GEOSagcm_GridComp',
                        'GEOSphysics_GridComp', 'GEOSsurface_GridComp', 'Shared',
                        'GEOS_SurfaceGridComp.rc')
 
-REF_COMMIT = 'ed23aa6'            # end of phase 2 (bug fixes); phases 3+ must be identical to it
+REF_COMMIT = '2ec60a8'            # end of phase 5; later refactoring must be identical to it
+# (history: ed23aa6 = end of phase 2 bug fixes)
 # (use --ref 0f6155f to compare against the original pre-refactor code)
 
 sys.path.insert(0, HERE)
@@ -304,7 +305,7 @@ def cases(D):
     add('r3_catchcn', {'RESTART': '3', 'LSM_CHOICE': '2'})
     add('r1_lake_landice_route', {'TILE_TYPES': '100 19 20', 'RUN_ROUTE': '1'})
     add('r1_lake_landice_zoom', {'TILE_TYPES': '100 19 20', 'MINLAT': '20.'})
-    add('r1_issm', {'TILE_TYPES': '100 20', 'DO_ISSM': '1'}, expect='diff')   # phase 5: ISSM key order
+    add('r1_issm', {'TILE_TYPES': '100 20', 'DO_ISSM': '1'})
     add('r2_remap', {'RESTART': '2', 'TILE_TYPES': '100 19 20'})
     add('rM_merra2', {'RESTART': 'M'})
     add('multi_sgmt', {'END_DATE': '20200501 000000', 'JOB_SGMT': '00000100 000000', 'NUM_SGMT': '1'})
@@ -317,9 +318,9 @@ def cases(D):
     # restart staging edge cases (phase 4)
     add('r3_ens3_fallback', {'RESTART': '3', 'NUM_LDAS_ENSEMBLE': '3'})          # no ens0002 -> member-0 files
     add('r1_ens2_all_types', {'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20', 'DO_ISSM': '1',
-                              'RUN_ROUTE': '1'}, expect='diff')   # phase 5: ISSM key order
+                              'RUN_ROUTE': '1'})
     add('r2_ens2_all_types', {'RESTART': '2', 'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20',
-                              'DO_ISSM': '1', 'RUN_ROUTE': '1'}, expect='diff')   # phase 5: ISSM key order
+                              'DO_ISSM': '1', 'RUN_ROUTE': '1'})
     add('r1_lake_only_zoom', {'TILE_TYPES': '19', 'MINLAT': '20.'})
     add('rM_lake', {'RESTART': 'M', 'TILE_TYPES': '100 19'})
     # coupled land-atm DAS: exeinp/batinp are dummy (non-existing) files

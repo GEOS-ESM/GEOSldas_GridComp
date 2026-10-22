@@ -14,7 +14,9 @@ cd GEOSldas_App
 python3 -m unittest discover -s tests -v          # unit tests
 python3 tests/mock_regression.py                  # end-to-end, ref commit vs working tree
 ```
-`mock_regression.py` compares against `REF_COMMIT` (0f6155f, pre-refactor) by default.
+`mock_regression.py` compares against `REF_COMMIT` by default (it moves forward after each phase
+that intentionally changes output; currently 2ec60a8). Use `--ref 0f6155f` to compare with the
+original pre-refactor code.
 For an intentional behavior change (bug fix), run it, check that the diff matches what you
 expect, and record that diff in the bug entry below.
 
