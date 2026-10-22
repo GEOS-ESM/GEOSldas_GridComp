@@ -22,6 +22,17 @@ from setup_utils                  import (parseInputFile, printDictionary, hours
 ldas class is used by ldas_setup
 """
 
+# -----------------------------------------------------------------------------------
+# Hard-wired (NCCS/discover) paths used for the coupled land-atm DAS (ladas_cpl > 0)
+# and in user messages.
+# -----------------------------------------------------------------------------------
+LADAS_BCS_PATH   = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
+LADAS_MWRTM_PATH = "/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/"
+ROUTE_RST_DIR    = "/discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/"
+
+# LSM_CHOICE -> name of land model (Catchment) gridded component / restart prefix
+LSM_CHOICE_TO_CATCH = {1: 'catch', 2: 'catchcnclm40', 3: 'catchcnclm45', 4: 'catchcnclm51'}
+
 class ldas:
 
     def __init__(self, cmdLineArgs):
@@ -119,7 +130,6 @@ class ldas:
            for name_ in ['nymdb', 'nhmsb', 'agcm_res', 'bcs_version', 'rstloc', 'varwindow', 'nens']:
               require(getattr(self, name_) is not None,
                       "Must have command line arg --%s for coupled land-atm DAS." % name_)
-           self.ladas_cpl = int(self.ladas_cpl)
         else:
            self.ladas_cpl = 0
 
@@ -176,7 +186,7 @@ class ldas:
 
             # when coupled to ADAS, "BCS_PATH" EXCLUDE bcs version info
             # hard-wired BCS_PATH for now
-            self.ExeInputs['BCS_PATH']                 = "/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
+            self.ExeInputs['BCS_PATH']                 = LADAS_BCS_PATH
             self.ExeInputs['BCS_PATH']                 = self.ExeInputs['BCS_PATH'].rstrip('/') + '/' + self.bcs_version
             if self.bcs_version == "Icarus-NLv3" :
                 self.ExeInputs['BCS_PATH']             = self.ExeInputs['BCS_PATH']  + '_new_layout'
@@ -184,7 +194,7 @@ class ldas:
             self.ExeInputs['RESTART_DOMAIN']           = self.agcm_res +'x6C_GLOBAL'
 
             # the following are not in default ExeInputs list; hardwire for now
-            self.ExeInputs['MWRTM_PATH']               = '/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/'
+            self.ExeInputs['MWRTM_PATH']               = LADAS_MWRTM_PATH
             self.ExeInputs['LAND_ASSIM']               = "YES"
             self.ExeInputs['MET_HINTERP']              = 0
             self.landassim_dt                          = 10800                                    # seconds
@@ -216,14 +226,9 @@ class ldas:
         if 'LSM_CHOICE' not in self.ExeInputs:
             self.ExeInputs['LSM_CHOICE'] = 1
         _lsm_choice_int = int(self.ExeInputs['LSM_CHOICE'])
-        if  _lsm_choice_int == 1:
-            self.catch = 'catch'
-        elif _lsm_choice_int == 2 :
-            self.catch = 'catchcnclm40'
-        elif _lsm_choice_int == 3 :
-            self.catch = 'catchcnclm45'
-        elif _lsm_choice_int == 4 :
-            self.catch = 'catchcnclm51'
+        require(_lsm_choice_int in LSM_CHOICE_TO_CATCH,
+                "Unknown LSM_CHOICE=%d; must be 1 (Catchment) or 2 (Catchment-CN4.0)" % _lsm_choice_int)
+        self.catch = LSM_CHOICE_TO_CATCH[_lsm_choice_int]
         _lsm_choice_int = None
 
         self.tile_types = self.ExeInputs.get('TILE_TYPES',"100").split()
@@ -237,11 +242,19 @@ class ldas:
         if "20" in self.tile_types :
             self.with_landice = True
 
-        if self.with_landice == True:
-            if int(self.ExeInputs.get('DO_ISSM'))==1:
-                self.with_issm = True
+        # DO_ISSM is optional in exeinp (default 0, as in GEOS_SurfaceGridComp.rc);
+        # self.do_issm is used only by ldas_setup and not written to LDAS.rc
+        self.do_issm = int(self.ExeInputs.get('DO_ISSM', 0))
+        if self.with_landice and self.do_issm == 1:
+            self.with_issm = True
 
         self.run_route = int(self.ExeInputs.get('RUN_ROUTE',0))
+
+        # fail early (before any remapping) for unsupported option combinations
+        require(not (self.run_route > 0 and RESTART_str == 'M'),
+                "RUN_ROUTE does not support MERRA-2 option (RESTART=M)")
+        require(not (self.with_issm and RESTART_str == 'M'),
+                "RESTART=M does not support DO_ISSM=1. Please provide a compatible ISSM restart and use RESTART=2.")
 
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
@@ -457,9 +470,7 @@ class ldas:
               self.has_mwrtm = True
               self.mwrtm_file = mwrtm_param_file_
            else :
-              # NOTE: condition below is always False (path is never empty) -> see REFACTOR_PLAN.md bug B2
-              require(not mwrtm_param_file_.strip(),  ' MWRTM_PATH: %s should contain mwRTM_param.nc4'% self.ExeInputs['MWRTM_PATH'])
-              del self.ExeInputs['MWRTM_PATH']
+              raise LdasSetupError('MWRTM_PATH/BCS_RESOLUTION [%s] must contain mwRTM_param.nc4' % self.ExeInputs['MWRTM_PATH'])
            if os.path.isfile(vegopacity_file_) :
               self.has_vegopacity = True
               self.ExeInputs['VEGOPACITY_FILE'] = vegopacity_file_
@@ -606,9 +617,7 @@ class ldas:
         _endDate = self.endDates[0]
         _d = _d + _difftime
         while _d < _endDate :
-            print (_difftime.days)
             self.nSegments +=1
-            print (_d.year, _d.month, _d.day)
             self.begDates.append(_d)
             self.endDates.insert(-1,_d)
             _d = _d+ _difftime
@@ -880,9 +889,7 @@ class ldas:
                self.has_landassim_seed = True
         mk_outdir = self.exphome+'/'+exp_id+'/mk_restarts/'
 
-        # MERRA-2 cannot provide ISSM restart
-        if (RESTART_str=='M' and self.with_issm):
-           raise LdasSetupError("RESTART=M does not support DO_ISSM=1. Please provide a compatible ISSM restart and use RESTART=2.")
+        # (RESTART=M with DO_ISSM=1 is rejected in __init__)
 
         if (RESTART_str in ['2', 'M'] and (self.with_land or self.with_lake or self.with_landice)):
            bc_base    = os.path.dirname(self.ExeInputs['BCS_PATH'].rstrip('/'))
@@ -1054,10 +1061,7 @@ class ldas:
                   routeRstFile = glob_first(mk_outdir+'*route_internal_rst.'+YYYYMMDD+'*', 'route restart in mk_restarts')
 
                if iens == 0 and not os.path.isfile(routeRstFile):
-                     raise LdasSetupError("Please copy a route restart from /discover/nobackup/projects/gmao/bcs_shared/restarts/surface/route/ \
-                            to " + routeRstFile)
-               if RESTART_str  == 'M':
-                  raise LdasSetupError("RUN_ROUTE does not support MERRA-2 option (RESTART=M)")
+                     raise LdasSetupError("Please copy a route restart from " + ROUTE_RST_DIR + " to " + routeRstFile)
 
                if os.path.isfile(routeRstFile) :
                   routeLocal = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.route_internal_rst.'+y4m2d2_h2m2
@@ -1246,7 +1250,7 @@ class ldas:
                         + str(self.ExeInputs['AEROSOL_DEPOSITION']) + ' ' \
                         + str(self.ExeInputs['RUN_IRRIG'])          + ' ' \
                         + str(self.nens)                            + ' ' \
-                        + str(self.ExeInputs['DO_ISSM'])
+                        + str(self.do_issm)
                     run_cmd(cmd)
                 replace_in_file(tmprcfile, 'GEOSldas_expid', self.ExeInputs['EXP_ID'])
 
@@ -1382,7 +1386,7 @@ class ldas:
                    valn='landassim_obspertrseed'+tmpl_+'_checkpoint'
                    ldasrcInp[keyn]= valn
 
-                for key,val in zip(rstkey,rstval) :
+                for ikey_, (key,val) in enumerate(zip(rstkey,rstval)) :
                     keyn = key+ '_INTERNAL_RESTART_FILE'
                     valn = '../input/restart/'+val+tmpl_+'_internal_rst'
                     ldasrcInp[keyn] = valn
@@ -1391,7 +1395,7 @@ class ldas:
                        valn = val + tmpl_ + '_internal_checkpoint'
                        ldasrcInp[keyn] = valn
 
-                    if self.with_issm:
+                    if self.with_issm and ikey_ == 0:
                        keyn = 'ISSM_INTERNAL_CHECKPOINT_FILE'
                        valn = 'issm'+tmpl_+'_internal_checkpoint'
                        ldasrcInp[keyn]= valn
@@ -1456,6 +1460,14 @@ class ldas:
         fout.write("\nsed -i 's/if($capdate<$enddate) "+SBATCHQSUB+"/#if($capdate<$enddate) "+SBATCHQSUB+"/g' lenkf.j\n\n")
         nSegments = self.nSegments
         for iseg in range(nSegments):
+            if self.GEOS_SITE == 'NAS':
+                # PBS: qsub prints the job id only
+                if iseg ==0 :
+                    fout.write("jobid%d=$(qsub lenkf.j)\n"%(iseg))
+                else :
+                    fout.write("jobid%d=$(qsub -W depend=afterok:$jobid%d lenkf.j)\n"%(iseg,iseg-1))
+                fout.write("echo $jobid%d\n"%iseg )
+                continue
             if iseg ==0 :
                 fout.write("jobid%d=$(echo $(sbatch lenkf.j) | cut -d' ' -f 4)\n"%(iseg))
                 fout.write("echo $jobid%d\n"%iseg )

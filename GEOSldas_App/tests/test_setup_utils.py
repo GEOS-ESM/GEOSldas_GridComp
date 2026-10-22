@@ -73,6 +73,13 @@ class TestHelpers(unittest.TestCase):
         f = _write(self.d, 'a.til.domain', 'l1\nl2\nPE720x4320-CF\n')
         self.assertEqual(su.read_gridname(f), 'PE720x4320-CF')
 
+    # run_cmd ---------------------------------------------------------------
+    def test_run_cmd(self):
+        self.assertEqual(su.run_cmd('true'), 0)
+        self.assertEqual(su.run_cmd('false'), 1)            # warning only
+        with self.assertRaises(su.LdasSetupError):
+            su.run_cmd('false', check=True)
+
     # resource keys -----------------------------------------------------
     def test_resource_keys(self):
         self.assertIn('account', su.getResourceKeys('required'))

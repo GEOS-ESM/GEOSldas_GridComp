@@ -27,7 +27,7 @@ expect, and record that diff in the bug entry below.
 | 1     | Add helpers to setup_utils                     | DONE          | 0f6155f |
 | 0     | Safety net: unit tests, diff tool, mock e2e harness | DONE (Discover run still recommended) | see Log |
 | 1b    | Use the helpers in ldas.py / ldas_setup        | DONE          | see Log |
-| 2     | Fix the known bugs (B1-B3, B5, B6, B8-B10; B4/B7 are not bugs) | TODO | |
+| 2     | Fix the known bugs (B1-B3, B5, B6, B8-B10; B4/B7 are not bugs) | DONE | see Log |
 | 3     | Split `ldas.__init__`                          | TODO          | |
 | 4     | Table-driven restart staging (`createLnRstBc`) | TODO          | |
 | 5     | rc file generation (`createRCFiles`)           | TODO          | |
@@ -56,9 +56,10 @@ expect, and record that diff in the bug entry below.
     nml_hist_custom (NML_INPUT_PATH, POSTPROC_HIST, irrig, aerosol, all optional batinp keys),
     tile_txt.
   - Options: `--case NAME..`, `--keep` (keep the work dir to inspect it), `-v`, `--ref COMMIT`.
-  - NOT covered: coupled mode (ladas_cpl>0, uses hard-wired /discover paths), the NAS site,
-    real Fortran zoom/optimize, and real remapping. Note that every case sets DO_ISSM
-    (see bug B1).
+  - Added in Phase 2: coupled mode `ladas_cpl1`/`ladas_cpl2` (the /discover paths are replaced
+    in the fake installs), the NAS site, and one case per bug fix. Cases have an
+    `expect` field: same | diff | ref_fails | new_fails.
+  - NOT covered: real Fortran zoom/optimize and real remapping.
 - Recommended but not done: run a few real cases on Discover (incl. `--ladas_cpl 1/2`) with
   installs of the old and new code, and compare them with `tests/compare_exp.py`.
 
@@ -79,35 +80,45 @@ expect, and record that diff in the bug entry below.
 
 ---------------------------------------------------------------------------------------
 
-## Known bugs (Phase 2). Fix one per commit, and note the expected diff in the baseline
+## Known bugs (Phase 2): DONE
 
-Line numbers refer to ldas.py after Phase 1b (approximate).
+Each fix is checked by a dedicated case in `tests/mock_regression.py` (shown in brackets).
 
-- **B1** `int(self.ExeInputs.get('DO_ISSM'))` (~l.242) raises TypeError when landice tiles are
-  used without DO_ISSM. `ExeInputs['DO_ISSM']` in the process_hist.csh call (~l.1250) raises
-  KeyError whenever DO_ISSM is missing from exeinp. Fix: default `DO_ISSM` to 0 in `__init__`.
-- **B2** In the MWRTM_PATH block, `require(not mwrtm_param_file_.strip(), ...)` always fails.
-  A MWRTM_PATH without mwRTM_param.nc4 always aborts, and the `del` after it never runs.
-  Decide what the behavior should be: abort with a clear message, or warn and drop MWRTM_PATH.
-- **B3** Route + RESTART=M: the "copy a route restart" error is raised before the intended
-  "RUN_ROUTE does not support MERRA-2" error. Move the M check to `__init__` (before remapping).
+- **B1 (FIXED)** A missing DO_ISSM crashed setup: TypeError via `int(ExeInputs.get('DO_ISSM'))` when
+  landice tiles were used, and KeyError in the process_hist.csh call in *every* run.
+  **This also broke the coupled land-atm DAS (`--ladas_cpl 1/2`) completely**, because the plain
+  HIST.rc is always processed and coupled runs have no exeinp.
+  Fix: `self.do_issm = int(ExeInputs.get('DO_ISSM', 0))`, which is used for with_issm and
+  process_hist. It is not written to LDAS.rc, so LDAS.rc is unchanged.
+  [B1_no_do_issm, ladas_cpl1, ladas_cpl2: ref fails, new OK]
+- **B2 (FIXED)** MWRTM_PATH without mwRTM_param.nc4: the old check could never pass (so it always
+  aborted with a confusing message), and the `del` after it was dead code. Kept the
+  behavior (abort) with a clear message: `MWRTM_PATH/BCS_RESOLUTION [..] must contain mwRTM_param.nc4`.
+  [B2_mwrtm_missing: new fails]
+- **B3 (FIXED)** RUN_ROUTE with RESTART=M, and DO_ISSM=1 with RESTART=M, are now rejected in
+  `__init__` before any remapping. The later (now unreachable) checks were removed. [B3_route_merra2]
 - ~~**B4**~~ **NOT A BUG (intended, confirmed 2026-10-22).** If the exeinp file exists,
   `ladas_cpl` is forced to 0 and `--ladas_cpl` is ignored. Keep this behavior in all phases.
-  Allowed cleanup only (no behavior change): remove the duplicated `int(self.ladas_cpl)`.
-- **B5** LSM_CHOICE: 3 and 4 are mapped to model names, but the `<=2` check rejects them (and only
-  when there are land tiles). An unknown value leaves `catch=''`. Use one validation: allowed {1,2}.
-- **B6** `createBatchRun` always writes `sbatch ... --dependency=afterok`, even on NAS
-  (only the sed line uses qsub). It should use the PBS syntax `qsub -W depend=afterok:` on NAS.
+  Done: removed the duplicated `int(self.ladas_cpl)`.
+- **B5 (FIXED)** LSM_CHOICE now goes through the `LSM_CHOICE_TO_CATCH` table. An unknown value
+  -> error (it used to leave `catch=''`). The existing "3 not supported with land tiles"
+  check is unchanged. [B5_bad_lsm_choice]
+- **B6 (FIXED)** `ldas_batchrun.j` on NAS now uses `jobidN=$(qsub [-W depend=afterok:$jobidN-1] lenkf.j)`
+  (it used to use sbatch syntax). NCCS output is unchanged. [B6_nas_multi_sgmt, nas_single: diff in
+  ldas_batchrun.j only. NOTE: the qsub syntax has not been tested on a real NAS system]
 - ~~**B7**~~ **NOT A BUG (intended, confirmed 2026-10-22).** `_calculateJobSegments` uses
   month = 30 days and year = 365 days on purpose. Do NOT switch to `relativedelta`, and keep the
-  segment dates byte-identical in all phases. Optional cleanup: remove the debug `print`s, which
-  only affects console output.
-- **B8** `run_cmd` return codes are ignored, so a failed preprocess_ldas.x / process_hist.csh
-  is not noticed. Add `check=True` to `run_cmd`. First confirm that preprocess_ldas.x returns 0 on success.
-- **B9** The `ISSM_INTERNAL_CHECKPOINT_FILE` key is set inside the loop over restart keys (repeated).
-  Move it out of the loop (no output change).
-- **B10** Hard-coded `/discover/...` paths (coupled BCS_PATH, MWRTM_PATH, route-restart message).
-  Move them into one constants block, or make them site-dependent.
+  segment dates byte-identical in all phases. Done: removed the debug `print`s (console only).
+  (Side effect: with the default JOB_SGMT a run from Jan 1 to Feb 1 gets 2 segments.)
+- **B8 (FIXED, soft)** `run_cmd(cmd, check=False)` now prints a WARNING when the return code is
+  non-zero, and raises if `check=True`. All calls still use the default (warn only), because the
+  exit codes of preprocess_ldas.x / process_hist.csh on Discover have not been confirmed.
+  TODO (later, on Discover): switch preprocess_ldas.x calls to `check=True`.
+- **B9 (FIXED)** The ISSM_INTERNAL_CHECKPOINT_FILE key is now set only on the first loop iteration,
+  which keeps the LDAS.rc key order. (The value is the same as the generic per-key one; the order
+  is fixed properly in Phase 5.)
+- **B10 (FIXED)** Constants at the top of ldas.py: `LADAS_BCS_PATH`, `LADAS_MWRTM_PATH`, `ROUTE_RST_DIR`
+  (the mock harness redirects the first two to fake data for the coupled cases).
 
 Other cleanups to do along the way: temp files (`domain_def`, f2g, optimize output) are never
 deleted; `os.chdir(self.rundir)` side effects in createRunScripts/createBatchRun.
@@ -185,3 +196,5 @@ PYTHONPATH=$S python3 ldas_setup setup /nonexistent x y      # -> "ldas_setup ER
   IDs are not renumbered.
 - 2026-10-22: Added tests/mock_regression.py (end-to-end mock harness, 14 cases). Phase 1b
   passes 14/14 IDENTICAL against 0f6155f. Committed Phase 0 + 1b.
+- 2026-10-22: Phase 2 done (B1-B3, B5, B6, B8-B10 + B4/B7 cleanups). Harness: 22 cases, PASS.
+  Important: B1 means coupled mode crashed in 0f6155f.

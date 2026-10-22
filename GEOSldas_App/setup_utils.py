@@ -34,12 +34,19 @@ def require(condition, message):
    if not condition:
       raise LdasSetupError(message)
 
-def run_cmd(cmd):
+def run_cmd(cmd, check=False):
    """
     Print and run a shell command given as a single string (no shell interpretation).
+    A non-zero return code triggers a WARNING, or an LdasSetupError if check=True.
+    Returns the return code.
    """
    print ("cmd:   " + cmd)
-   return sp.call(shlex.split(cmd))
+   rc = sp.call(shlex.split(cmd))
+   if rc != 0:
+      msg = "command returned non-zero status %d: %s" % (rc, cmd)
+      require(not check, msg)
+      print ("WARNING: " + msg)
+   return rc
 
 def glob_first(pattern, what):
    """

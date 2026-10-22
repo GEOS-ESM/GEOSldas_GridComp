@@ -146,8 +146,13 @@ def list_py_modules(commit):
     return [os.path.basename(l) for l in out.split() if l.endswith('.py')]
 
 
-def make_install(dest, commit, site='NCCS'):
-    """commit=None -> working tree"""
+DISCOVER_BCS   = b"/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
+DISCOVER_MWRTM = b"/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/"
+
+
+def make_install(dest, commit, site='NCCS', data_root=None):
+    """commit=None -> working tree.  Hard-wired /discover paths (coupled mode) are
+    redirected to the fake data tree under data_root."""
     bindir = os.path.join(dest, 'bin')
     etcdir = os.path.join(dest, 'etc')
     os.makedirs(bindir); os.makedirs(etcdir)
@@ -159,6 +164,9 @@ def make_install(dest, commit, site='NCCS'):
             data = git_show(commit, f)
         # emulate cmake configure_file(@ONLY) for all files (only ldas.py has placeholders)
         data = data.replace(b'@GEOS_SITE@', site.encode()).replace(b'@MPI_STACK@', b'openmpi')
+        if data_root:
+            data = data.replace(DISCOVER_BCS,   os.path.join(data_root, 'bcs').encode())
+            data = data.replace(DISCOVER_MWRTM, os.path.join(data_root, 'mwrtm').encode() + b'/')
         with open(os.path.join(bindir, f), 'wb') as fo:
             fo.write(data)
         os.chmod(os.path.join(bindir, f), 0o755)
@@ -228,13 +236,32 @@ def make_data(root):
             suffix = '_rst.' if comp == 'landassim_obspertrseed' else '_internal_rst.'
             w(os.path.join(rs, 'Y' + y, 'M' + m, rid + '.' + comp + suffix + stamp), comp + ' ' + ens + '\n')
 
+    # coupled land-atm DAS (ladas_cpl): CF0012 BCS, LDAS restarts at rstloc with ens0001, ens0002
+    cres = 'CF0012x6C_CF0012x6C'
+    cdom = 'CF0012x6C_GLOBAL'
+    ctile = 'header1\nheader2\nPE12x72-CF\nrest\n'
+    w(os.path.join(bcs, 'geometry', cres, cres + '.til'), ctile)
+    w(os.path.join(bcs, 'land', cres, 'clsm', 'catchment.def'), 'catchdef\n')
+    w(os.path.join(bcs, 'land', cres, 'vegdyn_x.dat'), 'vegdyn\n')
+    crid = 'ldas_rst'
+    crc = os.path.join(root, 'adas_rst', crid, 'output', cdom, 'rc_out')
+    w(os.path.join(crc, cres + '.til'), ctile)
+    for f in ['green_clim_x.data', 'lai_clim_x.data', 'ndvi_clim_x.data', 'nirdf_x.dat', 'visdf_x.dat']:
+        w(os.path.join(crc, f), 'cpl ' + f + '\n')
+    for ens in ['ens0001', 'ens0002']:
+        rs = os.path.join(root, 'adas_rst', crid, 'output', cdom, 'rs', ens)
+        w(os.path.join(rs, crid + '.vegdyn_internal_rst'), 'vegdyn ' + ens + '\n')
+        w(os.path.join(rs, 'Y2020', 'M01', crid + '.catch_internal_rst.20200101_2100'), 'catch ' + ens + '\n')
+    w(os.path.join(root, 'mwrtm', cres, 'mwRTM_param.nc4'), 'mwrtm cpl\n')
+
     w(os.path.join(root, 'mwrtm', BCS_RES, 'mwRTM_param.nc4'), 'mwrtm\n')
     w(os.path.join(root, 'mwrtm', BCS_RES, 'vegopacity.bin'), 'vegop\n')
     os.makedirs(os.path.join(root, 'met', 'MERRA2'), exist_ok=True)
     for i in range(3):
         os.makedirs(os.path.join(root, 'met', 'ensmet%03d' % i), exist_ok=True)
     w(os.path.join(root, 'nml', 'LDASsa_SPECIAL_inputs_ensupd.nml'), '&ens_upd_inputs\n/\n')
-    return dict(bcs=bcs, rpath=rpath, rid=rid, rdom=rdom, root=root)
+    return dict(bcs=bcs, rpath=rpath, rid=rid, rdom=rdom, root=root,
+                rstloc=os.path.join(root, 'adas_rst', crid))
 
 # ---------------------------------------------------------------------------------
 # cases
@@ -255,14 +282,14 @@ def base_exeinp(D):
 
 def cases(D):
     C = {}
-    def add(name, upd=(), drop=(), batinp=None, expect='same'):
+    def add(name, upd=(), drop=(), batinp=None, expect='same', site='NCCS', cpl=None):
         e = base_exeinp(D)
         e.update(dict(upd))
         for k in drop:
             e.pop(k, None)
         b = {'account': 's1234', 'walltime': '01:00:00', 'ntasks_model': '126'}
         b.update(batinp or {})
-        C[name] = dict(exeinp=e, batinp=b, expect=expect)
+        C[name] = dict(exeinp=e, batinp=b, expect=expect, site=site, cpl=cpl)
 
     add('r1_global')
     add('r1_zoom', {'MINLAT': '20.', 'MAXLAT': '50.', 'MINLON': '-120.', 'MAXLON': '-60.'})
@@ -286,6 +313,24 @@ def cases(D):
         batinp={'qos': 'debug', 'job_name': 'myjob', 'ntasks-per-node': '42', 'constraint': 'mil',
                 'oserver_nodes': '1', 'writers-per-node': '3'})
     add('tile_txt', {'TILE_FILE_FORMAT': 'TXT'})
+    # coupled land-atm DAS: exeinp/batinp are dummy (non-existing) files
+    # (ref 0f6155f crashes in coupled mode with KeyError DO_ISSM -> bug B1)
+    for lc, nens in [('1', '1'), ('2', '2')]:
+        add('ladas_cpl' + lc, expect='ref_fails', cpl=['--ladas_cpl', lc, '--account', 's1234', '--nymdb', '20200101',
+                                   '--nhmsb', '210000', '--agcm_res', '0012', '--bcs_version', BCS_VERSION,
+                                   '--rstloc', D['rstloc'], '--varwindow', '360', '--nens', nens])
+    add('B2_mwrtm_missing', {'MWRTM_PATH': os.path.join(D['root'], 'nomwrtm')}, expect='new_fails')
+    # expect: 'same'      -> ref and new must succeed and be identical
+    #         'diff'      -> ref and new must succeed; differences are printed (intended change)
+    #         'ref_fails' -> ref setup fails (bug), new must succeed
+    #         'new_fails' -> new setup must fail (input error detected); ref result ignored
+    # Phase 2 bug fixes:
+    add('B1_no_do_issm', {'TILE_TYPES': '100 20'}, drop=['DO_ISSM'], expect='ref_fails')
+    add('B6_nas_multi_sgmt', {'END_DATE': '20200501 000000', 'JOB_SGMT': '00000100 000000'},
+        site='NAS', expect='diff')
+    add('nas_single', site='NAS', expect='diff')   # 2 segments (30-day month, see B7)
+    add('B3_route_merra2', {'RESTART': 'M', 'RUN_ROUTE': '1'}, expect='new_fails')
+    add('B5_bad_lsm_choice', {'LSM_CHOICE': '7'}, expect='new_fails')
     return C
 
 
@@ -295,18 +340,33 @@ def write_kv(path, d):
             f.write('%s: %s\n' % (k, v))
 
 
-def run_case(bindir, exphome, case, verbose):
+def _last_error(exphome):
+    if not os.path.exists(os.path.join(exphome, 'setup.log')):
+        exphome = os.path.join(exphome, 'ldas')
+    log = open(os.path.join(exphome, 'setup.log')).read().strip().splitlines()
+    errs = [l for l in log if 'ERROR' in l or 'Error' in l]
+    return (errs or log or [''])[-1]
+
+
+def run_case(bindir, exphome, case, verbose, quiet=False):
     os.makedirs(exphome)
     exeinp = os.path.join(exphome, 'exeinp.txt')
     batinp = os.path.join(exphome, 'batinp.txt')
-    write_kv(exeinp, case['exeinp'])
-    write_kv(batinp, case['batinp'])
-    cmd = [sys.executable, os.path.join(bindir, 'ldas_setup'), 'setup', exphome, exeinp, batinp]
+    if case['cpl']:
+        # ldas exphome is a sub-dir of the ADAS exp dir; exeinp/batinp are dummy
+        exphome = os.path.join(exphome, 'ldas')
+        os.makedirs(exphome)
+        cmd = [sys.executable, os.path.join(bindir, 'ldas_setup'), 'setup', exphome,
+               'dummy_exeinp', 'dummy_batinp'] + case['cpl']
+    else:
+        write_kv(exeinp, case['exeinp'])
+        write_kv(batinp, case['batinp'])
+        cmd = [sys.executable, os.path.join(bindir, 'ldas_setup'), 'setup', exphome, exeinp, batinp]
     p = sp.run(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, cwd=exphome)
     log = p.stdout.decode(errors='replace')
     with open(os.path.join(exphome, 'setup.log'), 'w') as f:
         f.write(log)
-    if verbose or p.returncode != 0:
+    if verbose or (p.returncode != 0 and not quiet):
         print(textwrap.indent(log[-3000:], '      | '))
     return p.returncode
 
@@ -323,32 +383,56 @@ def main(argv):
     work = tempfile.mkdtemp(prefix='ldas_regr_')
     ok = True
     try:
-        ref_bin = make_install(os.path.join(work, 'inst_ref'), o.ref)
-        new_bin = make_install(os.path.join(work, 'inst_new'), None)
+        installs = {}
+        def inst(which, site):
+            key = (which, site)
+            if key not in installs:
+                installs[key] = make_install(os.path.join(work, 'inst_%s_%s' % key),
+                                             o.ref if which == 'ref' else None, site, D['root'])
+            return installs[key]
         D = make_data(os.path.join(work, 'data'))
         C = cases(D)
+        def expdir(which, name):
+            if C[name]['cpl']:
+                return os.path.join(work, which, name, 'ldas', name + '_LDAS' + ('4ens' if C[name]['cpl'][1] == '2' else ''))
+            return os.path.join(work, which, name, 'testexp')
         names = o.case or list(C)
         for name in names:
             case = C[name]
+            expect = case['expect']
             print('== %-24s' % name, end=' ', flush=True)
-            rc_ref = run_case(ref_bin, os.path.join(work, 'ref', name), case, o.verbose)
-            rc_new = run_case(new_bin, os.path.join(work, 'new', name), case, o.verbose)
+            quiet = expect in ('ref_fails', 'new_fails') and not o.verbose
+            rc_ref = run_case(inst('ref', case['site']), os.path.join(work, 'ref', name), case, o.verbose, quiet)
+            rc_new = run_case(inst('new', case['site']), os.path.join(work, 'new', name), case, o.verbose, quiet)
+            if expect == 'new_fails':
+                good = rc_new != 0
+                print('new failed as expected (ref rc=%d)' % rc_ref if good else 'ERROR: new setup did not fail')
+                if good:
+                    print(textwrap.indent(_last_error(os.path.join(work, 'new', name)), '      '))
+                ok = ok and good
+                continue
+            if expect == 'ref_fails':
+                good = rc_ref != 0 and rc_new == 0
+                print('ref failed, new OK (as expected)' if good else
+                      'UNEXPECTED: ref rc=%d new rc=%d' % (rc_ref, rc_new))
+                ok = ok and good
+                continue
             if rc_ref != 0 or rc_new != 0:
                 print('setup failed: ref rc=%d new rc=%d' % (rc_ref, rc_new))
                 ok = False
                 continue
             import io
             buf = io.StringIO()
-            nd = compare(os.path.join(work, 'ref', name, 'testexp'),
-                         os.path.join(work, 'new', name, 'testexp'),
-                         same=[(os.path.join(work, 'inst_ref'), os.path.join(work, 'inst_new'))],
+            nd = compare(expdir('ref', name), expdir('new', name),
+                         same=[(os.path.dirname(inst('ref', case['site'])),
+                                os.path.dirname(inst('new', case['site'])))],
                          out=buf)
             if nd == 0:
-                print('IDENTICAL')
+                print('IDENTICAL' + ('  (WARNING: a difference was expected)' if expect == 'diff' else ''))
             else:
-                print('%d DIFFERENCE(S)' % nd)
+                print('%d DIFFERENCE(S)%s' % (nd, '  (expected)' if expect == 'diff' else ''))
                 print(textwrap.indent(buf.getvalue(), '      '))
-                ok = False
+                ok = ok and expect == 'diff'
     finally:
         if o.keep:
             print('work dir kept: ' + work)
