@@ -39,6 +39,9 @@
 !       12      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb, SCF
 !               |   & 1d snow analysis (Toure et al. 2018 empirical gain)          | 
 !       13      | 3d soil moisture/Tskin/ght(1) excl. catdef unless PEATCLSM tile  | sfmc/sfds, Tb
+!
+! Make sure the "assim" or "getinnov" settings of the obs species below are appropriate
+!   for the selected update_type!
 
 update_type = 0
 
@@ -120,9 +123,9 @@ fcsterr_inflation_fac = -9999.
 ! %bias_tcut      = cutoff time for confident obs bias estimate [s]
 ! %nodata         = no-data-value
 ! %varname        = observation native variable name (before scaling)
-! %units          = observation native units (before scaling; eg., 'K' or 'm3/m3')
-! %fcstvarname    = observation-equivalent model variable name (Obs_pred)           [do not edit, filled by read_ens_upd_inputs()]
-! %fcstunits      = observation-equivalent model units (eg., 'K' or 'm3/m3')        [do not edit, filled by read_ens_upd_inputs()]
+! %units          = observation native units (before scaling; eg., 'K' or 'm3 m-3')
+! %fcstvarname    = observation-equivalent model variable name (Obs_pred)            [do not edit, filled by read_ens_upd_inputs()]
+! %fcstunits      = observation-equivalent model units (eg., 'K' or 'm3 m-3')        [do not edit, filled by read_ens_upd_inputs()]
 ! %path           = path to observations file 
 ! %name           = name identifier for file containing observations 
 ! %maskpath       = path to obs mask file
@@ -260,7 +263,7 @@ obs_param_nml( 1)%bias_trel      = 864000
 obs_param_nml( 1)%bias_tcut      = 432000
 obs_param_nml( 1)%nodata         = -9999.
 obs_param_nml( 1)%varname        = 'sfmc'
-obs_param_nml( 1)%units          = 'm3/m3'
+obs_param_nml( 1)%units          = 'm3 m-3'
 obs_param_nml( 1)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 1)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 1)%path           = '/land/l_data/AMSR/data/AMSR_E_L2_Land_V001/'
@@ -299,7 +302,7 @@ obs_param_nml( 2)%bias_trel      = 864000
 obs_param_nml( 2)%bias_tcut      = 432000
 obs_param_nml( 2)%nodata         = -9999.
 obs_param_nml( 2)%varname        = 'sfmc'
-obs_param_nml( 2)%units          = 'm3/m3'
+obs_param_nml( 2)%units          = 'm3 m-3'
 obs_param_nml( 2)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 2)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 2)%path           = '/land/l_data/AMSR/data/AMSR_E_L2_Land_V001/'
@@ -377,7 +380,7 @@ obs_param_nml( 4)%bias_trel      = 864000
 obs_param_nml( 4)%bias_tcut      = 432000
 obs_param_nml( 4)%nodata         = -999.
 obs_param_nml( 4)%varname        = 'sfmc'
-obs_param_nml( 4)%units          = 'm3/m3'
+obs_param_nml( 4)%units          = 'm3 m-3'
 obs_param_nml( 4)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 4)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 4)%path           = '/land/l_data/RedArk/Retrievals_36km/retrievals_20060508/'
@@ -416,7 +419,7 @@ obs_param_nml( 5)%bias_trel      = 864000
 obs_param_nml( 5)%bias_tcut      = 432000
 obs_param_nml( 5)%nodata         = -999.
 obs_param_nml( 5)%varname        = 'sfmc'
-obs_param_nml( 5)%units          = 'm3/m3'
+obs_param_nml( 5)%units          = 'm3 m-3'
 obs_param_nml( 5)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 5)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 5)%path           = '/land/l_data/RedArk/Truth/50mm_Soil_Moisture_Truth/'
@@ -455,7 +458,7 @@ obs_param_nml( 6)%bias_trel      = 864000
 obs_param_nml( 6)%bias_tcut      = 432000
 obs_param_nml( 6)%nodata         = -999.
 obs_param_nml( 6)%varname        = 'rzmc'
-obs_param_nml( 6)%units          = 'm3/m3'
+obs_param_nml( 6)%units          = 'm3 m-3'
 obs_param_nml( 6)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 6)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 6)%path           = '/land/l_data/RedArk/Truth/400mm_Soil_Moisture_Truth/'
@@ -494,7 +497,7 @@ obs_param_nml( 7)%bias_trel      = 864000
 obs_param_nml( 7)%bias_tcut      = 432000
 obs_param_nml( 7)%nodata         = -9999.
 obs_param_nml( 7)%varname        = 'sfmc'
-obs_param_nml( 7)%units          = 'm3/m3'
+obs_param_nml( 7)%units          = 'm3 m-3'
 obs_param_nml( 7)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 7)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 7)%path           = '/land/l_data/RedArk_OSSE/data/Retrievals_CLSM_synth/M0001_P0001_R0001_URI/std_synth_obs_0.020/'
@@ -533,7 +536,7 @@ obs_param_nml( 8)%bias_trel      = 864000
 obs_param_nml( 8)%bias_tcut      = 432000
 obs_param_nml( 8)%nodata         = -9999.
 obs_param_nml( 8)%varname        = 'sfmc'
-obs_param_nml( 8)%units          = 'm3/m3'
+obs_param_nml( 8)%units          = 'm3 m-3'
 obs_param_nml( 8)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 8)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 8)%path           = '/discover/nobackup/vmaggion/Synth_sfmc/radar_sim/std_synth_sfmc_0.040/'
@@ -572,7 +575,7 @@ obs_param_nml( 9)%bias_trel      = 864000
 obs_param_nml( 9)%bias_tcut      = 432000
 obs_param_nml( 9)%nodata         = -9999.
 obs_param_nml( 9)%varname        = 'sfmc'
-obs_param_nml( 9)%units          = 'm3/m3'
+obs_param_nml( 9)%units          = 'm3 m-3'
 obs_param_nml( 9)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 9)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml( 9)%path           = '/land/l_data/AMSR/data/AMSR_E_sm_LPRM/L2_EASE/bin/'
@@ -611,7 +614,7 @@ obs_param_nml(10)%bias_trel      = 864000
 obs_param_nml(10)%bias_tcut      = 432000
 obs_param_nml(10)%nodata         = -9999.
 obs_param_nml(10)%varname        = 'sfmc'
-obs_param_nml(10)%units          = 'm3/m3'
+obs_param_nml(10)%units          = 'm3 m-3'
 obs_param_nml(10)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(10)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(10)%path           = '/land/l_data/AMSR/data/AMSR_E_sm_LPRM/L2_EASE/bin/'
@@ -650,7 +653,7 @@ obs_param_nml(11)%bias_trel      = 864000
 obs_param_nml(11)%bias_tcut      = 432000
 obs_param_nml(11)%nodata         = -9999.
 obs_param_nml(11)%varname        = 'sfmc'
-obs_param_nml(11)%units          = 'm3/m3'
+obs_param_nml(11)%units          = 'm3 m-3'
 obs_param_nml(11)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(11)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(11)%path           = '/land/l_data/AMSR/data/AMSR_E_sm_LPRM/L2_EASE/bin/'
@@ -689,7 +692,7 @@ obs_param_nml(12)%bias_trel      = 864000
 obs_param_nml(12)%bias_tcut      = 432000
 obs_param_nml(12)%nodata         = -9999.
 obs_param_nml(12)%varname        = 'sfmc'
-obs_param_nml(12)%units          = 'm3/m3'
+obs_param_nml(12)%units          = 'm3 m-3'
 obs_param_nml(12)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(12)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(12)%path           = '/land/l_data/AMSR/data/AMSR_E_sm_LPRM/L2_EASE/bin/'
@@ -732,7 +735,7 @@ obs_param_nml(13)%bias_trel      = 864000
 obs_param_nml(13)%bias_tcut      = 432000
 obs_param_nml(13)%nodata         = -9999.
 obs_param_nml(13)%varname        = 'sfmc'
-obs_param_nml(13)%units          = 'm3/m3'
+obs_param_nml(13)%units          = 'm3 m-3'
 obs_param_nml(13)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(13)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(13)%path           = '/discover/nobackup/rreichle/l_data/ASCAT/TUW_W5.4/EASE/CONUS/bin/'
@@ -775,7 +778,7 @@ obs_param_nml(14)%bias_trel      = 864000
 obs_param_nml(14)%bias_tcut      = 432000
 obs_param_nml(14)%nodata         = -9999.
 obs_param_nml(14)%varname        = 'sfmc'
-obs_param_nml(14)%units          = 'm3/m3'
+obs_param_nml(14)%units          = 'm3 m-3'
 obs_param_nml(14)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(14)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(14)%path           = '/discover/nobackup/rreichle/l_data/ASCAT/TUW_W5.4/EASE/CONUS/bin/'
@@ -814,7 +817,7 @@ obs_param_nml(15)%bias_trel      = 864000
 obs_param_nml(15)%bias_tcut      = 432000
 obs_param_nml(15)%nodata         = -9999.
 obs_param_nml(15)%varname        = 'sfmc'
-obs_param_nml(15)%units          = 'm3/m3'
+obs_param_nml(15)%units          = 'm3 m-3'
 obs_param_nml(15)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(15)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(15)%path           = '/discover/nobackup/projects/gmao/ssd/land/l_data/SMOS/EASEv2/ESA_REPR/SMOS_M36_SMUDP2/'
@@ -853,7 +856,7 @@ obs_param_nml(16)%bias_trel      = 864000
 obs_param_nml(16)%bias_tcut      = 432000
 obs_param_nml(16)%nodata         = -9999.
 obs_param_nml(16)%varname        = 'sfmc'
-obs_param_nml(16)%units          = 'm3/m3'
+obs_param_nml(16)%units          = 'm3 m-3'
 obs_param_nml(16)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(16)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(16)%path           = '/discover/nobackup/projects/gmao/ssd/land/l_data/SMOS/EASEv2/ESA_REPR/SMOS_M36_SMUDP2/'
@@ -2413,7 +2416,7 @@ obs_param_nml(52)%bias_trel      = 864000
 obs_param_nml(52)%bias_tcut      = 432000
 obs_param_nml(52)%nodata         = -9999.
 obs_param_nml(52)%varname        = 'asnow'
-obs_param_nml(52)%units          = 'm2/m2'
+obs_param_nml(52)%units          = 'm2 m-2'
 obs_param_nml(52)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(52)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(52)%path           = '/discover/nobackup/projects/S2SHMA/MODIS/MYD10C1_V61/'
@@ -2456,7 +2459,7 @@ obs_param_nml(53)%bias_trel      = 864000
 obs_param_nml(53)%bias_tcut      = 432000
 obs_param_nml(53)%nodata         = -9999.	
 obs_param_nml(53)%varname        = 'asnow'
-obs_param_nml(53)%units          = 'm2/m2'
+obs_param_nml(53)%units          = 'm2 m-2'
 obs_param_nml(53)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(53)%fcstunits      = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(53)%path           = '/discover/nobackup/projects/S2SHMA/MODIS/MOD10C1_V61/'	
@@ -2557,18 +2560,29 @@ obs_param_nml(55)%xcorr          = 0.25
 obs_param_nml(55)%ycorr          = 0.25
 obs_param_nml(55)%adapt          = 0
 
-! --------------------------------------------------------------------------------------------------------------
+! --------------------------------------------------------------------
 !
-!  56 = CYGNSS_L1_DDM3X5_CROP_SCALAR
+! Next-generation Metop ASCAT surface soil moisture datasets from EUMETSAT H SAF,
+! Hahn et al 2026 doi:10.5194/essd-18-4393-2026
 !
-! Preprocessed CYGNSS Level 1 local DDM-crop scalar coefficient product.
+! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
+!
+! The obs reader averages the obs per tile and always thins the resulting
+! tile super-obs to a minimum distance of 25 km (separately for each species).
+!
+! ------------------------
+!
+!  56 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A)
+!
+! H121 CDR v8: 2007-01-01 to 2021-11-15
+! https://hsaf.meteoam.it/Products/Detail?prod=H121
 
-obs_param_nml(56)%descr          = 'CYGNSS_L1_DDM3X5_CROP_SCALAR'
+obs_param_nml(56)%descr          = 'ASCAT_HSAF_META_SM'
 obs_param_nml(56)%orbit          = 3
 obs_param_nml(56)%pol            = 0
 obs_param_nml(56)%N_ang          = 0
-obs_param_nml(56)%freq           = 1.57542e9
-obs_param_nml(56)%FOV            = 100.
+obs_param_nml(56)%freq           = 0
+obs_param_nml(56)%FOV            = 12.5
 obs_param_nml(56)%FOV_units      = 'km'
 obs_param_nml(56)%assim          = .false.
 obs_param_nml(56)%scale          = .false.
@@ -2578,41 +2592,35 @@ obs_param_nml(56)%bias_Npar      = 0
 obs_param_nml(56)%bias_trel      = 864000
 obs_param_nml(56)%bias_tcut      = 432000
 obs_param_nml(56)%nodata         = -9999.
-obs_param_nml(56)%varname        = 'cygl1scal'
-obs_param_nml(56)%units          = 'dB'
+obs_param_nml(56)%varname        = 'sfds'
+obs_param_nml(56)%units          = '%'
 obs_param_nml(56)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(56)%fcstunits      = 'NULL'                                                                                            ! do not edit!
-obs_param_nml(56)%path           = ''
+obs_param_nml(56)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121/metop_a/'
 obs_param_nml(56)%name           = ''
 obs_param_nml(56)%maskpath       = ''
 obs_param_nml(56)%maskname       = ''
 obs_param_nml(56)%scalepath      = ''
 obs_param_nml(56)%scalename      = ''
-obs_param_nml(56)%flistpath      = ''
-obs_param_nml(56)%flistname      = ''
-obs_param_nml(56)%errstd         = 3.
+obs_param_nml(56)%flistpath      = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/flists/'
+obs_param_nml(56)%flistname      = 'H121_METOPA.txt'
+obs_param_nml(56)%errstd         = 9.
 obs_param_nml(56)%std_normal_max = 2.5
 obs_param_nml(56)%zeromean       = .true.
 obs_param_nml(56)%coarsen_pert   = .true.
-obs_param_nml(56)%xcorr          = 0.25
-obs_param_nml(56)%ycorr          = 0.25
+obs_param_nml(56)%xcorr          = 0.2
+obs_param_nml(56)%ycorr          = 0.2
 obs_param_nml(56)%adapt          = 0
 
-! --------------------------------------------------------------------
-!
-! Next-generation Metop ASCAT surface soil moisture datasets from EUMETSAT H SAF,
-! Hahn et al 2026 doi:10.5194/essd-18-4393-2026
-!
-! netcdf, 12.5 km Fibonacci grid (~25 km theoretical resolution)
-!
 ! ------------------------
 !
-!  57 = ASCAT_HSAF_META_SM  (H SAF ASCAT SSM CDR H121, MetOp-A)
+!  57 = ASCAT_HSAF_METB_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-B)
 !
-! H121 CDR v8: 2007-01-01 to 2021-11-15
-! https://hsaf.meteoam.it/Products/Detail?prod=H121
+! H121 CDR v8: 2013-06-01 to 2024-12-31
+! H139 ICDR:   2025-01-01 onward (same schema, flist covers both products)
+! H121/H139 files are staged together under the path root below.
 
-obs_param_nml(57)%descr          = 'ASCAT_HSAF_META_SM'
+obs_param_nml(57)%descr          = 'ASCAT_HSAF_METB_SM'
 obs_param_nml(57)%orbit          = 3
 obs_param_nml(57)%pol            = 0
 obs_param_nml(57)%N_ang          = 0
@@ -2631,31 +2639,31 @@ obs_param_nml(57)%varname        = 'sfds'
 obs_param_nml(57)%units          = '%'
 obs_param_nml(57)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(57)%fcstunits      = 'NULL'                                                                                            ! do not edit!
-obs_param_nml(57)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121/metop_a/'
+obs_param_nml(57)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121_H139/metop_b/'
 obs_param_nml(57)%name           = ''
 obs_param_nml(57)%maskpath       = ''
 obs_param_nml(57)%maskname       = ''
 obs_param_nml(57)%scalepath      = ''
 obs_param_nml(57)%scalename      = ''
 obs_param_nml(57)%flistpath      = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/flists/'
-obs_param_nml(57)%flistname      = 'H121_METOPA.txt'
+obs_param_nml(57)%flistname      = 'H121_H139_METOPB.txt'
 obs_param_nml(57)%errstd         = 9.
 obs_param_nml(57)%std_normal_max = 2.5
 obs_param_nml(57)%zeromean       = .true.
 obs_param_nml(57)%coarsen_pert   = .true.
-obs_param_nml(57)%xcorr          = 0.3125
-obs_param_nml(57)%ycorr          = 0.3125
+obs_param_nml(57)%xcorr          = 0.2
+obs_param_nml(57)%ycorr          = 0.2
 obs_param_nml(57)%adapt          = 0
 
 ! ------------------------
 !
-!  58 = ASCAT_HSAF_METB_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-B)
+!  58 = ASCAT_HSAF_METC_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-C)
 !
-! H121 CDR v8: 2013-06-01 to 2024-12-31
-! H139 ICDR:   2025-01-01 onward (same schema, flist covers both products)
+! H121 CDR v8: 2019-04-01 to 2024-12-31
+! H139 ICDR:   2025-01-01 onward
 ! H121/H139 files are staged together under the path root below.
 
-obs_param_nml(58)%descr          = 'ASCAT_HSAF_METB_SM'
+obs_param_nml(58)%descr          = 'ASCAT_HSAF_METC_SM'
 obs_param_nml(58)%orbit          = 3
 obs_param_nml(58)%pol            = 0
 obs_param_nml(58)%N_ang          = 0
@@ -2674,36 +2682,34 @@ obs_param_nml(58)%varname        = 'sfds'
 obs_param_nml(58)%units          = '%'
 obs_param_nml(58)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(58)%fcstunits      = 'NULL'                                                                                            ! do not edit!
-obs_param_nml(58)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121_H139/metop_b/'
+obs_param_nml(58)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121_H139/metop_c/'
 obs_param_nml(58)%name           = ''
 obs_param_nml(58)%maskpath       = ''
 obs_param_nml(58)%maskname       = ''
 obs_param_nml(58)%scalepath      = ''
 obs_param_nml(58)%scalename      = ''
 obs_param_nml(58)%flistpath      = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/flists/'
-obs_param_nml(58)%flistname      = 'H121_H139_METOPB.txt'
+obs_param_nml(58)%flistname      = 'H121_H139_METOPC.txt'
 obs_param_nml(58)%errstd         = 9.
 obs_param_nml(58)%std_normal_max = 2.5
 obs_param_nml(58)%zeromean       = .true.
 obs_param_nml(58)%coarsen_pert   = .true.
-obs_param_nml(58)%xcorr          = 0.3125
-obs_param_nml(58)%ycorr          = 0.3125
+obs_param_nml(58)%xcorr          = 0.2
+obs_param_nml(58)%ycorr          = 0.2
 obs_param_nml(58)%adapt          = 0
 
-! --------------------------------------------------------------------
+! --------------------------------------------------------------------------------------------------------------
 !
-!  59 = ASCAT_HSAF_METC_SM  (H SAF ASCAT SSM CDR H121 + ICDR H139, MetOp-C, 12.5 km)
+!  59 = CYGNSS_L1_DDM3X5_CROP_SCALAR
 !
-! H121 CDR v8: 2019-04-01 to 2024-12-31
-! H139 ICDR:   2025-01-01 onward
-! H121/H139 files are staged together under the path root below.
+! Preprocessed CYGNSS Level 1 local DDM-crop scalar coefficient product.
 
-obs_param_nml(59)%descr          = 'ASCAT_HSAF_METC_SM'
+obs_param_nml(59)%descr          = 'CYGNSS_L1_DDM3X5_CROP_SCALAR'
 obs_param_nml(59)%orbit          = 3
 obs_param_nml(59)%pol            = 0
 obs_param_nml(59)%N_ang          = 0
-obs_param_nml(59)%freq           = 0
-obs_param_nml(59)%FOV            = 12.5
+obs_param_nml(59)%freq           = 1.57542e9
+obs_param_nml(59)%FOV            = 100.
 obs_param_nml(59)%FOV_units      = 'km'
 obs_param_nml(59)%assim          = .false.
 obs_param_nml(59)%scale          = .false.
@@ -2713,24 +2719,24 @@ obs_param_nml(59)%bias_Npar      = 0
 obs_param_nml(59)%bias_trel      = 864000
 obs_param_nml(59)%bias_tcut      = 432000
 obs_param_nml(59)%nodata         = -9999.
-obs_param_nml(59)%varname        = 'sfds'
-obs_param_nml(59)%units          = '%'
+obs_param_nml(59)%varname        = 'cygl1scal'
+obs_param_nml(59)%units          = 'dB'
 obs_param_nml(59)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
 obs_param_nml(59)%fcstunits      = 'NULL'                                                                                            ! do not edit!
-obs_param_nml(59)%path           = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/H121_H139/metop_c/'
+obs_param_nml(59)%path           = ''
 obs_param_nml(59)%name           = ''
 obs_param_nml(59)%maskpath       = ''
 obs_param_nml(59)%maskname       = ''
 obs_param_nml(59)%scalepath      = ''
 obs_param_nml(59)%scalename      = ''
-obs_param_nml(59)%flistpath      = '/discover/nobackup/projects/land_da/ASCAT_SSM_CDR/flists/'
-obs_param_nml(59)%flistname      = 'H121_H139_METOPC.txt'
-obs_param_nml(59)%errstd         = 9.
+obs_param_nml(59)%flistpath      = ''
+obs_param_nml(59)%flistname      = ''
+obs_param_nml(59)%errstd         = 3.
 obs_param_nml(59)%std_normal_max = 2.5
 obs_param_nml(59)%zeromean       = .true.
 obs_param_nml(59)%coarsen_pert   = .true.
-obs_param_nml(59)%xcorr          = 0.3125
-obs_param_nml(59)%ycorr          = 0.3125
+obs_param_nml(59)%xcorr          = 0.25
+obs_param_nml(59)%ycorr          = 0.25
 obs_param_nml(59)%adapt          = 0
 
 ! --------------------------------------------------------------------

@@ -253,8 +253,8 @@ contains
 
     ! frequency range for determining "need_mwRTM_param" 
     
-    real, parameter :: min_freq =  1.e9     ! GHz   ! include L-band (SMOS, SMAP)
-    real, parameter :: max_freq = 10.e9     ! GHz   ! include X-band (TRMM, AMSR-E)
+    real, parameter :: min_freq =  1.e9     ! Hz   ! include L-band (SMOS, SMAP)
+    real, parameter :: max_freq = 10.e9     ! Hz   ! include X-band (TRMM, AMSR-E)
 
     ! tolerance for checking xcorr against FOV (xcorr + tol >= "FOV") 
     
@@ -491,15 +491,15 @@ contains
              
              j = j + 1
              
-             obs_param(j)         = obs_param_nml(i)         ! inherit everything
+             obs_param(j)                                    = obs_param_nml(i)                   ! inherit everything
              
-             obs_param(j)%species = j                        ! provide unique species ID
+             obs_param(j)%species                            = j                                  ! provide unique species ID
              
-             obs_param(j)%N_ang   = 1                        ! overwrite N_ang
-             
-             obs_param(j)%ang(1)  = obs_param_nml(i)%ang(k)  ! overwrite ang(1)
-             
-             obs_param(j)%ang(2:N_obs_ang_max) = nodata_generic  ! fill rest with nodata
+             obs_param(j)%N_ang                              = min( 1, obs_param_nml(i)%N_ang )   ! overwrite N_ang with either 0 or 1
+              
+             obs_param(j)%ang(1:N_obs_ang_max)               = nodata_generic                     ! fill all angles with nodata
+
+             if (obs_param(j)%N_ang>0)  obs_param(j)%ang(1)  = obs_param_nml(i)%ang(k)            ! fill first angle with appropriate value
 
           end do
           
@@ -1658,8 +1658,8 @@ contains
     
     ! communicate tile_data_l as needed and get tile_data_lH
 
-    call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
-         tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
+    call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,                   &
+         tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                                         &
          N_catlH, tile_data_lH=tile_data_lH )    
     
     ! read out sfmc, rzmc, etc. from tile_data_lH    
@@ -1668,7 +1668,7 @@ contains
          get_sfmc_lH, get_rzmc_lH, get_tsurf_lH, get_FT_lH, get_asnow_lH, get_Tb_lH, &
          get_peat_lH, get_cygl1scal_lH, N_fields,                                &
          option=2, tile_data=tile_data_lH,                                       &
-         sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_l, stemp=stemp_lH,    &
+         sfmc=sfmc_lH, rzmc=rzmc_lH, tsurf=tsurf_lH, asnow=asnow_lH, FT=FT_lH, stemp=stemp_lH,    &
          Tb_h=Tb_h_lH, Tb_v=Tb_v_lH, peat=peat_lH,                               &
          mwp_clay=mwp_clay_lH, mwp_poros=mwp_poros_lH )
     
@@ -3506,7 +3506,7 @@ contains
     end if
     
     ! convert indices associated with lat/lon to min/max indices 
-    ! (note that ind_minlon>=ind_maxlon if j_dir==-1)
+    ! (note that ind_minlat>=ind_maxlat if j_dir==-1)
     ! (note that ind_minlon, ind_minlat, etc will be needed again below)
         
     ind_i_min = min( ind_minlon, ind_maxlon)
@@ -3673,11 +3673,20 @@ contains
     do k=1,N_obs
        
        ! map from grid to obs
+       !
+       ! get i/j_ind w.r.t. pert_grid_f and convert to pert_grid_lH with integer offsets;
+       ! previously, pert_grid_lH was used directly, but this made the result layout-dependent 
+       ! because its ll_lon/ll_lat (computed from the local obs extent) are subject to roundoff,
+       ! so an obs near a pert grid cell edge could be mapped to different cells
+       ! on different processors (amfox, 24 Sep 2026)
        
        this_lon = Observations(k)%lon
        this_lat = Observations(k)%lat
        
-       call get_ij_ind_from_latlon( pert_grid_lH, this_lat, this_lon, lon_ind, lat_ind )
+       call get_ij_ind_from_latlon( pert_grid_f, this_lat, this_lon, lon_ind, lat_ind )
+
+       lon_ind = lon_ind - (pert_grid_lH%i_offg - pert_grid_f%i_offg)
+       lat_ind = lat_ind - (pert_grid_lH%j_offg - pert_grid_f%j_offg)
        
        j = ind_species2obsparam(Observations(k)%species)
        
@@ -3782,9 +3791,11 @@ contains
     ! NOT YET USED
     ! - reichle, 14 Oct 2014
 
-    real, parameter :: SWE_threshold = +HUGE(1.) ! = 1.e-4           ! [kg/m2]
+    real,    parameter :: SWE_threshold         = +HUGE(1.)   ! [kg/m2]
     
-    real, parameter :: tp1_threshold = -HUGE(1.) ! = 0.2             ! [CELSIUS]
+    real,    parameter :: tp1_threshold         = -HUGE(1.)   ! [CELSIUS]
+
+    integer, parameter :: N_select_varnames_max = 3           ! max # varname search keys hardwired in update_type options below
 
     integer :: n, n_e, kk, ii, jj
     
@@ -3806,11 +3817,11 @@ contains
     
     real, allocatable, dimension(:)       :: State_lon, State_lat
 
+    character(40), dimension(N_select_varnames_max) :: select_varnames            
+    
     integer,       dimension(N_obs_param) :: select_species                                                ! alloc max possible length
     integer,       dimension(N_obs_param) :: select_species_smTb, select_species_Tb, select_species_asnow  ! alloc max possible length
 
-    character(40), dimension(N_obs_param) :: select_varnames ! alloc max possible length
-    
     integer, dimension(:), allocatable    :: select_tilenum
     
     integer, dimension(:,:),   pointer    :: N_tile_in_cell_ij      => null()
@@ -4164,12 +4175,12 @@ contains
               
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
 
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 3
        
        allocate( State_incr(N_state,N_ens) )
@@ -4191,7 +4202,7 @@ contains
                1,                select_tilenum,                      &
                N_select_species, select_species(1:N_select_species),  &
                N_selected_obs,   ind_obs )
-
+          
           if (N_selected_obs > 0) then
              
              ! assemble State_minus
@@ -4214,7 +4225,7 @@ contains
                   fcsterr_inflation_fac=fcsterr_inflation_fac )
              
              ! assemble cat_progn increments
-                          
+             
              cat_progn_incr(n,:)%tc1 = State_incr(1,:)*scale_temp
              cat_progn_incr(n,:)%tc2 = State_incr(2,:)*scale_temp
              cat_progn_incr(n,:)%tc4 = State_incr(3,:)*scale_temp
@@ -4236,12 +4247,12 @@ contains
        
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
 
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 4
        
        allocate( State_incr(N_state,N_ens) )
@@ -4257,7 +4268,7 @@ contains
           ! find observations for catchment n
           
           select_tilenum(1) = l2f(n)
-          
+
           call get_ind_obs(                                           &
                N_obs,            Observations,                        &
                1,                select_tilenum,                      &
@@ -4390,12 +4401,12 @@ contains
 
        N_select_varnames  = 1
        
-       select_varnames(1) = 'tskin'
+       select_varnames(1) = 'tsurf'
        
        call get_select_species(                                           &
             N_select_varnames, select_varnames(1:N_select_varnames),      &
             N_obs_param, obs_param, N_select_species, select_species )
-       
+
        N_state = 4
        
        allocate( State_incr(N_state,N_ens)) 
@@ -4738,7 +4749,7 @@ contains
              ! compute increments
              
              do n_e=1,N_ens
-                
+
                 ! TO DO: RESTRICT ANALYSIS TO SITUATIONS WHERE OBS AND MODEL 
                 !        CONTRADICT EACH OTHER
 
@@ -4746,6 +4757,8 @@ contains
                 !        USE ENS AVG OF ASNOW VS. THRESHOLD???
 
                 ! determine target (landscape-average) temperature increment
+                
+                deltaT = 0.
                 
                 if     (tmp_obs <= FT_ANA_FT_THRESHOLD) then                    
                    
@@ -5030,6 +5043,13 @@ contains
        ! determine species of assimilated obs associated with snow analysis
        
        call get_select_species(1, 'asnow', N_obs_param, obs_param, N_select_species_asnow, select_species_asnow )
+
+       ! initialize SWE increments to NO CHANGE for all tiles, also when no snow cover obs are assimilated;
+       ! swe_incr_ensavg is used below to decide whether a tile gets a soil moisture/Tb update, and
+       ! uninitialized (e.g., NaN) values would silently skip that update
+
+       swe_incr        = 0.   ! total SWE increment
+       swe_incr_ensavg = 0.   ! total SWE ensemble average increment
        
        if (N_select_species_asnow>0) then
           
@@ -5041,9 +5061,6 @@ contains
           if (SCF_ANA_MAXINCRSWE>WEMIN)  call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'must use SCF_ANA_MAXINCRSWE<=WEMIN')
           
           allocate(select_tilenum(1))
-          
-          swe_incr        = 0.   ! total SWE increment; initialize to NO CHANGE
-          swe_incr_ensavg = 0.   ! total SWE ensemble average increment; initialize to NO CHANGE
          
           
        end if
