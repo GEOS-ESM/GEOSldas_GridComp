@@ -6787,6 +6787,482 @@ contains
 
   ! *******************************************************************************************************
 
+  subroutine read_obs_JPSS_SCF(                                   &
+       date_time, dtstep_assim, N_catd, tile_coord,                &
+       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,        &
+       this_obs_param,                                             &
+       found_obs, JPSS_obs, std_JPSS_obs, JPSS_lon, JPSS_lat )
+    
+    ! read JPSS snow cover observations on the 0.05-degree climate
+    ! modeling grid (CMG)
+    !
+    ! JPSS1/NOAA-20:  VJ110C1 (launched 2022)
+    ! JPSS2/NOAA-21:  VJ210C1 (launched 2017)
+    ! S-NPP        :  VNP10C1 (launched 2011, decomissioned 2026)
+    !
+    !
+    ! For now, assume that VIIRS/JPSS resolution is finer than Catchment tile space 
+    ! and super-ob data to tile space, with lat/lon coords of obs matching
+    ! lat/lon coords of tiles 
+    !
+    ! lcandre2, 26 Oct 2026
+    !
+    ! ------------------------------------------------------------------------------
+
+    implicit none
+
+    ! inputs
+
+    type(date_time_type),                    intent(in)   :: date_time
+    
+    integer,                                 intent(in)   :: dtstep_assim           ! [seconds]
+    integer,                                 intent(in)   :: N_catd
+    
+    type(tile_coord_type), dimension(:),     pointer      :: tile_coord             ! input
+    
+    type(grid_def_type),                     intent(in)   :: tile_grid_d
+    
+    integer,               dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: N_tile_in_cell_ij
+    
+    integer,               dimension(:,:,:), pointer      :: tile_num_in_cell_ij    ! input
+    
+    type(obs_param_type),                    intent(in)   :: this_obs_param
+    
+    ! output
+
+    logical,                                  intent(out) :: found_obs
+
+    real,                  dimension(N_catd), intent(out) :: JPSS_obs, std_JPSS_obs, JPSS_lon, JPSS_lat
+
+    ! ------------------------------------------------------------------------
+    
+    ! locals
+
+    integer, parameter    :: dtstep_assim_max = 21600  ! [seconds]  avoid assim window spanning >=180 deg lon
+
+    real,    parameter    :: CMG_dlon         = 0.05   ! [degrees]  longitude spacing    of JPSS CMG grid
+    real,    parameter    :: CMG_dlat         = 0.05   ! [degrees]  latitude  spacing    of JPSS CMG grid
+ 
+    real,    parameter    :: CMG_ll_lon       = -180.  ! [degrees]  lower-left  longitude of JPSS CMG grid
+    real,    parameter    :: CMG_ur_lat       =   90.  ! [degrees]  upper-right latitude  of JPSS CMG grid
+    
+    character(7)          :: JPSS_product_ID
+    
+    character(4)          :: YYYY
+    character(3)          :: DDD                       ! day of year 
+    
+    character(400)        :: fname
+
+    real                  :: overpass_hour, tmp_delta, tmp_real, max_delta_lon
+    
+    integer               :: N_files, N_lon, N_lat, N_tmp, nn, kk, ind 
+    integer               :: N_CMG_obs, N_good_data, tmp_ind_start, tmp_ind_last
+
+    type(date_time_type)  :: date_time_beg,       date_time_end
+    type(date_time_type)  :: date_time_beg_JPSS, date_time_end_JPSS
+    type(date_time_type)  :: date_time_obs_beg
+
+    real                  :: lon_beg,             lon_end
+    real                  :: lon_beg_JPSS,       lon_end_JPSS
+    
+    integer               :: delta_day_beg,       delta_day_end
+    integer               :: delta_day_beg_JPSS, delta_day_end_JPSS
+
+    real                  :: lat_min,             lat_max
+
+    real,    dimension(2) :: lon_min_vec,         lon_max_vec
+
+    integer, dimension(2) :: N_lon_vec, year_vec, dofyr_vec, start_ind, last_ind
+
+    real,    dimension(:),     allocatable :: CMG_obs, CMG_lon, CMG_lat
+
+    integer, dimension(:),     allocatable :: tmp_tile_num
+
+    integer, dimension(N_catd)             :: N_obs_in_tile
+
+    character(len=*),          parameter   :: Iam = 'read_obs_JPSS_SCF'
+    character(len=400)                     :: err_msg
+
+    ! ------------------------------------------------------------------------------------
+    !
+    ! initialize
+    
+    found_obs        = .false.
+    
+    ! determine operating time range of sensor
+
+    if     (trim(this_obs_param%descr) == 'VJ110C1') then
+       date_time_obs_beg = date_time_type(2018, 1, 5, 0, 0, 0, -9999, -9999)    ! JPSS1
+    elseif (trim(this_obs_param%descr) == 'VJ210C1') then
+       date_time_obs_beg = date_time_type(2023, 2, 10, 0, 0, 0, -9999, -9999)    ! JPSS2
+    elseif (trim(this_obs_param%descr) == 'VNP10C1') then
+       date_time_obs_beg = date_time_type(2012, 1, 19, 0, 0, 0, -9999, -9999)
+    else
+       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    end if
+
+    ! return if date_time falls outside operating time range
+
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
+
+    ! ----------------------------------------------------------------------------------
+    !
+    ! restrict assimilation time step to max allowed 
+
+    if (dtstep_assim > dtstep_assim_max) then                 
+       
+       err_msg = 'dtstep_assim exceeds max allowed'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       
+    end if 
+
+    ! identify JPSS  product and overpass hour https://vlab.noaa.gov/web/towr-s/satellite-operations-updates 
+
+    MODIS_product_ID = this_obs_param%name(1:7)
+    
+    select case (MODIS_product_ID)
+       
+    case('VJ110C1'); overpass_hour = 13.5               ! [hours]    JPSS1: 13:30 local time
+       
+    case('VJ210C1'); overpass_hour = 13.5               ! [hours]    JPSS2:  13:30 local time
+
+    case('VNP10C1'); overpass_hour = 13.5               ! [hours]    S-NPP: 13:30 local time
+       
+    end select
+    
+    
+    ! determine beginning and end of assimilation window
+    
+    date_time_beg = date_time
+    date_time_end = date_time
+    
+    call augment_date_time( -dtstep_assim/2, date_time_beg )
+    call augment_date_time(  dtstep_assim/2, date_time_end )
+    
+    
+    ! determine longitude band associated with assimilation window and local overpass hour
+    !
+    ! observations will be returned only for tiles with lon_end < tile_coord%com_lon <= lon_beg
+    
+    call localtime2longitude( date_time_beg, overpass_hour, lon_beg, delta_day_beg )
+    call localtime2longitude( date_time_end, overpass_hour, lon_end, delta_day_end )
+    
+    
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! lca: do we want to narrow this band just slightly to remove the striping that occurs in the assimilation currently??? !!!!!!!!!!
+    ! determine (rough) longitude band for which MODIS obs need to be read    
+    !
+    ! --> because tiles have a non-zero extent, need to read JPSS obs in CMG grid cells located 
+    !     in a wider band (lon_min-delta:lon_max+delta),
+    !     where delta should be somewhat larger than max( tile_coord%max_lon - tile_coord%min_lon )
+    
+    tmp_delta = 3.*maxval( tile_coord(1:N_catd)%max_lon - tile_coord(1:N_catd)%min_lon )   ! [degrees]
+    
+    tmp_delta = tmp_delta/360.*86400.                                                      ! [seconds]
+    
+    date_time_beg_JPSS = date_time_beg
+    date_time_end_JPSS = date_time_end
+
+    call augment_date_time( -nint(tmp_delta), date_time_beg_JPSS )
+    call augment_date_time(  nint(tmp_delta), date_time_end_JPSS )
+   
+    call localtime2longitude( date_time_beg_JPSS, overpass_hour, lon_beg_JPSS, delta_day_beg_JPSS )
+    call localtime2longitude( date_time_end_JPSS, overpass_hour, lon_end_JPSS, delta_day_end_JPSS )
+    
+    ! adjust date_time_*_JPSS to reflect calendar date at lon_*_JPSS
+    
+    call augment_date_time( delta_day_beg_JPSS*86400, date_time_beg_JPSS )
+    call augment_date_time( delta_day_end_JPSS*86400, date_time_end_JPSS )
+        
+    ! put together arguments for call(s) to read_JPSS_SCF_hdf()
+    
+    lon_min_vec = MAPL_UNDEF
+    lon_max_vec = MAPL_UNDEF
+
+    year_vec    = -9999
+    dofyr_vec   = -9999
+
+    N_lon_vec   = 0
+
+    if (lon_end_JPSS < lon_beg_JPSS) then
+       
+       if ( date_time_end_JPSS%dofyr == date_time_beg_JPSS%dofyr ) then
+          
+          ! need only one daily MODIS file and longitude band 
+          
+          N_files = 1                             
+          
+          lon_min_vec(1) = lon_end_JPSS 
+          lon_max_vec(1) = lon_beg_JPSS
+          
+          year_vec(   1) = date_time_beg_JPSS%year
+          dofyr_vec(  1) = date_time_beg_JPSS%dofyr
+          
+       else
+          
+          ! this should never happen for dtstep_assim_max=21600 and overpass_hour of  13:30
+          
+          write (logunit,*) 'overpass_hour       = ', overpass_hour
+          write (logunit,*) 'date_time           = ', date_time
+          write (logunit,*) 'date_time_beg       = ', date_time_beg
+          write (logunit,*) 'date_time_end       = ', date_time_end
+          write (logunit,*) 'date_time_beg_MODIS = ', date_time_beg_JPSS
+          write (logunit,*) 'date_time_end_MODIS = ', date_time_end_JPSS
+          write (logunit,*) 'lon_beg             = ', lon_beg
+          write (logunit,*) 'lon_end             = ', lon_end
+          write (logunit,*) 'lon_beg_MODIS       = ', lon_beg_JPSS
+          write (logunit,*) 'lon_end_MODIS       = ', lon_end_JPSS
+          
+          err_msg = 'encountered unexpected condition for longitude band!!!'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          
+       end if
+          
+    else
+       
+       ! longitude band wraps around dateline, two daily MODIS files are needed 
+       !   (this could also occur if lon_*_MODIS=180., which would result in an
+       !    empty first longitude band, but because of tmp_delta>0, this should
+       !    never happen)
+       
+       N_files = 2
+       
+       lon_min_vec(1) = lon_end_JPSS 
+       lon_max_vec(1) = 179.999         ! use 179.999 such that zero-based last_ind<=N_lon-1 (see below)
+       
+       year_vec(   1) = date_time_end_JPSS%year
+       dofyr_vec(  1) = date_time_end_JPSS%dofyr
+       
+       lon_min_vec(2) = -180.                                
+       lon_max_vec(2) = lon_beg_JPSS
+       
+       year_vec(   2) = date_time_beg_JPSS%year
+       dofyr_vec(  2) = date_time_beg_JPSS%dofyr
+       
+    end if
+    
+    ! verify that longitude bands do not exceed max expected expected width 
+    !  (add 0.1 degree of wiggle room)
+    !!!!!!!!!! is this wiggle room the problem with the additional striping????!!!!!!
+    max_delta_lon = real(dtstep_assim_max + 2*nint(tmp_delta))/86400.*360. + 0.1   ! [degree]
+    
+    do nn=1,N_files
+       
+       if ( lon_max_vec(nn) - lon_min_vec(nn) > max_delta_lon ) then
+          
+          err_msg = 'longitude band too wide'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          
+       end if
+
+    end do
+
+
+    ! determine latitude band covered by domain (no need to read obs outside domain)
+
+    lat_min = minval( tile_coord(1:N_catd)%min_lat )
+    lat_max = maxval( tile_coord(1:N_catd)%max_lat )
+
+    
+    ! determine N_lat and N_lon[_vec] (# CMG grid cells in lat/lon bands )
+
+    start_ind(1) = (CMG_ur_lat - lat_max )/CMG_dlat
+    last_ind(1)  = (CMG_ur_lat - lat_min )/CMG_dlat
+        
+    N_lat        = last_ind(1) - start_ind(1) + 1
+    
+    start_ind(1:N_files) = (lon_min_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
+    last_ind( 1:N_files) = (lon_max_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
+    
+    N_lon_vec(1:N_files) = last_ind(1:N_files) - start_ind(1:N_files) + 1  
+    
+    N_lon        = sum( N_lon_vec(1:N_files) )
+    
+
+    
+    ! ! dbg ! ! write (*,*)  '###############################################################################'
+    ! ! dbg ! ! write (*,*)  Iam // '():'
+    ! ! dbg ! ! write (*,*)  'lon_min_vec = ', lon_min_vec
+    ! ! dbg ! ! write (*,*)  'lon_max_vec = ', lon_max_vec
+    ! ! dbg ! ! write (*,*)  'start_ind   = ', start_ind
+    ! ! dbg ! ! write (*,*)  'last_ind    = ', last_ind
+    ! ! dbg ! ! write (*,*)  'lat_min     = ', lat_min
+    ! ! dbg ! ! write (*,*)  'lat_max     = ', lat_max
+    ! ! dbg ! ! write (*,*)  'year_vec    = ', year_vec
+    ! ! dbg ! ! write (*,*)  'dofyr_vec   = ', dofyr_vec
+    ! ! dbg ! ! write (*,*)  'N_lon_vec   = ', N_lon_vec
+    ! ! dbg ! ! write (*,*)  'N_lat       = ', N_lat
+    ! ! dbg ! ! write (*,*)  '###############################################################################'    
+
+
+
+    ! allocate arrays for MODIS CMG data (max size that could possibly be needed for obs from both files)
+    
+    N_tmp = N_lon*N_lat
+
+    allocate( CMG_obs(N_tmp) )
+    allocate( CMG_lon(N_tmp) )
+    allocate( CMG_lat(N_tmp) )
+    
+    
+    ! read MODIS SCF obs    
+    !
+    !   - (renamed) files currently located at /discover/nobackup/projects/S2SHMA/MODIS/MOD10C1_V61/ (2010-2022)
+    !
+    !   - in ensupd nml file, specify the file "name" according to the following template:
+    !   
+    !       %name = 'VJ210C1.Ayyyyddd.002.'
+    !   full name = 'VJ210C1.AYYYYDDD.002.YYYYDDDhhmmss.h5              
+    !
+    !              
+    !       MOD10C1       = JPSS product name
+    !       .A            = "acquisition time" indicator
+    !       YYYYDDD       = placeholder for year/day-of-year 
+    !       .002          = version indicator
+    !       YYYYDDDhhmmss = production year, day and time 
+    !       .h5           = file name extension 
+    !
+    
+    N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_MODIS_SCF_hdf()
+    
+    do nn=1,N_files     ! loop through longitude bands
+       
+       ! determine MODIS file name(s)
+       
+       write (YYYY,'(i4.4)') year_vec( nn)
+       write (DDD, '(i3.3)') dofyr_vec(nn)
+       
+       fname =                                                                          &                                           
+            trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
+            this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:21)//'*'//'.h5'
+       
+       ! determine sub-array of CMG_* 
+       
+       tmp_ind_start = N_CMG_obs + 1
+       tmp_ind_last  = N_CMG_obs + N_lon_vec(nn)*N_lat
+       
+       call read_JPSS_SCF_hdf( fname,                                                  &
+            lon_min_vec(nn), lon_max_vec(nn), lat_min, lat_max,                         &
+            N_good_data,                                                                &
+            CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
+            CMG_lat(tmp_ind_start:tmp_ind_last),                                        &
+            CMG_obs(tmp_ind_start:tmp_ind_last)                          )
+
+       N_CMG_obs = N_CMG_obs + N_good_data
+       
+    end do
+    
+
+    ! return if no JPSS obs were found (found_obs=.false. per initialization above)    
+
+    if (N_CMG_obs==0)  return
+
+
+    ! map to tile space 
+    
+    allocate(tmp_tile_num(N_CMG_obs))
+    
+    call get_tile_num_for_obs( N_catd, tile_coord,                 &
+         tile_grid_d, N_tile_in_cell_ij,                           &
+         tile_num_in_cell_ij,                                      &
+         N_CMG_obs, CMG_lat(1:N_CMG_obs), CMG_lon(1:N_CMG_obs),    &
+         this_obs_param,                                           &
+         tmp_tile_num    )
+    
+    
+    std_JPSS_obs = this_obs_param%errstd
+    
+    JPSS_obs     = 0.
+    JPSS_lon     = 0.
+    JPSS_lat     = 0.
+
+    N_obs_in_tile = 0
+    
+    do kk=1,N_CMG_obs
+       
+       ind = tmp_tile_num(kk)          ! 1<=tmp_tile_num<=N_catd (unless nodata)
+       
+       if (ind>0) then                 ! this condition eliminates obs outside domain
+          
+          JPSS_obs(    ind) = JPSS_obs(    ind) + CMG_obs(kk)
+          JPSS_lon(    ind) = JPSS_lon(    ind) + CMG_lon(kk)
+          JPSS_lat(    ind) = JPSS_lat(    ind) + CMG_lat(kk)
+
+          N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
+          
+       end if
+       
+    end do
+    
+    ! normalize
+    
+    do kk=1,N_catd
+       if (N_obs_in_tile(kk)>0) then
+          
+          tmp_real      = real(N_obs_in_tile(kk))
+
+          JPSS_obs(kk) = JPSS_obs(kk)/tmp_real
+          JPSS_lon(kk) = JPSS_lon(kk)/tmp_real
+          JPSS_lat(kk) = JPSS_lat(kk)/tmp_real
+          
+       else if (N_obs_in_tile(kk)==0) then
+          
+          JPSS_obs(kk) = this_obs_param%nodata
+          JPSS_lon(kk) = this_obs_param%nodata
+          JPSS_lat(kk) = this_obs_param%nodata
+          
+       end if
+    end do
+    
+    if (any(N_obs_in_tile>0)) then
+       
+       found_obs = .true.
+       
+    else 
+       
+       found_obs = .false.
+       
+    end if
+    
+    deallocate(tmp_tile_num)
+  
+    deallocate(CMG_obs)    
+    deallocate(CMG_lon)
+    deallocate(CMG_lat)
+
+    ! to avoid double-counting of JPSS CMG obs, remove obs for tiles with center-of-mass longitude 
+    !   falling outside the longitude band associated with assimilation window
+    
+    if (lon_end < lon_beg) then
+       
+       ! need only one longitude band (keep obs when lon_end<=com_lon<=lon_beg)
+       
+       do kk=1,N_catd
+          
+          if ( (tile_coord(kk)%com_lon<lon_end) .or. (tile_coord(kk)%com_lon>lon_beg) )  &
+               JPSS_obs(kk) = this_obs_param%nodata
+          
+       end do
+       
+    else
+       
+       ! longitude band wraps around dateline (keep obs when -180<=com_lon<=lon_beg or lon_end<=com_lon<=180)
+       
+       do kk=1,N_catd
+          
+          if ( (tile_coord(kk)%com_lon>lon_beg) .and. (tile_coord(kk)%com_lon<lon_end) )  &
+               JPSS_obs(kk) = this_obs_param%nodata
+          
+       end do
+       
+    end if
+    
+
+  end subroutine read_obs_JPSS_SCF
+
+  ! *******************************************************************************************************
+
   subroutine localtime2longitude( date_time, local_hour, longitude, delta_day )
 
     ! for date_time in UTC, find the longitude where the local time is local_hour;
@@ -7236,9 +7712,391 @@ contains
     deallocate(Snow_Spatial_QA)
 
   end subroutine read_MODIS_SCF_hdf
-
-  ! *****************************************************************
  
+! *****************************************************************
+  
+  subroutine read_JPSS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
+       N_good_data, CMG_lon, CMG_lat, CMG_SCF )
+    
+    ! read snow cover area fraction (SCF) obs from daily VIIRS JPSS 1/2 and S-NPP, version 2 
+    !   - 
+    !   - 
+    !   - daily data with spatial resolution of 0.05 deg on MODIS climate modeling grid (CMG)
+    !   - Terra: missing days 2016 d. 50-58
+    !   - data are read for the requested lat/lon range 
+    !   - apply QC
+    !
+    ! reichle, 20 Oct 2023    
+    !
+    ! -------------------------------------------------------------------------------------------------
+    
+    implicit none
+    
+    character(*),          intent(in)  :: fname                             ! MODIS file name with full path
+    
+    real,                  intent(in)  :: lon_min, lon_max                  ! -180 <= lon_* <= 180
+    real,                  intent(in)  :: lat_min, lat_max                  !  -90 <= lat_* <=  90
+    
+    integer,               intent(out) :: N_good_data
+    
+    real,    dimension(:), intent(out) :: CMG_lon, CMG_lat, CMG_SCF         ! NOTE: 1-dim array on CMG grid
+    
+    ! -------------------------------------------------
+
+    ! local parameters
+    
+    ! ll/ur_lon/lat simply indicate the extent of the MODIS CMG grid
+    !
+    ! index increases from (-180,90) to (180,-90)  (southward and eastward)
+    
+    integer, parameter :: CMG_N_lon  = 7200
+    integer, parameter :: CMG_N_lat  = 3600
+    
+    real,    parameter :: CMG_ll_lon = -180.    
+    real,    parameter :: CMG_ll_lat =  -90.
+    
+    real,    parameter :: CMG_ur_lon =  180.
+    real,    parameter :: CMG_ur_lat =   90.
+    
+    real,    parameter :: CMG_dlon   = 0.05
+    real,    parameter :: CMG_dlat   = 0.05
+
+    integer,                            parameter :: N_fields    = 3 
+
+    character(22), dimension(N_fields), parameter :: field_names = (/       &
+         'Day_CMG_Snow_Cover    ',                                          &   ! 1
+         'Day_CMG_Clear_Index   ',                                          &   ! 2
+         'Snow_Spatial_QA       '/)                                             ! 3
+
+    !     1234567890123456789012
+    !              1         2
+
+    integer,         parameter :: SCF_nodata          = -9999. 
+    
+    integer(int16),  parameter :: qc_snow_cover_max   = 100    ! exclude lake ice, night, inland water, ocean, etc
+    integer(int16),  parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
+    integer(int16),  parameter :: qc_snow_spatial_max =   2    ! data quality (0=best, 1=good, 2=OK, 3=poor, 4=other)
+    
+    integer,         parameter :: DFACC_READ          =   1    ! from hdf.inc
+    
+    integer,         parameter :: uint8_min           =   0    
+    integer,         parameter :: uint8_max           = 255
+
+
+    ! local variables
+    
+    integer                                         :: N_lon, N_lat, N_tmp, ii, jj, kk, nn
+
+    real,               dimension(:),   allocatable :: lon_c
+    real,               dimension(:),   allocatable :: lat_c
+
+    real,               dimension(:),   allocatable :: lon_ind
+    real,               dimension(:),   allocatable :: lat_ind
+
+    integer,            dimension(2)                :: start, edge, stride, last, dimsizes
+    
+    logical                                         :: file_exists, keep_data
+    
+    integer                                         :: status, sd_id, sds_id, sds_index
+    
+    character(64)                                   :: sds_name
+
+    integer                                         :: rank, data_type, num_attrs
+
+    integer(int16),     dimension(:,:), allocatable :: Snow_Cover
+    integer(int16),     dimension(:,:), allocatable :: Clear_Index
+    integer(int16),     dimension(:,:), allocatable :: Snow_Spatial_QA
+    
+    character(kind=c_char, len=1), dimension(:,:), allocatable :: tmp_char1
+
+    character(len=*),                     parameter :: Iam = 'read_MODIS_SCF_hdf'
+    character(len=400)                              :: err_msg
+    
+    ! -------------------------------------------------------------------------
+    !
+    ! make sure file exists
+    
+    inquire( file=trim(fname), exist=file_exists )
+    
+    if (.not. file_exists ) then
+       
+       if (logit) then
+          write (logunit,'(400A)') trim(Iam), ': cannot find file  ', trim(fname)
+          write (logunit,*       ) 'not reading MODIS SCF obs'
+       end if
+
+       N_good_data = 0
+
+       return
+       
+    end if
+    
+    ! ensure lon_* and lat_* inputs are within range
+    
+    if ( (lon_min < CMG_ll_lon) .or.           &
+         (lon_max > CMG_ur_lon) .or.           & 
+         (lat_min < CMG_ll_lat) .or.           &
+         (lat_max > CMG_ur_lat)       ) then
+
+       err_msg = 'lat/lon min/max inputs out of range'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+              
+    end if
+    
+    ! determine MODIS CMG array indices for requested lat/lon_min/max range
+    
+    ! MODIS CMG hdf files: 
+    !  - lon-by-lat (NOTE: The metadata "s.Vgroup(1).Vgroup(1).SDS(1).Dims.Size" returned
+    !                      by Matlab's hdfinfo() confusingly suggests that CMG files are 
+    !                      lat-by-lon, which is not the case!)
+    !  - index values increase eastward and southward
+
+    start(1)  = (lon_min    - CMG_ll_lon)/CMG_dlon      ! 0-based [as required for hdf read]
+    start(2)  = (CMG_ur_lat - lat_max   )/CMG_dlat      ! 0-based [as required for hdf read]
+    
+    last(1)   = (lon_max    - CMG_ll_lon)/CMG_dlon      ! 0-based [as required for hdf read]
+    last(2)   = (CMG_ur_lat - lat_min   )/CMG_dlat      ! 0-based [as required for hdf read]
+    
+    N_lon     = last(1) - start(1) + 1
+    N_lat     = last(2) - start(2) + 1 
+    
+    edge(1)   = N_lon
+    edge(2)   = N_lat
+    
+    stride(1) = 1
+    stride(2) = 1
+    
+
+
+    ! ! dbg ! ! write (*,*)  '###############################################################################'
+    ! ! dbg ! ! write (*,*)  Iam // '():'
+    ! ! dbg ! ! write (*,*)  'size(CMG_SCF), N_lon, N_lat   = ', size(CMG_SCF), N_lon, N_lat
+    ! ! dbg ! ! write (*,*)  'lon_min, lon_max              = ', lon_min, lon_max
+    ! ! dbg ! ! write (*,*)  'lat_min, lat_max              = ', lat_min, lat_max       
+    ! ! dbg ! ! write (*,*)  'start [lon, lat]              = ', start
+    ! ! dbg ! ! write (*,*)  'last  [lon, lat]              = ', last
+    ! ! dbg ! ! write (*,*)  'edge  [lon, lat]              = ', edge
+    ! ! dbg ! ! write (*,*)  '###############################################################################'    
+    
+
+
+    ! checks array dimensions
+    
+    N_tmp = N_lon*N_lat
+           
+    if ( (N_tmp /= size(CMG_lon)) .or.            &
+         (N_tmp /= size(CMG_lat)) .or.            &
+         (N_tmp /= size(CMG_SCF))      ) then
+       
+       err_msg = 'inconsistent array dimensions'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       
+    end if
+    
+    ! check array bounds
+    
+    if ( ( start(1) < 0       ) .or. ( start(1) > CMG_N_lon - 1 ) .or.         &
+         ( start(2) < 0       ) .or. ( start(2) > CMG_N_lat - 1 ) .or.         &
+         ( last( 1) < 0       ) .or. ( last( 1) > CMG_N_lon - 1 ) .or.         &
+         ( last( 2) < 0       ) .or. ( last( 2) > CMG_N_lat - 1 ) .or.         &
+         ( start(1) > last(1) ) .or. ( start(2) > last(2)       )              & 
+         ) then  
+       
+       err_msg = 'start/edge indices out of bounds'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+              
+    end if
+
+    if (logit) then
+       write (logunit,'(400A)') trim(Iam), '(): reading MODIS SCF obs from  ', trim(fname)
+       write (logunit,*       ) '  N_lon, N_lat, lon_min, lon_max, lat_min, lat_max = '
+       write (logunit,*       ) N_lon, N_lat, lon_min, lon_max, lat_min, lat_max       
+    end if
+    
+
+    ! allocate arrays
+
+    allocate(lon_c(  N_lon))
+    allocate(lat_c(  N_lat))
+    
+    allocate(lon_ind(N_lon))
+    allocate(lat_ind(N_lat))
+
+    allocate(Snow_Cover     (N_lon,N_lat))
+    allocate(Clear_Index    (N_lon,N_lat))
+    allocate(Snow_Spatial_QA(N_lon,N_lat))
+
+    allocate(tmp_char1(      N_lon,N_lat))
+
+    ! --------------------------
+    
+    ! determine center lat/lon of CMG cells 
+
+    lon_ind = (/(ii, ii=0, N_lon-1, 1)/)               ! =0:(N_lon-1)
+    lat_ind = (/(jj, jj=0, N_lat-1, 1)/)               ! =0:(N_lat-1)
+
+    ! lat_c, lon_c are lat/lon at center of CMG grid cell 
+    
+    lon_c     = CMG_ll_lon + 0.5*CMG_dlon + (start(1)+lon_ind)*CMG_dlon
+    lat_c     = CMG_ur_lat - 0.5*CMG_dlat - (start(2)+lat_ind)*CMG_dlat
+        
+    ! --------------------------
+    
+    ! open hdf file (read-only) and initialize SD interface 
+    
+    sd_id = sfstart(trim(fname), DFACC_READ)
+
+    if (sd_id<0) then
+              
+       err_msg = 'cannot sfstart (open) file: ' // trim(fname)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       
+    end if
+    
+    ! read data
+
+    do nn=1,N_fields
+       
+       sds_index = sfn2index( sd_id, trim(field_names(nn)) )
+       sds_id    = sfselect(  sd_id, sds_index             )
+
+
+       status    = sfginfo( sds_id, sds_name, rank, dimsizes, data_type, num_attrs )
+       
+       if ( (dimsizes(1)/=CMG_N_lon) .or. (dimsizes(2)/=CMG_N_lat) ) then 
+
+          err_msg = 'dimensions in hdf file doe not match CMG_N_lon and/or CMG_N_lat'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+          
+       end if
+       
+
+       ! #########################################################
+       ! ! dbg ! ! write (*,*)  'sds_name                   = ', trim(sds_name)
+       ! ! dbg ! ! write (*,*)  'rank, data_type, num_attrs = ', rank, data_type, num_attrs
+       ! ! dbg ! ! write (*,*)  'dimsizes                   = ', dimsizes
+       ! #########################################################
+
+          
+       select case (nn)
+          
+       case (1); status = sfrdata( sds_id, start, stride, edge, tmp_char1 ); Snow_Cover      = ichar(tmp_char1,2)
+       case (2); status = sfrdata( sds_id, start, stride, edge, tmp_char1 ); Clear_Index     = ichar(tmp_char1,2)
+       case (3); status = sfrdata( sds_id, start, stride, edge, tmp_char1 ); Snow_Spatial_QA = ichar(tmp_char1,2)
+          
+       case default; call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown field')
+             
+       end select
+       
+       if (status/=0) then
+          
+          err_msg = 'error reading data from hdf file: ' // trim(fname)
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+   
+       end if
+
+       status   = sfendacc(sds_id)                   ! terminate access to SDS (field)
+          
+    end do
+    
+    status = sfend(sd_id)                            ! close hdf file and SD interface
+
+
+    ! #################################################################################
+    ! ! dbg ! ! write (*,*)  'Snow_Cover(1:10,1:5)='
+    ! ! dbg ! ! write (*,*)  Snow_Cover(1:10,1:5)
+    ! ! dbg ! ! write (*,*)  'Clear_Index(1:10,1:5)='
+    ! ! dbg ! ! write (*,*)  Clear_Index(1:10,1:5)
+    ! ! dbg ! ! write (*,*)  'Snow_Spatial_QA(1:10,1:5)='
+    ! ! dbg ! ! write (*,*)  Snow_Spatial_QA(1:10,1:5)
+    
+    ! ! dbg ! ! !if ( (lon_min>-138) .and. (lon_min<-134) ) then
+    ! ! dbg ! ! if (.false.) then
+    ! ! dbg ! !    do jj=1,N_lat     
+    ! ! dbg ! !       write(997) Snow_Cover(     jj,:)
+    ! ! dbg ! !       write(998) Clear_Index(    jj,:)
+    ! ! dbg ! !       write(999) Snow_Spatial_QA(jj,:)
+    ! ! dbg ! !    end do
+    ! ! dbg ! !    write (*,*) 'stopping after file dump '
+    ! ! dbg ! !    stop
+    ! ! dbg ! ! end if
+    ! #################################################################################
+
+
+
+    ! check range (make sure uint8 from hdf file is correctly translated into Fortran integer)
+
+    if ( any(Snow_Cover      < uint8_min) .or.          &
+         any(Snow_Cover      > uint8_max) .or.          &
+         any(Clear_Index     < uint8_min) .or.          &
+         any(Clear_Index     > uint8_max) .or.          &
+         any(Snow_Spatial_QA < uint8_min) .or.          &
+         any(Snow_Spatial_QA > uint8_max)       ) then
+       
+       err_msg = 'unexpected range in data from hdf file'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       
+    end if
+    
+    ! -------------------------------------
+    !
+    ! apply QC and put SCF obs into output array
+    
+    CMG_lon = SCF_nodata                             ! initialize
+    CMG_lat = SCF_nodata                             ! initialize
+    CMG_SCF = SCF_nodata                             ! initialize
+
+    kk      = 0                                      ! initialize counter for "good" data
+
+    do ii=1,N_lon
+       do jj=1,N_lat
+          
+          ! note: Snow_Cover >= 0 per range check above, no need to check for minimum 
+          
+          keep_data =                                                  &  
+               (Snow_Cover(     ii,jj) <= qc_snow_cover_max  )  .and.  &  ! 0<=SCF<=100 (1) 
+               (Clear_Index(    ii,jj) >  qc_clear_index_min )  .and.  &  ! sufficiently clear sky (2)
+               (Snow_Spatial_QA(ii,jj) <= qc_snow_spatial_max)            ! keep "best", "good", or "OK" quality (3)
+          
+          ! (1)  excludes "lake ice", "night", "inland water", "ocean", "cloud obscured water", "data not mapped", "fill"
+          ! (2)  clear_index>100 already removed via qc_snow_cover_max
+          ! (3)  excludes Antarctica
+          
+          if (keep_data) then
+
+             kk = kk + 1
+             
+             ! raw SCF value is for clear portion of grid cell only, need to normalize with Clear_Index
+             
+             CMG_SCF(kk) = real(Snow_Cover(ii,jj))/real(Clear_Index(ii,jj)) 
+             
+             CMG_lon(kk) = lon_c(ii)
+             CMG_lat(kk) = lat_c(jj)
+             
+          end if
+          
+       end do
+    end do
+    
+    N_good_data = kk
+    
+    if (logit)  write (logunit,*) 'N_good_data = ', N_good_data
+        
+    deallocate(lat_c)
+    deallocate(lon_c)
+    
+    deallocate(lat_ind)
+    deallocate(lon_ind)
+
+    deallocate(Snow_Cover     )
+    deallocate(Clear_Index    )
+    deallocate(Snow_Spatial_QA)
+
+  end subroutine read_JPSS_SCF_hdf
+
+  
+  ! *****************************************************************
+  ! lca currently working on!!
   subroutine read_obs_SMAP_FT( date_time, N_catd, this_obs_param,            &
        dtstep_assim, tile_coord, tile_grid_d,                                &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &

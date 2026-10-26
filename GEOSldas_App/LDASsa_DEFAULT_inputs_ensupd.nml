@@ -2699,7 +2699,136 @@ obs_param_nml(58)%ycorr          = 0.2
 obs_param_nml(58)%adapt          = 0
 
 ! --------------------------------------------------------------------
+! --------------------------------------------------------------------
+!
+!  59 = VIIRS/JPSS1 snow cover area fraction (SCF)
+!
+! VJ110C1.*.002.*h5: VIIRS/JPSS1 Snow Cover Daily L3 Global  0.05deg CMG, daytime (13:30 local) ascending overpass, version 2
+!
+! for rule-based snow cover analysis (no obs error/pert specs)
 
+obs_param_nml(59)%descr          = 'VJ110C1'
+obs_param_nml(59)%orbit          = 1
+obs_param_nml(59)%pol            = 0
+obs_param_nml(59)%N_ang          = 0
+obs_param_nml(59)%freq           = 0.
+obs_param_nml(59)%FOV            = 0.
+obs_param_nml(59)%FOV_units      = 'deg'
+obs_param_nml(59)%assim          = .false.
+obs_param_nml(59)%scale          = .false.
+obs_param_nml(59)%getinnov       = .false.
+obs_param_nml(59)%RTM_ID         = 0
+obs_param_nml(59)%bias_Npar      = 0
+obs_param_nml(59)%bias_trel      = 864000
+obs_param_nml(59)%bias_tcut      = 432000
+obs_param_nml(59)%nodata         = -9999.
+obs_param_nml(59)%varname        = 'asnow'
+obs_param_nml(59)%units          = 'm2 m-2'
+obs_param_nml(59)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(59)%fcstunits      = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(59)%path           = '/discover/nobackup/projects/gmao/polarm/VJ110C1/'
+obs_param_nml(59)%name           = 'VJ110C1.AYYYYDDD.002.'
+obs_param_nml(59)%maskpath       = ''
+obs_param_nml(59)%maskname       = ''
+obs_param_nml(59)%scalepath      = ''
+obs_param_nml(59)%scalename      = ''
+obs_param_nml(59)%flistpath      = ''
+obs_param_nml(59)%flistname      = ''
+obs_param_nml(59)%errstd         = -9999.
+obs_param_nml(59)%std_normal_max = -9999.
+obs_param_nml(59)%zeromean       = .false.
+obs_param_nml(59)%coarsen_pert   = .false.
+obs_param_nml(59)%xcorr          = 0.
+obs_param_nml(59)%ycorr          = 0.
+obs_param_nml(59)%adapt          = 0
+
+! --------------------------------------------------------------------
+!
+!  60 = VIIRS/JPSS2 snow cover area fraction (SCF)
+!
+! VJ210C1.*.002.*h5: VIIRS/JPSS2 Snow Cover Daily L3 Global  0.05deg CMG, daytime (13:30 local) ascending overpass, version 2
+! for rule-based snow cover analysis (no obs error/pert specs)
+
+
+obs_param_nml(60)%descr          = 'VJ210C1'
+obs_param_nml(60)%orbit          = 1
+obs_param_nml(60)%pol            = 0
+obs_param_nml(60)%N_ang          = 0
+obs_param_nml(60)%freq           = 0.
+obs_param_nml(60)%FOV            = 0.
+obs_param_nml(60)%FOV_units      = 'deg'
+obs_param_nml(60)%assim          = .false.
+obs_param_nml(60)%scale          = .false.
+obs_param_nml(60)%getinnov       = .false.
+obs_param_nml(60)%RTM_ID         = 0
+obs_param_nml(60)%bias_Npar      = 0
+obs_param_nml(60)%bias_trel      = 864000
+obs_param_nml(60)%bias_tcut      = 432000
+obs_param_nml(60)%nodata         = -9999.
+obs_param_nml(60)%varname        = 'asnow'
+obs_param_nml(60)%units          = 'm2 m-2'
+obs_param_nml(60)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(60)%fcstunits      = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(60)%path           = '/discover/nobackup/projects/gmao/polarm/VJ210C1/'
+obs_param_nml(60)%name           = 'VJ210C1.AYYYYDDD.002.'
+obs_param_nml(60)%maskpath       = ''
+obs_param_nml(60)%maskname       = ''
+obs_param_nml(60)%scalepath      = ''
+obs_param_nml(60)%scalename      = ''
+obs_param_nml(60)%flistpath      = ''
+obs_param_nml(60)%flistname      = ''
+obs_param_nml(60)%errstd         = -9999.
+obs_param_nml(60)%std_normal_max = -9999.
+obs_param_nml(60)%zeromean       = .false.
+obs_param_nml(60)%coarsen_pert   = .false.
+obs_param_nml(60)%xcorr          = 0.
+obs_param_nml(60)%ycorr          = 0.
+obs_param_nml(60)%adapt          = 0
+
+! --------------------------------------------------------------------
+!
+!  61 = VIIRS/S-NPP snow cover area fraction (SCF)
+!
+! VNP10C1.*.002.*h5: VIIRS/S-NPP SCF, 0.05deg CMG, daytime (13:30 local) ascending overpass, version 2
+!
+! for rule-based snow cover analysis (no obs error/pert specs)
+
+obs_param_nml(61)%descr          = 'VNP10C1'
+obs_param_nml(61)%orbit          = 1
+obs_param_nml(61)%pol            = 0
+obs_param_nml(61)%N_ang          = 0
+obs_param_nml(61)%freq           = 0.
+obs_param_nml(61)%FOV            = 0.
+obs_param_nml(61)%FOV_units      = 'deg'
+obs_param_nml(61)%assim          = .false.
+obs_param_nml(61)%scale          = .false.
+obs_param_nml(61)%getinnov       = .false.
+obs_param_nml(61)%RTM_ID         = 0
+obs_param_nml(61)%bias_Npar      = 0
+obs_param_nml(61)%bias_trel      = 864000
+obs_param_nml(61)%bias_tcut      = 432000
+obs_param_nml(61)%nodata         = -9999.
+obs_param_nml(61)%varname        = 'asnow'
+obs_param_nml(61)%units          = 'm2 m-2'
+obs_param_nml(61)%fcstvarname    = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(61)%fcstunits      = 'NULL'                                                                                            ! do not edit!
+obs_param_nml(61)%path           = '/discover/nobackup/projects/gmao/polam/JPSS/VNP10C1/'
+obs_param_nml(61)%name           = 'VNP10C1.AYYYYDDD.002.'
+obs_param_nml(61)%maskpath       = ''
+obs_param_nml(61)%maskname       = ''
+obs_param_nml(61)%scalepath      = ''
+obs_param_nml(61)%scalename      = ''
+obs_param_nml(61)%flistpath      = ''
+obs_param_nml(61)%flistname      = ''
+obs_param_nml(61)%errstd         = -9999.
+obs_param_nml(61)%std_normal_max = -9999.
+obs_param_nml(61)%zeromean       = .false.
+obs_param_nml(61)%coarsen_pert   = .false.
+obs_param_nml(61)%xcorr          = 0.
+obs_param_nml(61)%ycorr          = 0.
+obs_param_nml(61)%adapt          = 0
+
+! --------------------------------------------------------------------
 
 /
 
