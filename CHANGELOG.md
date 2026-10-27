@@ -10,15 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-
+- Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
+- Improved error handling in preprocessor for SMOS obs ([PR #212](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/212)).
+ 
 ### Changed
+- Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
 ### Fixed
-
+- Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
+- Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
+  
 ### Removed
 
 ### Deprecated
-
+ 
 -----------------------------
 
 ## [v4.1.0] - 2026-10-15
