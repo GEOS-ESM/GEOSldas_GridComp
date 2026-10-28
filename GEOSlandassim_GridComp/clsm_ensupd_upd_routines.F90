@@ -93,9 +93,6 @@ module clsm_ensupd_upd_routines
   use land_pert_routines,               ONLY:     &
        get_pert
 
-  use LDAS_PertRoutinesMod,             ONLY:     &
-       get_use_sphere_pert
-
   use mwRTM_routines,                   ONLY:     &
        mwRTM_get_Tb,                              &
        catch2mwRTM_vars
@@ -3547,8 +3544,6 @@ contains
        obs_pert_param(j)%ycorr           = obs_param(i)%ycorr         
        obs_pert_param(j)%tcorr           = 0
 
-       obs_pert_param(j)%use_sphere_pert = get_use_sphere_pert()
-       
     end do
     
     ! --------------------------------------------------------------------
@@ -3559,9 +3554,10 @@ contains
     allocate(Obs_pert_grid(  pert_grid_lH%N_lon, pert_grid_lH%N_lat, N_assim_species, N_ens))
 
     call get_pert(                                                        &
-         N_assim_species, N_assim_species, N_ens,                         &
-         pert_grid_lH, pert_grid_f,                                       &  ! switched order (reichle, 17 Jul 2020)
-         dtstep,                                                          &
+          N_assim_species, N_assim_species, N_ens,                         &
+          pert_grid_lH, pert_grid_f,                                       &  ! switched order (reichle, 17 Jul 2020)
+          .false.,                                                         &
+          dtstep,                                                          &
          obs_pert_param,                                                  &
          Pert_rseed,                                                      &
          Obs_pert_ntrmdt,                                                 &
