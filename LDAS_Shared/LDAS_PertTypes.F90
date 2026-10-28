@@ -83,8 +83,8 @@ module LDAS_PertTypes
      real             :: xcorr  ! correlation length along latitudes   [deg]
      real             :: ycorr  ! correlation length along longitudes  [deg]
      real             :: tcorr  ! temporal correlation length          [s]
-
-   end type pert_param_type
+     
+  end type pert_param_type
   
   ! **********************************************************************
 
