@@ -66,6 +66,8 @@ module GEOS_LandPertGridCompMod
   integer :: lat1, lat2, lon1, lon2
   integer :: FIRST_ENS_ID
   logical :: COLDSTART
+  logical :: use_sphere_pert
+  character(len=3) :: use_sphere_pert_rc
 contains
 
   !BOP
@@ -899,6 +901,9 @@ contains
     ! Are we perturbing variables?
     call MAPL_GetResource(MAPL, internal%PERTURBATIONS, 'PERTURBATIONS:', default=0, rc=status)
     VERIFY_(status)
+    call MAPL_GetResource(MAPL, use_sphere_pert_rc, 'USE_SPHERE_PERT:', default='NO', rc=status)
+    VERIFY_(status)
+    use_sphere_pert = (trim(use_sphere_pert_rc) /= 'NO')
 
     if (internal%PERTURBATIONS == 0) then ! no perturbations
        allocate(progn_pert_param(0))
@@ -1136,10 +1141,11 @@ contains
        call init_randseed(pert_rseed)
        ! -ForcePert-
        call propagate_pert(                                                     &
-            internal%ForcePert%fft_npert,                                       &
-            1,                                                                  &
-            tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-            ! arbitrary dtstep
+             internal%ForcePert%fft_npert,                                       &
+             1,                                                                  &
+             tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
+             use_sphere_pert,                                                     &
+             ! arbitrary dtstep
             -1.0,                                                               &
             pert_rseed,                                                         &
             internal%ForcePert%param,                                           &
@@ -1151,10 +1157,11 @@ contains
 
        ! -prognostics-
        call propagate_pert(                                                     &
-            internal%PrognPert%fft_npert,                                       &
-            1,                                                                  &
-            tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-            ! arbitrary dtstep
+             internal%PrognPert%fft_npert,                                       &
+             1,                                                                  &
+             tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
+             use_sphere_pert,                                                     &
+             ! arbitrary dtstep
             -1.0,                                                               &
             pert_rseed,                                                         &
             internal%PrognPert%param,                                           &
@@ -1415,10 +1422,11 @@ contains
 
     call get_pert(                                                              &
          internal%ForcePert%npert,                                              &
-         internal%ForcePert%fft_npert,                                          &
-         1,                                                                     &
-         tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
-         real(internal%ForcePert%dtstep),                                       &
+          internal%ForcePert%fft_npert,                                          &
+          1,                                                                     &
+          tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
+          use_sphere_pert,                                                        &
+          real(internal%ForcePert%dtstep),                                       &
          internal%ForcePert%param,                                              &
          pert_rseed,                                                            &
          fpert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%ForcePert%npert),          &
@@ -1447,10 +1455,11 @@ contains
     
     call get_pert(                                                              &
          internal%PrognPert%npert,                                              &
-         internal%PrognPert%fft_npert,                                          &
-         1,                                                                     &
-         tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
-         real(internal%PrognPert%dtstep),                                       &
+          internal%PrognPert%fft_npert,                                          &
+          1,                                                                     &
+          tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
+          use_sphere_pert,                                                        &
+          real(internal%PrognPert%dtstep),                                       &
          internal%PrognPert%param,                                              &
          pert_rseed,                                                            &
          ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),          &
@@ -1683,10 +1692,11 @@ contains
 
     ! -ForcePert-
        call propagate_pert(                                                   &
-          internal%ForcePert%fft_npert,                                       &
-          1,                                                                  &
-          tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-          real(internal%ForcePert%dtstep),                                    &
+           internal%ForcePert%fft_npert,                                       &
+           1,                                                                  &
+           tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
+           use_sphere_pert,                                                     &
+           real(internal%ForcePert%dtstep),                                    &
           pert_rseed,                                                         &
           internal%ForcePert%param,                                           &
           fpert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%ForcePert%npert),       &
@@ -1711,10 +1721,11 @@ contains
 
     ! -prognostics-
         call propagate_pert(                                                  &
-           internal%PrognPert%fft_npert,                                      &
-           1,                                                                 &
-           tcinternal%pgrid_l, tcinternal%pgrid_f,                                &
-           real(internal%PrognPert%dtstep),                                   &
+            internal%PrognPert%fft_npert,                                      &
+            1,                                                                 &
+            tcinternal%pgrid_l, tcinternal%pgrid_f,                                &
+            use_sphere_pert,                                                    &
+            real(internal%PrognPert%dtstep),                                   &
            pert_rseed,                                                        &
            internal%PrognPert%param,                                          &
            ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),      &
@@ -1961,6 +1972,7 @@ contains
                internal%ForcePert%fft_npert,                                       &
                1,                                                                  &
                tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
+               use_sphere_pert,                                                     &
                real(internal%ForcePert%dtstep),                                    &
                internal%ForcePert%param,                                           &
                pert_rseed,                                                         &
@@ -2438,10 +2450,11 @@ contains
 
        call get_pert(                                                           &
             internal%PrognPert%npert,                                           &
-            internal%PrognPert%fft_npert,                                       &
-            1,                                                                  &
-            tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-            real(internal%PrognPert%dtstep),                                    &
+             internal%PrognPert%fft_npert,                                       &
+             1,                                                                  &
+             tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
+             use_sphere_pert,                                                     &
+             real(internal%PrognPert%dtstep),                                    &
             internal%PrognPert%param,                                           &
             pert_rseed,                                                         &
             ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),       &

@@ -1504,6 +1504,8 @@ contains
     type(obs_type),       dimension(:),     pointer     :: Observations_l => null()
 
     logical  :: fresh_incr
+    logical  :: use_sphere_pert
+    character(len=3) :: use_sphere_pert_rc
     integer  :: N_obsf,N_obsl
     !! import ensemble forcing
     
@@ -1581,6 +1583,9 @@ contains
     
     call MAPL_GetResource ( MAPL, out_path, Label="OUT_PATH:", DEFAULT="./", RC=STATUS)
     call MAPL_GetResource ( MAPL, exp_id, Label="EXP_ID:", DEFAULT="exp_id", RC=STATUS)
+    call MAPL_GetResource ( MAPL, use_sphere_pert_rc, Label="USE_SPHERE_PERT:", DEFAULT="NO", RC=STATUS)
+    _VERIFY(STATUS)
+    use_sphere_pert = (trim(use_sphere_pert_rc) /= 'NO')
     
     ! Get component's internal variable
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
@@ -1916,9 +1921,9 @@ contains
          met_force, lai, cat_param, mwRTM_param,                           &
          tile_coord_l, tile_coord_rf,                                      &
          tcinternal%tgrid_g, tcinternal%pgrid_f, tcinternal%pgrid_g,       &
-         N_catl_vec, low_ind, l2rf, rf2l,                                  &
-         update_type,                                                      &
-         LandAssimDTstep,                                                  &
+          N_catl_vec, low_ind, l2rf, rf2l,                                  &
+          update_type,                                                      &
+          LandAssimDTstep, use_sphere_pert,                                 &
          xcompact, ycompact, fcsterr_inflation_fac,                        &
          N_obs_param, obs_param, N_obsbias_max,                            &
          out_obslog, out_smapL4SMaup,                                      &

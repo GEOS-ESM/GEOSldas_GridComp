@@ -162,8 +162,8 @@ contains
        kw_std_normal_max_force_pert, &
        kw_xcorr_force_pert,          &
        kw_ycorr_force_pert,          &
-       kw_tcorr_force_pert,          &
-       kw_ccorr_force_pert           &
+        kw_tcorr_force_pert,          &
+        kw_ccorr_force_pert            &
        )
 
     ! read ensemble propagation inputs from namelist file
@@ -321,8 +321,8 @@ contains
          std_normal_max_force_pert,  &
          xcorr_force_pert,           &
          ycorr_force_pert,           &
-         tcorr_force_pert,           &
-         ccorr_force_pert
+          tcorr_force_pert,           &
+          ccorr_force_pert
 
 
     root_proc = (myid ==0)
@@ -810,7 +810,7 @@ contains
          descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
          std_normal_max_progn_pert, std_progn_pert,                        &
          xcorr_progn_pert, ycorr_progn_pert,                               &
-         tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert        )
+          tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert )
 
     call get_pert_select( N_progn_pert_max, pert_grid_l, std_progn_pert,   &
          N_progn_pert, progn_pert_select )
@@ -826,8 +826,8 @@ contains
             descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
             std_normal_max_progn_pert,                                        &
             std_progn_pert, xcorr_progn_pert, ycorr_progn_pert,               &
-            tcorr_progn_pert, typ_progn_pert, ccorr_progn_pert,               &
-            progn_pert_select, progn_pert_param )
+             tcorr_progn_pert, typ_progn_pert, ccorr_progn_pert,               &
+             progn_pert_select, progn_pert_param )
 
     end if
 
@@ -878,7 +878,7 @@ contains
          descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
          std_normal_max_force_pert, std_force_pert,                        &
          xcorr_force_pert, ycorr_force_pert,                               &
-         tcorr_force_pert, typ_force_pert,   ccorr_force_pert        )
+          tcorr_force_pert, typ_force_pert,   ccorr_force_pert )
 
     call get_pert_select( N_force_pert_max, pert_grid_l, std_force_pert,   &
          N_force_pert, force_pert_select )
@@ -893,8 +893,8 @@ contains
             descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
             std_normal_max_force_pert,                                        &
             std_force_pert, xcorr_force_pert, ycorr_force_pert,               &
-            tcorr_force_pert, typ_force_pert, ccorr_force_pert,               &
-            force_pert_select, force_pert_param )
+             tcorr_force_pert, typ_force_pert, ccorr_force_pert,               &
+             force_pert_select, force_pert_param )
 
     end if
 
@@ -905,8 +905,8 @@ contains
   subroutine get_force_pert_inputs( pert_grid_l,                         &
        descr_force_pert, zeromean_force_pert, coarsen_force_pert,        &
        std_normal_max_force_pert, std_force_pert,                        &
-       xcorr_force_pert, ycorr_force_pert,                               &
-       tcorr_force_pert, typ_force_pert,   ccorr_force_pert       )
+        xcorr_force_pert, ycorr_force_pert,                               &
+        tcorr_force_pert, typ_force_pert,   ccorr_force_pert       )
 
     ! get inputs for forcing perturbations for ALL forcing
     ! variables (including zero standard deviations) on a grid (typically,
@@ -1296,8 +1296,8 @@ contains
   subroutine get_progn_pert_inputs( pert_grid_l,                         &
        descr_progn_pert, zeromean_progn_pert, coarsen_progn_pert,        &
        std_normal_max_progn_pert, std_progn_pert,                        &
-       xcorr_progn_pert, ycorr_progn_pert,                               &
-       tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert       )
+        xcorr_progn_pert, ycorr_progn_pert,                               &
+        tcorr_progn_pert, typ_progn_pert,   ccorr_progn_pert       )
 
     ! get inputs for perturbations to prognostic variables for ALL prognostic
     ! variables (including zero standard deviations) on a grid (typically,
@@ -1685,8 +1685,8 @@ contains
        descr_pert, zeromean_pert, coarsen_pert,                  &
        std_normal_max_pert,                                      &
        std_pert, xcorr_pert, ycorr_pert, tcorr_pert, typ_pert,   &
-       ccorr_pert,                                               &
-       pert_select, pert_param )
+        ccorr_pert,                                               &
+        pert_select, pert_param )
 
     ! assemble perturbation parameters for the prognostics or forcings
     !  that have been selected to be subject to perturbations
@@ -1764,7 +1764,6 @@ contains
           pert_param(m)%ycorr = ycorr_pert(k)
           pert_param(m)%tcorr = tcorr_pert(k)
           pert_param(m)%typ   = nint(typ_pert(k))
-
 
           n = 0
 

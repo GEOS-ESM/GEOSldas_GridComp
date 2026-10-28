@@ -141,6 +141,9 @@ LAND_ASSIM: NO
 #
 PERTURBATIONS: 0
 
+# Use spherical (YES) or rectangular (NO) random fields.
+USE_SPHERE_PERT: NO
+
 # ---- Perturbations: ID of first ensemble member
 #
 FIRST_ENS_ID: 0
@@ -277,5 +280,3 @@ WRITE_RESTART_BY_OSERVER: NO
 
 #
 # =================================== EOF ==========================================
-
-
