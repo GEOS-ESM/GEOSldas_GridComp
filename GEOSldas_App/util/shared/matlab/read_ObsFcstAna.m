@@ -22,9 +22,7 @@ function [date_time,              ...
 %  binary: see f90 subroutine output_ObsFcstAna()    in GEOSldas
 %  nc4:    see f90 subroutine write_ObsFcstAna_nc4() in GEOSldas
 %
-% reichle,  4 Oct 2011
-% amfox,   15 Oct 2026 - read nc4 instead of Fortran sequential binary
-%
+% reichle,         4 Oct 2011 - initial implementation
 % amfox, reichle, 21 Oct 2026 - added nc4 read functionality, removed isLDASsa flag
 %
 % ------------------------------------------------------------------
