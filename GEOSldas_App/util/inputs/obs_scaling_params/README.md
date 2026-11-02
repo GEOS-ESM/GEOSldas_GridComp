@@ -66,7 +66,7 @@ Both versions use the same method.
 |---|---|
 | `run_obs_scaling_params.py` | command-line driver (`--method latlon` or `--method tb`) |
 | `get_obs_scaling_latlon.py` | soil moisture obs (e.g. ASCAT, CYGNSS) on a global lat/lon grid; nc4 output for `scale_obs_sfmc_zscore` |
-| `get_obs_scaling_tb.py` | Tb obs (e.g. SMAP, SMOS) in tile space, one orbit per run; binary output for `scale_obs_Tb_zscore` |
+| `get_obs_scaling_tb.py` | Tb obs (e.g. SMAP, SMOS) in tile space, one orbit direction per run; binary output for `scale_obs_Tb_zscore` |
 | `obs_scaling_utils.py` | helpers for the moving-window loop |
 
 The GEOSldas output files are read with `../../shared/python/read_GEOSldas.py`,
