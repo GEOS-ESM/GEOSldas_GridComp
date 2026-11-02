@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added Python version of obs scaling scripts ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
 - Improved error handling in preprocessor for SMOS obs ([PR #212](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/212)).
  
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ### Fixed
 - Fixed bugs in MATLAB obs scaling parameter scripts (not 0-diff for lat/lon grid) ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
+- Fixed string and no-data obs handling in read_GEOSldas.py ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
 - Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
   
