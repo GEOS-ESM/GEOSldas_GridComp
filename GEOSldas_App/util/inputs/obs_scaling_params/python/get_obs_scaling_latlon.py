@@ -15,7 +15,7 @@
 # amfox - Oct 2026
 
 import os
-import sys;        sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../shared/python'))
+import sys;        sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../shared/python'))
 import warnings
 
 import numpy as np

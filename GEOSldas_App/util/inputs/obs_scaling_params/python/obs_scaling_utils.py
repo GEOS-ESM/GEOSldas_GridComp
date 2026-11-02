@@ -1,7 +1,7 @@
 
 # Helpers for the moving-window loop over the climatological year in the GEOSldas
 # observation scaling scripts.  The GEOSldas output files are read with
-# ../../shared/python/read_GEOSldas.py.
+# ../../../shared/python/read_GEOSldas.py.
 #
 # amfox - Oct 2026
 

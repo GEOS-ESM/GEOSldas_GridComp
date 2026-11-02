@@ -9,7 +9,8 @@ z-score scaling of observations before assimilation:
 obs_scaled = m_mean + (obs - o_mean) * m_std / o_std
 ```
 
-There is a MATLAB and a Python version.  Both read nc4 ObsFcstAna files and give
+There is a MATLAB version (in `matlab/`) and a Python version (in `python/`).
+Both read nc4 ObsFcstAna files and give
 the same results (checked on a CF0360 open loop, Oct 2026: lat/lon H SAF ASCAT
 and CYGNSS identical up to rounding <1e-14; Tb SMAP/SMOS identical except for
 one float32 ulp in a few m_std values).
@@ -69,8 +70,8 @@ Both versions use the same method.
 | `get_obs_scaling_tb.py` | Tb obs (e.g. SMAP, SMOS) in tile space, one orbit direction per run; binary output for `scale_obs_Tb_zscore` |
 | `obs_scaling_utils.py` | helpers for the moving-window loop |
 
-The GEOSldas output files are read with `../../shared/python/read_GEOSldas.py`,
-and the EASEv2 transforms are from `../../shared/python/EASEv2.py`.  The scripts
+The GEOSldas output files are read with `../../../shared/python/read_GEOSldas.py`,
+and the EASEv2 transforms are from `../../../shared/python/EASEv2.py`.  The scripts
 can be run from any directory (`python run_obs_scaling_params.py --help`).
 
 The window length is `--window-days` (default 75; must be an odd number of
@@ -137,5 +138,6 @@ python run_obs_scaling_params.py --method tb \
   `get_model_and_obs_clim_stats_latlon_grid.m`: lat/lon method.
 - `Run_get_L4_Tb_scale_SMAP.m` with `get_model_and_obs_clim_stats.m`: Tb method.
 
-The MATLAB scripts use the readers in `../../shared/matlab/`.  Settings are
+The MATLAB scripts use the readers in `../../../shared/matlab/` (run them from
+`matlab/`).  Settings are
 edited in the `Run_*.m` scripts.
