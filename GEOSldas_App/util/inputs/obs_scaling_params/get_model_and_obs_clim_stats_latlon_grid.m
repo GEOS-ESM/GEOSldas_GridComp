@@ -186,18 +186,10 @@ for imonth = 1:length(run_months)
             end
             
             if ~isempty(ind)
-              obs_tilenum_i = obs_tilenum(ind);
               obs_obs_i     = obs_obs(    ind);
               obs_fcst_i    = obs_fcst(   ind);
               obs_lon_i     = obs_lon(    ind);
               obs_lat_i     = obs_lat(    ind);
-              
-              % Check if any location receives more than 1 obs (or 1 species)
-              tmp = sort(obs_tilenum_i);
-              same_tile = find(diff(tmp) == 0, 1);
-              if ~isempty(same_tile) && ~combine_species_stats
-                error('multiple obs of the same species at one location? - only last one in line is used');
-              end
               
               % Put obs lat/lon on our grid and figure out obsnum/grid index.
               % Use ceil() in single precision, consistent with the lookup of
