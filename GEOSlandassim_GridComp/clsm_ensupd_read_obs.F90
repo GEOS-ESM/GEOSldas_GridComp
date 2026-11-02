@@ -7779,9 +7779,11 @@ contains
 
     integer,         parameter :: SCF_nodata          = -9999. 
     
-    integer,         parameter :: qc_snow_cover_max   = 100    ! exclude no decision, night, lake, ocean, Antarctica, cloud, fill, etc
+    integer,         parameter :: qc_snow_cover_max   = 100    ! exclude no decision, night, lake, ocean, fill, etc
     integer,         parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
-    integer,         parameter :: qc_basic_qa_max     =   0    ! data quality (0=good, 1=poor, 2=bad, 3=other)
+    integer,         parameter :: qc_clear_index_max  = 100    ! exclude flag values (e.g., Antarctica)
+    integer,         parameter :: qc_basic_qa_max     =   3    ! data quality (0=best, 1=good, 2=poor, 3=other)
+    integer,         parameter :: qc_basic_qa_poor    =   2    ! exclude "poor" quality
     
     integer,         parameter :: uint8_min           =   0    
     integer,         parameter :: uint8_max           = 255
@@ -7983,11 +7985,16 @@ contains
           keep_data =                                                  &  
                (Snow_Cover( ii,jj) <= qc_snow_cover_max  )  .and.      &  ! 0<=SCF<=100 (1)
                (Clear_Index(ii,jj) >  qc_clear_index_min )  .and.      &  ! sufficiently clear sky (2)
-               (Basic_QA(   ii,jj) <= qc_basic_qa_max    )                ! keep "good" quality (3)
-          
-          ! (1)  excludes "no decision", "night", "lake", "ocean", "Antarctica", "cloud", "fill", etc
-          ! (2)  clear_index>100 already removed via qc_snow_cover_max
-          ! (3)  excludes "poor", "bad", and "other" quality
+               (Clear_Index(ii,jj) <= qc_clear_index_max )  .and.      &  ! 0<=CI<=100 (3)
+               (Basic_QA(   ii,jj) <= qc_basic_qa_max    )  .and.      &  ! keep "best", "good", or "other" (4)
+               (Basic_QA(   ii,jj) /= qc_basic_qa_poor   )                !   quality (4)
+
+          ! (1)  excludes "no decision", "night", "lake", "ocean", "fill", etc; cloud is not
+          !       flagged (cloudy cells have low Clear_Index); Antarctica has Snow_Cover=100
+          ! (2)  Snow_Cover and Clear_Index are percent of all obs in grid cell
+          ! (3)  excludes Antarctica (Clear_Index=243) and other flag values
+          ! (4)  "other" = low illumination (70<=SZA<85 deg); must be kept to retain most
+          !       high-latitude winter obs (as with MODIS reader); excludes "poor" and flag values
           
           if (keep_data) then
 
