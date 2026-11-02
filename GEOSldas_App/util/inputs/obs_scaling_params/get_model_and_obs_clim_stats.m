@@ -396,7 +396,7 @@ for imonth = 1:length(run_months)
                     'Y', YYYYMMDD(1:4), '/',                  ...
                     'M', YYYYMMDD(5:6), '/',                  ...
                     exp_run, '.ens_avg.ldas_ObsFcstAna.',     ...
-                    YYYYMMDD, '_', HHMM, 'z.bin' ];
+                    YYYYMMDD, '_', HHMM, 'z.nc4' ];
           
           ifp = fopen( fname, 'r', 'l' );          
           
@@ -419,9 +419,10 @@ for imonth = 1:length(run_months)
             ] =                     ...
                 read_ObsFcstAna( fname );
             
-            % remove tiles where obs_fcst is no-data (note: read_ObsFcstAna() returns NaN)
+            % remove obs where obs_obs or obs_fcst is no-data (note: read_ObsFcstAna() returns NaN),
+            % so that obs and model statistics use the same obs/fcst pairs
             
-            idx = isnan(obs_fcst);
+            idx = isnan(obs_fcst) | isnan(obs_obs);
             
             obs_assim(  idx) = [];
             obs_species(idx) = [];
