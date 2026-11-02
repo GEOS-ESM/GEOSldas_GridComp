@@ -6796,9 +6796,9 @@ contains
     ! read JPSS snow cover observations on the 0.05-degree climate
     ! modeling grid (CMG)
     !
-    ! JPSS1/NOAA-20:  VJ110C1 (launched 2022)
-    ! JPSS2/NOAA-21:  VJ210C1 (launched 2017)
-    ! S-NPP        :  VNP10C1 (launched 2011, decomissioned 2026)
+    ! JPSS1/NOAA-20:  VJ110C1 (launched 2017)
+    ! JPSS2/NOAA-21:  VJ210C1 (launched 2022)
+    ! S-NPP        :  VNP10C1 (launched 2011, decommissioned 2026)
     !
     !
     ! For now, assume that VIIRS/JPSS resolution is finer than Catchment tile space 
@@ -6919,9 +6919,9 @@ contains
 
     ! identify JPSS  product and overpass hour https://vlab.noaa.gov/web/towr-s/satellite-operations-updates 
 
-    MODIS_product_ID = this_obs_param%name(1:7)
+    JPSS_product_ID = this_obs_param%name(1:7)
     
-    select case (MODIS_product_ID)
+    select case (JPSS_product_ID)
        
     case('VJ110C1'); overpass_hour = 13.5               ! [hours]    JPSS1: 13:30 local time
        
@@ -6951,7 +6951,7 @@ contains
     
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! lca: do we want to narrow this band just slightly to remove the striping that occurs in the assimilation currently??? !!!!!!!!!!
-    ! determine (rough) longitude band for which MODIS obs need to be read    
+    ! determine (rough) longitude band for which JPSS obs need to be read    
     !
     ! --> because tiles have a non-zero extent, need to read JPSS obs in CMG grid cells located 
     !     in a wider band (lon_min-delta:lon_max+delta),
@@ -6989,7 +6989,7 @@ contains
        
        if ( date_time_end_JPSS%dofyr == date_time_beg_JPSS%dofyr ) then
           
-          ! need only one daily MODIS file and longitude band 
+          ! need only one daily JPSS file and longitude band 
           
           N_files = 1                             
           
@@ -7007,12 +7007,12 @@ contains
           write (logunit,*) 'date_time           = ', date_time
           write (logunit,*) 'date_time_beg       = ', date_time_beg
           write (logunit,*) 'date_time_end       = ', date_time_end
-          write (logunit,*) 'date_time_beg_MODIS = ', date_time_beg_JPSS
-          write (logunit,*) 'date_time_end_MODIS = ', date_time_end_JPSS
+          write (logunit,*) 'date_time_beg_JPSS  = ', date_time_beg_JPSS
+          write (logunit,*) 'date_time_end_JPSS  = ', date_time_end_JPSS
           write (logunit,*) 'lon_beg             = ', lon_beg
           write (logunit,*) 'lon_end             = ', lon_end
-          write (logunit,*) 'lon_beg_MODIS       = ', lon_beg_JPSS
-          write (logunit,*) 'lon_end_MODIS       = ', lon_end_JPSS
+          write (logunit,*) 'lon_beg_JPSS        = ', lon_beg_JPSS
+          write (logunit,*) 'lon_end_JPSS        = ', lon_end_JPSS
           
           err_msg = 'encountered unexpected condition for longitude band!!!'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -7021,8 +7021,8 @@ contains
           
     else
        
-       ! longitude band wraps around dateline, two daily MODIS files are needed 
-       !   (this could also occur if lon_*_MODIS=180., which would result in an
+       ! longitude band wraps around dateline, two daily JPSS files are needed 
+       !   (this could also occur if lon_*_JPSS=180., which would result in an
        !    empty first longitude band, but because of tmp_delta>0, this should
        !    never happen)
        
@@ -7097,7 +7097,7 @@ contains
 
 
 
-    ! allocate arrays for MODIS CMG data (max size that could possibly be needed for obs from both files)
+    ! allocate arrays for JPSS CMG data (max size that could possibly be needed for obs from both files)
     
     N_tmp = N_lon*N_lat
 
@@ -7106,36 +7106,38 @@ contains
     allocate( CMG_lat(N_tmp) )
     
     
-    ! read MODIS SCF obs    
+    ! read VIIRS SCF obs    
     !
-    !   - (renamed) files currently located at /discover/nobackup/projects/S2SHMA/MODIS/MOD10C1_V61/ (2010-2022)
+    !   - files must be renamed (production time stamp removed), as for MODIS SCF obs:
+    !       original name: VJ110C1.AYYYYDDD.002.yyyydddhhmmss.h5
+    !       renamed:       VJ110C1.AYYYYDDD.002.h5
     !
     !   - in ensupd nml file, specify the file "name" according to the following template:
     !   
-    !       %name = 'VJ210C1.Ayyyyddd.002.'
-    !   full name = 'VJ210C1.AYYYYDDD.002.YYYYDDDhhmmss.h5              
+    !       %name = 'VJ110C1.Ayyyyddd.002.h5'
     !
-    !              
-    !       MOD10C1       = JPSS product name
-    !       .A            = "acquisition time" indicator
-    !       YYYYDDD       = placeholder for year/day-of-year 
-    !       .002          = version indicator
-    !       YYYYDDDhhmmss = production year, day and time 
-    !       .h5           = file name extension 
+    !                         1         2
+    !                12345678901234567890123
+    ! 
+    !       VJ110C1 = VIIRS product name (VNP10C1, VJ110C1, or VJ210C1)
+    !       .A      = "acquisition time" indicator
+    !       yyyyddd = placeholder for year/day-of-year 
+    !       .002    = version (Collection) indicator
+    !       .h5     = file name extension 
     !
     
-    N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_MODIS_SCF_hdf()
+    N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_JPSS_SCF_hdf()
     
     do nn=1,N_files     ! loop through longitude bands
        
-       ! determine MODIS file name(s)
+       ! determine JPSS file name(s)
        
        write (YYYY,'(i4.4)') year_vec( nn)
        write (DDD, '(i3.3)') dofyr_vec(nn)
        
        fname =                                                                          &                                           
             trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
-            this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:21)//'*'//'.h5'
+            this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:23)
        
        ! determine sub-array of CMG_* 
        
@@ -7718,21 +7720,23 @@ contains
   subroutine read_JPSS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
        N_good_data, CMG_lon, CMG_lat, CMG_SCF )
     
-    ! read snow cover area fraction (SCF) obs from daily VIIRS JPSS 1/2 and S-NPP, version 2 
-    !   - 
-    !   - 
+    ! read snow cover area fraction (SCF) obs from daily VIIRS V[NP|J1|J2]10C1, version 2 (hdf5)
+    !   - S-NPP:  https://nsidc.org/data/vnp10c1/versions/2
+    !   - JPSS1:  https://nsidc.org/data/vj110c1/versions/2
+    !   - JPSS2:  https://nsidc.org/data/vj210c1/versions/2
     !   - daily data with spatial resolution of 0.05 deg on MODIS climate modeling grid (CMG)
-    !   - Terra: missing days 2016 d. 50-58
     !   - data are read for the requested lat/lon range 
     !   - apply QC
     !
-    ! reichle, 20 Oct 2023    
+    ! adapted from read_MODIS_SCF_hdf() (reichle, 20 Oct 2023)
+    !
+    ! amfox, 2 Nov 2026 - hdf5 version for VIIRS
     !
     ! -------------------------------------------------------------------------------------------------
     
     implicit none
     
-    character(*),          intent(in)  :: fname                             ! MODIS file name with full path
+    character(*),          intent(in)  :: fname                             ! VIIRS file name with full path
     
     real,                  intent(in)  :: lon_min, lon_max                  ! -180 <= lon_* <= 180
     real,                  intent(in)  :: lat_min, lat_max                  !  -90 <= lat_* <=  90
@@ -7745,7 +7749,7 @@ contains
 
     ! local parameters
     
-    ! ll/ur_lon/lat simply indicate the extent of the MODIS CMG grid
+    ! ll/ur_lon/lat simply indicate the extent of the CMG grid
     !
     ! index increases from (-180,90) to (180,-90)  (southward and eastward)
     
@@ -7763,21 +7767,21 @@ contains
 
     integer,                            parameter :: N_fields    = 3 
 
-    character(22), dimension(N_fields), parameter :: field_names = (/       &
-         'Day_CMG_Snow_Cover    ',                                          &   ! 1
-         'Day_CMG_Clear_Index   ',                                          &   ! 2
-         'Snow_Spatial_QA       '/)                                             ! 3
+    character(*),                       parameter :: field_path  = '/HDFEOS/GRIDS/VIIRS_Daily_SnowCover_CMG/Data Fields/'
 
-    !     1234567890123456789012
-    !              1         2
+    character(11), dimension(N_fields), parameter :: field_names = (/       &
+         'Snow_Cover ',                                                     &   ! 1
+         'Clear_Index',                                                     &   ! 2
+         'Basic_QA   '/)                                                        ! 3
+
+    !     12345678901
+    !              1
 
     integer,         parameter :: SCF_nodata          = -9999. 
     
-    integer(int16),  parameter :: qc_snow_cover_max   = 100    ! exclude lake ice, night, inland water, ocean, etc
-    integer(int16),  parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
-    integer(int16),  parameter :: qc_snow_spatial_max =   2    ! data quality (0=best, 1=good, 2=OK, 3=poor, 4=other)
-    
-    integer,         parameter :: DFACC_READ          =   1    ! from hdf.inc
+    integer,         parameter :: qc_snow_cover_max   = 100    ! exclude no decision, night, lake, ocean, Antarctica, cloud, fill, etc
+    integer,         parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
+    integer,         parameter :: qc_basic_qa_max     =   0    ! data quality (0=good, 1=poor, 2=bad, 3=other)
     
     integer,         parameter :: uint8_min           =   0    
     integer,         parameter :: uint8_max           = 255
@@ -7793,23 +7797,21 @@ contains
     real,               dimension(:),   allocatable :: lon_ind
     real,               dimension(:),   allocatable :: lat_ind
 
-    integer,            dimension(2)                :: start, edge, stride, last, dimsizes
+    integer,            dimension(2)                :: start, last
+
+    integer,            dimension(7)                :: dimsizes
     
     logical                                         :: file_exists, keep_data
     
-    integer                                         :: status, sd_id, sds_id, sds_index
+    integer                                         :: rank
     
-    character(64)                                   :: sds_name
+    type(hdf5read)                                  :: h5r
 
-    integer                                         :: rank, data_type, num_attrs
+    integer,            dimension(:,:), allocatable :: Snow_Cover
+    integer,            dimension(:,:), allocatable :: Clear_Index
+    integer,            dimension(:,:), allocatable :: Basic_QA
 
-    integer(int16),     dimension(:,:), allocatable :: Snow_Cover
-    integer(int16),     dimension(:,:), allocatable :: Clear_Index
-    integer(int16),     dimension(:,:), allocatable :: Snow_Spatial_QA
-    
-    character(kind=c_char, len=1), dimension(:,:), allocatable :: tmp_char1
-
-    character(len=*),                     parameter :: Iam = 'read_MODIS_SCF_hdf'
+    character(len=*),                     parameter :: Iam = 'read_JPSS_SCF_hdf'
     character(len=400)                              :: err_msg
     
     ! -------------------------------------------------------------------------
@@ -7822,7 +7824,7 @@ contains
        
        if (logit) then
           write (logunit,'(400A)') trim(Iam), ': cannot find file  ', trim(fname)
-          write (logunit,*       ) 'not reading MODIS SCF obs'
+          write (logunit,*       ) 'not reading VIIRS SCF obs'
        end if
 
        N_good_data = 0
@@ -7843,12 +7845,10 @@ contains
               
     end if
     
-    ! determine MODIS CMG array indices for requested lat/lon_min/max range
+    ! determine CMG array indices for requested lat/lon_min/max range
     
-    ! MODIS CMG hdf files: 
-    !  - lon-by-lat (NOTE: The metadata "s.Vgroup(1).Vgroup(1).SDS(1).Dims.Size" returned
-    !                      by Matlab's hdfinfo() confusingly suggests that CMG files are 
-    !                      lat-by-lon, which is not the case!)
+    ! VIIRS CMG hdf5 files:
+    !  - lat-by-lon in the file (3600x7200), which is lon-by-lat in Fortran
     !  - index values increase eastward and southward
 
     start(1)  = (lon_min    - CMG_ll_lon)/CMG_dlon      ! 0-based [as required for hdf read]
@@ -7859,26 +7859,6 @@ contains
     
     N_lon     = last(1) - start(1) + 1
     N_lat     = last(2) - start(2) + 1 
-    
-    edge(1)   = N_lon
-    edge(2)   = N_lat
-    
-    stride(1) = 1
-    stride(2) = 1
-    
-
-
-    ! ! dbg ! ! write (*,*)  '###############################################################################'
-    ! ! dbg ! ! write (*,*)  Iam // '():'
-    ! ! dbg ! ! write (*,*)  'size(CMG_SCF), N_lon, N_lat   = ', size(CMG_SCF), N_lon, N_lat
-    ! ! dbg ! ! write (*,*)  'lon_min, lon_max              = ', lon_min, lon_max
-    ! ! dbg ! ! write (*,*)  'lat_min, lat_max              = ', lat_min, lat_max       
-    ! ! dbg ! ! write (*,*)  'start [lon, lat]              = ', start
-    ! ! dbg ! ! write (*,*)  'last  [lon, lat]              = ', last
-    ! ! dbg ! ! write (*,*)  'edge  [lon, lat]              = ', edge
-    ! ! dbg ! ! write (*,*)  '###############################################################################'    
-    
-
 
     ! checks array dimensions
     
@@ -7908,7 +7888,7 @@ contains
     end if
 
     if (logit) then
-       write (logunit,'(400A)') trim(Iam), '(): reading MODIS SCF obs from  ', trim(fname)
+       write (logunit,'(400A)') trim(Iam), '(): reading VIIRS SCF obs from  ', trim(fname)
        write (logunit,*       ) '  N_lon, N_lat, lon_min, lon_max, lat_min, lat_max = '
        write (logunit,*       ) N_lon, N_lat, lon_min, lon_max, lat_min, lat_max       
     end if
@@ -7922,11 +7902,9 @@ contains
     allocate(lon_ind(N_lon))
     allocate(lat_ind(N_lat))
 
-    allocate(Snow_Cover     (N_lon,N_lat))
-    allocate(Clear_Index    (N_lon,N_lat))
-    allocate(Snow_Spatial_QA(N_lon,N_lat))
-
-    allocate(tmp_char1(      N_lon,N_lat))
+    allocate(Snow_Cover (N_lon,N_lat))
+    allocate(Clear_Index(N_lon,N_lat))
+    allocate(Basic_QA   (N_lon,N_lat))
 
     ! --------------------------
     
@@ -7942,98 +7920,47 @@ contains
         
     ! --------------------------
     
-    ! open hdf file (read-only) and initialize SD interface 
+    ! open hdf5 file (read-only)
     
-    sd_id = sfstart(trim(fname), DFACC_READ)
-
-    if (sd_id<0) then
-              
-       err_msg = 'cannot sfstart (open) file: ' // trim(fname)
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       
-    end if
+    call h5r%openFile(trim(fname))
     
     ! read data
 
     do nn=1,N_fields
        
-       sds_index = sfn2index( sd_id, trim(field_names(nn)) )
-       sds_id    = sfselect(  sd_id, sds_index             )
+       call h5r%queryDataset(field_path // trim(field_names(nn)), rank, dimsizes)
 
+       if ( (rank/=2) .or. (dimsizes(1)/=CMG_N_lon) .or. (dimsizes(2)/=CMG_N_lat) ) then
 
-       status    = sfginfo( sds_id, sds_name, rank, dimsizes, data_type, num_attrs )
-       
-       if ( (dimsizes(1)/=CMG_N_lon) .or. (dimsizes(2)/=CMG_N_lat) ) then 
-
-          err_msg = 'dimensions in hdf file doe not match CMG_N_lon and/or CMG_N_lat'
+          err_msg = 'dimensions in hdf5 file do not match CMG_N_lon and/or CMG_N_lat'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
           
        end if
        
-
-       ! #########################################################
-       ! ! dbg ! ! write (*,*)  'sds_name                   = ', trim(sds_name)
-       ! ! dbg ! ! write (*,*)  'rank, data_type, num_attrs = ', rank, data_type, num_attrs
-       ! ! dbg ! ! write (*,*)  'dimsizes                   = ', dimsizes
-       ! #########################################################
-
-          
        select case (nn)
           
-       case (1); status = sfrdata( sds_id, start, stride, edge, tmp_char1 ); Snow_Cover      = ichar(tmp_char1,2)
-       case (2); status = sfrdata( sds_id, start, stride, edge, tmp_char1 ); Clear_Index     = ichar(tmp_char1,2)
-       case (3); status = sfrdata( sds_id, start, stride, edge, tmp_char1 ); Snow_Spatial_QA = ichar(tmp_char1,2)
+       case (1); call h5r%readDataset(Snow_Cover,  start)
+       case (2); call h5r%readDataset(Clear_Index, start)
+       case (3); call h5r%readDataset(Basic_QA,    start)
           
        case default; call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown field')
              
        end select
        
-       if (status/=0) then
-          
-          err_msg = 'error reading data from hdf file: ' // trim(fname)
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-   
-       end if
-
-       status   = sfendacc(sds_id)                   ! terminate access to SDS (field)
-          
     end do
     
-    status = sfend(sd_id)                            ! close hdf file and SD interface
+    call h5r%closeFile                               ! close hdf5 file
 
+    ! check range (make sure uint8 from hdf5 file is correctly translated into Fortran integer)
 
-    ! #################################################################################
-    ! ! dbg ! ! write (*,*)  'Snow_Cover(1:10,1:5)='
-    ! ! dbg ! ! write (*,*)  Snow_Cover(1:10,1:5)
-    ! ! dbg ! ! write (*,*)  'Clear_Index(1:10,1:5)='
-    ! ! dbg ! ! write (*,*)  Clear_Index(1:10,1:5)
-    ! ! dbg ! ! write (*,*)  'Snow_Spatial_QA(1:10,1:5)='
-    ! ! dbg ! ! write (*,*)  Snow_Spatial_QA(1:10,1:5)
+    if ( any(Snow_Cover  < uint8_min) .or.          &
+         any(Snow_Cover  > uint8_max) .or.          &
+         any(Clear_Index < uint8_min) .or.          &
+         any(Clear_Index > uint8_max) .or.          &
+         any(Basic_QA    < uint8_min) .or.          &
+         any(Basic_QA    > uint8_max)       ) then
     
-    ! ! dbg ! ! !if ( (lon_min>-138) .and. (lon_min<-134) ) then
-    ! ! dbg ! ! if (.false.) then
-    ! ! dbg ! !    do jj=1,N_lat     
-    ! ! dbg ! !       write(997) Snow_Cover(     jj,:)
-    ! ! dbg ! !       write(998) Clear_Index(    jj,:)
-    ! ! dbg ! !       write(999) Snow_Spatial_QA(jj,:)
-    ! ! dbg ! !    end do
-    ! ! dbg ! !    write (*,*) 'stopping after file dump '
-    ! ! dbg ! !    stop
-    ! ! dbg ! ! end if
-    ! #################################################################################
-
-
-
-    ! check range (make sure uint8 from hdf file is correctly translated into Fortran integer)
-
-    if ( any(Snow_Cover      < uint8_min) .or.          &
-         any(Snow_Cover      > uint8_max) .or.          &
-         any(Clear_Index     < uint8_min) .or.          &
-         any(Clear_Index     > uint8_max) .or.          &
-         any(Snow_Spatial_QA < uint8_min) .or.          &
-         any(Snow_Spatial_QA > uint8_max)       ) then
-       
-       err_msg = 'unexpected range in data from hdf file'
+       err_msg = 'unexpected range in data from hdf5 file'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        
     end if
@@ -8054,19 +7981,19 @@ contains
           ! note: Snow_Cover >= 0 per range check above, no need to check for minimum 
           
           keep_data =                                                  &  
-               (Snow_Cover(     ii,jj) <= qc_snow_cover_max  )  .and.  &  ! 0<=SCF<=100 (1) 
-               (Clear_Index(    ii,jj) >  qc_clear_index_min )  .and.  &  ! sufficiently clear sky (2)
-               (Snow_Spatial_QA(ii,jj) <= qc_snow_spatial_max)            ! keep "best", "good", or "OK" quality (3)
+               (Snow_Cover( ii,jj) <= qc_snow_cover_max  )  .and.      &  ! 0<=SCF<=100 (1)
+               (Clear_Index(ii,jj) >  qc_clear_index_min )  .and.      &  ! sufficiently clear sky (2)
+               (Basic_QA(   ii,jj) <= qc_basic_qa_max    )                ! keep "good" quality (3)
           
-          ! (1)  excludes "lake ice", "night", "inland water", "ocean", "cloud obscured water", "data not mapped", "fill"
+          ! (1)  excludes "no decision", "night", "lake", "ocean", "Antarctica", "cloud", "fill", etc
           ! (2)  clear_index>100 already removed via qc_snow_cover_max
-          ! (3)  excludes Antarctica
+          ! (3)  excludes "poor", "bad", and "other" quality
           
           if (keep_data) then
 
              kk = kk + 1
              
-             ! raw SCF value is for clear portion of grid cell only, need to normalize with Clear_Index
+             ! raw SCF value is percent of all obs in grid cell, need to normalize with Clear_Index
              
              CMG_SCF(kk) = real(Snow_Cover(ii,jj))/real(Clear_Index(ii,jj)) 
              
@@ -8088,9 +8015,9 @@ contains
     deallocate(lat_ind)
     deallocate(lon_ind)
 
-    deallocate(Snow_Cover     )
-    deallocate(Clear_Index    )
-    deallocate(Snow_Spatial_QA)
+    deallocate(Snow_Cover )
+    deallocate(Clear_Index)
+    deallocate(Basic_QA   )
 
   end subroutine read_JPSS_SCF_hdf
 
@@ -10886,6 +10813,14 @@ contains
     case ('MOD10C1','MYD10C1')
        
        call read_obs_MODIS_SCF(                                       &
+            date_time, dtstep_assim, N_catd, tile_coord,              &
+            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            this_obs_param,                                           &
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
+
+    case ('VNP10C1','VJ110C1','VJ210C1')
+       
+       call read_obs_JPSS_SCF(                                        &
             date_time, dtstep_assim, N_catd, tile_coord,              &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
             this_obs_param,                                           &

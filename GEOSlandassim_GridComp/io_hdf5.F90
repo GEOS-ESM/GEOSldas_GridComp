@@ -50,13 +50,14 @@ module io_hdf5
      procedure, public  :: openFile
      procedure, public  :: closeFile
      procedure, public  :: queryDataset
-     generic,   public  :: readDataset => readDataset1DReal, readDataset1DReal8, readDataset1DInt, readDataset1DChar24, readDataset2DReal
+     generic,   public  :: readDataset => readDataset1DReal, readDataset1DReal8, readDataset1DInt, readDataset1DChar24, readDataset2DReal, readDataset2DInt
      ! private
      procedure, private :: readDataset1DReal
      procedure, private :: readDataset1DReal8
      procedure, private :: readDataset1DInt
      procedure, private :: readDataset1DChar24
      procedure, private :: readDataset2DReal
+     procedure, private :: readDataset2DInt
      procedure, private :: uninitDataset
   end type hdf5read
 
@@ -323,6 +324,46 @@ contains
     call this%uninitDataset
 
   end subroutine readDataset2DReal
+
+  ! read block of 2D integer dataset that starts at (0-based) offset;
+  ! block size is given by shape of data2D
+  subroutine readDataset2DInt(this, data2D, offset)
+
+    ! input/output variables
+    class (hdf5read), intent(inout) :: this
+    integer, intent(out) :: data2D(:,:)
+    integer, intent(in)  :: offset(2)
+
+    ! local variables
+    integer :: hdf5err
+    integer(hsize_t) :: block_size(2)
+    integer(hid_t)   :: memspace_id
+
+    ! check dataset state
+    if (this%dset_name == UNINIT_STR) then
+       write(*,*) 'ERROR readDataset2DInt: No open dataset available'
+       stop
+    end if
+
+    block_size = shape(data2D)
+
+    ! select block in file and create matching data space in memory
+    call h5sselect_hyperslab_f(this%dspace_id, H5S_SELECT_SET_F, int(offset,hsize_t), block_size, hdf5err)
+    call checkErrCode_('h5sselect_hyperslab_f', hdf5err)
+
+    call h5screate_simple_f(2, block_size, memspace_id, hdf5err)
+    call checkErrCode_('h5screate_simple_f', hdf5err)
+
+    call h5dread_f(this%dset_id, H5T_NATIVE_INTEGER, data2D, block_size, hdf5err, memspace_id, this%dspace_id)
+    call checkErrCode_('h5dread_f', hdf5err)
+
+    call h5sclose_f(memspace_id, hdf5err)
+    call checkErrCode_('h5sclose_f', hdf5err)
+
+    ! un-initialize dataset just queried/read
+    call this%uninitDataset
+
+  end subroutine readDataset2DInt
 
   ! check return code
   ! (not part of class hdf5read)
