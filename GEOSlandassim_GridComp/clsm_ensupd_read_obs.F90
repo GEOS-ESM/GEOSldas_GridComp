@@ -8000,9 +8000,10 @@ contains
 
              kk = kk + 1
              
-             ! raw SCF value is percent of all obs in grid cell, need to normalize with Clear_Index
+             ! raw SCF value is percent of all obs in grid cell, need to normalize with Clear_Index;
+             ! cap at 1 because VIIRS Snow_Cover can exceed Clear_Index by 1 (rounding)
              
-             CMG_SCF(kk) = real(Snow_Cover(ii,jj))/real(Clear_Index(ii,jj)) 
+             CMG_SCF(kk) = min( 1., real(Snow_Cover(ii,jj))/real(Clear_Index(ii,jj)) )
              
              CMG_lon(kk) = lon_c(ii)
              CMG_lat(kk) = lat_c(jj)
