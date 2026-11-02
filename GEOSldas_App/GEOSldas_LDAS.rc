@@ -132,17 +132,13 @@ LAND_ASSIM: NO
 # LANDASSIM_T0: 000000   
 
 
-# ---- Perturbations: On/off 
-#
-# If num_ensemble > 1, PERTURBATIONS will automatically be set to 1. 
+# ---- Perturbations: 
 #
 #    0 : No perturbactions.
-#    1 : With perturbations.
+#    1 : With perturbations (generated on rectangular grid).
+#    2 : With perturbations (generated on sphere).
 #
 PERTURBATIONS: 0
-
-# Use spherical (YES) or rectangular (NO) random fields.
-USE_SPHERE_PERT: NO
 
 # ---- Perturbations: ID of first ensemble member
 #

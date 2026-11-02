@@ -96,7 +96,7 @@ class ldas:
         self.has_landassim_seed = False
         self.has_geos_pert      = False
         self.nSegments          = 1
-        self.perturb            = 0
+        self.perturb            = 0                    # 0=none, 1=rectangular, 2=sphere (as in rc var 'PERTURBATIONS')
         self.first_ens_id       = 0
         self.in_rstdir          = None
         self.in_tilefile        = None                 # default string
@@ -249,13 +249,12 @@ class ldas:
             if int(self.ExeInputs.get('DO_ISSM'))==1:
                 self.with_issm = True
 
-        self.run_route = int(self.ExeInputs.get('RUN_ROUTE',0))
-
-        self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
-        self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
-        self.perturb = int(self.ExeInputs.get('PERTURBATIONS',0))
+        self.run_route    = int(self.ExeInputs.get('RUN_ROUTE',     0))
+        self.nens         = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])       # fails if value of Nens is not an integer
+        self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',  0))
+        self.perturb      = int(self.ExeInputs.get('PERTURBATIONS', 0))
         if self.nens > 1:
-           self.perturb = 1
+            assert self.perturb>0, "Inconsistent inputs for rc variables NUM_LDAS_ENSEMBLE and PERTURBATIONS."
         self.ensdirs  = ['ens%04d'%iens for iens in range(self.first_ens_id, self.nens  + self.first_ens_id)]
         # if self.ens_id_width = 4, _width = '_e%04d'
         _width = '_e%0{}d'.format(self.ens_id_width-2)
@@ -1147,7 +1146,7 @@ class ldas:
                else :
                    routeRstFile = routeRstFile0
 
-            if (self.has_geos_pert and self.perturb == 1) :
+            if (self.has_geos_pert and self.perturb > 0) :
                 pertRstFile = rstpath+ensdir +'/'+ y4m2+'/'+self.ExeInputs['RESTART_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
                 pertLocal   = self.rstdir+ensdir +'/'+ y4m2+'/'+self.ExeInputs['EXP_ID']+'.landpert_internal_rst.'+y4m2d2_h2m2
                 shutil.copy(pertRstFile,pertLocal)
@@ -1176,7 +1175,7 @@ class ldas:
                   print("link issm restart: " + myIssmRst)
                   os.symlink(issmRstFile, myIssmRst)
 
-            if ( self.has_geos_pert and  self.perturb == 1 ):
+            if ( self.has_geos_pert and  self.perturb > 0 ):
                os.symlink(pertRstFile,    myPertRst)
 
         # catch_param restar file
@@ -1390,8 +1389,8 @@ class ldas:
                 tmpl_ = ''
                 if self.nens >1 :
                    tmpl_='%s'
-                if self.perturb == 1:
-                   ldasrcInp['PERTURBATIONS'] ='1'
+                if self.perturb > 0:
+                   ldasrcInp['PERTURBATIONS'] = str(self.perturb)
                 rstkey =[]
                 rstval =[]
                 if self.with_land :
@@ -1490,7 +1489,7 @@ class ldas:
 
 
                 # specify LANDPERT restart file
-                if (self.perturb == 1):
+                if (self.perturb > 0):
                     keyn = 'LANDPERT_INTERNAL_RESTART_FILE'
                     valn = '../input/restart/landpert'+tmpl_+'_internal_rst'
                     ldasrcInp[keyn]= valn
