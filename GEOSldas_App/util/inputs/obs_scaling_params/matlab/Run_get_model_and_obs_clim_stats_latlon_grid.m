@@ -4,8 +4,7 @@ clear
 %                     Begin user-defined inputs
 % -------------------------------------------------------------------
 
-% addpath('../../shared/matlab/');
-addpath('/discover/nobackup/amfox/current_GEOSldas/GEOSldas/src/Components/GEOSldas_GridComp/GEOSldas_App/util/shared/matlab')
+addpath('../../../shared/matlab/');
 
 % Define the Open Loop experiment path, run name, domain, and output prefix
 
