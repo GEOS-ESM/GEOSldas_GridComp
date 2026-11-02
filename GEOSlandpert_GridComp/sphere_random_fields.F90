@@ -31,17 +31,18 @@
 ! -----------------------------------------------------------------------
 
 module sphere_random_fields_mod
-  use abstract_random_fieldsMod, only: abstract_random_fields
-  use LDAS_PertTypes, only: pert_param_type
-  use LDAS_TileCoordType, only: grid_def_type
-  use MAPL_MathConstantsMod, only: PI => MAPL_PI_R8, MAPL_DEGREES_TO_RADIANS_R8
+  
+  use abstract_random_fieldsMod,     only: abstract_random_fields
+  use LDAS_PertTypes,                only: pert_param_type
+  use LDAS_TileCoordType,            only: grid_def_type
+  use MAPL_MathConstantsMod,         only: PI => MAPL_PI_R8, MAPL_DEGREES_TO_RADIANS_R8
   use, intrinsic :: iso_fortran_env, only: REAL64, INT64
   use mpi
-  use nr_ran2_gasdev, only: NRANDSEED, nr_ran2_2d, nr_gasdev
+  use nr_ran2_gasdev,                only: NRANDSEED, nr_ran2_2d, nr_gasdev
 #ifdef MKL_AVAILABLE
   use MKL_DFTI
 #endif
-
+  
   implicit none
   private
 
@@ -51,24 +52,24 @@ module sphere_random_fields_mod
   type, extends(abstract_random_fields) :: sphere_random_fields
     private
     ! MPI context (comm == MPI_COMM_NULL -> serial)
-    integer :: comm = MPI_COMM_NULL
-    integer :: rank = 0, npes = 1
+    integer                            :: comm = MPI_COMM_NULL
+    integer                            :: rank = 0, npes = 1
     ! Grid / truncation
-    integer :: nlon = 0, nlat = 0
-    integer :: L = 0, nh = 0, nm = 0
-    real(REAL64) :: c2 = 0.0d0
-    real(REAL64) :: scale = 1.0d0
+    integer                            :: nlon = 0, nlat = 0
+    integer                            :: L = 0, nh = 0, nm = 0
+    real(REAL64)                       :: c2 = 0.0d0
+    real(REAL64)                       :: scale = 1.0d0
     ! m-modes owned by this rank
-    integer :: nmloc = 0
-    integer,    allocatable :: mloc(:)
-    integer(INT64), allocatable :: coff(:)       ! global coefficient offset per m (0:L)
-    integer(INT64) :: ncoef = 0                  ! total (l,m) pairs, m<=l<=L
-    real(REAL64), allocatable :: sqrtC(:), lfac(:), x(:), logs(:)
+    integer                            :: nmloc = 0
+    integer,               allocatable :: mloc(:)
+    integer(INT64),        allocatable :: coff(:)                           ! global coefficient offset per m (0:L)
+    integer(INT64)                     :: ncoef = 0                         ! total (l,m) pairs, m<=l<=L
+    real(  REAL64),        allocatable :: sqrtC(:), lfac(:), x(:), logs(:)
     ! Ring distribution
-    integer, allocatable :: rcount(:), rdispl(:)
-    integer :: nloc = 0
+    integer,               allocatable :: rcount(:), rdispl(:)
+    integer                            :: nloc = 0
 #ifdef MKL_AVAILABLE
-    type(DFTI_DESCRIPTOR), pointer :: desc => null()
+    type(DFTI_DESCRIPTOR), pointer     :: desc => null()
 #endif
   contains
     procedure, public :: generate_2d_Random_field
@@ -83,9 +84,12 @@ module sphere_random_fields_mod
 contains
 
   function sphere_random_fields_id(pert_param, pert_grid_f) result(id_string)
-    type(pert_param_type), intent(in) :: pert_param
-    type(grid_def_type), intent(in) :: pert_grid_f
-    character(len=:), allocatable :: id_string
+    
+    type(pert_param_type), intent(in)  :: pert_param
+    type(grid_def_type),   intent(in)  :: pert_grid_f
+    
+    character(len=:),      allocatable :: id_string
+    
     character(len=256) :: id
 
     write(id,'(a,":",i0,":",i0,":",es16.8)') 'sphere_sh', &
@@ -96,12 +100,13 @@ contains
   ! ----------------------------------------------------------------------
 
   function new_sphere_random_fields(pert_param, pert_grid_f, comm, rc) result(rf)
-    type(sphere_random_fields) :: rf
-    type(pert_param_type), intent(in) :: pert_param
-    type(grid_def_type), intent(in) :: pert_grid_f
-    integer, optional, intent(in) :: comm
-    integer, optional, intent(out) :: rc
-
+    
+    type(sphere_random_fields)                        :: rf
+    type(pert_param_type),                intent(in)  :: pert_param
+    type(grid_def_type),                  intent(in)  :: pert_grid_f
+    integer,                    optional, intent(in)  :: comm
+    integer,                    optional, intent(out) :: rc
+    
     integer :: ierr, i, m, r, l, nlat, nlon
     real(REAL64) :: xcorr_deg, var, th, llp1, c2_use
 
@@ -224,10 +229,11 @@ contains
   ! ----------------------------------------------------------------------
 
   subroutine generate_2d_Random_field(this, rseed, rfield, rfield2, lx, ly, dx, dy)
+
     class(sphere_random_fields), intent(inout) :: this
-    integer, intent(inout) :: rseed(NRANDSEED)
-    real, intent(out) :: rfield(:,:), rfield2(:,:)
-    real, intent(in) :: lx, ly, dx, dy   ! unused: spectrum is set at construction
+    integer,                     intent(inout) :: rseed(NRANDSEED)
+    real,                        intent(out)   :: rfield(:,:), rfield2(:,:)
+    real,                        intent(in)    :: lx, ly, dx, dy             ! unused: spectrum is set at construction
 
     if (size(rfield,1) /= this%nlon .or. size(rfield,2) /= this%nlat) then
       write(*,'(a)') 'sphere_random_fields: output grid differs from constructor grid'
@@ -238,6 +244,8 @@ contains
     call normalize_unit_variance(rfield2)
   end subroutine generate_2d_Random_field
 
+  ! ----------------------------------------------------------------------
+  
   subroutine generate_white_field(this, rseed, rfield)
     class(sphere_random_fields), intent(inout) :: this
     integer, intent(inout) :: rseed(NRANDSEED)
@@ -254,9 +262,13 @@ contains
     end do
   end subroutine generate_white_field
 
+  ! ----------------------------------------------------------------------
+  
   subroutine finalize(this, rc)
-    class(sphere_random_fields), intent(inout) :: this
-    integer, optional, intent(out) :: rc
+    
+    class(sphere_random_fields),           intent(inout) :: this
+    integer,                     optional, intent(out)   :: rc
+
     integer :: ierr
 #ifdef MKL_AVAILABLE
     if (associated(this%desc)) then
@@ -417,6 +429,8 @@ contains
     end if
   end subroutine sh_draw
 
+  ! ======================================================================
+    
 #ifndef MKL_AVAILABLE
   ! Pure-Fortran O(nph^2) inverse real DFT without 1/N (matches MKL backward).
   subroutine irfft_rows(inp, nrows, nm, nph, out)
@@ -441,6 +455,8 @@ contains
   end subroutine irfft_rows
 #endif
 
+  ! ======================================================================
+  
   subroutine normalize_unit_variance(field)
     real, intent(inout) :: field(:,:)
     real(REAL64) :: field_mean, field_norm
@@ -509,3 +525,5 @@ contains
   end subroutine xcorr_deg_to_c2
 
 end module sphere_random_fields_mod
+
+! ============ EOF ==================================================================

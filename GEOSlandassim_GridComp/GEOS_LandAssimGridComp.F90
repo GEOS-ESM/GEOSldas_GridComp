@@ -1507,6 +1507,7 @@ contains
     logical  :: use_sphere_pert
     character(len=3) :: use_sphere_pert_rc
     integer  :: N_obsf,N_obsl
+    
     !! import ensemble forcing
     
     real, pointer :: TA_enavg(:)=>null()

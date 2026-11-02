@@ -5,13 +5,13 @@
 ! random field generator in 2d:
 !  generate a pair of random fields in 2d with zero mean
 !
-! subroutines generate_2d_Random_field() and sqrt_gauss_spectrum are translated from
+! subroutines generate_2d_Random_field() and sqrt_gauss_spectrum() are translated from
 !  C++ code rfg2d.C written for MIT EnKF work by reichle
 !  (see janus:~reichle/nasa/EnKF)
 !
 ! covariance is specified through its spectrum, so far only Gaussian
 !
-! IMPORTANT: read comments for generate_2d_Random_field()
+! IMPORTANT: read comments in subroutine generate_2d_Random_field()
 !
 ! written for NSIPP - EnKF
 ! Type:   f90
@@ -34,12 +34,13 @@
 #include "unused_dummy.H"
 
 module rectangle_random_fieldsMod
-  use abstract_random_fieldsMod, only: abstract_random_fields
-  use LDAS_PertTypes, only: pert_param_type
-  use LDAS_TileCoordType, only: grid_def_type
+  
+  use abstract_random_fieldsMod,        ONLY: abstract_random_fields
+  use LDAS_PertTypes,                   ONLY: pert_param_type
+  use LDAS_TileCoordType,               ONLY: grid_def_type
   
 #ifdef MKL_AVAILABLE
-  use, intrinsic :: iso_c_binding, only: c_loc, c_f_pointer, c_ptr, c_sizeof, C_NULL_PTR
+  use, intrinsic :: iso_c_binding,      ONLY: c_loc, c_f_pointer, c_ptr, c_sizeof, C_NULL_PTR
   use mpi
   use MKL_DFTI
 #else
@@ -64,23 +65,23 @@ module rectangle_random_fieldsMod
   
   type, public, extends(abstract_random_fields) :: rectangle_random_fields
      private
-     integer :: N_x, N_y
-     integer :: N_x_fft, N_y_fft
-     integer, public :: xStride, yStride  ! coarsening strides
-     real,    public :: rdlon, rdlat      ! grid spacing of the (coarsened) grid
-     real, allocatable :: field1_fft(:,:), field2_fft(:,:)
-     integer :: fft_lens(2) ! length of each dim for 2D transform
+     integer                            :: N_x, N_y
+     integer                            :: N_x_fft, N_y_fft
+     integer,               public      :: xStride, yStride                  ! coarsening strides
+     real,                  public      :: rdlon, rdlat                      ! grid spacing of the (coarsened) grid
+     real,                  allocatable :: field1_fft(:,:), field2_fft(:,:)
+     integer                            :: fft_lens(2)                       ! length of each dim for 2D transform
 #ifdef MKL_AVAILABLE
-     integer :: comm
-     integer :: node_comm
-     integer :: win
-     type (c_ptr) :: base_address 
+     integer                            :: comm
+     integer                            :: node_comm
+     integer                            :: win
+     type (c_ptr)                       :: base_address 
      
-     type(DFTI_DESCRIPTOR), pointer :: Desc_Handle
-     type(DFTI_DESCRIPTOR), pointer :: Desc_Handle_dim1
-     type(DFTI_DESCRIPTOR), pointer :: Desc_Handle_dim2
-     integer, allocatable :: dim1_counts(:)
-     integer, allocatable :: dim2_counts(:)
+     type(DFTI_DESCRIPTOR), pointer     :: Desc_Handle
+     type(DFTI_DESCRIPTOR), pointer     :: Desc_Handle_dim1
+     type(DFTI_DESCRIPTOR), pointer     :: Desc_Handle_dim2
+     integer,               allocatable :: dim1_counts(:)
+     integer,               allocatable :: dim2_counts(:)
 #endif
 
    contains
@@ -110,11 +111,11 @@ contains
     type(grid_def_type),   intent(in)  :: pert_grid_f
     integer,               intent(out) :: Nx, Ny, Nx_fft, Ny_fft, xStride, yStride
     real,                  intent(out) :: rdlon, rdlat
-
+    
     real, parameter :: mult_of_xcorr = 2.
     real, parameter :: mult_of_ycorr = 2.
     real, parameter :: coarsen_param = 0.8
-
+    
     xStride = 1
     yStride = 1
     if (pert_param%coarsen) then
@@ -123,38 +124,39 @@ contains
     endif
     rdlon = real(xStride)*pert_grid_f%dlon
     rdlat = real(yStride)*pert_grid_f%dlat
-
+    
     ! NOTE: number of grid cells of coarsened grid might not evenly divide
     ! that of pert_grid_f
     Nx = (pert_grid_f%N_lon + xStride - 1) / xStride
     Ny = (pert_grid_f%N_lat + yStride - 1) / yStride
-
+    
     ! add minimum required correlation lengths, ensure powers of two
     Nx_fft = 2**ceiling(log(real(Nx + ceiling(mult_of_xcorr*pert_param%xcorr/rdlon)))/log(2.))
     Ny_fft = 2**ceiling(log(real(Ny + ceiling(mult_of_ycorr*pert_param%ycorr/rdlat)))/log(2.))
-
+    
   end subroutine calc_fft_grid
 
   ! key for caching random field instances
 
   function rectangle_random_fields_id(pert_param, pert_grid_f) result(id_string)
-
+    
     type(pert_param_type), intent(in) :: pert_param
     type(grid_def_type),   intent(in) :: pert_grid_f
     character(len=:), allocatable     :: id_string
-
+    
     integer            :: Nx, Ny, Nx_fft, Ny_fft, xStride, yStride
     real               :: rdlon, rdlat
     character(len=256) :: id
-
+    
     call calc_fft_grid(pert_param, pert_grid_f, Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, rdlon, rdlat)
     write(id,'(i0,":",i0,":",i0,":",i0,":",i0,":",i0,":",es16.8,":",es16.8)') &
          Nx, Ny, Nx_fft, Ny_fft, xStride, yStride, pert_param%xcorr, pert_param%ycorr
     id_string = trim(id)
-
+    
   end function rectangle_random_fields_id
-
+  
   ! constructor (set parameter values), allocate memory
+
   function new_rectangle_random_fields(pert_param, pert_grid_f, comm, rc) result (rf)
     
     ! input/output variables [NEED class(rectangle_random_fields)
@@ -174,7 +176,7 @@ contains
     call calc_fft_grid(pert_param, pert_grid_f, rf%N_x, rf%N_y, rf%N_x_fft, rf%N_y_fft, &
          rf%xStride, rf%yStride, rf%rdlon, rf%rdlat)
     rf%ID_string = rectangle_random_fields_id(pert_param, pert_grid_f)
-
+    
     ! allocate memory
     allocate(rf%field1_fft(rf%N_x_fft, rf%N_y_fft))
     allocate(rf%field2_fft(rf%N_x_fft, rf%N_y_fft))
@@ -259,14 +261,16 @@ contains
   ! **************************************************************************
   
   ! destructor - deallocate memory
+  
   subroutine finalize(this, rc)
 
     ! input/output variables
-    class(rectangle_random_fields), intent(inout) :: this
-    integer, optional, intent(out) :: rc
+    class(rectangle_random_fields),           intent(inout) :: this
+    integer,                        optional, intent(out)   :: rc
+
     ! local variable
     integer :: status
-
+    
     ! deallocate memory
     if(allocated(this%field1_fft)) deallocate(this%field1_fft)
     if(allocated(this%field2_fft)) deallocate(this%field2_fft)
@@ -287,7 +291,7 @@ contains
        deallocate(this%dim1_counts, this%dim2_counts)
     endif
 #endif
-
+    
   end subroutine finalize
   
 
@@ -327,7 +331,7 @@ contains
 
     ! input/output variables
     class(rectangle_random_fields), intent(inout) :: this
-    real,                 intent(in)    :: lx, ly, dx, dy
+    real,                           intent(in)    :: lx, ly, dx, dy
 
     ! local variables
     real    :: dkx, dky, fac, lamx2dkx2, lamy2dky2
@@ -641,15 +645,15 @@ contains
     implicit none
 
     ! input/output variables
-    class(rectangle_random_fields), intent(inout) :: this
-    integer, intent(inout) :: rseed(NRANDSEED) ! nr_gasdev modifies rseed
-    real, dimension(:,:), intent(out), target :: rfield
+    class(rectangle_random_fields),                 intent(inout)       :: this
+    integer,                                        intent(inout)       :: rseed(NRANDSEED)  ! nr_gasdev modifies rseed
+    real,                           dimension(:,:), intent(out), target :: rfield
     
     ! local variables
-    integer :: Nxy, index
+    integer           :: Nxy, index
     real, allocatable :: buf(:)
-    logical :: NxyIsOdd
-    real :: tmp_real(2)
+    logical           :: NxyIsOdd
+    real              :: tmp_real(2)
 
     Nxy = this%N_x*this%N_y
 
@@ -690,45 +694,49 @@ contains
     stop
     
   end subroutine quit
-
+  
 #ifdef MKL_AVAILABLE
   subroutine win_allocate(this, nx, ny, rc)
-     class(rectangle_random_fields), intent(inout) :: this
-     integer, intent(in) :: nx, ny
-     integer, optional, intent(out) :: rc
-     complex :: dummy
-     integer(kind=MPI_ADDRESS_KIND) :: windowsize
-     integer :: disp_unit,status, Rank
-     integer(kind=MPI_ADDRESS_KIND) :: n_bytes 
-
-
-     call MPI_Comm_rank( this%node_comm, rank, status)
-     n_bytes = nx*ny*c_sizeof(dummy)
-     windowsize = 0_MPI_ADDRESS_KIND
-     if (Rank == 0) windowsize = n_bytes
-     disp_unit  = 4
-     call MPI_Win_allocate_shared(windowsize, disp_unit, MPI_INFO_NULL, this%node_comm, &
-              this%base_address, this%win, status)
-     _VERIFY(status)
-     if (rank /=0)  CALL MPI_Win_shared_query(this%win, 0, windowsize, disp_unit, this%base_address, status)
-     call MPI_Win_fence(0, this%win, status)
-     _VERIFY(status)
-     call MPI_Barrier(this%node_comm, status)
-     _VERIFY(status)
-     _RETURN(_SUCCESS)
+    
+    class(rectangle_random_fields),           intent(inout) :: this
+    integer,                                  intent(in)    :: nx, ny
+    integer,                        optional, intent(out)   :: rc
+    
+    ! local variables
+    complex                        :: dummy
+    integer(kind=MPI_ADDRESS_KIND) :: windowsize
+    integer                        :: disp_unit,status, Rank
+    integer(kind=MPI_ADDRESS_KIND) :: n_bytes 
+    
+    call MPI_Comm_rank( this%node_comm, rank, status)
+    n_bytes = nx*ny*c_sizeof(dummy)
+    windowsize = 0_MPI_ADDRESS_KIND
+    if (Rank == 0) windowsize = n_bytes
+    disp_unit  = 4
+    call MPI_Win_allocate_shared(windowsize, disp_unit, MPI_INFO_NULL, this%node_comm, &
+         this%base_address, this%win, status)
+    _VERIFY(status)
+    if (rank /=0)  CALL MPI_Win_shared_query(this%win, 0, windowsize, disp_unit, this%base_address, status)
+    call MPI_Win_fence(0, this%win, status)
+    _VERIFY(status)
+    call MPI_Barrier(this%node_comm, status)
+    _VERIFY(status)
+    _RETURN(_SUCCESS)
   end subroutine win_allocate
-
+  
   subroutine win_deallocate(this, rc)
-     class(rectangle_random_fields), intent(inout) :: this
-     integer, optional, intent(out) :: rc
-     integer :: status
-     call MPI_Win_fence(0, this%win, status)
-     _VERIFY(status)
-     call MPI_Win_free(this%win, status)
-     _VERIFY(status)
-     call MPI_comm_free(this%node_comm, status)
-     _VERIFY(status)
-
+    
+    class(rectangle_random_fields),           intent(inout) :: this
+    integer,                        optional, intent(out)   :: rc
+    
+    integer :: status
+    call MPI_Win_fence(0, this%win, status)
+    _VERIFY(status)
+    call MPI_Win_free(this%win, status)
+    _VERIFY(status)
+    call MPI_comm_free(this%node_comm, status)
+    _VERIFY(status)
+    
   end subroutine win_deallocate
 #endif
   

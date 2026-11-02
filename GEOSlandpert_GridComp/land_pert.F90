@@ -38,17 +38,22 @@ module land_pert_routines
        init_randseed
 
   use rectangle_random_fieldsMod
-  use sphere_random_fields_mod, only: sphere_random_fields, &
+  
+  use sphere_random_fields_mod,         ONLY:     &
+       sphere_random_fields,                      &
        sphere_random_fields_id
+  
   use StringAbstractRandom_fieldsMapMod
-  use abstract_random_fieldsMod, only: abstract_random_fields
 
+  use abstract_random_fieldsMod,        ONLY:     &
+       abstract_random_fields
+  
   use nr_jacobi,                        ONLY:     &
        jacobi
-
+  
   use LDAS_TileCoordType,               ONLY:     &
        grid_def_type
-
+  
   use LDAS_ExceptionsMod,               ONLY:     & 
        ldas_abort,                                &
        LDAS_GENERIC_ERROR
@@ -78,10 +83,10 @@ contains
   ! **********************************************************************
   
   subroutine get_pert(                                &
-        N_pert, fft_npert,  N_ens,                     &
-        pert_grid_l, pert_grid_f,                      &
-        use_sphere_pert,                               &
-        dtstep,                                        &
+       N_pert, fft_npert,  N_ens,                     &
+       pert_grid_l, pert_grid_f,                      &
+       use_sphere_pert,                               &
+       dtstep,                                        &
        pert_param,                                    &
        Pert_rseed,                                    &
        Pert_ntrmdt,                                   &
@@ -119,13 +124,14 @@ contains
     integer, intent(in) :: N_pert     ! # different perturbations
     integer, intent(in) :: fft_npert  ! # different perturbations for fft; equals n_pert if proc has tiles.
 
-    integer, intent(in) :: N_ens  ! # ensemble members
+    integer, intent(in) :: N_ens      ! # ensemble members
 
     type(grid_def_type), intent(in) :: pert_grid_l
     type(grid_def_type), intent(in) :: pert_grid_f
+
     logical, intent(in) :: use_sphere_pert
 
-    real, intent(in) :: dtstep        ! perturbation time step in seconds
+    real,    intent(in) :: dtstep     ! perturbation time step in seconds
 
     ! Parameter structure for perturbations (see type definition for details).
 
@@ -394,8 +400,8 @@ contains
   
   subroutine propagate_pert(                            &
        N_pert, N_ens, pert_grid_l, pert_grid_f,         &
-        use_sphere_pert, dtstep,                        &
-        Pert_rseed,                                      &
+       use_sphere_pert, dtstep,                         &
+       Pert_rseed,                                      &
        pert_param,                                      &
        Pert_ntrmdt,                                     &
        initialize              )
@@ -432,17 +438,18 @@ contains
     integer, intent(in) :: N_ens, N_pert
 
     type(grid_def_type), intent(in) :: pert_grid_l, pert_grid_f   ! local/full grids
+
     logical, intent(in) :: use_sphere_pert
 
     type(pert_param_type), dimension(N_pert), intent(in) :: pert_param
 
-    real, intent(in) :: dtstep  ! time step of generation of error fields [s]
-
+    real,    intent(in) :: dtstep  ! time step of generation of error fields [s]
+    
     integer, dimension(NRANDSEED,N_ens), intent(inout) :: Pert_rseed
-
+    
     real, dimension(pert_grid_l%N_lon, pert_grid_l%N_lat, N_pert, N_ens), &
          intent(inout) :: Pert_ntrmdt
-
+    
     logical, intent(in) :: initialize   ! switch
 
     ! ---------------------------    
@@ -1231,31 +1238,31 @@ contains
   end subroutine get_sqrt_corr_matrix
   
   ! ************************************************************************
-
-   function find_rf(pert_param, pert_grid_f, use_sphere_pert, comm) result (rf)
-
-    class(abstract_random_fields), pointer   :: rf
-     type(pert_param_type),         intent(in) :: pert_param
-     type(grid_def_type),           intent(in) :: pert_grid_f
-     logical,                        intent(in) :: use_sphere_pert
+  
+  function find_rf(pert_param, pert_grid_f, use_sphere_pert, comm) result (rf)
+    
+    class(abstract_random_fields), pointer    :: rf
+    type(pert_param_type),         intent(in) :: pert_param
+    type(grid_def_type),           intent(in) :: pert_grid_f
+    logical,                       intent(in) :: use_sphere_pert
     integer,             optional, intent(in) :: comm
     
     ! local variables
     
-    type(StringAbstractRandom_fieldsMapIterator) :: iter
-    character(len=:), allocatable :: id_string
-    type(rectangle_random_fields) :: rf_tmp
-    type(sphere_random_fields) :: sf_tmp
-
-     if (use_sphere_pert) then
-       id_string = sphere_random_fields_id(pert_param, pert_grid_f)
+    type(StringAbstractRandom_fieldsMapIterator)              :: iter
+    character(len=:),                             allocatable :: id_string
+    type(rectangle_random_fields)                             :: rf_tmp
+    type(sphere_random_fields)                                :: sf_tmp
+    
+    if (use_sphere_pert) then
+       id_string = sphere_random_fields_id(   pert_param, pert_grid_f)
     else
        id_string = rectangle_random_fields_id(pert_param, pert_grid_f)
     end if
     iter = random_fieldsMap%find(id_string)
     if (iter == random_fieldsMap%end() ) then
-        if (use_sphere_pert) then
-          sf_tmp = sphere_random_fields(pert_param, pert_grid_f, comm=comm)
+       if (use_sphere_pert) then
+          sf_tmp = sphere_random_fields(   pert_param, pert_grid_f, comm=comm)
           call random_fieldsMap%insert(id_string, sf_tmp)
        else
           rf_tmp = rectangle_random_fields(pert_param, pert_grid_f, comm=comm)
@@ -1584,9 +1591,9 @@ program test
   pert_grid%dlon  = dx
   pert_grid%dlat  = dy
     
-   call get_pert(                                           &
-        N_forcepert, N_forcepert, N_ens, pert_grid,           &
-        pert_grid, .false., dtstep,                           &
+  call get_pert(                                           &
+       N_forcepert, N_forcepert, N_ens, pert_grid,         &
+       pert_grid, .false., dtstep,                         &
        forcepert_param,                                    &
        Forcepert_rseed,                                    &
        Forcepert_ntrmdt,                                   &
@@ -1611,9 +1618,9 @@ program test
   
   do tt=1,N_t
      
-      call get_pert(                                           &
-           N_forcepert, N_forcepert, N_ens, pert_grid,         &
-           pert_grid, .false., dtstep,                         &
+     call get_pert(                                           &
+          N_forcepert, N_forcepert, N_ens, pert_grid,         &
+          pert_grid, .false., dtstep,                         &
           forcepert_param,                                    &
           Forcepert_rseed,                                    &
           Forcepert_ntrmdt,                                   &
