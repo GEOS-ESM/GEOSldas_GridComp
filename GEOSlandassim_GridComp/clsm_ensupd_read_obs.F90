@@ -36,7 +36,8 @@ module clsm_ensupd_read_obs
        vsqfnelt, vsfseek, vsfsfld,                &
        vsfread, vsfdtch, vfend,                   &
        sfstart, sfn2index, sfselect,              &
-       sfginfo, sfrdata, sfendacc, sfend
+       sfginfo, sfrdata, sfendacc, sfend,         &
+       sffattr, sfgainfo, sfrcatt
   
   use MAPL,                             ONLY:     &
        MAPL_ease_convert,                         &
@@ -6858,6 +6859,74 @@ contains
     
   ! *****************************************************************
   
+  subroutine get_MODIS_granule_id( sd_id, granule_id )
+
+    ! get original file name (incl. production time stamp) of MODIS hdf4 file from
+    ! LOCALGRANULEID in global attribute "CoreMetadata.0" (ODL text), e.g.,
+    !
+    !    OBJECT                 = LOCALGRANULEID
+    !      NUM_VAL              = 1
+    !      VALUE                = "MYD10C1.A2020015.061.2020326041737.hdf"
+    !    END_OBJECT             = LOCALGRANULEID
+    !
+    ! returns blank if not found
+    !
+    ! amfox, 3 Nov 2026
+    !
+    ! -------------------------------------------------------------------------------------------------
+
+    implicit none
+
+    integer,                        intent(in)  :: sd_id              ! from sfstart()
+
+    character(*),                   intent(out) :: granule_id
+
+    ! local variables
+
+    integer                                     :: attr_index, data_type, attr_count, status, i1, i2, i3
+
+    character(256)                              :: attr_name
+
+    character(:),                   allocatable :: core_metadata
+
+    ! -------------------------------------------------
+
+    granule_id = ''
+
+    attr_index = sffattr( sd_id, 'CoreMetadata.0' )
+
+    if (attr_index < 0) return
+
+    status = sfgainfo( sd_id, attr_index, attr_name, data_type, attr_count )
+
+    if (status < 0) return
+
+    allocate(character(attr_count) :: core_metadata)
+
+    status = sfrcatt( sd_id, attr_index, core_metadata )
+
+    if (status >= 0) then
+
+       ! find first double quote after LOCALGRANULEID (i.e., start of VALUE) and the closing double quote
+
+       i2 = 0
+       i3 = 0
+
+       i1 = index( core_metadata, 'LOCALGRANULEID' )
+
+       if (i1 > 0)  i2 = index( core_metadata(i1:),    '"' )      ! opening quote (relative to i1)
+       if (i2 > 0)  i3 = index( core_metadata(i1+i2:), '"' )      ! closing quote (relative to i1+i2)
+
+       if (i3 > 1)  granule_id = core_metadata(i1+i2:i1+i2+i3-2)
+
+    end if
+
+    deallocate(core_metadata)
+
+  end subroutine get_MODIS_granule_id
+
+  ! *****************************************************************
+
   subroutine read_MODIS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
        N_good_data, CMG_lon, CMG_lat, CMG_SCF )
     
@@ -6943,6 +7012,8 @@ contains
     integer                                         :: status, sd_id, sds_id, sds_index
     
     character(64)                                   :: sds_name
+
+    character(256)                                  :: granule_id
 
     integer                                         :: rank, data_type, num_attrs
 
@@ -7096,6 +7167,13 @@ contains
        
     end if
     
+    ! log original file name (incl. production time stamp) because files are renamed
+    ! (see read_obs_MODIS_SCF()); identifies the obs used in an experiment
+
+    call get_MODIS_granule_id( sd_id, granule_id )
+
+    if (logit) write (logunit,'(400A)') '  LocalGranuleID = ', trim(granule_id)
+
     ! read data
 
     do nn=1,N_fields
