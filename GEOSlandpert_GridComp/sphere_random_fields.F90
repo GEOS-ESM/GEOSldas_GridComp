@@ -15,10 +15,11 @@
 !
 ! Build (constructor): c2, sqrt(C_l) and the m's owned by this rank
 !   (snake order).
-! Draw: random a_lm -> per-m normalised associated Legendre functions
-!   Pbar_lm(cos theta_j) (north rings) -> DGEMM (even/odd l split gives both
-!   hemispheres) -> MPI_Alltoallv to ring blocks -> batched inverse
-!   real FFT -> MPI_Allgatherv.  Two fields are drawn per call.
+! Draw: random a_lm -> per-m Legendre synthesis, with the normalised
+!   Pbar_lm(cos theta_j) recurrence (north rings) fused into the sum (even/odd
+!   l split gives both hemispheres) -> MPI_Alltoallv to ring blocks -> batched
+!   inverse real FFT -> normalisation on local rings -> MPI_Allgatherv.
+!   Two fields are drawn per call.
 !
 ! The random coefficients are taken from one global stream (identical on
 ! every rank) so the result is independent of the number of ranks and the
@@ -249,8 +250,6 @@ contains
       stop 1
     end if
     call sh_draw(this, rseed, rfield, rfield2)
-    call normalize_unit_variance(rfield)
-    call normalize_unit_variance(rfield2)
   end subroutine generate_2d_Random_field
 
   ! ----------------------------------------------------------------------
@@ -303,33 +302,59 @@ contains
   end subroutine finalize
 
   ! ======================================================================
-  ! Pbar_lm(x_j) for l = m..L, north rings j = 1..nh, stored P(nh, nl).
+  ! Legendre synthesis for one m, fused with the normalised Pbar_lm(x_j)
+  ! recurrence (l = m..L, north rings j = 1..nh) so no Pbar matrix is stored:
+  !   E(j,c) = sum_{l-m even} Pbar_lm(x_j) gz(l-m+1,c)
+  !   O(j,c) = sum_{l-m odd } Pbar_lm(x_j) gz(l-m+1,c)
 
-  subroutine plm_block(sh, m, nl, P)
+  subroutine plm_accum(sh, m, nl, gz, E, O)
     type(sphere_random_fields), intent(in) :: sh
     integer, intent(in) :: m, nl
-    real(REAL64), intent(out) :: P(sh%nh, nl)
+    real(REAL64), intent(in) :: gz(:,:)
+    real(REAL64), intent(out) :: E(sh%nh,4), O(sh%nh,4)
+    real(REAL64) :: p0(sh%nh), p1(sh%nh)
     integer :: j, l, k
-    real(REAL64) :: a, b, rl, rm
+    real(REAL64) :: a, b, rl, rm, pn
 
     rm = real(m,REAL64)
     do j = 1, sh%nh
-      P(j,1) = exp(sh%lfac(m) + rm*sh%logs(j))   ! underflow -> 0 is harmless
+      p1(j) = exp(sh%lfac(m) + rm*sh%logs(j))   ! underflow -> 0 is harmless
+      E(j,:) = p1(j)*gz(1,:)
     end do
-    if (nl >= 2) then
-      a = sqrt(real(2*m+3,REAL64))
-      P(:,2) = a * sh%x(:) * P(:,1)
-    end if
+    O = 0.0d0
+    if (nl < 2) return
+    a = sqrt(real(2*m+3,REAL64))
+    do j = 1, sh%nh
+      p0(j) = p1(j)
+      p1(j) = a * sh%x(j) * p0(j)
+      O(j,:) = p1(j)*gz(2,:)
+    end do
     do k = 3, nl
       l = m + k - 1
       rl = real(l,REAL64)
       a = sqrt((4.0d0*rl*rl - 1.0d0) / (rl*rl - rm*rm))
       b = sqrt(((rl-1.0d0)**2 - rm*rm) / (4.0d0*(rl-1.0d0)**2 - 1.0d0))
-      do j = 1, sh%nh
-        P(j,k) = a * (sh%x(j)*P(j,k-1) - b*P(j,k-2))
-      end do
+      if (mod(k,2) == 1) then
+        do j = 1, sh%nh
+          pn = a * (sh%x(j)*p1(j) - b*p0(j))
+          p0(j) = p1(j); p1(j) = pn
+          E(j,1) = E(j,1) + pn*gz(k,1)
+          E(j,2) = E(j,2) + pn*gz(k,2)
+          E(j,3) = E(j,3) + pn*gz(k,3)
+          E(j,4) = E(j,4) + pn*gz(k,4)
+        end do
+      else
+        do j = 1, sh%nh
+          pn = a * (sh%x(j)*p1(j) - b*p0(j))
+          p0(j) = p1(j); p1(j) = pn
+          O(j,1) = O(j,1) + pn*gz(k,1)
+          O(j,2) = O(j,2) + pn*gz(k,2)
+          O(j,3) = O(j,3) + pn*gz(k,3)
+          O(j,4) = O(j,4) + pn*gz(k,4)
+        end do
+      end if
     end do
-  end subroutine plm_block
+  end subroutine plm_accum
 
   ! ======================================================================
   ! sh_draw: two independent realisations f1, f2 on the (nlon, nlat) grid
@@ -341,10 +366,10 @@ contains
     real, intent(out) :: f1(sh%nlon, sh%nlat), f2(sh%nlon, sh%nlat)
 
     complex(REAL64), allocatable :: Gm(:,:,:), sbuf(:), rbuf(:), Gl(:)
-    real(REAL64), allocatable :: Pw(:), Be(:,:), Bo(:,:), E(:,:), O(:,:), gz(:,:), rout(:)
+    real(REAL64), allocatable :: E(:,:), O(:,:), gz(:,:), rout(:)
     real, allocatable :: u(:), loc1(:), loc2(:)
     integer, allocatable :: rc(:), rd(:), sc(:), sd(:), rcv(:), rdv(:), ptr(:)
-    integer :: i, m, nl, ne, no, k, l, j, c, ierr, nlat, nlon, nu, r, f, p, s
+    integer :: i, m, nl, k, l, j, c, ierr, nlat, nlon, nu, r, f, p, s
     integer(INT64) :: n0
     real(REAL64) :: fac, r1, r2
 
@@ -357,14 +382,12 @@ contains
 
     ! Gm(ring, field, i): Fourier coefficient of owned mode mloc(i)
     allocate(Gm(nlat, 2, max(1, sh%nmloc)))
-    allocate(Be((sh%L+2)/2, 4), Bo((sh%L+2)/2, 4), E(sh%nh,4), O(sh%nh,4))
+    allocate(E(sh%nh,4), O(sh%nh,4))
     allocate(gz(sh%L+1, 4))
-    allocate(Pw(int(sh%nh,INT64)*int(sh%L+1,INT64)))
 
     do i = 1, sh%nmloc
       m  = sh%mloc(i)
       nl = sh%L - m + 1
-      ne = (nl+1)/2; no = nl/2
       fac = merge(1.0d0, sqrt(0.5d0), m == 0)
       do k = 1, nl
         l  = m + k - 1
@@ -380,19 +403,7 @@ contains
       if (m == 0) then
         gz(1:nl,2) = 0.0d0; gz(1:nl,4) = 0.0d0
       end if
-      Be(1:ne,:) = gz(1:nl:2,:)
-      if (no > 0) Bo(1:no,:) = gz(2:nl:2,:)
-
-      ! even/odd l rows of Pbar are interleaved: leading dimension 2*nh
-      call plm_block(sh, m, nl, Pw(1:int(sh%nh,INT64)*nl))
-      call dgemm('N','N', sh%nh, 4, ne, 1.0d0, Pw(1), 2*sh%nh, &
-                 Be, size(Be,1), 0.0d0, E, sh%nh)
-      if (no > 0) then
-        call dgemm('N','N', sh%nh, 4, no, 1.0d0, Pw(1+sh%nh), 2*sh%nh, &
-                   Bo, size(Bo,1), 0.0d0, O, sh%nh)
-      else
-        O = 0.0d0
-      end if
+      call plm_accum(sh, m, nl, gz, E, O)
 
       ! north ring j (theta_j) -> lat index nlat+1-j ; south mirror -> j
       do j = 1, sh%nh
@@ -457,23 +468,82 @@ contains
     call irfft_rows(Gl, 2*sh%nloc, sh%nm, nlon, rout)
 #endif
 
+    ! --- local rings to single precision, normalised to zero mean and
+    !     unit variance using global sums (ring partial sums are combined in
+    !     ring order, so the result does not depend on the number of ranks)
+    allocate(loc1(max(1,nlon*sh%nloc)), loc2(max(1,nlon*sh%nloc)))
+    do j = 1, sh%nloc
+      loc1((j-1)*nlon+1:j*nlon) = real(rout((2*j-2)*nlon+1:(2*j-1)*nlon))
+      loc2((j-1)*nlon+1:j*nlon) = real(rout((2*j-1)*nlon+1:(2*j)*nlon))
+    end do
+    deallocate(rout)
+    call normalize_rings(sh, loc1, loc2)
+
     if (sh%comm /= MPI_COMM_NULL) then
-      allocate(loc1(max(1,nlon*sh%nloc)), loc2(max(1,nlon*sh%nloc)))
-      do j = 1, sh%nloc
-        loc1((j-1)*nlon+1:j*nlon) = real(rout((2*j-2)*nlon+1:(2*j-1)*nlon))
-        loc2((j-1)*nlon+1:j*nlon) = real(rout((2*j-1)*nlon+1:(2*j)*nlon))
-      end do
       allocate(rc(sh%npes), rd(sh%npes))
       rc = nlon*sh%rcount; rd = nlon*sh%rdispl
       call MPI_Allgatherv(loc1, nlon*sh%nloc, MPI_REAL, f1, rc, rd, MPI_REAL, sh%comm, ierr)
       call MPI_Allgatherv(loc2, nlon*sh%nloc, MPI_REAL, f2, rc, rd, MPI_REAL, sh%comm, ierr)
     else
-      do j = 1, nlat
-        f1(:,j) = real(rout((2*j-2)*nlon+1:(2*j-1)*nlon))
-        f2(:,j) = real(rout((2*j-1)*nlon+1:(2*j)*nlon))
-      end do
+      f1 = reshape(loc1, [nlon, nlat])
+      f2 = reshape(loc2, [nlon, nlat])
     end if
   end subroutine sh_draw
+
+  ! ======================================================================
+  ! normalize_rings: zero mean, unit variance over the full field for both
+  ! fields, given only the local rings (nlon x nloc each).
+
+  subroutine normalize_rings(sh, loc1, loc2)
+    type(sphere_random_fields), intent(in) :: sh
+    real, intent(inout) :: loc1(:), loc2(:)
+    real(REAL64) :: mean(2), norm(2)
+    real(REAL64), allocatable :: rsum(:,:)
+    integer :: j, n, nlon
+
+    nlon = sh%nlon
+    n    = sh%nlon*sh%nlat
+    allocate(rsum(2, sh%nlat))
+
+    call ring_sums(.false.)
+    mean = sum(rsum, dim=2) / real(n,REAL64)
+    loc1(1:nlon*sh%nloc) = real(real(loc1(1:nlon*sh%nloc),REAL64) - mean(1))
+    loc2(1:nlon*sh%nloc) = real(real(loc2(1:nlon*sh%nloc),REAL64) - mean(2))
+
+    call ring_sums(.true.)
+    norm = sqrt(sum(rsum, dim=2) / real(n,REAL64))
+    if (norm(1) > 0.0_REAL64) &
+      loc1(1:nlon*sh%nloc) = real(real(loc1(1:nlon*sh%nloc),REAL64) / norm(1))
+    if (norm(2) > 0.0_REAL64) &
+      loc2(1:nlon*sh%nloc) = real(real(loc2(1:nlon*sh%nloc),REAL64) / norm(2))
+
+  contains
+
+    ! per-ring sums (or sums of squares), gathered into rsum(2, nlat)
+    subroutine ring_sums(squared)
+      logical, intent(in) :: squared
+      real(REAL64) :: lsum(2, max(1,sh%nloc))
+      integer :: ierr, k0
+      do j = 1, sh%nloc
+        k0 = (j-1)*nlon
+        if (squared) then
+          lsum(1,j) = sum(real(loc1(k0+1:k0+nlon),REAL64)**2)
+          lsum(2,j) = sum(real(loc2(k0+1:k0+nlon),REAL64)**2)
+        else
+          lsum(1,j) = sum(real(loc1(k0+1:k0+nlon),REAL64))
+          lsum(2,j) = sum(real(loc2(k0+1:k0+nlon),REAL64))
+        end if
+      end do
+      if (sh%comm /= MPI_COMM_NULL) then
+        call MPI_Allgatherv(lsum, 2*sh%nloc, MPI_DOUBLE_PRECISION, rsum, &
+                            2*sh%rcount, 2*sh%rdispl, MPI_DOUBLE_PRECISION, sh%comm, ierr)
+      else
+        rsum = lsum
+      end if
+    end subroutine ring_sums
+
+  end subroutine normalize_rings
+
 
   ! ======================================================================
     
@@ -500,19 +570,6 @@ contains
     end do
   end subroutine irfft_rows
 #endif
-
-  ! ======================================================================
-  
-  subroutine normalize_unit_variance(field)
-    real, intent(inout) :: field(:,:)
-    real(REAL64) :: field_mean, field_norm
-    ! Accumulate in double precision: single-precision sums over ~4e6
-    ! points bias the variance by O(1e-3).
-    field_mean = sum(real(field,REAL64)) / real(size(field),REAL64)
-    field = real(real(field,REAL64) - field_mean)
-    field_norm = sqrt(sum(real(field,REAL64)**2) / real(size(field),REAL64))
-    if (field_norm > 0.0_REAL64) field = real(real(field,REAL64) / field_norm)
-  end subroutine normalize_unit_variance
 
   ! ======================================================================
   ! xcorr_deg_to_c2: calibrate c2 from xcorr.
