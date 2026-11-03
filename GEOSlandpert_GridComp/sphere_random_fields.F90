@@ -17,7 +17,7 @@
 !   (snake order).
 ! Draw: random a_lm -> per-m normalised associated Legendre functions
 !   Pbar_lm(cos theta_j) (north rings) -> DGEMM (even/odd l split gives both
-!   hemispheres) -> MPI_Reduce_scatter to ring blocks -> batched inverse
+!   hemispheres) -> MPI_Alltoallv to ring blocks -> batched inverse
 !   real FFT -> MPI_Allgatherv.  Two fields are drawn per call.
 !
 ! The random coefficients are taken from one global stream (identical on
@@ -64,6 +64,8 @@ module sphere_random_fields_mod
     ! m-modes owned by this rank
     integer                            :: nmloc = 0
     integer,               allocatable :: mloc(:)
+    integer,               allocatable :: mowner(:)                         ! owning rank per m (0:L)
+    integer,               allocatable :: nmcount(:)                        ! number of m's per rank
     integer(INT64),        allocatable :: coff(:)                           ! global coefficient offset per m (0:L)
     integer(INT64)                     :: ncoef = 0                         ! total (l,m) pairs, m<=l<=L
     real(  REAL64),        allocatable :: sqrtC(:), lfac(:), x(:), logs(:)
@@ -187,11 +189,14 @@ contains
     rf%ncoef = rf%coff(rf%L) + 1
 
     ! --- m distribution: snake order for load balance -------------------
-    allocate(rf%mloc(rf%L/rf%npes + 2))
+    allocate(rf%mloc(rf%L/rf%npes + 2), rf%mowner(0:rf%L), rf%nmcount(rf%npes))
     rf%nmloc = 0
+    rf%nmcount = 0
     do m = 0, rf%L
       r = mod(m, 2*rf%npes)
       if (r >= rf%npes) r = 2*rf%npes - 1 - r
+      rf%mowner(m) = r
+      rf%nmcount(r+1) = rf%nmcount(r+1) + 1
       if (r == rf%rank) then
         rf%nmloc = rf%nmloc + 1
         rf%mloc(rf%nmloc) = m
@@ -281,6 +286,8 @@ contains
     end if
 #endif
     if (allocated(this%mloc))   deallocate(this%mloc)
+    if (allocated(this%mowner)) deallocate(this%mowner)
+    if (allocated(this%nmcount)) deallocate(this%nmcount)
     if (allocated(this%coff))   deallocate(this%coff)
     if (allocated(this%sqrtC))  deallocate(this%sqrtC)
     if (allocated(this%lfac))   deallocate(this%lfac)
@@ -333,11 +340,11 @@ contains
     integer, intent(inout) :: rseed(NRANDSEED)
     real, intent(out) :: f1(sh%nlon, sh%nlat), f2(sh%nlon, sh%nlat)
 
-    complex(REAL64), allocatable :: G(:,:,:), Gl(:)
+    complex(REAL64), allocatable :: Gm(:,:,:), sbuf(:), rbuf(:), Gl(:)
     real(REAL64), allocatable :: Pw(:), Be(:,:), Bo(:,:), E(:,:), O(:,:), gz(:,:), rout(:)
     real, allocatable :: u(:), loc1(:), loc2(:)
-    integer, allocatable :: rc(:), rd(:)
-    integer :: i, m, nl, ne, no, k, l, j, c, ierr, nlat, nlon, nu
+    integer, allocatable :: rc(:), rd(:), sc(:), sd(:), rcv(:), rdv(:), ptr(:)
+    integer :: i, m, nl, ne, no, k, l, j, c, ierr, nlat, nlon, nu, r, f, p, s
     integer(INT64) :: n0
     real(REAL64) :: fac, r1, r2
 
@@ -348,7 +355,8 @@ contains
     allocate(u(nu))
     call nr_ran2_2d(1, nu, rseed, u)
 
-    allocate(G(sh%nm, 2, nlat)); G = (0.0d0, 0.0d0)
+    ! Gm(ring, field, i): Fourier coefficient of owned mode mloc(i)
+    allocate(Gm(nlat, 2, max(1, sh%nmloc)))
     allocate(Be((sh%L+2)/2, 4), Bo((sh%L+2)/2, 4), E(sh%nh,4), O(sh%nh,4))
     allocate(gz(sh%L+1, 4))
     allocate(Pw(int(sh%nh,INT64)*int(sh%L+1,INT64)))
@@ -388,24 +396,58 @@ contains
 
       ! north ring j (theta_j) -> lat index nlat+1-j ; south mirror -> j
       do j = 1, sh%nh
-        G(m+1,1,nlat+1-j) = cmplx(E(j,1)+O(j,1), E(j,2)+O(j,2), REAL64)
-        G(m+1,2,nlat+1-j) = cmplx(E(j,3)+O(j,3), E(j,4)+O(j,4), REAL64)
-        G(m+1,1,j)        = cmplx(E(j,1)-O(j,1), E(j,2)-O(j,2), REAL64)
-        G(m+1,2,j)        = cmplx(E(j,3)-O(j,3), E(j,4)-O(j,4), REAL64)
+        Gm(nlat+1-j,1,i) = cmplx(E(j,1)+O(j,1), E(j,2)+O(j,2), REAL64)
+        Gm(nlat+1-j,2,i) = cmplx(E(j,3)+O(j,3), E(j,4)+O(j,4), REAL64)
+        Gm(j,1,i)        = cmplx(E(j,1)-O(j,1), E(j,2)-O(j,2), REAL64)
+        Gm(j,2,i)        = cmplx(E(j,3)-O(j,3), E(j,4)-O(j,4), REAL64)
       end do
     end do
     deallocate(u)
 
     ! --- transpose m-distributed -> ring-distributed --------------------
-    allocate(Gl(max(1, 2*sh%nm*sh%nloc)))
+    ! Each rank sends only its owned modes for the destination's ring block
+    ! (ordered by owned mode, field, ring) and receives, from every rank,
+    ! that rank's modes for its own rings.
+    allocate(sc(sh%npes), sd(sh%npes), rcv(sh%npes), rdv(sh%npes))
+    sc  = 2*sh%nmloc*sh%rcount
+    rcv = 2*sh%nmcount*sh%nloc
+    sd(1) = 0; rdv(1) = 0
+    do r = 2, sh%npes
+      sd(r)  = sd(r-1)  + sc(r-1)
+      rdv(r) = rdv(r-1) + rcv(r-1)
+    end do
+    allocate(sbuf(max(1, sum(sc))), rbuf(max(1, sum(rcv))))
+    p = 0
+    do r = 1, sh%npes
+      do i = 1, sh%nmloc
+        do f = 1, 2
+          sbuf(p+1:p+sh%rcount(r)) = Gm(sh%rdispl(r)+1:sh%rdispl(r)+sh%rcount(r), f, i)
+          p = p + sh%rcount(r)
+        end do
+      end do
+    end do
+    deallocate(Gm)
     if (sh%comm /= MPI_COMM_NULL) then
-      allocate(rc(sh%npes))
-      rc = 2*sh%nm*sh%rcount
-      call MPI_Reduce_scatter(G, Gl, rc, MPI_DOUBLE_COMPLEX, MPI_SUM, sh%comm, ierr)
+      call MPI_Alltoallv(sbuf, sc, sd, MPI_DOUBLE_COMPLEX, rbuf, rcv, rdv, &
+                         MPI_DOUBLE_COMPLEX, sh%comm, ierr)
     else
-      Gl = reshape(G, [2*sh%nm*nlat])
+      rbuf = sbuf
     end if
-    deallocate(G)
+    deallocate(sbuf)
+
+    ! Gl(m+1, field, local ring); modes m > L stay zero
+    allocate(Gl(max(1, 2*sh%nm*sh%nloc))); Gl = (0.0d0, 0.0d0)
+    allocate(ptr(sh%npes)); ptr = rdv
+    do m = 0, sh%L
+      s = sh%mowner(m) + 1
+      do f = 1, 2
+        do j = 1, sh%nloc
+          Gl(m+1 + (f-1)*sh%nm + (j-1)*2*sh%nm) = rbuf(ptr(s)+j)
+        end do
+        ptr(s) = ptr(s) + sh%nloc
+      end do
+    end do
+    deallocate(rbuf, ptr)
 
     ! --- inverse real FFT of local rings (both fields) ------------------
     allocate(rout(max(1, nlon*2*sh%nloc)))
@@ -421,7 +463,7 @@ contains
         loc1((j-1)*nlon+1:j*nlon) = real(rout((2*j-2)*nlon+1:(2*j-1)*nlon))
         loc2((j-1)*nlon+1:j*nlon) = real(rout((2*j-1)*nlon+1:(2*j)*nlon))
       end do
-      allocate(rd(sh%npes))
+      allocate(rc(sh%npes), rd(sh%npes))
       rc = nlon*sh%rcount; rd = nlon*sh%rdispl
       call MPI_Allgatherv(loc1, nlon*sh%nloc, MPI_REAL, f1, rc, rd, MPI_REAL, sh%comm, ierr)
       call MPI_Allgatherv(loc2, nlon*sh%nloc, MPI_REAL, f2, rc, rd, MPI_REAL, sh%comm, ierr)
