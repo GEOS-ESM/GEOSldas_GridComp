@@ -66,8 +66,6 @@ module GEOS_LandPertGridCompMod
   integer :: lat1, lat2, lon1, lon2
   integer :: FIRST_ENS_ID
   logical :: COLDSTART
-  logical :: use_sphere_pert
-  character(len=3) :: use_sphere_pert_rc
 contains
 
   !BOP
@@ -901,9 +899,6 @@ contains
     ! Are we perturbing variables?
     call MAPL_GetResource(MAPL, internal%PERTURBATIONS, 'PERTURBATIONS:', default=0, rc=status)
     VERIFY_(status)
-    call MAPL_GetResource(MAPL, use_sphere_pert_rc, 'USE_SPHERE_PERT:', default='NO', rc=status)
-    VERIFY_(status)
-    use_sphere_pert = (trim(use_sphere_pert_rc) /= 'NO')
 
     if (internal%PERTURBATIONS == 0) then ! no perturbations
        allocate(progn_pert_param(0))
@@ -1144,7 +1139,7 @@ contains
              internal%ForcePert%fft_npert,                                       &
              1,                                                                  &
              tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-             use_sphere_pert,                                                     &
+             internal%PERTURBATIONS,                                               &
              ! arbitrary dtstep
             -1.0,                                                               &
             pert_rseed,                                                         &
@@ -1160,7 +1155,7 @@ contains
              internal%PrognPert%fft_npert,                                       &
              1,                                                                  &
              tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-             use_sphere_pert,                                                     &
+             internal%PERTURBATIONS,                                               &
              ! arbitrary dtstep
             -1.0,                                                               &
             pert_rseed,                                                         &
@@ -1425,7 +1420,7 @@ contains
           internal%ForcePert%fft_npert,                                          &
           1,                                                                     &
           tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
-          use_sphere_pert,                                                        &
+          internal%PERTURBATIONS,                                                  &
           real(internal%ForcePert%dtstep),                                       &
          internal%ForcePert%param,                                              &
          pert_rseed,                                                            &
@@ -1458,7 +1453,7 @@ contains
           internal%PrognPert%fft_npert,                                          &
           1,                                                                     &
           tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
-          use_sphere_pert,                                                        &
+          internal%PERTURBATIONS,                                                  &
           real(internal%PrognPert%dtstep),                                       &
          internal%PrognPert%param,                                              &
          pert_rseed,                                                            &
@@ -1695,7 +1690,7 @@ contains
            internal%ForcePert%fft_npert,                                       &
            1,                                                                  &
            tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-           use_sphere_pert,                                                     &
+           internal%PERTURBATIONS,                                               &
            real(internal%ForcePert%dtstep),                                    &
           pert_rseed,                                                         &
           internal%ForcePert%param,                                           &
@@ -1724,7 +1719,7 @@ contains
             internal%PrognPert%fft_npert,                                      &
             1,                                                                 &
             tcinternal%pgrid_l, tcinternal%pgrid_f,                                &
-            use_sphere_pert,                                                    &
+            internal%PERTURBATIONS,                                              &
             real(internal%PrognPert%dtstep),                                   &
            pert_rseed,                                                        &
            internal%PrognPert%param,                                          &
@@ -1972,7 +1967,7 @@ contains
                internal%ForcePert%fft_npert,                                       &
                1,                                                                  &
                tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-               use_sphere_pert,                                                     &
+               internal%PERTURBATIONS,                                               &
                real(internal%ForcePert%dtstep),                                    &
                internal%ForcePert%param,                                           &
                pert_rseed,                                                         &
@@ -2453,7 +2448,7 @@ contains
              internal%PrognPert%fft_npert,                                       &
              1,                                                                  &
              tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-             use_sphere_pert,                                                     &
+             internal%PERTURBATIONS,                                               &
              real(internal%PrognPert%dtstep),                                    &
             internal%PrognPert%param,                                           &
             pert_rseed,                                                         &

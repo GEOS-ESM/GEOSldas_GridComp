@@ -85,7 +85,7 @@ contains
   subroutine get_pert(                                &
        N_pert, fft_npert,  N_ens,                     &
        pert_grid_l, pert_grid_f,                      &
-       use_sphere_pert,                               &
+       perturbations,                                 &
        dtstep,                                        &
        pert_param,                                    &
        Pert_rseed,                                    &
@@ -108,7 +108,8 @@ contains
     ! dimension for ensemble members (and a call to subroutine adjust_mean()).
     ! Otherwise the two subroutines were identical.
     ! - wjiang+reichle, 9 Apr 2021
-    ! use_sphere_pert selects spherical or rectangular random fields.
+    ! PERTURBATIONS=2 selects spherical random fields; otherwise they are
+    ! rectangular.
 
     
     implicit none
@@ -129,7 +130,7 @@ contains
     type(grid_def_type), intent(in) :: pert_grid_l
     type(grid_def_type), intent(in) :: pert_grid_f
 
-    logical, intent(in) :: use_sphere_pert
+    integer, intent(in) :: perturbations
 
     real,    intent(in) :: dtstep     ! perturbation time step in seconds
 
@@ -254,7 +255,7 @@ contains
     if (.not. diagn_only)                            &
          call propagate_pert(                        &
           fft_npert, N_ens, pert_grid_l, pert_grid_f, &
-          use_sphere_pert,                            &
+          perturbations,                                &
          dtstep,                                     &
          Pert_rseed,                                 &
          pert_param,                                 &
@@ -400,7 +401,7 @@ contains
   
   subroutine propagate_pert(                            &
        N_pert, N_ens, pert_grid_l, pert_grid_f,         &
-       use_sphere_pert, dtstep,                         &
+       perturbations, dtstep,                         &
        Pert_rseed,                                      &
        pert_param,                                      &
        Pert_ntrmdt,                                     &
@@ -439,7 +440,7 @@ contains
 
     type(grid_def_type), intent(in) :: pert_grid_l, pert_grid_f   ! local/full grids
 
-    logical, intent(in) :: use_sphere_pert
+    integer, intent(in) :: perturbations
 
     type(pert_param_type), dimension(N_pert), intent(in) :: pert_param
 
@@ -522,9 +523,9 @@ contains
 
        ! initialize instance rf and get its grid parameters
 #ifdef MKL_AVAILABLE
-        rf => find_rf(pert_param(m), pert_grid_f, use_sphere_pert, comm=mpicomm)
+        rf => find_rf(pert_param(m), pert_grid_f, perturbations, comm=mpicomm)
 #else
-        rf => find_rf(pert_param(m), pert_grid_f, use_sphere_pert)
+        rf => find_rf(pert_param(m), pert_grid_f, perturbations)
 #endif
 
        select type (rf)
@@ -1239,12 +1240,12 @@ contains
   
   ! ************************************************************************
   
-  function find_rf(pert_param, pert_grid_f, use_sphere_pert, comm) result (rf)
+  function find_rf(pert_param, pert_grid_f, perturbations, comm) result (rf)
     
     class(abstract_random_fields), pointer    :: rf
     type(pert_param_type),         intent(in) :: pert_param
     type(grid_def_type),           intent(in) :: pert_grid_f
-    logical,                       intent(in) :: use_sphere_pert
+    integer,                       intent(in) :: perturbations
     integer,             optional, intent(in) :: comm
     
     ! local variables
@@ -1254,14 +1255,14 @@ contains
     type(rectangle_random_fields)                             :: rf_tmp
     type(sphere_random_fields)                                :: sf_tmp
     
-    if (use_sphere_pert) then
+    if (perturbations == 2) then
        id_string = sphere_random_fields_id(   pert_param, pert_grid_f)
     else
        id_string = rectangle_random_fields_id(pert_param, pert_grid_f)
     end if
     iter = random_fieldsMap%find(id_string)
     if (iter == random_fieldsMap%end() ) then
-       if (use_sphere_pert) then
+       if (perturbations == 2) then
           sf_tmp = sphere_random_fields(   pert_param, pert_grid_f, comm=comm)
           call random_fieldsMap%insert(id_string, sf_tmp)
        else
@@ -1593,7 +1594,7 @@ program test
     
   call get_pert(                                           &
        N_forcepert, N_forcepert, N_ens, pert_grid,         &
-       pert_grid, .false., dtstep,                         &
+       pert_grid, 1, dtstep,                              &
        forcepert_param,                                    &
        Forcepert_rseed,                                    &
        Forcepert_ntrmdt,                                   &
@@ -1620,7 +1621,7 @@ program test
      
      call get_pert(                                           &
           N_forcepert, N_forcepert, N_ens, pert_grid,         &
-          pert_grid, .false., dtstep,                         &
+          pert_grid, 1, dtstep,                              &
           forcepert_param,                                    &
           Forcepert_rseed,                                    &
           Forcepert_ntrmdt,                                   &
