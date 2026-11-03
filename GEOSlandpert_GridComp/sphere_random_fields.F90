@@ -22,7 +22,9 @@
 !
 ! The random coefficients are taken from one global stream (identical on
 ! every rank) so the result is independent of the number of ranks and the
-! rseed is advanced identically everywhere.
+! rseed is advanced identically everywhere.  The communicator is split per
+! node (MPI_COMM_TYPE_SHARED), so each node synthesises the full field from
+! the same rseed without inter-node communication.
 !
 ! Public interface:
 !   sphere_random_fields    - abstract_random_fields implementation
@@ -118,7 +120,9 @@ contains
     rf%ID_string = sphere_random_fields_id(pert_param, pert_grid_f)
 
     if (present(comm)) then
-      call MPI_Comm_dup(comm, rf%comm, ierr)
+      ! node-local communicator (as in rectangle_random_fields): each node
+      ! computes the full field independently, avoiding inter-node traffic
+      call MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, rf%comm, ierr)
       call MPI_Comm_rank(rf%comm, rf%rank, ierr)
       call MPI_Comm_size(rf%comm, rf%npes, ierr)
     else
