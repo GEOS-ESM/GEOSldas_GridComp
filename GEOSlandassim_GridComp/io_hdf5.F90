@@ -51,6 +51,7 @@ module io_hdf5
      procedure, public  :: closeFile
      procedure, public  :: queryDataset
      generic,   public  :: readDataset => readDataset1DReal, readDataset1DReal8, readDataset1DInt, readDataset1DChar24, readDataset2DReal, readDataset2DInt
+     generic,   public  :: readAttribute => readAttributeChar
      ! private
      procedure, private :: readDataset1DReal
      procedure, private :: readDataset1DReal8
@@ -58,6 +59,7 @@ module io_hdf5
      procedure, private :: readDataset1DChar24
      procedure, private :: readDataset2DReal
      procedure, private :: readDataset2DInt
+     procedure, private :: readAttributeChar
      procedure, private :: uninitDataset
   end type hdf5read
 
@@ -364,6 +366,56 @@ contains
     call this%uninitDataset
 
   end subroutine readDataset2DInt
+
+  ! read (fixed-length) string attribute of root group of file (e.g., global
+  ! attribute "LocalGranuleID"); returns blank if attribute does not exist
+  subroutine readAttributeChar(this, attrName, attrValue)
+
+    ! input/output variables
+    class (hdf5read), intent(inout) :: this
+    character(len=*), intent(in)  :: attrName
+    character(len=*), intent(out) :: attrValue
+
+    ! local variables
+    integer :: hdf5err
+    logical :: attr_exists
+    integer(hid_t)   :: attr_id, memtype_id
+    integer(hsize_t) :: dims(1)
+
+    ! check file state
+    if (this%file_id == INVALID_HID) then
+       write(*,*) 'ERROR readAttributeChar: No open file available'
+       stop
+    end if
+
+    attrValue = ''
+
+    call h5aexists_f(this%file_id, attrName, attr_exists, hdf5err)
+    call checkErrCode_('h5aexists_f', hdf5err)
+
+    if (.not. attr_exists) return
+
+    call h5aopen_f(this%file_id, attrName, attr_id, hdf5err)
+    call checkErrCode_('h5aopen_f', hdf5err)
+
+    ! create the memory datatype for a fixed-length string of length len(attrValue)
+    call h5tcopy_f(H5T_FORTRAN_S1, memtype_id, hdf5err)
+    call checkErrCode_('h5tcopy_f', hdf5err)
+
+    call h5tset_size_f(memtype_id, int(len(attrValue),size_t), hdf5err)
+    call checkErrCode_('h5tset_size_f', hdf5err)
+
+    dims = 1_hsize_t
+    call h5aread_f(attr_id, memtype_id, attrValue, dims, hdf5err)
+    call checkErrCode_('h5aread_f', hdf5err)
+
+    call h5tclose_f(memtype_id, hdf5err)
+    call checkErrCode_('h5tclose_f', hdf5err)
+
+    call h5aclose_f(attr_id, hdf5err)
+    call checkErrCode_('h5aclose_f', hdf5err)
+
+  end subroutine readAttributeChar
 
   ! check return code
   ! (not part of class hdf5read)

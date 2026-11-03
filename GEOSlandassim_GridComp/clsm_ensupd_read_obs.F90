@@ -7813,6 +7813,8 @@ contains
     integer,            dimension(:,:), allocatable :: Clear_Index
     integer,            dimension(:,:), allocatable :: Basic_QA
 
+    character(256)                                  :: granule_id
+
     character(len=*),                     parameter :: Iam = 'read_JPSS_SCF_hdf'
     character(len=400)                              :: err_msg
     
@@ -7926,6 +7928,13 @@ contains
     
     call h5r%openFile(trim(fname))
     
+    ! log original file name (incl. production time stamp) because files are renamed
+    ! (see read_obs_JPSS_SCF()); identifies the obs used in an experiment
+
+    call h5r%readAttribute('LocalGranuleID', granule_id)
+
+    if (logit) write (logunit,'(400A)') '  LocalGranuleID = ', trim(granule_id)
+
     ! read data
 
     do nn=1,N_fields
