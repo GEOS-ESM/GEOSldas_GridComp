@@ -13,7 +13,7 @@ endif ()
 
 # no need to install executables and scripts (not used by ldas_setup or GEOSldas.x)
 #
-install(
-  PROGRAMS compare_pert.py plot_timing.py run_compare.sh
-           xcorr_stats.py plot_xcorr_stats.py pole_check.py run_xcorr_stats.sh
-  DESTINATION bin)
+#install(
+#  PROGRAMS compare_pert.py plot_timing.py run_compare.sh
+#           xcorr_stats.py plot_xcorr_stats.py pole_check.py run_xcorr_stats.sh
+#  DESTINATION bin)
