@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
 ### Fixed
+- Fixed double assimilation of MODIS SCF obs for tiles whose center longitude is exactly on the boundary between two assimilation windows (not 0-diff for EASEv2 M36 and CF0360) ([PR #240](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/240)).
 - Fixed bugs in MATLAB obs scaling parameter scripts (not 0-diff for lat/lon grid) ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 - Fixed string and no-data obs handling in read_GEOSldas.py ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
