@@ -2747,8 +2747,8 @@ obs_param_nml(59)%adapt          = 0
 !  60 = VIIRS/JPSS2 snow cover area fraction (SCF)
 !
 ! VJ210C1.*.002.*h5: VIIRS/JPSS2 Snow Cover Daily L3 Global  0.05deg CMG, daytime (13:30 local) ascending overpass, version 2
+!
 ! for rule-based snow cover analysis (no obs error/pert specs)
-
 
 obs_param_nml(60)%descr          = 'VJ210C1'
 obs_param_nml(60)%orbit          = 1
@@ -2789,7 +2789,7 @@ obs_param_nml(60)%adapt          = 0
 !
 !  61 = VIIRS/S-NPP snow cover area fraction (SCF)
 !
-! VNP10C1.*.002.*h5: VIIRS/S-NPP SCF, 0.05deg CMG, daytime (13:30 local) ascending overpass, version 2
+! VNP10C1.*.002.*h5: VIIRS/S-NPP Snow Cover Daily L3 Global  0.05deg CMG, daytime (13:30 local) ascending overpass, version 2
 !
 ! for rule-based snow cover analysis (no obs error/pert specs)
 

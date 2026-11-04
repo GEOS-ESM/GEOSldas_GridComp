@@ -8043,7 +8043,6 @@ contains
 
   
   ! *****************************************************************
-  ! lca currently working on!!
   subroutine read_obs_SMAP_FT( date_time, N_catd, this_obs_param,            &
        dtstep_assim, tile_coord, tile_grid_d,                                &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &
