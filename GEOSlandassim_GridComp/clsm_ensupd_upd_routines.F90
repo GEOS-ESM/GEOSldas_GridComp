@@ -3309,7 +3309,7 @@ contains
   
   ! *********************************************************************
   
-   subroutine get_obs_pert( N_ens, N_obs, N_obs_param, perturbations, &
+   subroutine get_obs_pert( N_ens, N_obs, N_obs_param, pert_choice,     &
        pert_grid_f,                                                     &
        obs_param, Observations,                                         &
        Pert_rseed,                                                      &
@@ -3322,7 +3322,7 @@ contains
     implicit none
     
     integer, intent(in) :: N_ens, N_obs, N_obs_param
-    integer, intent(in) :: perturbations
+    integer, intent(in) :: pert_choice
     
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
     
@@ -3557,7 +3557,7 @@ contains
     call get_pert(                                                        &
          N_assim_species, N_assim_species, N_ens,                         &
          pert_grid_lH, pert_grid_f,                                       &  ! switched order (reichle, 17 Jul 2020)
-         perturbations,                                                   &
+         pert_choice,                                                     &
          dtstep,                                                          &
          obs_pert_param,                                                  &
          Pert_rseed,                                                      &

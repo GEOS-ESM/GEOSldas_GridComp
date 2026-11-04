@@ -102,7 +102,7 @@ module LDAS_PertTypes
   ! Internal state and its wrapper
    type T_LANDPERT_STATE
      !private
-      integer :: PERTURBATIONS    ! rc variable: 0=none, 1=rectangular, 2=sphere (see also GEOSldas_LDAS.rc) 
+      integer :: PERT_CHOICE    ! => rc variable PERTURBATIONS: 0=none, 1=rectangular, 2=sphere (see also GEOSldas_LDAS.rc) 
       integer :: ens_id
       integer :: NUM_ENSEMBLE
       logical :: isCubedSphere

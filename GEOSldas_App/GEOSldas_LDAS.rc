@@ -132,7 +132,7 @@ LAND_ASSIM: NO
 # LANDASSIM_T0: 000000   
 
 
-# ---- Perturbations: 
+# ---- Perturbations choice
 #
 #    0 : No perturbactions.
 #    1 : With perturbations (generated on rectangular grid).

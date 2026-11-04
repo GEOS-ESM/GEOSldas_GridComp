@@ -897,10 +897,10 @@ contains
     tile_coord => tcinternal%tile_coord
 
     ! Are we perturbing variables?
-    call MAPL_GetResource(MAPL, internal%PERTURBATIONS, 'PERTURBATIONS:', default=0, rc=status)
+    call MAPL_GetResource(MAPL, internal%PERT_CHOICE, 'PERTURBATIONS:', default=0, rc=status)
     VERIFY_(status)
 
-    if (internal%PERTURBATIONS == 0) then ! no perturbations
+    if (internal%PERT_CHOICE == 0) then           ! no perturbations
        allocate(progn_pert_param(0))
        allocate(force_pert_param(0))
        call MAPL_TimerOff(MAPL, "Initialize")
@@ -1136,11 +1136,11 @@ contains
        call init_randseed(pert_rseed)
        ! -ForcePert-
        call propagate_pert(                                                     &
-             internal%ForcePert%fft_npert,                                       &
-             1,                                                                  &
-             tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-             internal%PERTURBATIONS,                                               &
-             ! arbitrary dtstep
+            internal%ForcePert%fft_npert,                                       &
+            1,                                                                  &
+            tcinternal%pgrid_l, tcinternal%pgrid_f,                             &
+            internal%PERT_CHOICE,                                               &
+            ! arbitrary dtstep
             -1.0,                                                               &
             pert_rseed,                                                         &
             internal%ForcePert%param,                                           &
@@ -1152,11 +1152,11 @@ contains
 
        ! -prognostics-
        call propagate_pert(                                                     &
-             internal%PrognPert%fft_npert,                                       &
-             1,                                                                  &
-             tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-             internal%PERTURBATIONS,                                               &
-             ! arbitrary dtstep
+            internal%PrognPert%fft_npert,                                       &
+            1,                                                                  &
+            tcinternal%pgrid_l, tcinternal%pgrid_f,                             &
+            internal%PERT_CHOICE,                                               &
+            ! arbitrary dtstep
             -1.0,                                                               &
             pert_rseed,                                                         &
             internal%PrognPert%param,                                           &
@@ -1357,7 +1357,7 @@ contains
     n_lon = tcinternal%pgrid_l%n_lon
     n_lat = tcinternal%pgrid_l%n_lat
 
-    if (internal%PERTURBATIONS == 0) then ! no perturbations
+    if (internal%PERT_CHOICE == 0) then                    ! no perturbations
        call MAPL_TimerOff(MAPL, "phase2_Initialize")
        call MAPL_TimerOff(MAPL, "TOTAL")
        RETURN_(ESMF_SUCCESS)
@@ -1417,11 +1417,11 @@ contains
 
     call get_pert(                                                              &
          internal%ForcePert%npert,                                              &
-          internal%ForcePert%fft_npert,                                          &
-          1,                                                                     &
-          tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
-          internal%PERTURBATIONS,                                                  &
-          real(internal%ForcePert%dtstep),                                       &
+         internal%ForcePert%fft_npert,                                          &
+         1,                                                                     &
+         tcinternal%pgrid_l, tcinternal%pgrid_f,                                &
+         internal%PERT_CHOICE,                                                  &
+         real(internal%ForcePert%dtstep),                                       &
          internal%ForcePert%param,                                              &
          pert_rseed,                                                            &
          fpert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%ForcePert%npert),          &
@@ -1450,18 +1450,18 @@ contains
     
     call get_pert(                                                              &
          internal%PrognPert%npert,                                              &
-          internal%PrognPert%fft_npert,                                          &
-          1,                                                                     &
-          tcinternal%pgrid_l, tcinternal%pgrid_f,                                    &
-          internal%PERTURBATIONS,                                                  &
-          real(internal%PrognPert%dtstep),                                       &
+         internal%PrognPert%fft_npert,                                          &
+         1,                                                                     &
+         tcinternal%pgrid_l, tcinternal%pgrid_f,                                &
+         internal%PERT_CHOICE,                                                  &
+         real(internal%PrognPert%dtstep),                                       &
          internal%PrognPert%param,                                              &
          pert_rseed,                                                            &
          ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),          &
          ppert_grid,                                                            &
          initialize_rseed=.false.,                                              &
          initialize_ntrmdt=.false.,                                             &
-        ! propagate_pert is NOT called
+         ! propagate_pert is NOT called
          diagnose_pert_only=.true.                                              &
          )
 
@@ -1565,7 +1565,7 @@ contains
     VERIFY_(status)
     internal => wrap%ptr
 
-    if (internal%PERTURBATIONS == 0) then ! no perturbations
+    if (internal%PERT_CHOICE == 0) then                     ! no perturbations
        call MAPL_TimerOff(MAPL, "GenerateRaw")
        RETURN_(ESMF_SUCCESS)
     end if
@@ -1685,18 +1685,18 @@ contains
 
     if (ESMF_AlarmIsRinging(ForcePertAlarm)) then
 
-    ! -ForcePert-
-       call propagate_pert(                                                   &
-           internal%ForcePert%fft_npert,                                       &
-           1,                                                                  &
-           tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-           internal%PERTURBATIONS,                                               &
-           real(internal%ForcePert%dtstep),                                    &
-          pert_rseed,                                                         &
-          internal%ForcePert%param,                                           &
-          fpert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%ForcePert%npert),       &
-          .false.                                                             &
-        )
+       ! -ForcePert-
+       call propagate_pert(                                                     &
+            internal%ForcePert%fft_npert,                                       &
+            1,                                                                  &
+            tcinternal%pgrid_l, tcinternal%pgrid_f,                             &
+            internal%PERT_CHOICE,                                               &
+            real(internal%ForcePert%dtstep),                                    &
+            pert_rseed,                                                         &
+            internal%ForcePert%param,                                           &
+            fpert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%ForcePert%npert),       &
+            .false.                                                             &
+            )
 
        if(internal%ens_id == FIRST_ENS_ID ) fpert_enavg(:,:,:)=0.    
 
@@ -1714,18 +1714,18 @@ contains
 
     if (ESMF_AlarmIsRinging(PrognPertAlarm)) then
 
-    ! -prognostics-
-        call propagate_pert(                                                  &
+       ! -prognostics-
+       call propagate_pert(                                                    &
             internal%PrognPert%fft_npert,                                      &
             1,                                                                 &
-            tcinternal%pgrid_l, tcinternal%pgrid_f,                                &
-            internal%PERTURBATIONS,                                              &
+            tcinternal%pgrid_l, tcinternal%pgrid_f,                            &
+            internal%PERT_CHOICE,                                              &
             real(internal%PrognPert%dtstep),                                   &
-           pert_rseed,                                                        &
-           internal%PrognPert%param,                                          &
-           ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),      &
-           .false.                                                            &
-          )
+            pert_rseed,                                                        &
+            internal%PrognPert%param,                                          &
+            ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),      &
+            .false.                                                            &
+            )
 
        if(internal%ens_id == FIRST_ENS_ID) ppert_enavg(:,:,:)=0.       
 
@@ -1898,7 +1898,7 @@ contains
     VERIFY_(status)
 
     ! TODO: this is really, really kludgy and needs to be cleaned
-    if (internal%PERTURBATIONS /=0 ) then
+    if (internal%PERT_CHOICE /=0 ) then
 
        ! Compute FORCEPERT
 
@@ -1966,8 +1966,8 @@ contains
                internal%ForcePert%npert,                                           &
                internal%ForcePert%fft_npert,                                       &
                1,                                                                  &
-               tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-               internal%PERTURBATIONS,                                               &
+               tcinternal%pgrid_l, tcinternal%pgrid_f,                             &
+               internal%PERT_CHOICE,                                               &
                real(internal%ForcePert%dtstep),                                    &
                internal%ForcePert%param,                                           &
                pert_rseed,                                                         &
@@ -2059,7 +2059,7 @@ contains
     mfPert%PARdffs = PARdffs
     mfPert%Wind = Wind
 
-    if (internal%PERTURBATIONS /=0) then
+    if (internal%PERT_CHOICE /=0) then
 
        ! Apply FORCEPERT to MetForcing variables
 
@@ -2176,7 +2176,7 @@ contains
     call MAPL_TimerOff(MAPL, '-MetForcing2Catch')
 
     ! Update the r8 version of pert_rseed
-    if (internal%PERTURBATIONS /=0 ) then
+    if (internal%PERT_CHOICE /=0 ) then
        pert_rseed_r8 = real(pert_rseed,kind=ESMF_kind_r8)
        pert_iseed(:,internal%ens_id+1-FIRST_ENS_ID) = pert_rseed           
     endif
@@ -2316,7 +2316,7 @@ contains
     VERIFY_(status)
     internal => wrap%ptr
     ! if no perturbation, do nothing
-    if(internal%PERTURBATIONS == 0) then
+    if(internal%PERT_CHOICE == 0) then
        RETURN_(ESMF_SUCCESS)
     endif
     ! Turn timers on
@@ -2445,11 +2445,11 @@ contains
 
        call get_pert(                                                           &
             internal%PrognPert%npert,                                           &
-             internal%PrognPert%fft_npert,                                       &
-             1,                                                                  &
-             tcinternal%pgrid_l, tcinternal%pgrid_f,                                 &
-             internal%PERTURBATIONS,                                               &
-             real(internal%PrognPert%dtstep),                                    &
+            internal%PrognPert%fft_npert,                                       &
+            1,                                                                  &
+            tcinternal%pgrid_l, tcinternal%pgrid_f,                             &
+            internal%PERT_CHOICE,                                               &
+            real(internal%PrognPert%dtstep),                                    &
             internal%PrognPert%param,                                           &
             pert_rseed,                                                         &
             ppert_ntrmdt(lon1:lon2,lat1:lat2,1:internal%PrognPert%npert),       &
@@ -2499,7 +2499,7 @@ contains
     dtmh = real(model_dtstep)/3600.
 
 
-    if (internal%PERTURBATIONS /=0) then
+    if (internal%PERT_CHOICE /=0) then
 
        ! Apply PROGNPERT to Prognostic variables
        do ipert=1,internal%PrognPert%npert
@@ -2708,7 +2708,7 @@ contains
     VERIFY_(status)
     tcinternal => tcwrap%ptr
 
-    if ( internal%isCubedSphere .and. internal%PERTURBATIONS /= 0) then
+    if ( internal%isCubedSphere .and. internal%PERT_CHOICE /= 0) then
        call MAPL_Get(MAPL, LocStream=locstream,rc=status)
        VERIFY_(status)
        call MAPL_LocStreamGet(locstream, NT_LOCAL=land_nt_local,rc=status)
