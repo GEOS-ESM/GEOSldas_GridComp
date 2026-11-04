@@ -7097,6 +7097,8 @@ contains
     !
     ! make sure file exists
     
+    granule_id = ''
+
     inquire( file=trim(fname), exist=file_exists )
     
     if (.not. file_exists ) then
