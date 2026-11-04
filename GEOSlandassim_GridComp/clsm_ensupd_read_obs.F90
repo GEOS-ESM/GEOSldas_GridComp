@@ -37,7 +37,8 @@ module clsm_ensupd_read_obs
        vsfread, vsfdtch, vfend,                   &
        sfstart, sfn2index, sfselect,              &
        sfginfo, sfrdata, sfendacc, sfend,         &
-       sffattr, sfgainfo, sfrcatt
+       sffattr, sfgainfo, sfrcatt,                &
+       DFNT_UCHAR8, DFNT_CHAR8
   
   use MAPL,                             ONLY:     &
        MAPL_ease_convert,                         &
@@ -6883,9 +6884,9 @@ contains
 
     ! local variables
 
-    integer                                     :: attr_index, data_type, attr_count, status, i1, i2, i3
+    integer                                     :: attr_index, data_type, attr_count, status, i1, i2, i3, i4
 
-    character(256)                              :: attr_name
+    character(256)                             :: attr_name
 
     character(:),                   allocatable :: core_metadata
 
@@ -6901,21 +6902,29 @@ contains
 
     if (status < 0) return
 
+    ! CoreMetadata.0 is a character attribute; return blank for any other type
+    ! (sfrcatt() writes attr_count values of data_type, so the buffer below would be too small)
+
+    if ((data_type /= DFNT_CHAR8 .and. data_type /= DFNT_UCHAR8) .or. attr_count <= 0) return
+
     allocate(character(attr_count) :: core_metadata)
 
     status = sfrcatt( sd_id, attr_index, core_metadata )
 
     if (status >= 0) then
 
-       ! find first double quote after LOCALGRANULEID (i.e., start of VALUE) and the closing double quote
+       ! search only within the LOCALGRANULEID object, i.e., from "LOCALGRANULEID" to the next
+       ! "END_OBJECT"; VALUE is the text between the first two double quotes there
 
        i2 = 0
        i3 = 0
+       i4 = 0
 
        i1 = index( core_metadata, 'LOCALGRANULEID' )
 
-       if (i1 > 0)  i2 = index( core_metadata(i1:),    '"' )      ! opening quote (relative to i1)
-       if (i2 > 0)  i3 = index( core_metadata(i1+i2:), '"' )      ! closing quote (relative to i1+i2)
+       if (i1 > 0)  i4 = index( core_metadata(i1:),           'END_OBJECT' )   ! end of object (relative to i1)
+       if (i4 > 0)  i2 = index( core_metadata(i1:i1+i4-2),    '"' )            ! opening quote (relative to i1)
+       if (i2 > 0)  i3 = index( core_metadata(i1+i2:i1+i4-2), '"' )            ! closing quote (relative to i1+i2)
 
        if (i3 > 1)  granule_id = core_metadata(i1+i2:i1+i2+i3-2)
 

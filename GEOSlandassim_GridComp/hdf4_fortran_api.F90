@@ -7,6 +7,9 @@ module hdf4_fortran_api
   public :: hopen, hclose, vfstart, vfend, vsfatch, vsqfnelt, vsfseek, vsfsfld, vsfread, vsfdtch
   public :: sfstart, sfn2index, sfselect, sfginfo, sfrdata, sfendacc, sfend
   public :: sffattr, sfgainfo, sfrcatt
+  public :: DFNT_UCHAR8, DFNT_CHAR8
+
+  integer, parameter :: DFNT_UCHAR8 = 3, DFNT_CHAR8 = 4     ! HDF4 data types (see hntdefs.h)
 
   interface vsfread
     module procedure vsfread_real
