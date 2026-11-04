@@ -1385,12 +1385,7 @@ class ldas:
                 #for key,val in optinxny.items():
                 #    ldasrcInp[key]= val
 
-                # create BC in rc file
-                tmpl_ = ''
-                if self.nens >1 :
-                   tmpl_='%s'
-                if self.perturb > 0:
-                   ldasrcInp['PERTURBATIONS'] = str(self.perturb)
+                # add BC and rst info in rc file
                 rstkey =[]
                 rstval =[]
                 if self.with_land :
@@ -1458,7 +1453,9 @@ class ldas:
                    valn='../input/vegopacity.data'
                    ldasrcInp[keyn]= valn
 
+                tmpl_ = ''
                 if self.nens > 1 :
+                   tmpl_='%s'
                    keyn='ENS_ID_WIDTH'
                    valn=str(self.ens_id_width)
                    ldasrcInp[keyn]= valn
