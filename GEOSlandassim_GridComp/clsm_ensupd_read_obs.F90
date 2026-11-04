@@ -7076,24 +7076,6 @@ contains
     N_lon_vec(1:N_files) = last_ind(1:N_files) - start_ind(1:N_files) + 1  
     
     N_lon        = sum( N_lon_vec(1:N_files) )
-    
-
-    
-    ! ! dbg ! ! write (*,*)  '###############################################################################'
-    ! ! dbg ! ! write (*,*)  Iam // '():'
-    ! ! dbg ! ! write (*,*)  'lon_min_vec = ', lon_min_vec
-    ! ! dbg ! ! write (*,*)  'lon_max_vec = ', lon_max_vec
-    ! ! dbg ! ! write (*,*)  'start_ind   = ', start_ind
-    ! ! dbg ! ! write (*,*)  'last_ind    = ', last_ind
-    ! ! dbg ! ! write (*,*)  'lat_min     = ', lat_min
-    ! ! dbg ! ! write (*,*)  'lat_max     = ', lat_max
-    ! ! dbg ! ! write (*,*)  'year_vec    = ', year_vec
-    ! ! dbg ! ! write (*,*)  'dofyr_vec   = ', dofyr_vec
-    ! ! dbg ! ! write (*,*)  'N_lon_vec   = ', N_lon_vec
-    ! ! dbg ! ! write (*,*)  'N_lat       = ', N_lat
-    ! ! dbg ! ! write (*,*)  '###############################################################################'    
-
-
 
     ! allocate arrays for JPSS CMG data (max size that could possibly be needed for obs from both files)
     
