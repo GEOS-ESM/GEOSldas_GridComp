@@ -14,16 +14,15 @@ function [date_time,              ...
     read_ObsFcstAna( fname )
 
 %
-% read_ObsFcstAna.m can be used to read "ObsFcstAna" files that 
-%  contain Observations and observation-space model forecasts and 
+% read_ObsFcstAna.m can be used to read "ObsFcstAna" files that
+%  contain Observations and observation-space model forecasts and
 %  analysis data
 %
 % data format:
 %  binary: see f90 subroutine output_ObsFcstAna()    in GEOSldas
 %  nc4:    see f90 subroutine write_ObsFcstAna_nc4() in GEOSldas
 %
-% reichle,  4 Oct 2011
-%
+% reichle,         4 Oct 2011 - initial implementation
 % amfox, reichle, 21 Oct 2026 - added nc4 read functionality, removed isLDASsa flag
 %
 % ------------------------------------------------------------------
