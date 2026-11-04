@@ -6950,7 +6950,6 @@ contains
     
     
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! lca: do we want to narrow this band just slightly to remove the striping that occurs in the assimilation currently??? !!!!!!!!!!
     ! determine (rough) longitude band for which JPSS obs need to be read    
     !
     ! --> because tiles have a non-zero extent, need to read JPSS obs in CMG grid cells located 
@@ -7044,7 +7043,6 @@ contains
     
     ! verify that longitude bands do not exceed max expected expected width 
     !  (add 0.1 degree of wiggle room)
-    !!!!!!!!!! is this wiggle room the problem with the additional striping????!!!!!!
     max_delta_lon = real(dtstep_assim_max + 2*nint(tmp_delta))/86400.*360. + 0.1   ! [degree]
     
     do nn=1,N_files
