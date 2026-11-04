@@ -369,6 +369,7 @@ contains
 
   ! read (fixed-length) string attribute of root group of file (e.g., global
   ! attribute "LocalGranuleID"); returns blank if attribute does not exist
+  ! or is not a single fixed-length string
   subroutine readAttributeChar(this, attrName, attrValue)
 
     ! input/output variables
@@ -377,10 +378,10 @@ contains
     character(len=*), intent(out) :: attrValue
 
     ! local variables
-    integer :: hdf5err
-    logical :: attr_exists
-    integer(hid_t)   :: attr_id, memtype_id
-    integer(hsize_t) :: dims(1)
+    integer :: hdf5err, type_class
+    logical :: attr_exists, is_vlen
+    integer(hid_t)   :: attr_id, memtype_id, filetype_id, space_id
+    integer(hsize_t) :: dims(1), npoints
 
     ! check file state
     if (this%file_id == INVALID_HID) then
@@ -397,6 +398,39 @@ contains
 
     call h5aopen_f(this%file_id, attrName, attr_id, hdf5err)
     call checkErrCode_('h5aopen_f', hdf5err)
+
+    ! return blank unless the attribute is a single fixed-length string
+    ! (h5aread_f() below reads into one string of length len(attrValue); other types
+    ! fail the type conversion, and more than one element would overflow attrValue)
+    call h5aget_type_f(attr_id, filetype_id, hdf5err)
+    call checkErrCode_('h5aget_type_f', hdf5err)
+
+    call h5tget_class_f(filetype_id, type_class, hdf5err)
+    call checkErrCode_('h5tget_class_f', hdf5err)
+
+    is_vlen = .false.
+    if (type_class == H5T_STRING_F) then
+       call h5tis_variable_str_f(filetype_id, is_vlen, hdf5err)
+       call checkErrCode_('h5tis_variable_str_f', hdf5err)
+    end if
+
+    call h5tclose_f(filetype_id, hdf5err)
+    call checkErrCode_('h5tclose_f', hdf5err)
+
+    call h5aget_space_f(attr_id, space_id, hdf5err)
+    call checkErrCode_('h5aget_space_f', hdf5err)
+
+    call h5sget_simple_extent_npoints_f(space_id, npoints, hdf5err)
+    call checkErrCode_('h5sget_simple_extent_npoints_f', hdf5err)
+
+    call h5sclose_f(space_id, hdf5err)
+    call checkErrCode_('h5sclose_f', hdf5err)
+
+    if (type_class /= H5T_STRING_F .or. is_vlen .or. npoints /= 1_hsize_t) then
+       call h5aclose_f(attr_id, hdf5err)
+       call checkErrCode_('h5aclose_f', hdf5err)
+       return
+    end if
 
     ! create the memory datatype for a fixed-length string of length len(attrValue)
     call h5tcopy_f(H5T_FORTRAN_S1, memtype_id, hdf5err)
