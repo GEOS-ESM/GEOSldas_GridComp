@@ -2158,7 +2158,7 @@ contains
   subroutine read_obs_sm_ASCAT_HSAF(                                          &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
-       this_obs_param,                                                        &
+       this_obs_param, write_obslog,                                          &
        found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
 
     ! Read H SAF ASCAT SSM CDR (H121) and ICDR (H139) from netCDF swath files.
@@ -2194,6 +2194,7 @@ contains
     !             https://hsaf.meteoam.it/
     !
     ! A. Fox, reichle, Jun 2026
+    ! amfox, 5 Nov 2026 - added obslog output
     !
     ! --------------------------------------------------------------------
 
@@ -2216,6 +2217,8 @@ contains
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
     type(obs_param_type), intent(in) :: this_obs_param
+
+    logical, intent(in) :: write_obslog
 
     ! outputs:
 
@@ -2271,11 +2274,17 @@ contains
     character( 80) :: fname_of_fname_list
     character(300) :: tmpfname
 
+    character( 12) :: tmpstr12
+    character( 16) :: YYYYMMDD_HHMMSSz
+    character( 80) :: tmpstr80
+
     integer :: ii, ind, kk, N_fnames, N_fnames_tmp, N_tmp, N_files, n_fn, N_valid, N_obs_file
     integer :: N_kept
 
     character(200), dimension(2*N_fnames_max) :: fname_list           ! max 2 days of files
     character(300), dimension(2*N_fnames_max) :: tmpfnames            ! max 2 days of files
+
+    integer,        dimension(2*N_fnames_max) :: N_obs_kept
 
     character(300), allocatable               :: fnames(:)
 
@@ -2452,6 +2461,7 @@ contains
     ASCAT_lat     = 0.
     ASCAT_time    = 0.0D0
     N_obs_in_tile = 0
+    N_obs_kept    = 0
 
     ! scratch arrays for valid obs from one file at a time
 
@@ -2602,6 +2612,8 @@ contains
 
        if (logit) write(logunit,*) trim(Iam)//': ', N_valid, ' obs passed QC from ', trim(fnames(kk))
 
+       N_obs_kept(kk) = N_valid
+
        if (N_valid == 0) cycle
 
        ! ----------------------------------------------------------------
@@ -2643,6 +2655,25 @@ contains
        deallocate(tmp_lat, tmp_lon, tmp_jtime, tmp_tile_num)
 
     end do  ! file loop
+
+    ! write "obslog" file
+
+    if (write_obslog) then
+
+       YYYYMMDD_HHMMSSz = date_time2string(date_time)
+
+       tmpstr80 = trim(Iam) // '()'
+
+       do kk=1,N_files
+
+          write (tmpstr12,'(i12)') N_obs_kept(kk)
+
+          call add_to_obslog( YYYYMMDD_HHMMSSz, this_obs_param%descr, tmpstr80, &
+               tmpstr12, fnames(kk) )
+
+       end do
+
+    end if
 
     deallocate(tmp1_lat, tmp1_lon, tmp1_obs, tmp1_jtime)
     deallocate(fnames)
@@ -2761,7 +2792,7 @@ contains
   subroutine read_obs_sm_CYGNSS(                                              &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
-       this_obs_param,                                                        &
+       this_obs_param, write_obslog,                                          &
        found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
 
     !---------------------------------------------------------------------
@@ -2780,6 +2811,7 @@ contains
     ! obs are assimilated.
     !
     ! A. Fox, reichle, Jan 2025 
+    ! amfox, 5 Nov 2026 - added obslog output
     !
     ! --------------------------------------------------------------------
 
@@ -2802,6 +2834,8 @@ contains
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
     type(obs_param_type), intent(in) :: this_obs_param
+
+    logical, intent(in) :: write_obslog
 
     ! outputs:
 
@@ -2828,6 +2862,10 @@ contains
     character(300)       :: tmpfname, tmpname, tmpmaskname
     character(  2)       :: MM, DD, HH, MI
     character(  4)       :: YYYY
+
+    character( 12)       :: tmpstr12
+    character( 16)       :: YYYYMMDD_HHMMSSz
+    character( 80)       :: tmpstr80
 
     integer              :: i, idx, N_obs, j, ind, ii, dt_obs, obs_hour
     integer              :: ierr, ncid
@@ -3133,6 +3171,21 @@ contains
             end if
         end do
     end do
+
+    ! write "obslog" file
+
+    if (write_obslog) then
+
+       YYYYMMDD_HHMMSSz = date_time2string(date_time)
+
+       tmpstr80 = trim(Iam) // '()'
+
+       write (tmpstr12,'(i12)') N_obs
+
+       call add_to_obslog( YYYYMMDD_HHMMSSz, this_obs_param%descr, tmpstr80, &
+            tmpstr12, tmpfname )
+
+    end if
 
     if (logit) then
           
@@ -9828,7 +9881,7 @@ contains
        call read_obs_sm_ASCAT_HSAF(                                   &
             date_time, dtstep_assim, N_catd, tile_coord,              &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-            this_obs_param,                                           &
+            this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
             tmp_time)
 
@@ -9849,7 +9902,7 @@ contains
        call read_obs_sm_CYGNSS(                                       &
             date_time, dtstep_assim, N_catd, tile_coord,              &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-            this_obs_param,                                           &
+            this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
             tmp_time)
        
@@ -11618,17 +11671,49 @@ contains
     character( *), intent(in) :: subroutine_name
     character( *), intent(in) :: num_obs_string
     character(*), intent(in) :: file_name
+
+    ! local variables
+
+    character(2*len(file_name)+2) :: tmpfname
+
+    integer :: ii, jj
     
     ! obslog file format (comma-separated values; CSV): 
     !
     !  analysis time, obs species descriptor, subroutine name, obs_count, file name
+
+    ! quote filenames containing CSV delimiters, quotes, or whitespace
+    ! (H SAF filenames contain commas); double any embedded quotes
+
+    tmpfname = file_name
+
+    if (scan(trim(file_name), ', "' // achar(9) // achar(10) // achar(13)) > 0) then
+
+       tmpfname = '"'
+       jj = 1
+
+       do ii=1,len_trim(file_name)
+
+          jj = jj+1
+          tmpfname(jj:jj) = file_name(ii:ii)
+
+          if (file_name(ii:ii) == '"') then
+             jj = jj+1
+             tmpfname(jj:jj) = '"'
+          end if
+
+       end do
+
+       tmpfname(jj+1:jj+1) = '"'
+
+    end if
     
     write (unitnum_obslog,'(500A)')           &
          date_time_string      // ', ' //     &
          trim(obs_param_descr) // ', ' //     &
          trim(subroutine_name) // ', ' //     &
          num_obs_string        // ', ' //     &
-         trim(file_name)             
+         trim(tmpfname)
     
   end subroutine add_to_obslog
   
