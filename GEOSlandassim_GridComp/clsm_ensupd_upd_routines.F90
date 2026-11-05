@@ -824,7 +824,8 @@ contains
     write (unitnum_obslog,'(200A)') & 
          'Format (comma-separated values; last line: "EOF"): '                 // & 
          'EnKF analysis time [YYYYMMDD_HHMMSSz], obs species descriptor, '     // &
-         'subroutine name, obs_count, file name'
+         'subroutine name, obs_count, file name '                              // &
+         '(in double quotes if it contains commas, quotes or spaces)'
     
     ! obslog file remains open (similar to "logunit")
         
