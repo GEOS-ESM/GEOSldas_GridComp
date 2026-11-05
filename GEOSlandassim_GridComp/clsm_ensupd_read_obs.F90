@@ -7236,12 +7236,10 @@ contains
        
     end if
     
-    ! log original file name (incl. production time stamp) because files are renamed
-    ! (see read_obs_MODIS_SCF()); identifies the exact obs file version used in an experiment
+    ! get original file name (incl. production time stamp) because files are renamed; returned to
+    ! read_obs_MODIS_SCF() for the obslog, identifies the exact obs file version used in an experiment
 
     call get_MODIS_granule_id( sd_id, granule_id )
-
-    !if (logit) write (logunit,'(400A)') '  LocalGranuleID = ', trim(granule_id)
 
     ! read data
 
