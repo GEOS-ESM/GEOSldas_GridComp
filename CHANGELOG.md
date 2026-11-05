@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Python version of obs scaling scripts ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
 - Improved error handling in preprocessor for SMOS obs ([PR #212](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/212)).
-- Added Python reader for obslog files (`read_obslog()` in `read_GEOSldas.py`); `read_obslog.m` now reads file names in double quotes (e.g., H SAF).
+- Added Python reader for obslog files (`read_obslog()` in `read_GEOSldas.py`); `read_obslog.m` now reads file names in double quotes (e.g., H SAF) ([PR #243](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/243)).
  
 ### Changed
 - Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
