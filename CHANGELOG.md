@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added obslog output for H SAF ASCAT and CYGNSS L3 soil moisture, with quoted filenames where needed.
+- Added obslog output for H SAF ASCAT and CYGNSS L3 soil moisture, with quoted filenames where needed ([PR #242](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/242)).
 - Added functionality to generate perturbations on sphere ([PR #187](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/187)).
 - Added Python version of obs scaling scripts ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
