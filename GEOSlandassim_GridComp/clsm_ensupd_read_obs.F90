@@ -6794,7 +6794,7 @@ contains
   subroutine read_obs_JPSS_SCF(                                   &
        date_time, dtstep_assim, N_catd, tile_coord,                &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,        &
-       this_obs_param,                                             &
+       this_obs_param, write_obslog,                               &
        found_obs, JPSS_obs, std_JPSS_obs, JPSS_lon, JPSS_lat )
     
     ! read JPSS snow cover observations on the 0.05-degree climate
@@ -6832,6 +6832,8 @@ contains
     
     type(obs_param_type),                    intent(in)   :: this_obs_param
     
+    logical,                                 intent(in)   :: write_obslog
+
     ! output
 
     logical,                                  intent(out) :: found_obs
@@ -6855,11 +6857,18 @@ contains
     character(4)          :: YYYY
     character(3)          :: DDD                       ! day of year 
     
+    character( 12)        :: tmpstr12
+    character( 16)        :: YYYYMMDD_HHMMSSz
+    character( 80)        :: tmpstr80
+
     character(400)        :: fname
+    character(256)        :: granule_id
+
+    character(400), dimension(2) :: fname_list
 
     real                  :: overpass_hour, tmp_delta, tmp_real, max_delta_lon
     
-    integer               :: N_files, N_lon, N_lat, N_tmp, nn, kk, ind 
+    integer               :: N_files, N_lon, N_lat, N_tmp, nn, kk, ind, tmp_ind
     integer               :: N_CMG_obs, N_good_data, tmp_ind_start, tmp_ind_last
 
     type(date_time_type)  :: date_time_beg,       date_time_end
@@ -6876,7 +6885,7 @@ contains
 
     real,    dimension(2) :: lon_min_vec,         lon_max_vec
 
-    integer, dimension(2) :: N_lon_vec, year_vec, dofyr_vec, start_ind, last_ind
+    integer, dimension(2) :: N_lon_vec, year_vec, dofyr_vec, start_ind, last_ind, N_good_data_list
 
     real,    dimension(:),     allocatable :: CMG_obs, CMG_lon, CMG_lat
 
@@ -7112,7 +7121,7 @@ contains
     
     N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_JPSS_SCF_hdf()
     
-    do nn=1,N_files     ! loop through longitude bands
+    do nn=1,N_files     ! loop through longitude bands (i.e., files)
        
        ! determine JPSS file name(s)
        
@@ -7133,12 +7142,51 @@ contains
             N_good_data,                                                                &
             CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
             CMG_lat(tmp_ind_start:tmp_ind_last),                                        &
-            CMG_obs(tmp_ind_start:tmp_ind_last)                          )
+            CMG_obs(tmp_ind_start:tmp_ind_last),                                        &
+            granule_id                                               )
 
        N_CMG_obs = N_CMG_obs + N_good_data
        
+       ! record number of good obs and file name for obslog
+
+       N_good_data_list(nn) = N_good_data
+
+       if (len_trim(granule_id)>0) then
+
+          tmp_ind = index(trim(fname), '/', back=.true.)             ! position of last "/"
+
+          if (tmp_ind>0) then
+             fname_list(nn) = fname(1:tmp_ind) // trim(granule_id)   ! replace file name with granule id
+          else
+             fname_list(nn) = trim(granule_id)                       ! fname was only file name (no path)
+          end if
+
+       else
+
+          fname_list(   nn) = fname                                  ! use fname b/c granule_id is empty
+
+       end if
+
     end do
     
+    ! write "obslog" file
+
+    if (write_obslog) then
+
+       YYYYMMDD_HHMMSSz = date_time2string(date_time)
+
+       tmpstr80 = trim(Iam) // '()'                                  ! name of this subroutine
+
+       do nn=1,N_files
+
+          write (tmpstr12,'(i12)') N_good_data_list(nn)              ! convert integer to string
+
+          call add_to_obslog( YYYYMMDD_HHMMSSz, this_obs_param%descr, tmpstr80, &
+               tmpstr12, fname_list(nn) )
+
+       end do
+
+    end if
 
     ! return if no JPSS obs were found (found_obs=.false. per initialization above)    
 
@@ -7706,7 +7754,7 @@ contains
 ! *****************************************************************
   
   subroutine read_JPSS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
-       N_good_data, CMG_lon, CMG_lat, CMG_SCF )
+       N_good_data, CMG_lon, CMG_lat, CMG_SCF, granule_id )
     
     ! read snow cover area fraction (SCF) obs from daily VIIRS V[NP|J1|J2]10C1, version 2 (hdf5)
     !   - S-NPP:  https://nsidc.org/data/vnp10c1/versions/2
@@ -7720,6 +7768,13 @@ contains
     !
     ! amfox, 2 Nov 2026 - hdf5 version for VIIRS
     !
+    ! Added output of "granule_id", which is the original VIIRS file name including the production
+    !  date/time stamp (global attribute "LocalGranuleID").  The VIIRS file names on Discover are
+    !  stripped of the production date/time stamp to make the file names predictable. The
+    !  "granule_id" is returned so the information can be added into the "obslog" file by the
+    !  calling subroutine read_obs_JPSS_SCF(), as for MODIS
+    ! - amfox, 5 Nov 2026
+    !
     ! -------------------------------------------------------------------------------------------------
     
     implicit none
@@ -7732,6 +7787,8 @@ contains
     integer,               intent(out) :: N_good_data
     
     real,    dimension(:), intent(out) :: CMG_lon, CMG_lat, CMG_SCF         ! NOTE: 1-dim array on CMG grid
+
+    character(256),        intent(out) :: granule_id                        ! original VIIRS file name (incl. production time stamp)
     
     ! -------------------------------------------------
 
@@ -7801,14 +7858,14 @@ contains
     integer,            dimension(:,:), allocatable :: Clear_Index
     integer,            dimension(:,:), allocatable :: Basic_QA
 
-    character(256)                                  :: granule_id
-
     character(len=*),                     parameter :: Iam = 'read_JPSS_SCF_hdf'
     character(len=400)                              :: err_msg
     
     ! -------------------------------------------------------------------------
     !
     ! make sure file exists
+
+    granule_id = ''
     
     inquire( file=trim(fname), exist=file_exists )
     
@@ -7916,12 +7973,11 @@ contains
     
     call h5r%openFile(trim(fname))
     
-    ! log original file name (incl. production time stamp) because files are renamed
-    ! (see read_obs_JPSS_SCF()); identifies the obs used in an experiment
+    ! get original file name (incl. production time stamp) because files are renamed; returned to
+    ! read_obs_JPSS_SCF() for the obslog, identifies the exact obs file version used in an experiment
+    ! (blank if the attribute is missing or cannot be read)
 
     call h5r%readAttribute('LocalGranuleID', granule_id)
-
-    if (logit) write (logunit,'(400A)') '  LocalGranuleID = ', trim(granule_id)
 
     ! read data
 
@@ -10828,7 +10884,7 @@ contains
        call read_obs_JPSS_SCF(                                        &
             date_time, dtstep_assim, N_catd, tile_coord,              &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-            this_obs_param,                                           &
+            this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
    
     case('SMAP_L1C_Tbh_A',     'SMAP_L1C_Tbv_A',        &
