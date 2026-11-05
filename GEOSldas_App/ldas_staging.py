@@ -415,7 +415,7 @@ class LdasStaging:
         if self.run_route > 0:
             C.append(comp('route', mk('route', 'route restart in mk_restarts') if R == '2' else src_rs('route'),
                           fallback0=True, required0=True))
-        if self.has_geos_pert and self.perturb == 1:
+        if self.has_geos_pert and self.pert_choice > 0:
             C.append(comp('landpert', src_rs('landpert'), always=True))
         return C
 

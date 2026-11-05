@@ -128,13 +128,14 @@ contains
     
     ! -------------------------------------------------------
 
+    ! load/store the generator state once rather than per number
+    idum  = rseed(1)
+    idum2 = rseed(2)
+    iy    = rseed(3)
+    iv    = rseed(4:NRANDSEED)
+
     do jcnt = 1, ny
        do icnt = 1, nx
-          
-          idum  = rseed(1)           
-          idum2 = rseed(2)           
-          iy    = rseed(3)           
-          iv    = rseed(4:NRANDSEED) 
           
           k=idum/IQ1
           idum=IA1*(idum-k*IQ1)-k*IR1
@@ -147,14 +148,14 @@ contains
           iv(j)=idum
           if(iy.lt.1)iy=iy+IMM1
           ran_num(icnt,jcnt)=min(AM*iy,RNMX)
-          
-          rseed(1)           = idum
-          rseed(2)           = idum2
-          rseed(3)           = iy
-          rseed(4:NRANDSEED) = iv
 
        end do
     end do
+
+    rseed(1)           = idum
+    rseed(2)           = idum2
+    rseed(3)           = iy
+    rseed(4:NRANDSEED) = iv
     
     return
     
