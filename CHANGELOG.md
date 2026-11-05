@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added functionality to generate perturbations on sphere ([PR #187](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/187)).
 - Added Python version of obs scaling scripts ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
 - Improved error handling in preprocessor for SMOS obs ([PR #212](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/212)).
