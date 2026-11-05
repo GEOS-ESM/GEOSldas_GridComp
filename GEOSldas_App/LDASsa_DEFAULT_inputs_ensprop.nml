@@ -26,7 +26,9 @@
 ! FORCING AND PROGNOSTICS PERTURBATIONS
 !
 ! Forcing and prognostics perturbations are auto-regressive, order-one (AR(1)) 
-! time series of spatially correlated and cross-correlated 2d fields.
+! time series of spatially correlated and cross-correlated 2d random fields.
+! The 2d random fields can be generated on a rectangular grid or sphere (see rc
+! variable PERTURBATIONS). 
 !
 ! The AR(1) time series are generated at intervals governed by "force_pert_dtstep"
 ! and "progn_pert_dtstep" (typically every 3 hours) with a neutral mean value.

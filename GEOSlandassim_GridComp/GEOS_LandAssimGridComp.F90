@@ -1504,7 +1504,9 @@ contains
     type(obs_type),       dimension(:),     pointer     :: Observations_l => null()
 
     logical  :: fresh_incr
+    integer  :: pert_choice
     integer  :: N_obsf,N_obsl
+    
     !! import ensemble forcing
     
     real, pointer :: TA_enavg(:)=>null()
@@ -1579,8 +1581,10 @@ contains
     call ESMF_ClockGetAlarm(clock, 'LandAssim', LandAssimAlarm, rc=status)
     _VERIFY(status)
     
-    call MAPL_GetResource ( MAPL, out_path, Label="OUT_PATH:", DEFAULT="./", RC=STATUS)
-    call MAPL_GetResource ( MAPL, exp_id, Label="EXP_ID:", DEFAULT="exp_id", RC=STATUS)
+    call MAPL_GetResource ( MAPL, out_path,    Label="OUT_PATH:",      DEFAULT="./",     RC=STATUS)
+    call MAPL_GetResource ( MAPL, exp_id,      Label="EXP_ID:",        DEFAULT="exp_id", RC=STATUS)
+    call MAPL_GetResource ( MAPL, pert_choice, Label="PERTURBATIONS:", DEFAULT=0,        RC=STATUS)
+    _VERIFY(STATUS)
     
     ! Get component's internal variable
     call ESMF_UserCompGetInternalState(gc, 'TILE_COORD', tcwrap, status)
@@ -1918,7 +1922,7 @@ contains
          tcinternal%tgrid_g, tcinternal%pgrid_f, tcinternal%pgrid_g,       &
          N_catl_vec, low_ind, l2rf, rf2l,                                  &
          update_type,                                                      &
-         LandAssimDTstep,                                                  &
+         LandAssimDTstep, pert_choice,                                     &
          xcompact, ycompact, fcsterr_inflation_fac,                        &
          N_obs_param, obs_param, N_obsbias_max,                            &
          out_obslog, out_smapL4SMaup,                                      &

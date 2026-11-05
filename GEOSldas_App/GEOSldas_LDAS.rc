@@ -132,12 +132,11 @@ LAND_ASSIM: NO
 # LANDASSIM_T0: 000000   
 
 
-# ---- Perturbations: On/off 
-#
-# If num_ensemble > 1, PERTURBATIONS will automatically be set to 1. 
+# ---- Perturbations choice
 #
 #    0 : No perturbactions.
-#    1 : With perturbations.
+#    1 : With perturbations (generated on rectangular grid).
+#    2 : With perturbations (generated on sphere).
 #
 PERTURBATIONS: 0
 
@@ -277,5 +276,3 @@ WRITE_RESTART_BY_OSERVER: NO
 
 #
 # =================================== EOF ==========================================
-
-

@@ -6757,25 +6757,29 @@ contains
 
     ! to avoid double-counting of MODIS CMG obs, remove obs for tiles with center-of-mass longitude 
     !   falling outside the longitude band associated with assimilation window
+    !
+    ! the band excludes lon_end, so that a tile with com_lon exactly on the boundary between two
+    !   assimilation windows gets its obs only once (e.g., EASEv2 M36 tiles at +-45 and +-135 deg
+    !   for windows centered at 0z, 3z, ...)
     
     if (lon_end < lon_beg) then
        
-       ! need only one longitude band (keep obs when lon_end<=com_lon<=lon_beg)
+       ! need only one longitude band (keep obs when lon_end<com_lon<=lon_beg)
        
        do kk=1,N_catd
           
-          if ( (tile_coord(kk)%com_lon<lon_end) .or. (tile_coord(kk)%com_lon>lon_beg) )  &
+          if ( (tile_coord(kk)%com_lon<=lon_end) .or. (tile_coord(kk)%com_lon>lon_beg) )  &
                MODIS_obs(kk) = this_obs_param%nodata
           
        end do
        
     else
        
-       ! longitude band wraps around dateline (keep obs when -180<=com_lon<=lon_beg or lon_end<=com_lon<=180)
+       ! longitude band wraps around dateline (keep obs when -180<=com_lon<=lon_beg or lon_end<com_lon<=180)
        
        do kk=1,N_catd
           
-          if ( (tile_coord(kk)%com_lon>lon_beg) .and. (tile_coord(kk)%com_lon<lon_end) )  &
+          if ( (tile_coord(kk)%com_lon>lon_beg) .and. (tile_coord(kk)%com_lon<=lon_end) )  &
                MODIS_obs(kk) = this_obs_param%nodata
           
        end do

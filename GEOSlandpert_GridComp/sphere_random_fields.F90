@@ -1,0 +1,632 @@
+!
+! sphere_random_fields.F90
+!
+! Isotropic Gaussian random fields on the sphere by direct spherical-
+! harmonic (SH) synthesis, with power spectrum
+!
+!     C_l = 1 / (1 + c2 * (l(l+1))^2)
+!
+! c2 calibrated from xcorr (Gaussian sigma, degrees) by xcorr_deg_to_c2.
+!
+! Synthesis on the regular lat-lon grid (ring centres theta_j=(j-0.5)*pi/nlat):
+!
+!   f(theta,phi) = sum_l [ a_l0 Y_l0 + 2 Re sum_{m>0} a_lm Y_lm ]
+!   a_l0 ~ N(0,C_l),  Re/Im a_lm ~ N(0,C_l/2),  l,m <= L = nlat-1
+!
+! Build (constructor): c2, sqrt(C_l) and the m's owned by this rank
+!   (snake order).
+! Draw: random a_lm -> per-m Legendre synthesis, with the normalised
+!   Pbar_lm(cos theta_j) recurrence (north rings) fused into the sum (even/odd
+!   l split gives both hemispheres) -> MPI_Alltoallv to ring blocks -> batched
+!   inverse real FFT -> normalisation on local rings -> MPI_Allgatherv.
+!   Two fields are drawn per call.
+!
+! The random coefficients are taken from one global stream (identical on
+! every rank) so the result is independent of the number of ranks and the
+! rseed is advanced identically everywhere.  The communicator is split per
+! node (MPI_COMM_TYPE_SHARED), so each node synthesises the full field from
+! the same rseed without inter-node communication.
+!
+! Public interface:
+!   sphere_random_fields    - abstract_random_fields implementation
+!   sphere_random_fields_id - cache key for the land_pert generator map
+!
+! -----------------------------------------------------------------------
+
+module sphere_random_fields_mod
+  
+  use abstract_random_fieldsMod,     only: abstract_random_fields
+  use LDAS_PertTypes,                only: pert_param_type
+  use LDAS_TileCoordType,            only: grid_def_type
+  use MAPL_MathConstantsMod,         only: PI => MAPL_PI_R8, MAPL_DEGREES_TO_RADIANS_R8
+  use, intrinsic :: iso_fortran_env, only: REAL64, INT64
+  use mpi
+  use nr_ran2_gasdev,                only: NRANDSEED, nr_ran2_2d, nr_gasdev
+#ifdef MKL_AVAILABLE
+  use MKL_DFTI
+#endif
+  
+  implicit none
+  private
+
+  public :: sphere_random_fields
+  public :: sphere_random_fields_id
+
+  type, extends(abstract_random_fields) :: sphere_random_fields
+    private
+    ! MPI context (comm == MPI_COMM_NULL -> serial)
+    integer                            :: comm = MPI_COMM_NULL
+    integer                            :: rank = 0, npes = 1
+    ! Grid / truncation
+    integer                            :: nlon = 0, nlat = 0
+    integer                            :: L = 0, nh = 0, nm = 0
+    real(REAL64)                       :: c2 = 0.0d0
+    real(REAL64)                       :: scale = 1.0d0
+    ! m-modes owned by this rank
+    integer                            :: nmloc = 0
+    integer,               allocatable :: mloc(:)
+    integer,               allocatable :: mowner(:)                         ! owning rank per m (0:L)
+    integer,               allocatable :: nmcount(:)                        ! number of m's per rank
+    integer(INT64),        allocatable :: coff(:)                           ! global coefficient offset per m (0:L)
+    integer(INT64)                     :: ncoef = 0                         ! total (l,m) pairs, m<=l<=L
+    real(  REAL64),        allocatable :: sqrtC(:), lfac(:), x(:), logs(:)
+    ! Ring distribution
+    integer,               allocatable :: rcount(:), rdispl(:)
+    integer                            :: nloc = 0
+#ifdef MKL_AVAILABLE
+    type(DFTI_DESCRIPTOR), pointer     :: desc => null()
+#endif
+  contains
+    procedure, public :: generate_2d_Random_field
+    procedure, public :: generate_white_field
+    procedure, public :: finalize
+  end type sphere_random_fields
+
+  interface sphere_random_fields
+    module procedure new_sphere_random_fields
+  end interface sphere_random_fields
+
+contains
+
+  function sphere_random_fields_id(pert_param, pert_grid_f) result(id_string)
+    
+    type(pert_param_type), intent(in)  :: pert_param
+    type(grid_def_type),   intent(in)  :: pert_grid_f
+    
+    character(len=:),      allocatable :: id_string
+    
+    character(len=256) :: id
+
+    write(id,'(a,":",i0,":",i0,":",es16.8)') 'sphere_sh', &
+         pert_grid_f%N_lat, pert_grid_f%N_lon, pert_param%xcorr
+    id_string = trim(id)
+  end function sphere_random_fields_id
+
+  ! ----------------------------------------------------------------------
+
+  function new_sphere_random_fields(pert_param, pert_grid_f, comm, rc) result(rf)
+    
+    type(sphere_random_fields)                        :: rf
+    type(pert_param_type),                intent(in)  :: pert_param
+    type(grid_def_type),                  intent(in)  :: pert_grid_f
+    integer,                    optional, intent(in)  :: comm
+    integer,                    optional, intent(out) :: rc
+    
+    integer :: ierr, i, m, r, l, nlat, nlon
+    real(REAL64) :: xcorr_deg, var, th, llp1, c2_use
+
+    if (present(rc)) rc = 0
+    nlon = pert_grid_f%N_lon
+    nlat = pert_grid_f%N_lat
+    rf%nlon = nlon
+    rf%nlat = nlat
+    rf%ID_string = sphere_random_fields_id(pert_param, pert_grid_f)
+
+    if (present(comm)) then
+      ! node-local communicator (as in rectangle_random_fields): each node
+      ! computes the full field independently, avoiding inter-node traffic
+      call MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, rf%comm, ierr)
+      call MPI_Comm_rank(rf%comm, rf%rank, ierr)
+      call MPI_Comm_size(rf%comm, rf%npes, ierr)
+    else
+      rf%comm = MPI_COMM_NULL
+      rf%rank = 0
+      rf%npes = 1
+    end if
+
+    rf%L  = nlat - 1
+    rf%nh = nlat / 2
+    rf%nm = nlon / 2 + 1
+    if (mod(nlat, 2) /= 0 .or. mod(nlon, 2) /= 0 .or. rf%nm < rf%L + 1) then
+      if (rf%rank == 0) write(*,'(a,i0,a,i0,a)') &
+        'sphere_random_fields: need even nlat, nlon >= 2*nlat-2 (got ', &
+        nlon, 'x', nlat, ')'
+      if (present(rc)) then
+        rc = 1; return
+      end if
+      stop 1
+    end if
+
+    ! --- spectrum -------------------------------------------------------
+    xcorr_deg = real(pert_param%xcorr, REAL64)
+    if (rf%rank == 0) then
+      if (xcorr_deg > 0.0d0) then
+        call xcorr_deg_to_c2(xcorr_deg, nlat, c2_use)
+      else
+        c2_use = 1.0d-12
+      end if
+    end if
+    if (rf%comm /= MPI_COMM_NULL) &
+      call MPI_Bcast(c2_use, 1, MPI_DOUBLE_PRECISION, 0, rf%comm, ierr)
+    rf%c2 = c2_use
+
+    allocate(rf%sqrtC(0:rf%L))
+    var = 0.0d0
+    do l = 0, rf%L
+      llp1 = real(l,REAL64)*real(l+1,REAL64)
+      rf%sqrtC(l) = sqrt(1.0d0 / (1.0d0 + rf%c2*llp1**2))
+      var = var + real(2*l+1,REAL64) * rf%sqrtC(l)**2 / (4.0d0*PI)
+    end do
+    rf%scale = 1.0d0 / sqrt(var)
+
+    ! --- log of Pbar_mm prefactor: log(sqrt(1/4pi) prod sqrt((2k+1)/2k)) --
+    allocate(rf%lfac(0:rf%L))
+    rf%lfac(0) = 0.5d0*log(1.0d0/(4.0d0*PI))
+    do m = 1, rf%L
+      rf%lfac(m) = rf%lfac(m-1) + 0.5d0*log(real(2*m+1,REAL64)/real(2*m,REAL64))
+    end do
+    allocate(rf%x(rf%nh), rf%logs(rf%nh))
+    do i = 1, rf%nh
+      th = (real(i,REAL64) - 0.5d0) * PI / real(nlat,REAL64)
+      rf%x(i) = cos(th); rf%logs(i) = log(sin(th))
+    end do
+
+    ! --- global coefficient offsets (rank-independent random stream) ----
+    allocate(rf%coff(0:rf%L))
+    rf%coff(0) = 0
+    do m = 1, rf%L
+      rf%coff(m) = rf%coff(m-1) + int(rf%L - m + 2, INT64)
+    end do
+    rf%ncoef = rf%coff(rf%L) + 1
+
+    ! --- m distribution: snake order for load balance -------------------
+    allocate(rf%mloc(rf%L/rf%npes + 2), rf%mowner(0:rf%L), rf%nmcount(rf%npes))
+    rf%nmloc = 0
+    rf%nmcount = 0
+    do m = 0, rf%L
+      r = mod(m, 2*rf%npes)
+      if (r >= rf%npes) r = 2*rf%npes - 1 - r
+      rf%mowner(m) = r
+      rf%nmcount(r+1) = rf%nmcount(r+1) + 1
+      if (r == rf%rank) then
+        rf%nmloc = rf%nmloc + 1
+        rf%mloc(rf%nmloc) = m
+      end if
+    end do
+
+    ! --- ring distribution ---------------------------------------------
+    allocate(rf%rcount(rf%npes), rf%rdispl(rf%npes))
+    do r = 0, rf%npes-1
+      rf%rcount(r+1) = nlat/rf%npes + merge(1, 0, r < mod(nlat, rf%npes))
+    end do
+    rf%rdispl(1) = 0
+    do r = 2, rf%npes
+      rf%rdispl(r) = rf%rdispl(r-1) + rf%rcount(r-1)
+    end do
+    rf%nloc = rf%rcount(rf%rank+1)
+
+#ifdef MKL_AVAILABLE
+    block
+      integer :: st
+      st = DftiCreateDescriptor(rf%desc, DFTI_DOUBLE, DFTI_REAL, 1, nlon)
+      st = DftiSetValue(rf%desc, DFTI_PLACEMENT, DFTI_NOT_INPLACE)
+      st = DftiSetValue(rf%desc, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX)
+      st = DftiSetValue(rf%desc, DFTI_NUMBER_OF_TRANSFORMS, max(1, 2*rf%nloc))
+      st = DftiSetValue(rf%desc, DFTI_INPUT_DISTANCE,  rf%nm)
+      st = DftiSetValue(rf%desc, DFTI_OUTPUT_DISTANCE, nlon)
+      st = DftiCommitDescriptor(rf%desc)
+      if (st /= DFTI_NO_ERROR) then
+        write(*,'(a,i0)') 'sphere_random_fields: DFTI commit failed ', st
+        if (present(rc)) then
+          rc = st; return
+        end if
+        stop 1
+      end if
+    end block
+#endif
+  end function new_sphere_random_fields
+
+  ! ----------------------------------------------------------------------
+
+  subroutine generate_2d_Random_field(this, rseed, rfield, rfield2, lx, ly, dx, dy)
+
+    class(sphere_random_fields), intent(inout) :: this
+    integer,                     intent(inout) :: rseed(NRANDSEED)
+    real,                        intent(out)   :: rfield(:,:), rfield2(:,:)
+    real,                        intent(in)    :: lx, ly, dx, dy             ! unused: spectrum is set at construction
+
+    if (size(rfield,1) /= this%nlon .or. size(rfield,2) /= this%nlat) then
+      write(*,'(a)') 'sphere_random_fields: output grid differs from constructor grid'
+      stop 1
+    end if
+    call sh_draw(this, rseed, rfield, rfield2)
+  end subroutine generate_2d_Random_field
+
+  ! ----------------------------------------------------------------------
+  
+  subroutine generate_white_field(this, rseed, rfield)
+    class(sphere_random_fields), intent(inout) :: this
+    integer, intent(inout) :: rseed(NRANDSEED)
+    real, target, intent(out) :: rfield(:,:)
+    real :: values(2)
+    integer :: i, j
+
+    do j = 1, size(rfield, 2)
+      do i = 1, size(rfield, 1), 2
+        call nr_gasdev(rseed, values)
+        rfield(i,j) = values(1)
+        if (i + 1 <= size(rfield, 1)) rfield(i + 1,j) = values(2)
+      end do
+    end do
+  end subroutine generate_white_field
+
+  ! ----------------------------------------------------------------------
+  
+  subroutine finalize(this, rc)
+    
+    class(sphere_random_fields),           intent(inout) :: this
+    integer,                     optional, intent(out)   :: rc
+
+    integer :: ierr
+#ifdef MKL_AVAILABLE
+    if (associated(this%desc)) then
+      ierr = DftiFreeDescriptor(this%desc)
+      nullify(this%desc)
+    end if
+#endif
+    if (allocated(this%mloc))   deallocate(this%mloc)
+    if (allocated(this%mowner)) deallocate(this%mowner)
+    if (allocated(this%nmcount)) deallocate(this%nmcount)
+    if (allocated(this%coff))   deallocate(this%coff)
+    if (allocated(this%sqrtC))  deallocate(this%sqrtC)
+    if (allocated(this%lfac))   deallocate(this%lfac)
+    if (allocated(this%x))      deallocate(this%x)
+    if (allocated(this%logs))   deallocate(this%logs)
+    if (allocated(this%rcount)) deallocate(this%rcount)
+    if (allocated(this%rdispl)) deallocate(this%rdispl)
+    if (this%comm /= MPI_COMM_NULL) then
+      call MPI_Comm_free(this%comm, ierr)
+      this%comm = MPI_COMM_NULL
+    end if
+    if (present(rc)) rc = 0
+  end subroutine finalize
+
+  ! ======================================================================
+  ! Legendre synthesis for one m, fused with the normalised Pbar_lm(x_j)
+  ! recurrence (l = m..L, north rings j = 1..nh) so no Pbar matrix is stored:
+  !   E(j,c) = sum_{l-m even} Pbar_lm(x_j) gz(l-m+1,c)
+  !   O(j,c) = sum_{l-m odd } Pbar_lm(x_j) gz(l-m+1,c)
+
+  subroutine plm_accum(sh, m, nl, gz, E, O)
+    type(sphere_random_fields), intent(in) :: sh
+    integer, intent(in) :: m, nl
+    real(REAL64), intent(in) :: gz(:,:)
+    real(REAL64), intent(out) :: E(sh%nh,4), O(sh%nh,4)
+    real(REAL64) :: p0(sh%nh), p1(sh%nh)
+    integer :: j, l, k
+    real(REAL64) :: a, b, rl, rm, pn
+
+    rm = real(m,REAL64)
+    do j = 1, sh%nh
+      p1(j) = exp(sh%lfac(m) + rm*sh%logs(j))   ! underflow -> 0 is harmless
+      E(j,:) = p1(j)*gz(1,:)
+    end do
+    O = 0.0d0
+    if (nl < 2) return
+    a = sqrt(real(2*m+3,REAL64))
+    do j = 1, sh%nh
+      p0(j) = p1(j)
+      p1(j) = a * sh%x(j) * p0(j)
+      O(j,:) = p1(j)*gz(2,:)
+    end do
+    do k = 3, nl
+      l = m + k - 1
+      rl = real(l,REAL64)
+      a = sqrt((4.0d0*rl*rl - 1.0d0) / (rl*rl - rm*rm))
+      b = sqrt(((rl-1.0d0)**2 - rm*rm) / (4.0d0*(rl-1.0d0)**2 - 1.0d0))
+      if (mod(k,2) == 1) then
+        do j = 1, sh%nh
+          pn = a * (sh%x(j)*p1(j) - b*p0(j))
+          p0(j) = p1(j); p1(j) = pn
+          E(j,1) = E(j,1) + pn*gz(k,1)
+          E(j,2) = E(j,2) + pn*gz(k,2)
+          E(j,3) = E(j,3) + pn*gz(k,3)
+          E(j,4) = E(j,4) + pn*gz(k,4)
+        end do
+      else
+        do j = 1, sh%nh
+          pn = a * (sh%x(j)*p1(j) - b*p0(j))
+          p0(j) = p1(j); p1(j) = pn
+          O(j,1) = O(j,1) + pn*gz(k,1)
+          O(j,2) = O(j,2) + pn*gz(k,2)
+          O(j,3) = O(j,3) + pn*gz(k,3)
+          O(j,4) = O(j,4) + pn*gz(k,4)
+        end do
+      end if
+    end do
+  end subroutine plm_accum
+
+  ! ======================================================================
+  ! sh_draw: two independent realisations f1, f2 on the (nlon, nlat) grid
+  ! (lat index 1 = southernmost ring).  Every rank returns the full fields.
+
+  subroutine sh_draw(sh, rseed, f1, f2)
+    type(sphere_random_fields), intent(inout) :: sh
+    integer, intent(inout) :: rseed(NRANDSEED)
+    real, intent(out) :: f1(sh%nlon, sh%nlat), f2(sh%nlon, sh%nlat)
+
+    complex(REAL64), allocatable :: Gm(:,:,:), sbuf(:), rbuf(:), Gl(:)
+    real(REAL64), allocatable :: E(:,:), O(:,:), gz(:,:), rout(:)
+    real, allocatable :: u(:), loc1(:), loc2(:)
+    integer, allocatable :: rc(:), rd(:), sc(:), sd(:), rcv(:), rdv(:), ptr(:)
+    integer :: i, m, nl, k, l, j, c, ierr, nlat, nlon, nu, r, f, p, s
+    integer(INT64) :: n0
+    real(REAL64) :: fac, r1, r2
+
+    nlat = sh%nlat; nlon = sh%nlon
+
+    ! --- global uniform stream: 4 normals per (l,m), Box-Muller pairs ----
+    nu = int(4_INT64*sh%ncoef)
+    allocate(u(nu))
+    call nr_ran2_2d(1, nu, rseed, u)
+
+    ! Gm(ring, field, i): Fourier coefficient of owned mode mloc(i)
+    allocate(Gm(nlat, 2, max(1, sh%nmloc)))
+    allocate(E(sh%nh,4), O(sh%nh,4))
+    allocate(gz(sh%L+1, 4))
+
+    do i = 1, sh%nmloc
+      m  = sh%mloc(i)
+      nl = sh%L - m + 1
+      fac = merge(1.0d0, sqrt(0.5d0), m == 0)
+      do k = 1, nl
+        l  = m + k - 1
+        n0 = 4_INT64*(sh%coff(m) + k - 1)
+        do c = 1, 3, 2
+          r1 = sqrt(-2.0d0*log(max(real(u(n0+c),REAL64), 1.0d-300)))
+          r2 = 2.0d0*PI*real(u(n0+c+1),REAL64)
+          gz(k,c)   = r1*cos(r2)
+          gz(k,c+1) = r1*sin(r2)
+        end do
+        gz(k,:) = gz(k,:) * fac * sh%sqrtC(l) * sh%scale
+      end do
+      if (m == 0) then
+        gz(1:nl,2) = 0.0d0; gz(1:nl,4) = 0.0d0
+      end if
+      call plm_accum(sh, m, nl, gz, E, O)
+
+      ! north ring j (theta_j) -> lat index nlat+1-j ; south mirror -> j
+      do j = 1, sh%nh
+        Gm(nlat+1-j,1,i) = cmplx(E(j,1)+O(j,1), E(j,2)+O(j,2), REAL64)
+        Gm(nlat+1-j,2,i) = cmplx(E(j,3)+O(j,3), E(j,4)+O(j,4), REAL64)
+        Gm(j,1,i)        = cmplx(E(j,1)-O(j,1), E(j,2)-O(j,2), REAL64)
+        Gm(j,2,i)        = cmplx(E(j,3)-O(j,3), E(j,4)-O(j,4), REAL64)
+      end do
+    end do
+    deallocate(u)
+
+    ! --- transpose m-distributed -> ring-distributed --------------------
+    ! Each rank sends only its owned modes for the destination's ring block
+    ! (ordered by owned mode, field, ring) and receives, from every rank,
+    ! that rank's modes for its own rings.
+    allocate(sc(sh%npes), sd(sh%npes), rcv(sh%npes), rdv(sh%npes))
+    sc  = 2*sh%nmloc*sh%rcount
+    rcv = 2*sh%nmcount*sh%nloc
+    sd(1) = 0; rdv(1) = 0
+    do r = 2, sh%npes
+      sd(r)  = sd(r-1)  + sc(r-1)
+      rdv(r) = rdv(r-1) + rcv(r-1)
+    end do
+    allocate(sbuf(max(1, sum(sc))), rbuf(max(1, sum(rcv))))
+    p = 0
+    do r = 1, sh%npes
+      do i = 1, sh%nmloc
+        do f = 1, 2
+          sbuf(p+1:p+sh%rcount(r)) = Gm(sh%rdispl(r)+1:sh%rdispl(r)+sh%rcount(r), f, i)
+          p = p + sh%rcount(r)
+        end do
+      end do
+    end do
+    deallocate(Gm)
+    if (sh%comm /= MPI_COMM_NULL) then
+      call MPI_Alltoallv(sbuf, sc, sd, MPI_DOUBLE_COMPLEX, rbuf, rcv, rdv, &
+                         MPI_DOUBLE_COMPLEX, sh%comm, ierr)
+    else
+      rbuf = sbuf
+    end if
+    deallocate(sbuf)
+
+    ! Gl(m+1, field, local ring); modes m > L stay zero
+    allocate(Gl(max(1, 2*sh%nm*sh%nloc))); Gl = (0.0d0, 0.0d0)
+    allocate(ptr(sh%npes)); ptr = rdv
+    do m = 0, sh%L
+      s = sh%mowner(m) + 1
+      do f = 1, 2
+        do j = 1, sh%nloc
+          Gl(m+1 + (f-1)*sh%nm + (j-1)*2*sh%nm) = rbuf(ptr(s)+j)
+        end do
+        ptr(s) = ptr(s) + sh%nloc
+      end do
+    end do
+    deallocate(rbuf, ptr)
+
+    ! --- inverse real FFT of local rings (both fields) ------------------
+    allocate(rout(max(1, nlon*2*sh%nloc)))
+#ifdef MKL_AVAILABLE
+    if (sh%nloc > 0) ierr = DftiComputeBackward(sh%desc, Gl, rout)
+#else
+    call irfft_rows(Gl, 2*sh%nloc, sh%nm, nlon, rout)
+#endif
+
+    ! --- local rings to single precision, normalised to zero mean and
+    !     unit variance using global sums (ring partial sums are combined in
+    !     ring order, so the result does not depend on the number of ranks)
+    allocate(loc1(max(1,nlon*sh%nloc)), loc2(max(1,nlon*sh%nloc)))
+    do j = 1, sh%nloc
+      loc1((j-1)*nlon+1:j*nlon) = real(rout((2*j-2)*nlon+1:(2*j-1)*nlon))
+      loc2((j-1)*nlon+1:j*nlon) = real(rout((2*j-1)*nlon+1:(2*j)*nlon))
+    end do
+    deallocate(rout)
+    call normalize_rings(sh, loc1, loc2)
+
+    if (sh%comm /= MPI_COMM_NULL) then
+      allocate(rc(sh%npes), rd(sh%npes))
+      rc = nlon*sh%rcount; rd = nlon*sh%rdispl
+      call MPI_Allgatherv(loc1, nlon*sh%nloc, MPI_REAL, f1, rc, rd, MPI_REAL, sh%comm, ierr)
+      call MPI_Allgatherv(loc2, nlon*sh%nloc, MPI_REAL, f2, rc, rd, MPI_REAL, sh%comm, ierr)
+    else
+      f1 = reshape(loc1, [nlon, nlat])
+      f2 = reshape(loc2, [nlon, nlat])
+    end if
+  end subroutine sh_draw
+
+  ! ======================================================================
+  ! normalize_rings: zero mean, unit variance over the full field for both
+  ! fields, given only the local rings (nlon x nloc each).
+
+  subroutine normalize_rings(sh, loc1, loc2)
+    type(sphere_random_fields), intent(in) :: sh
+    real, intent(inout) :: loc1(:), loc2(:)
+    real(REAL64) :: mean(2), norm(2)
+    real(REAL64), allocatable :: rsum(:,:)
+    integer :: j, n, nlon
+
+    nlon = sh%nlon
+    n    = sh%nlon*sh%nlat
+    allocate(rsum(2, sh%nlat))
+
+    call ring_sums(.false.)
+    mean = sum(rsum, dim=2) / real(n,REAL64)
+    loc1(1:nlon*sh%nloc) = real(real(loc1(1:nlon*sh%nloc),REAL64) - mean(1))
+    loc2(1:nlon*sh%nloc) = real(real(loc2(1:nlon*sh%nloc),REAL64) - mean(2))
+
+    call ring_sums(.true.)
+    norm = sqrt(sum(rsum, dim=2) / real(n,REAL64))
+    if (norm(1) > 0.0_REAL64) &
+      loc1(1:nlon*sh%nloc) = real(real(loc1(1:nlon*sh%nloc),REAL64) / norm(1))
+    if (norm(2) > 0.0_REAL64) &
+      loc2(1:nlon*sh%nloc) = real(real(loc2(1:nlon*sh%nloc),REAL64) / norm(2))
+
+  contains
+
+    ! per-ring sums (or sums of squares), gathered into rsum(2, nlat)
+    subroutine ring_sums(squared)
+      logical, intent(in) :: squared
+      real(REAL64) :: lsum(2, max(1,sh%nloc))
+      integer :: ierr, k0
+      do j = 1, sh%nloc
+        k0 = (j-1)*nlon
+        if (squared) then
+          lsum(1,j) = sum(real(loc1(k0+1:k0+nlon),REAL64)**2)
+          lsum(2,j) = sum(real(loc2(k0+1:k0+nlon),REAL64)**2)
+        else
+          lsum(1,j) = sum(real(loc1(k0+1:k0+nlon),REAL64))
+          lsum(2,j) = sum(real(loc2(k0+1:k0+nlon),REAL64))
+        end if
+      end do
+      if (sh%comm /= MPI_COMM_NULL) then
+        call MPI_Allgatherv(lsum, 2*sh%nloc, MPI_DOUBLE_PRECISION, rsum, &
+                            2*sh%rcount, 2*sh%rdispl, MPI_DOUBLE_PRECISION, sh%comm, ierr)
+      else
+        rsum = lsum
+      end if
+    end subroutine ring_sums
+
+  end subroutine normalize_rings
+
+
+  ! ======================================================================
+    
+#ifndef MKL_AVAILABLE
+  ! Pure-Fortran O(nph^2) inverse real DFT without 1/N (matches MKL backward).
+  subroutine irfft_rows(inp, nrows, nm, nph, out)
+    integer, intent(in) :: nrows, nm, nph
+    complex(REAL64), intent(in) :: inp(nm, *)
+    real(REAL64), intent(out) :: out(nph, *)
+    integer :: row, j, k
+    real(REAL64) :: ang, s, w
+    w = 2.0d0*PI/real(nph,REAL64)
+    do row = 1, nrows
+      do j = 0, nph-1
+        s = real(inp(1,row))
+        do k = 1, nm-2
+          ang = w*real(j,REAL64)*real(k,REAL64)
+          s = s + 2.0d0*(real(inp(k+1,row))*cos(ang) - aimag(inp(k+1,row))*sin(ang))
+        end do
+        ang = w*real(j,REAL64)*real(nm-1,REAL64)
+        s = s + real(inp(nm,row))*cos(ang)
+        out(j+1,row) = s
+      end do
+    end do
+  end subroutine irfft_rows
+#endif
+
+  ! ======================================================================
+  ! xcorr_deg_to_c2: calibrate c2 from xcorr.
+  ! xcorr is the Gaussian sigma: C(xcorr)/C(0) = exp(-0.5).
+
+  subroutine xcorr_deg_to_c2(xcorr_deg, nz, c2_out)
+    real(REAL64), intent(in)  :: xcorr_deg
+    integer,        intent(in)  :: nz
+    real(REAL64), intent(out) :: c2_out
+    real(REAL64) :: lo, hi, mid, r, z, target
+    integer :: it, lmax
+
+    z = cos(xcorr_deg*MAPL_DEGREES_TO_RADIANS_R8)
+    lmax = 3*nz
+    target = exp(-0.5d0)
+    lo = 1.0d-12; hi = 1.0d2
+    if (ratio(lo) > target) then
+      c2_out = lo; return
+    end if
+    if (ratio(hi) < target) then
+      c2_out = hi; return
+    end if
+    mid = lo
+    do it = 1, 80
+      mid = 0.5d0*(lo+hi)
+      r = ratio(mid)
+      if (abs(r - target) < 1.0d-12) exit
+      if (r > target) then
+        hi = mid
+      else
+        lo = mid
+      end if
+    end do
+    c2_out = mid
+  contains
+    real(REAL64) function ratio(c2)
+      real(REAL64), intent(in) :: c2
+      real(REAL64) :: num, den, C, P0, P1, P2
+      integer :: l
+      num = 0; den = 0; P0 = 1; P1 = z
+      do l = 0, lmax
+        C = 1.0d0/(1.0d0 + c2*(real(l,REAL64)*real(l+1,REAL64))**2)
+        den = den + real(2*l+1,REAL64)*C
+        if (l == 0) then
+          num = num + C
+        else if (l == 1) then
+          num = num + 3.0d0*C*z
+        else
+          P2 = (real(2*l-1,REAL64)*z*P1 - real(l-1,REAL64)*P0)/real(l,REAL64)
+          num = num + real(2*l+1,REAL64)*C*P2
+          P0 = P1; P1 = P2
+        end if
+      end do
+      ratio = num/den
+    end function ratio
+  end subroutine xcorr_deg_to_c2
+
+end module sphere_random_fields_mod
+
+! ============ EOF ==================================================================

@@ -3309,10 +3309,10 @@ contains
   
   ! *********************************************************************
   
-  subroutine get_obs_pert( N_ens, N_obs, N_obs_param,                  &
-       pert_grid_f,                                                    &
-       obs_param, Observations,                                        &
-       Pert_rseed,                                                     &
+   subroutine get_obs_pert( N_ens, N_obs, N_obs_param, pert_choice,     &
+       pert_grid_f,                                                     &
+       obs_param, Observations,                                         &
+       Pert_rseed,                                                      &
        Obs_pert )
 
     ! reichle, 27 Jul 2005
@@ -3322,6 +3322,7 @@ contains
     implicit none
     
     integer, intent(in) :: N_ens, N_obs, N_obs_param
+    integer, intent(in) :: pert_choice
     
     type(obs_param_type), dimension(N_obs_param), intent(in) :: obs_param
     
@@ -3543,7 +3544,7 @@ contains
        obs_pert_param(j)%xcorr           = obs_param(i)%xcorr
        obs_pert_param(j)%ycorr           = obs_param(i)%ycorr         
        obs_pert_param(j)%tcorr           = 0
-       
+
     end do
     
     ! --------------------------------------------------------------------
@@ -3552,10 +3553,11 @@ contains
     
     allocate(Obs_pert_ntrmdt(pert_grid_lH%N_lon, pert_grid_lH%N_lat, N_assim_species, N_ens))
     allocate(Obs_pert_grid(  pert_grid_lH%N_lon, pert_grid_lH%N_lat, N_assim_species, N_ens))
-
+    
     call get_pert(                                                        &
          N_assim_species, N_assim_species, N_ens,                         &
          pert_grid_lH, pert_grid_f,                                       &  ! switched order (reichle, 17 Jul 2020)
+         pert_choice,                                                     &
          dtstep,                                                          &
          obs_pert_param,                                                  &
          Pert_rseed,                                                      &

@@ -152,7 +152,7 @@ contains
        tile_grid_g, pert_grid_f, pert_grid_g,                            &
        N_catl_vec, low_ind, l2f, f2l,                                    &
        update_type,                                                      &
-       dtstep_assim,                                                     &
+       dtstep_assim, pert_choice,                                        &
        xcompact, ycompact, fcsterr_inflation_fac,                        &
        N_obs_param, obs_param, N_obsbias_max,                            &
        out_obslog, out_smapL4SMaup,                                      &
@@ -206,6 +206,7 @@ contains
     integer, intent(in), dimension(N_catf)   :: f2l
 
     integer, intent(in) :: update_type, dtstep_assim
+    integer, intent(in) :: pert_choice
 
     real,    intent(in) :: xcompact, ycompact, fcsterr_inflation_fac
 
@@ -1036,19 +1037,19 @@ contains
           !        to keep Pert_rseed consistent across processors 
 
           allocate(Obs_pert_tmp(nObs_ana,N_ens))
-          call get_obs_pert( N_ens, nObs_ana, N_obs_param,                 &
-               pert_grid_f,                                                &
-               obs_param, Obs_ana,                                         &
-               Pert_rseed,                                                 &
+          call get_obs_pert( N_ens, nObs_ana, N_obs_param, pert_choice,      &
+               pert_grid_f,                                                  &
+               obs_param, Obs_ana,                                           &
+               Pert_rseed,                                                   &
                Obs_pert_tmp )
-
+          
 #else
-
+          
           allocate(Obs_pert_tmp(N_obslH,N_ens))
-          call get_obs_pert( N_ens, N_obslH, N_obs_param,                  &
-               pert_grid_f,                                                &
-               obs_param, Observations_lH,                                 &
-               Pert_rseed,                                                 &
+          call get_obs_pert( N_ens, N_obslH,  N_obs_param, pert_choice,      &
+               pert_grid_f,                                                  &
+               obs_param, Observations_lH,                                   &
+               Pert_rseed,                                                   &
                Obs_pert_tmp )
 #endif
 
