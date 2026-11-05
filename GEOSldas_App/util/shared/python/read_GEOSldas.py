@@ -754,11 +754,20 @@ def read_obslog(fname):
 
     print(f"reading from {fname}")
 
+    # keep line ends (newline=''), so that a quoted file name may contain a line break
+
     with open(fname, 'r', newline='') as fid:
-        lines = fid.read().splitlines()
+        lines = fid.readlines()
 
     if len(lines) < 4 or lines[-1].strip() != 'EOF':
         raise ValueError(f"read_obslog(): ERROR reading data from {fname}")
+
+    # strict: a quote that is not closed is an error (instead of absorbing the following rows)
+
+    try:
+        rows = list(csv.reader(lines[3:-1], skipinitialspace=True, strict=True))
+    except csv.Error as err:
+        raise ValueError(f"read_obslog(): ERROR reading data from {fname}: {err}")
 
     ana_time      = []
     obs_descr     = []
@@ -766,7 +775,7 @@ def read_obslog(fname):
     N_obs_read    = []
     obs_fname     = []
 
-    for row in csv.reader(lines[3:-1], skipinitialspace=True):
+    for row in rows:
 
         if len(row) != 5:
             raise ValueError(f"read_obslog(): ERROR reading data from {fname}: {row}")
