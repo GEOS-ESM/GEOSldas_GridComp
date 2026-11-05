@@ -82,7 +82,7 @@ class LdasConfig:
         self.has_landassim_seed = False
         self.has_geos_pert      = False
         self.nSegments          = 1
-        self.perturb            = 0
+        self.pert_choice        = 0                    # 0=none, 1=rectangular, 2=sphere (as in rc var 'PERTURBATIONS')
         self.first_ens_id       = 0
         self.in_rstdir          = None
         self.in_tilefile        = None                 # default string
@@ -243,9 +243,9 @@ class LdasConfig:
 
         self.nens = int(self.ExeInputs['NUM_LDAS_ENSEMBLE'])             # fails if value of Nens is not an integer
         self.first_ens_id = int(self.ExeInputs.get('FIRST_ENS_ID',0))
-        self.perturb = int(self.ExeInputs.get('PERTURBATIONS',0))
+        self.pert_choice  = int(self.ExeInputs.get('PERTURBATIONS', 0))
         if self.nens > 1:
-           self.perturb = 1
+            require(self.pert_choice > 0, "Inconsistent inputs for rc variables NUM_LDAS_ENSEMBLE and PERTURBATIONS.")
         self.ensdirs  = ['ens%04d'%iens for iens in range(self.first_ens_id, self.nens  + self.first_ens_id)]
         # if self.ens_id_width = 4, _width = '_e%04d'
         _width = '_e%0{}d'.format(self.ens_id_width-2)

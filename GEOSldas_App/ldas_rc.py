@@ -171,9 +171,6 @@ class LdasRc:
         # '%s' template for ensemble member id in file names
         tmpl_ = '%s' if self.nens > 1 else ''
 
-        if self.perturb == 1:
-           ldasrcInp['PERTURBATIONS'] ='1'
-
         # restart components: (RC key prefix, file name prefix)
         rst = []
         if self.with_land :
@@ -223,7 +220,7 @@ class LdasRc:
                ldasrcInp[key+'_INTERNAL_CHECKPOINT_FILE'] = val+tmpl_+'_internal_checkpoint'
 
         # LANDPERT restart file
-        if (self.perturb == 1):
+        if (self.pert_choice > 0):
             ldasrcInp['LANDPERT_INTERNAL_RESTART_FILE'] = '../input/restart/landpert'+tmpl_+'_internal_rst'
             # for lat/lon and EASE tile space, specify LANDPERT checkpoint file here (via MAPL);
             # for cube-sphere tile space, Landpert GC will set up LANDPERT checkpoint file

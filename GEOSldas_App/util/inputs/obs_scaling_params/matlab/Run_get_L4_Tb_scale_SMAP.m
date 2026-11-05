@@ -7,7 +7,7 @@
 clear
 
 % add path to matlab functions in src/Components/GEOSldas_GridComp/GEOSldas_App/util/shared/matlab/
-addpath('../../shared/matlab/');
+addpath('../../../shared/matlab/');
 
 %======
 
