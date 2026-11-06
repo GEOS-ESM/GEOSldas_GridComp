@@ -1002,7 +1002,7 @@ contains
        obs_param,                                                &
        met_force, lai, cat_param, cat_progn, mwRTM_param,        &
        N_obsl, Observations_l, Obs_pred_l, obsbias_ok,           &
-       fcsterr_inflation_fac )
+       fcsterr_inflation_fac, c3_tile_space )
     
     ! Compute ensemble of measurement predictions from ensemble 
     !  of tile-space Catchment prognostics.
@@ -1025,6 +1025,8 @@ contains
     ! 18 Jun 2012 - reichle: rewritten for better memory management w/ MPI
     ! 26 Mar 2014 - reichle: apply all model-based QC only before EnKF update
     ! 25 Sep 2020 - wjiang+reichle: accommodate processors that have no tiles
+    !  6 Nov 2026 - amfox: added optional input "c3_tile_space" and QC of Tb for non-land
+    !                      surfaces in cube-sphere tile space
     
     implicit none
     
@@ -1059,6 +1061,11 @@ contains
    
     real,                   intent(in),                       optional :: fcsterr_inflation_fac      
     
+    ! "tile_grid_g" is the pert grid (lat/lon for cube-sphere tile space), so tell
+    !  get_obs_pred() whether the tile space is cube-sphere (default: .false.)
+
+    logical,                intent(in),                       optional :: c3_tile_space
+
     ! --------------------------------------------------------------------------------
     !
     ! locals
@@ -1087,6 +1094,9 @@ contains
     real                                    :: tmpsum_w
 
     logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
+
+    logical                                 :: c3_tile_space_tmp
+    integer                                 :: ind_i_min, ind_i_max, ind_j_min, ind_j_max
 
     real, dimension(1)                      :: tmpmean, tmpvar
         
@@ -1139,6 +1149,7 @@ contains
     integer, dimension(:),     allocatable  :: ind_tmp
 
     real,    dimension(:),     allocatable  :: tmp_ndst2, tmp_wFOV, tmp_weights, tmp_data
+    real,    dimension(:),     allocatable  :: tmp_wcell           ! cube-sphere tile space only
                                                              
     ! dimension "N_catlH-[by-N_XXXX-]by-N_ens"  
     ! (need to be communicated between processors)
@@ -1150,6 +1161,9 @@ contains
     real,    dimension(:,:,:), allocatable  :: Tb_h_lH, Tb_v_lH
 
     real,    dimension(:),     allocatable  :: peat_lH
+
+    real,    dimension(:),     allocatable  :: land_frac_cell_lH   ! cube-sphere tile space only
+    real,    dimension(:,:),   allocatable  :: land_frac_cell_ij   ! cube-sphere tile space only
     
     real,    dimension(:,:,:), pointer      :: tile_data_lH => null()
     
@@ -1576,6 +1590,44 @@ contains
     call get_tiles_in_halo( N_catl, N_fields, N_ens, tile_data_l, tile_coord_l,  &
          tile_coord_f, N_catl_vec, low_ind, xhalo, yhalo,                        &
          N_catlH, tile_coord_lH=tile_coord_lH )
+
+    ! for cube-sphere tile space, get the land fraction of the (cube-sphere) grid cell
+    !  of each tile in the local halo domain ("lH") for the QC of Tb for non-land surfaces
+    !  (below); a grid cell contains several tiles, whose frac_cell add up to the land
+    !  fraction of the grid cell (tile_coord_f must contain all tiles of the grid cell)
+    ! - amfox, 6 Nov 2026
+
+    c3_tile_space_tmp = .false.
+
+    if (present(c3_tile_space))  c3_tile_space_tmp = c3_tile_space
+
+    if (c3_tile_space_tmp .and. get_Tb_lH) then
+
+       ind_i_min = minval(tile_coord_f%i_indg)
+       ind_i_max = maxval(tile_coord_f%i_indg)
+       ind_j_min = minval(tile_coord_f%j_indg)
+       ind_j_max = maxval(tile_coord_f%j_indg)
+
+       allocate(land_frac_cell_ij(ind_i_min:ind_i_max,ind_j_min:ind_j_max))
+
+       land_frac_cell_ij = 0.
+
+       do k=1,N_catf
+          if (tile_coord_f(k)%typ==MAPL_LAND)                                         &
+               land_frac_cell_ij(tile_coord_f(k)%i_indg,tile_coord_f(k)%j_indg) =      &
+               land_frac_cell_ij(tile_coord_f(k)%i_indg,tile_coord_f(k)%j_indg) +      &
+               tile_coord_f(k)%frac_cell
+       end do
+
+       allocate(land_frac_cell_lH(N_catlH))
+
+       do k=1,N_catlH
+          land_frac_cell_lH(k) = land_frac_cell_ij(tile_coord_lH(k)%i_indg,tile_coord_lH(k)%j_indg)
+       end do
+
+       deallocate(land_frac_cell_ij)
+
+    end if
     
     if (get_sfmc_lH)   allocate(sfmc_lH( N_catlH,                     N_ens))
     if (get_rzmc_lH)   allocate(rzmc_lH( N_catlH,                     N_ens))
@@ -1677,6 +1729,7 @@ contains
     allocate(tmp_wFOV(   N_catlH))
     allocate(tmp_weights(N_catlH))
     allocate(tmp_data(   N_catlH))
+    if (c3_tile_space_tmp)  allocate(tmp_wcell(N_catlH))
 
     do i=1,N_obsl
        
@@ -1879,6 +1932,9 @@ contains
                 
                 ! for EASE grids *ONLY*: screen for non-land surfaces (e.g., lakes)
                 ! - reichle, 28 Mar 2015
+                !
+                ! and for cube-sphere tile space (see below)
+                ! - amfox, 6 Nov 2026
                 
                 if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
                    
@@ -1901,6 +1957,25 @@ contains
                    
                    tmpWater = ( 1. - tmp_fraccell > EASE_max_water_frac )
                    
+                elseif (c3_tile_space_tmp) then
+
+                   ! cube-sphere tile space: screen for non-land surfaces as for EASE grids,
+                   !  but a grid cell contains several tiles; average the land fraction of
+                   !  the grid cells in the FOV (FOV-weighted) and count each grid cell once
+                   !  by weighting each tile with its share of the land in its grid cell
+                   !  (identical to EASE grids if there is one tile per grid cell)
+                   ! - amfox, 6 Nov 2026
+
+                   tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
+
+                   tmp_wcell(1:N_tmp) = tmp_wFOV(1:N_tmp)                                &
+                        * tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell / max( tmp_data(1:N_tmp), 1.e-10 )
+
+                   call tile2obs_helper(                                               &
+                        N_tmp, tmp_wcell(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
+
+                   tmpWater = ( 1. - tmp_fraccell > EASE_max_water_frac )
+
                 else
                    
                    tmpWater = .false.
@@ -2024,6 +2099,8 @@ contains
     if (allocated(tmp_wFOV))                 deallocate(tmp_wFOV)   ! fix memory leak
     if (allocated(tmp_weights))              deallocate(tmp_weights)
     if (allocated(tmp_data))                 deallocate(tmp_data)
+    if (allocated(tmp_wcell))                deallocate(tmp_wcell)
+    if (allocated(land_frac_cell_lH))        deallocate(land_frac_cell_lH)
 
     if (allocated(peat_lH))                  deallocate(peat_lH)
     

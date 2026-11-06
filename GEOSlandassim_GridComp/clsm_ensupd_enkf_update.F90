@@ -517,7 +517,8 @@ contains
                obs_param,                                         &
                met_force, lai, cat_param, cat_progn, mwRTM_param, &
                N_obsl, Observations_l, Obs_pred_l, obsbias_ok,    &
-               fcsterr_inflation_fac )
+               fcsterr_inflation_fac,                             &
+               c3_tile_space = (index(tile_grid_g%gridtype,'c3')/=0) )
 
           if (allocated(obsbias_ok)) deallocate(obsbias_ok)
 
@@ -2127,6 +2128,10 @@ contains
             obs_param,                                         &
             met_force, lai, cat_param, cat_progn, mwRTM_param, &
             N_obsl_tmp, Observations_l, Obs_pred_l )
+
+       ! NOTE: c3_tile_space is not needed here; obs that fail the QC of Tb for non-land
+       !       surfaces were removed in the call to get_obs_pred() before the EnKF update
+       !       (amfox, 6 Nov 2026)
 
        ! clean up
 
