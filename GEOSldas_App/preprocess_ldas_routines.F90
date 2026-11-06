@@ -2808,6 +2808,9 @@ end block
     ! modified to accommodate additional tile types (landice)
     ! - wjiang, reichle, 30 Apr 2025
     !
+    ! fixed "frac_cell" and units of "area" for nc4 tile file
+    ! - amfox, 6 Nov 2026
+    !
     ! -------------------------------------------------------------
 
     character(*),                                          intent(in)   :: tile_file
@@ -2927,8 +2930,25 @@ end block
        tile_coord_r(:)%pfaf_index= iTable(r2g, 4) 
        tile_coord_r(:)%com_lon   = rTable(r2g, 1)
        tile_coord_r(:)%com_lat   = rTable(r2g, 2)
-       tile_coord_r(:)%area      = rTable(r2g, 3)
-       tile_coord_r(:)%frac_cell = rTable(r2g, 4)
+       ! MAPL_ReadTilingNC4() returns "area" in [radian2] and, where frac_cell/=0,
+       !  area/frac_cell (i.e., the area of the grid cell) instead of frac_cell;
+       !  convert to frac_cell and area [km^2] as read from *.til file (see below)
+       ! - amfox, 6 Nov 2026
+
+       do k=1,size(r2g)
+          if (rTable(r2g(k),4)/=0.d0) then
+             tile_coord_r(k)%frac_cell = rTable(r2g(k),3)/rTable(r2g(k),4)
+          else
+             tile_coord_r(k)%frac_cell = 0.
+          end if
+       end do
+
+       if (ease_grid) then
+          tile_coord_r(:)%area = ease_cell_area*tile_coord_r(:)%frac_cell/1000./1000.  ! [km^2]
+       else
+          tile_coord_r(:)%area = rTable(r2g, 3)*MAPL_RADIUS*MAPL_RADIUS/1000./1000.    ! [km^2]
+       end if
+
        tile_coord_r(:)%min_lon   = rTable(r2g, 6)
        tile_coord_r(:)%max_lon   = rTable(r2g, 7)
        tile_coord_r(:)%min_lat   = rTable(r2g, 8)
