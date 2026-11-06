@@ -5,7 +5,7 @@ set (alldirs
   )
 
 set (SRCS
-  hdf4_c_api.c hdf4_fortran_api.F90 io_hdf5.F90 enkf_general.F90 adapt_types.F90 mwRTM_types.F90 clsm_ensupd_glob_param.F90
+  hdf4_fortran_api.F90 io_hdf5.F90 enkf_general.F90 adapt_types.F90 mwRTM_types.F90 clsm_ensupd_glob_param.F90
   mwRTM_routines.F90 clsm_ensupd_upd_routines.F90 clsm_ensdrv_drv_routines.F90
   clsm_ensupd_read_obs.F90 catch_bias_types.F90 clsm_bias_routines.F90 clsm_adapt_routines.F90
   clsm_ensupd_enkf_update.F90 clsm_ensdrv_out_routines.F90 GEOS_LandAssimGridComp.F90
@@ -15,6 +15,14 @@ find_package(HDF5 REQUIRED COMPONENTS Fortran)
 find_path(HDF4_INCLUDE_DIR hdf.h PATH_SUFFIXES hdf REQUIRED)
 find_library(HDF4_MFHDF_LIBRARY NAMES mfhdf REQUIRED)
 find_library(HDF4_DF_LIBRARY NAMES df REQUIRED)
+
+# The HDF4 C bridge is compiled separately so that it only sees the HDF4 headers.
+# Otherwise, on case-insensitive file systems (macOS), the <assert.h> included by
+# hdf.h resolves to GMAO_mpeu/assert.H through the include paths of the dependencies.
+add_library (${this}_hdf4_c OBJECT hdf4_c_api.c)
+target_include_directories (${this}_hdf4_c PRIVATE ${HDF4_INCLUDE_DIR})
+set_target_properties (${this}_hdf4_c PROPERTIES POSITION_INDEPENDENT_CODE ON)
+list (APPEND SRCS $<TARGET_OBJECTS:${this}_hdf4_c>)
 
 esma_add_library (${this}
   SRCS ${SRCS}
