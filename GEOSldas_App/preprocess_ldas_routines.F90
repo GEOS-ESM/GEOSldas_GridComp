@@ -2915,7 +2915,9 @@ end block
     
 
     if (isNC4 ) then
+       
        N_tiles_land_g  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + ExcludeFromDomain))
+       
        tile_coord_r(:)%typ     = iTable(r2g, 0)
        tile_coord_r(:)%i_indg  = iTable(r2g, 2) 
        tile_coord_r(:)%j_indg  = iTable(r2g, 3)
@@ -2928,7 +2930,7 @@ end block
        tile_coord_r(:)%com_lon   = rTable(r2g, 1)
        tile_coord_r(:)%com_lat   = rTable(r2g, 2)
        tile_coord_r(:)%area      = rTable(r2g, 3)
-       tile_coord_r(:)%frac_cell = rTable(r2g, 4)
+       tile_coord_r(:)%frac_cell = rTable(r2g, 3)/rTable(r2g, 4)        ! rTable(:,4) is area of atm grid cell; assume >0
        tile_coord_r(:)%min_lon   = rTable(r2g, 6)
        tile_coord_r(:)%max_lon   = rTable(r2g, 7)
        tile_coord_r(:)%min_lat   = rTable(r2g, 8)
@@ -2938,7 +2940,14 @@ end block
        tile_coord_r%frac_pfaf    =      nodata_generic
        tile_coord_r%pert_i_indg  = nint(nodata_generic)
        tile_coord_r%pert_j_indg  = nint(nodata_generic)
+
+       
+       ! compute area of tile in [km^2]  (units convention in tile_coord structure)
+       
+       tile_coord_r(:)%area = tile_coord_r(:)%area*MAPL_RADIUS*MAPL_RADIUS/1000./1000.              
+
     else
+       
        allocate(tile_coord(n_tiles))
        allocate(r2g_tmp(n_tiles))
        
@@ -3068,6 +3077,7 @@ end block
        
        deallocate(tile_coord) 
        deallocate(r2g_tmp)
+       
        ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing
        tile_coord_r%pert_i_indg = nint(nodata_generic)
        tile_coord_r%pert_j_indg = nint(nodata_generic)
@@ -3102,6 +3112,7 @@ end block
           if (logit) write (logunit,*) 'WARNING: tile elevation NOT avaialable'
           
        end if
+       
     endif !isNC4
     ! ----------------------------------------------------------------------
     !
