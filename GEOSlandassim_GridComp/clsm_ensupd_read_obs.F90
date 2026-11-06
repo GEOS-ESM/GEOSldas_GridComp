@@ -20,7 +20,7 @@ module clsm_ensupd_read_obs
        c_char
   
   use, intrinsic :: iso_fortran_env,    ONLY:     &
-       int16
+       int16, REAL64
   
   use MAPL_BaseMod,                     ONLY:     &
        MAPL_UNDEF
@@ -2291,7 +2291,7 @@ contains
 
     ! per-file arrays allocated to actual obs dimension size
     integer,    allocatable :: lat_raw(:), lon_raw(:)
-    real(8),    allocatable :: time_raw(:)
+    real(REAL64), allocatable :: time_raw(:)
     integer(2), allocatable :: ssm_raw(:)
     integer(1), allocatable :: sflag_raw(:)    ! surface_flag                      (NC_UBYTE  -> int8)
     integer(1), allocatable :: pflag_raw(:)    ! processing_flag                   (NC_UBYTE  -> int8)
