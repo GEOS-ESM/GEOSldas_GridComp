@@ -10,15 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added obslog output for H SAF ASCAT and CYGNSS L3 soil moisture, with quoted filenames where needed ([PR #242](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/242)).
+- Added functionality to generate perturbations on sphere ([PR #187](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/187)).
 - Added Python version of obs scaling scripts ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Added support for M21C date/time formatting in post-processing of HISTORY output ([PR #229](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/229)).
 - Improved error handling in preprocessor for SMOS obs ([PR #212](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/212)).
+- Added Python reader for obslog files (`read_obslog()` in `read_GEOSldas.py`); `read_obslog.m` now reads file names in double quotes (e.g., H SAF) ([PR #243](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/243)).
+- Added logging of original (pre-renaming) file names of MODIS SCF obs ([PR #239](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/239)).
  
 ### Changed
 - Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
 ### Fixed
+- Fixed double assimilation of MODIS SCF obs for tiles whose center longitude is exactly on the boundary between two assimilation windows (not 0-diff for EASEv2 M36 and CF0360) ([PR #240](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/240)).
 - Fixed bugs in MATLAB obs scaling parameter scripts (not 0-diff for lat/lon grid) ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 - Fixed string and no-data obs handling in read_GEOSldas.py ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
