@@ -6,6 +6,10 @@ module hdf4_fortran_api
 
   public :: hopen, hclose, vfstart, vfend, vsfatch, vsqfnelt, vsfseek, vsfsfld, vsfread, vsfdtch
   public :: sfstart, sfn2index, sfselect, sfginfo, sfrdata, sfendacc, sfend
+  public :: sffattr, sfgainfo, sfrcatt
+  public :: DFNT_UCHAR8, DFNT_CHAR8
+
+  integer, parameter :: DFNT_UCHAR8 = 3, DFNT_CHAR8 = 4     ! HDF4 data types (see hntdefs.h)
 
   interface vsfread
     module procedure vsfread_real
@@ -97,6 +101,25 @@ module hdf4_fortran_api
       integer(c_int32_t), value :: sds_id
       integer(c_int32_t), intent(in) :: start(*), stride(*), edge(*)
       type(c_ptr), value :: data
+      integer(c_int32_t) :: status
+    end function
+    function c_sffattr(obj_id, name, name_length) bind(C, name='ldas_h4_sffattr') result(status)
+      import :: c_int32_t, c_char
+      integer(c_int32_t), value :: obj_id, name_length
+      character(kind=c_char), intent(in) :: name(*)
+      integer(c_int32_t) :: status
+    end function
+    function c_sfgainfo(obj_id, index, name, name_length, data_type, count) bind(C, name='ldas_h4_sfgainfo') result(status)
+      import :: c_int32_t, c_char
+      integer(c_int32_t), value :: obj_id, index, name_length
+      character(kind=c_char), intent(out) :: name(*)
+      integer(c_int32_t), intent(out) :: data_type, count
+      integer(c_int32_t) :: status
+    end function
+    function c_sfrcatt(obj_id, index, data) bind(C, name='ldas_h4_sfrcatt') result(status)
+      import :: c_int32_t, c_char
+      integer(c_int32_t), value :: obj_id, index
+      character(kind=c_char), intent(out) :: data(*)
       integer(c_int32_t) :: status
     end function
     function c_sfendacc(sds_id) bind(C, name='ldas_h4_sfendacc') result(status)
@@ -214,6 +237,30 @@ contains
     c_stride = stride(1:2)
     c_edge = edge(1:2)
     status = c_sfrdata(int(sds_id, c_int32_t), c_start, c_stride, c_edge, c_loc(data(1)))
+  end function
+  function sffattr(obj_id, name) result(status)
+    integer, intent(in) :: obj_id
+    character(*), intent(in) :: name
+    integer :: status
+    status = c_sffattr(int(obj_id, c_int32_t), name, len_trim(name))
+  end function
+  function sfgainfo(obj_id, index, name, data_type, count) result(status)
+    integer, intent(in) :: obj_id, index
+    character(*), intent(out) :: name
+    integer, intent(out) :: data_type, count
+    integer :: status
+    integer(c_int32_t) :: c_data_type, c_count
+    name = ' '
+    status = c_sfgainfo(int(obj_id, c_int32_t), int(index, c_int32_t), name, len(name), c_data_type, c_count)
+    data_type = c_data_type
+    count = c_count
+  end function
+  ! data must hold at least "count" characters (see sfgainfo)
+  function sfrcatt(obj_id, index, data) result(status)
+    integer, intent(in) :: obj_id, index
+    character(*), intent(out) :: data
+    integer :: status
+    status = c_sfrcatt(int(obj_id, c_int32_t), int(index, c_int32_t), data)
   end function
   function sfendacc(sds_id) result(status)
     integer, intent(in) :: sds_id
