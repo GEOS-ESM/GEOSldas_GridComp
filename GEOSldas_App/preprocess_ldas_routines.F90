@@ -2943,9 +2943,13 @@ end block
 
        
        ! compute area of tile in [km^2]  (units convention in tile_coord structure)
-       
-       tile_coord_r(:)%area = tile_coord_r(:)%area*MAPL_RADIUS*MAPL_RADIUS/1000./1000.              
 
+       if (ease_grid) then
+          tile_coord_r(:)%area = ease_cell_area*tile_coord(:)%frac_cell/1000./1000.          ! [km^2]
+       else
+          tile_coord_r(:)%area = tile_coord_r(:)%area*MAPL_RADIUS*MAPL_RADIUS/1000./1000.    ! [km^2]  
+       end if
+          
     else
        
        allocate(tile_coord(n_tiles))
