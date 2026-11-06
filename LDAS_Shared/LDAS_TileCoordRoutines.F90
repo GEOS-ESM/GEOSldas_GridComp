@@ -5,6 +5,8 @@
 ! reichle,  14 Apr 2006 - split tile_coord.F90 into 2 files to avoid 
 !                         having more than one module per file
 ! reichle,   5 Apr 2013 - added EASEv2 grid, minimal change to max lat/lon for EASE (v1)  
+! amfox,     6 Nov 2026 - added cube-sphere grid ("c3") to get_ij_ind_from_latlon() and
+!                         get_tile_num_from_latlon(); added check_c3_tile_grid()
 !
 ! ========================================================================
 
@@ -24,7 +26,9 @@ module LDAS_TileCoordRoutines
        nodata_tol_generic
   
   use MAPL_ConstantsMod,                ONLY:     &
-       MAPL_RADIUS                                    ! Earth radius
+       MAPL_RADIUS,                               &   ! Earth radius
+       MAPL_PI,                                   &
+       MAPL_PI_R8
   
   use MAPL,                             ONLY:     &
        MAPL_ease_convert,                         &
@@ -47,6 +51,7 @@ module LDAS_TileCoordRoutines
   public :: get_tile_num_in_ellipse
   public :: get_tile_num_from_latlon
   public :: get_ij_ind_from_latlon
+  public :: check_c3_tile_grid
   public :: tile2grid_simple
   public :: grid2tile
   public :: tile_mask_grid
@@ -775,6 +780,12 @@ contains
     ! distance units are in [deg]; added functionality for latitude-dependent
     !  meridional max distance (max_dist_x)
     ! - reichle, 2014/12/23
+    !
+    ! added cube-sphere ("c3") tile_grid; tiles do not nest in the cells of a lat/lon
+    !  grid, so for cube-sphere tile space, tile_grid must be the cube-sphere grid
+    !  that defines the tile space (and N_tile_in_cell_ij, tile_num_in_cell_ij must be
+    !  obtained from tile_coord%i_indg and tile_coord%j_indg)
+    ! - amfox, 6 Nov 2026
     
     implicit none
     
@@ -809,6 +820,13 @@ contains
     real                         :: tmp_dist_x, min_dist_x
     real, dimension(N_latlon)    ::                         max_dist_tmp_x 
     
+    ! for cube-sphere tile_grid
+
+    integer                      :: ii, jj, kk, N_cell_c3
+    integer, dimension(9)        :: i_cell_c3, j_cell_c3
+
+    real                         :: tmp_hx, tmp_hy, tmp_dlon, tmp_dlat
+
     character(len=*),  parameter :: Iam = 'get_tile_num_from_latlon'
     character(len=400)           :: err_msg
 
@@ -910,6 +928,138 @@ contains
                 
              end do
 
+          elseif (index(tile_grid%gridtype, 'c3')/=0) then
+
+             ! Cube-sphere tile space:  Each tile is inside the cube-sphere grid cell
+             ! given by tile_coord%i_indg and tile_coord%j_indg, but a tile can be much
+             ! smaller than the grid cell, and lat/lon is often not inside the tile with
+             ! the nearest center-of-mass.  Therefore, use the bounding box of the tiles:
+             !
+             ! 1.) Loop through all tiles within grid cell that contains lat/lon.
+             !     Among the tiles whose bounding box contains lat/lon, find the minimum
+             !     normalized square distance (dx/hx)**2 + (dy/hy)**2, where hx and hy
+             !     are half the width and height of the bounding box.
+             !
+             ! 2.) If there is no such tile, repeat 1.) for all tiles within the grid cells
+             !     that contain the 8 points at +/- half a grid cell (approx.) around
+             !     lat/lon, because the bounding box of a tile can extend into a
+             !     neighboring grid cell.
+             !
+             ! 3.) If there is still no such tile, loop through all tiles of 1.) and 2.)
+             !     and find minimum distance (Minkowski norm) as for LatLon.  This tile
+             !     is subject to the bounding box and max_dist check below.
+             !
+             ! If there are no land tiles in these grid cells, tile_num will not change
+             ! from its initialized value.
+             !
+             ! amfox, 6 Nov 2026
+
+             N_cell_c3    = 1
+
+             i_cell_c3(1) = i_ind
+             j_cell_c3(1) = j_ind
+
+             do kk=1,9
+
+                if (kk>N_cell_c3) exit
+
+                do k=1,N_tile_in_cell_ij(i_cell_c3(kk),j_cell_c3(kk))
+
+                   this_tile_num = tile_num_in_cell_ij(i_cell_c3(kk),j_cell_c3(kk),k)
+
+                   if ( tile_coord(this_tile_num)%min_lon <= lon(n)    .and.      &
+                        tile_coord(this_tile_num)%max_lon >= lon(n)    .and.      &
+                        tile_coord(this_tile_num)%min_lat <= lat(n)    .and.      &
+                        tile_coord(this_tile_num)%max_lat >= lat(n)           ) then
+
+                      ! lat/lon is inside bounding box of tile
+
+                      tmp_hx     = 0.5*(tile_coord(this_tile_num)%max_lon - tile_coord(this_tile_num)%min_lon)
+                      tmp_hy     = 0.5*(tile_coord(this_tile_num)%max_lat - tile_coord(this_tile_num)%min_lat)
+
+                      tmp_hx     = max( tmp_hx, 1.e-6 )   ! avoid division by zero
+                      tmp_hy     = max( tmp_hy, 1.e-6 )
+
+                      tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                      tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                      tmp_dist   = (tmp_dist_x/tmp_hx)**2 + (tmp_dist_y/tmp_hy)**2
+
+                      if (tmp_dist<min_dist) then
+
+                         min_dist    = tmp_dist
+                         min_dist_x  = tmp_dist_x
+                         min_dist_y  = tmp_dist_y
+
+                         tile_num(n) = this_tile_num
+
+                      end if
+
+                   end if
+
+                end do
+
+                ! no tile found in grid cell that contains lat/lon:
+                ! add grid cells of 8 points around lat/lon
+                ! (tile_grid%dlon = 360/(4*N) is the approximate grid spacing, see LDAS_create_grid_g())
+
+                if (kk==1 .and. tile_num(n)==nodata_tilenum) then
+
+                   tmp_dlat = 0.5*tile_grid%dlon
+                   tmp_dlon = tmp_dlat / max( cos( MAPL_PI/180. * lat(n) ), 0.1 )
+
+                   do ii=-1,1
+                      do jj=-1,1
+
+                         if (ii==0 .and. jj==0) cycle
+
+                         N_cell_c3 = N_cell_c3 + 1
+
+                         call get_ij_ind_from_latlon( tile_grid,                                   &
+                              lat(n)+real(jj)*tmp_dlat, lon(n)+real(ii)*tmp_dlon,                 &
+                              i_cell_c3(N_cell_c3), j_cell_c3(N_cell_c3) )
+
+                         i_cell_c3(N_cell_c3) = min( max(i_cell_c3(N_cell_c3), 1), tile_grid%N_lon )
+                         j_cell_c3(N_cell_c3) = min( max(j_cell_c3(N_cell_c3), 1), tile_grid%N_lat )
+
+                      end do
+                   end do
+
+                end if
+
+             end do
+
+             ! no bounding box contains lat/lon:  find minimum distance (Minkowski norm)
+
+             if (tile_num(n)==nodata_tilenum) then
+
+                do kk=1,N_cell_c3
+
+                   do k=1,N_tile_in_cell_ij(i_cell_c3(kk),j_cell_c3(kk))
+
+                      this_tile_num = tile_num_in_cell_ij(i_cell_c3(kk),j_cell_c3(kk),k)
+
+                      tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                      tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                      tmp_dist   = tmp_dist_x + tmp_dist_y    ! Minkowski norm
+
+                      if (tmp_dist<min_dist) then
+
+                         min_dist    = tmp_dist
+                         min_dist_x  = tmp_dist_x
+                         min_dist_y  = tmp_dist_y
+
+                         tile_num(n) = this_tile_num
+
+                      end if
+
+                   end do
+
+                end do
+
+             end if
+
           else
              
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown grid type')
@@ -990,6 +1140,17 @@ contains
     
     real :: r, s, i_indg, j_indg
 
+    ! for cube-sphere grid; parameters from MAPL_GetGlobalHorzIJIndex()
+
+    real*8, parameter :: sqr2  = 1.41421356237310d0   ! sqrt(2), center to middle of edge of 2x2x2 cube
+    real*8, parameter :: alpha = 0.615479708670387d0  ! asin(1/sqrt(3)), angle betw. lines from center
+    !                                                 !  to middle and to end of an edge
+    real*8, parameter :: shift = 0.174532925199433d0  ! pi/18, shift of longitude ("Japan Fuji mountain")
+
+    integer :: N_c3, face, i_indg_c3, j_indg_c3
+
+    real*8  :: tmp_lon, tmp_lat, x, y, z, max_xyz, xval, yval, dalpha
+
     character(len=*), parameter :: Iam = 'get_ij_ind_from_latlon'
     character(len=400) :: err_msg
 
@@ -1040,6 +1201,99 @@ contains
           
        end if
 
+    elseif (index(tile_grid%gridtype, 'c3')/=0) then
+
+       ! cube-sphere grid lat/lon to index provides *global*, *1-based* index!
+       !
+       ! i_indg_c3 = 1,...,N_c3 and j_indg_c3 = 1,...,6*N_c3 (6 faces stacked in j),
+       !  as in tile_coord%i_indg and tile_coord%j_indg
+       !
+       ! N_c3 = number of grid cells along the edge of a face of the *global* grid,
+       !  obtained from (approximate) dlon = 360/(4*N_c3) set in LDAS_create_grid_g();
+       !  dlon is the same for the global and domain grids (get_minExtent_grid() does
+       !  not zoom in for cube-sphere grids)
+       !
+       ! geometry ported from MAPL_GetGlobalHorzIJIndex() (MAPL Base_Base_implementation.F90)
+       !  for gnomonic, equal-edge cube-sphere grids with pi/18 shift of longitude
+       !  (*not* for stretched grids, see check_c3_tile_grid());
+       !  the MAPL subroutine would need the ESMF grid
+       !
+       ! amfox, 6 Nov 2026
+
+       N_c3    = nint( 90./tile_grid%dlon )
+
+       dalpha  = 2.d0*alpha/N_c3
+
+       ! point on unit sphere (with shift of longitude), projected onto 2x2x2 cube
+
+       tmp_lon = lon
+       tmp_lat = lat
+
+       tmp_lon = tmp_lon*(MAPL_PI_R8/180.d0) + shift
+       tmp_lat = tmp_lat*(MAPL_PI_R8/180.d0)
+
+       x       = cos(tmp_lat)*cos(tmp_lon)
+       y       = cos(tmp_lat)*sin(tmp_lon)
+       z       = sin(tmp_lat)
+
+       max_xyz = max( abs(x), abs(y), abs(z) )
+
+       x       = x/max_xyz
+       y       = y/max_xyz
+       z       = z/max_xyz
+
+       ! find face and coordinates on face (points on edges of faces are assigned
+       !  in the order of faces 1,...,6)
+
+       if     (abs(x-1.d0) <= epsilon(1.d0)) then
+
+          face =  1
+          xval =  y
+          yval =  z
+
+       elseif (abs(y-1.d0) <= epsilon(1.d0)) then
+
+          face =  2
+          xval = -x
+          yval =  z
+
+       elseif (abs(z-1.d0) <= epsilon(1.d0)) then
+
+          face =  3
+          xval = -x
+          yval = -y
+
+       elseif (abs(x+1.d0) <= epsilon(1.d0)) then
+
+          face =  4
+          xval = -z
+          yval = -y
+
+       elseif (abs(y+1.d0) <= epsilon(1.d0)) then
+
+          face =  5
+          xval = -z
+          yval =  x
+
+       else    ! z = -1
+
+          face =  6
+          xval =  y
+          yval =  x
+
+       end if
+
+       i_indg_c3 = ceiling( (atan(xval/sqr2) + alpha)/dalpha )
+       j_indg_c3 = ceiling( (atan(yval/sqr2) + alpha)/dalpha )
+
+       i_indg_c3 = min( max(i_indg_c3, 1), N_c3 )
+       j_indg_c3 = min( max(j_indg_c3, 1), N_c3 ) + (face-1)*N_c3
+
+       ! convert to index into array defined by tile_grid_d
+
+       i_ind = i_indg_c3 - tile_grid%i_offg - (tile_grid%ind_base - 1)
+       j_ind = j_indg_c3 - tile_grid%j_offg - (tile_grid%ind_base - 1)
+
     else
 
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'unknown grid type')
@@ -1048,6 +1302,74 @@ contains
     
   end subroutine get_ij_ind_from_latlon
   
+  ! *******************************************************************
+
+  subroutine check_c3_tile_grid( N_tile, tile_coord, tile_grid )
+
+    ! check the cube-sphere geometry in get_ij_ind_from_latlon():
+    !  map center-of-mass lat/lon of all tiles to the cube-sphere tile_grid and count
+    !  the tiles whose grid cell differs from tile_coord%i_indg and tile_coord%j_indg
+    !
+    ! The geometry in get_ij_ind_from_latlon() is for gnomonic, equal-edge cube-sphere
+    !  grids with pi/18 shift of longitude.  For other cube-sphere grids (e.g., stretched
+    !  grids), most tiles do not match, and obs cannot be mapped to tiles --> abort.
+    !
+    ! A few tiles do not match because their center-of-mass is outside of (or on the
+    !  edge of) their grid cell, e.g., 23 of 1188020 land tiles for CF0360.
+    !
+    ! amfox, 6 Nov 2026
+
+    implicit none
+
+    integer,                              intent(in) :: N_tile
+
+    type(tile_coord_type), dimension(:),  pointer    :: tile_coord ! input
+
+    type(grid_def_type),                  intent(in) :: tile_grid
+
+    ! local variables
+
+    real,              parameter :: max_frac_mismatch = 0.001   ! abort if more tiles do not match
+
+    integer                      :: n, i_ind, j_ind, off_i, off_j, N_mismatch
+
+    character(len=*),  parameter :: Iam = 'check_c3_tile_grid'
+    character(len=400)           :: err_msg
+
+    ! -----------------------------------------------------------
+
+    ! adjust for 0-based indexing (as in get_number_of_tiles_in_cell_ij())
+
+    off_i = tile_grid%i_offg + (tile_grid%ind_base - 1)
+    off_j = tile_grid%j_offg + (tile_grid%ind_base - 1)
+
+    N_mismatch = 0
+
+    do n=1,N_tile
+
+       call get_ij_ind_from_latlon( tile_grid, tile_coord(n)%com_lat, tile_coord(n)%com_lon, &
+            i_ind, j_ind )
+
+       if ( (i_ind /= tile_coord(n)%i_indg - off_i)  .or.               &
+            (j_ind /= tile_coord(n)%j_indg - off_j)        )  N_mismatch = N_mismatch + 1
+
+    end do
+
+    if (logit) write (logunit,*) trim(Iam), ': number of tiles = ', N_tile,                   &
+         ', number of tiles w/ center-of-mass not in grid cell [i_indg,j_indg] = ', N_mismatch
+    if (logit) write (logunit,*)
+
+    if (real(N_mismatch) > max_frac_mismatch*real(N_tile)) then
+
+       write (err_msg,'(A,i8,A,i8,A)') 'center-of-mass of ', N_mismatch, ' of ', N_tile,          &
+            ' tiles not in cube-sphere grid cell [i_indg,j_indg]; only gnomonic cube-sphere ' //  &
+            'grids w/ pi/18 shift of longitude (not stretched) are supported'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+    end if
+
+  end subroutine check_c3_tile_grid
+
   ! *******************************************************************
 
   subroutine get_tile_num_in_ellipse( lon, lat, r_x, r_y,                 &
