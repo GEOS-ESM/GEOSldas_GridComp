@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed string and no-data obs handling in read_GEOSldas.py ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
 - Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
+- Fixed mapping of obs to tiles in cube-sphere tile space, which dropped ~38% and misassigned ~16% of land obs (not 0-diff for cube-sphere tile space; 0-diff for EASE and lat/lon tile spaces).
   
 ### Removed
 
