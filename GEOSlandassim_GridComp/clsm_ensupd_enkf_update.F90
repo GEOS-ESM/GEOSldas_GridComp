@@ -73,6 +73,7 @@ module clsm_ensupd_enkf_update
   use LDAS_TilecoordRoutines,           ONLY:     &
        get_number_of_tiles_in_cell_ij,            &
        get_tile_num_in_cell_ij,                   &
+       check_c3_tile_grid,                        &
        grid2tile
 
   use nr_ran2_gasdev,                   ONLY:     &
@@ -277,6 +278,13 @@ contains
     integer, dimension(:,:),   pointer     :: N_tile_in_cell_ij_f
     integer, dimension(:,:,:), pointer     :: tile_num_in_cell_ij_f
 
+    ! grid that goes with N_tile_in_cell_ij_f and tile_num_in_cell_ij_f:
+    !  pert_grid_f, or tile_grid_f for cube-sphere tile space (amfox, 6 Nov 2026)
+
+    type(grid_def_type)                    :: obs2tile_grid_f
+
+    logical, save                          :: c3_tile_grid_checked = .false.
+
     integer :: i, n, n_e
 
     ! obs bias variables
@@ -390,20 +398,73 @@ contains
        ! from lat/lon to tiles.  This needs to be done:
        ! - by root process (because of call to read_obs() in collect_obs())
        ! - by all processes if FOV>~0 ("tile_num_in_circle" needed in get_obs_pred())
+
+       obs2tile_grid_f = pert_grid_f    ! for cube-sphere tile space see below
+
        if ( (root_proc)                                        .or.              &
             (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
 
-          allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
+          if (index(tile_grid_g%gridtype,'c3')/=0) then
 
-          ! first call: count how many tiles are in each pert_grid_f cell
-          call get_number_of_tiles_in_cell_ij( N_catf,                           &
-               tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
-               pert_grid_f, N_tile_in_cell_ij_f )
-          ! second call: find out which tiles are in each pert_grid_f cell
+             ! cube-sphere tile space:  map obs to tiles on the cube-sphere tile_grid_f,
+             !  not on the lat/lon pert_grid_f, because tiles do not nest in the cells of
+             !  pert_grid_f; each tile is inside the tile_grid_f cell given by
+             !  tile_coord%i_indg and tile_coord%j_indg (see get_tile_num_from_latlon())
+             !
+             ! tile_grid_f is identical to tile_grid_g for cube-sphere tile space
+             !  (get_minExtent_grid() does not zoom in for cube-sphere grids)
+             !
+             ! keep lat/lon extent of pert_grid_f because get_tile_num_from_latlon()
+             !  ignores obs outside of this extent, as needed for obs perturbations
+             !  (see get_obs_pert()); the extent is not used to find the cube-sphere
+             !  grid cell of an obs (see get_ij_ind_from_latlon())
+             !
+             ! amfox, 6 Nov 2026
 
-          call get_tile_num_in_cell_ij( N_catf,                                  &
-               tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
-               pert_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+             obs2tile_grid_f        = tile_grid_g
+
+             obs2tile_grid_f%ll_lon = pert_grid_f%ll_lon
+             obs2tile_grid_f%ll_lat = pert_grid_f%ll_lat
+             obs2tile_grid_f%ur_lon = pert_grid_f%ur_lon
+             obs2tile_grid_f%ur_lat = pert_grid_f%ur_lat
+
+             ! check (once) the cube-sphere geometry of get_ij_ind_from_latlon()
+
+             if (root_proc .and. (.not. c3_tile_grid_checked)) then
+
+                call check_c3_tile_grid( N_catf, tile_coord_f, tile_grid_g )
+
+                c3_tile_grid_checked = .true.
+
+             end if
+
+             allocate(N_tile_in_cell_ij_f(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat))
+
+             ! first call: count how many tiles are in each tile_grid_f cell
+             call get_number_of_tiles_in_cell_ij( N_catf,                        &
+                  tile_coord_f%i_indg, tile_coord_f%j_indg,                      &
+                  obs2tile_grid_f, N_tile_in_cell_ij_f )
+             ! second call: find out which tiles are in each tile_grid_f cell
+
+             call get_tile_num_in_cell_ij( N_catf,                               &
+                  tile_coord_f%i_indg, tile_coord_f%j_indg,                      &
+                  obs2tile_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+
+          else
+
+             allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
+
+             ! first call: count how many tiles are in each pert_grid_f cell
+             call get_number_of_tiles_in_cell_ij( N_catf,                           &
+                  tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
+                  pert_grid_f, N_tile_in_cell_ij_f )
+             ! second call: find out which tiles are in each pert_grid_f cell
+
+             call get_tile_num_in_cell_ij( N_catf,                                  &
+                  tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
+                  pert_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+
+          end if
        else
           allocate(N_tile_in_cell_ij_f(0,0))  ! for debugging
        end if
@@ -421,7 +482,7 @@ contains
        if (out_smapL4SMaup)                                                        &
             call output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,   &
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
-            tile_coord_f, tile_grid_g, pert_grid_f,                                &
+            tile_coord_f, tile_grid_g, obs2tile_grid_f,                            &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
             N_obs_param, obs_param, Observations_l, cat_param, cat_progn  )
 
@@ -430,7 +491,7 @@ contains
        call collect_obs(                                              &
             work_path, exp_id, date_time, dtstep_assim,               &
             N_catl,                                                   &
-            N_catf, tile_coord_f, pert_grid_f,                        &
+            N_catf, tile_coord_f, obs2tile_grid_f,                    &
             N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,               &
             N_catl_vec, low_ind, l2f,                                 &
             N_obs_param, obs_param, N_obsl_max, out_obslog,           &
@@ -2146,7 +2207,7 @@ contains
 
   subroutine output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,    &
        N_ens, N_catl, N_catf, N_obsl_max,                               &
-       tile_coord_f, tile_grid_g, pert_grid_f,                                  &
+       tile_coord_f, tile_grid_g, obs2tile_grid_f,                              &
        N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,    &
        N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
 
@@ -2158,6 +2219,8 @@ contains
     ! reichle,  2 May 2013
     ! reichle, 11 Dec 2013 - added 'SMOS_fit_Tb*' obs species
     !                        (needed for L4_SM_SMOS prototype product)
+    ! amfox,    6 Nov 2026 - renamed pert_grid_f to obs2tile_grid_f, which is tile_grid_f
+    !                        for cube-sphere tile space (see get_enkf_increments())
     !
     ! -------------------------------------------------------------------
 
@@ -2175,7 +2238,7 @@ contains
     type(tile_coord_type), dimension(:),     pointer :: tile_coord_f  ! input
 
     type(grid_def_type),                             intent(in) :: tile_grid_g
-    type(grid_def_type),                             intent(in) :: pert_grid_f
+    type(grid_def_type),                             intent(in) :: obs2tile_grid_f
 
     integer,               dimension(numprocs),      intent(in) :: N_catl_vec
     integer,               dimension(numprocs),      intent(in) :: low_ind
@@ -2250,7 +2313,7 @@ contains
     call collect_obs(                                                            &
          work_path, exp_id, date_time, dtstep_assim,                             &
          N_catl,                                                                 &
-         N_catf, tile_coord_f, pert_grid_f,                                      &
+         N_catf, tile_coord_f, obs2tile_grid_f,                                  &
          N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
          N_catl_vec, low_ind, l2f,                                               &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), N_obsl_max, .false., &
