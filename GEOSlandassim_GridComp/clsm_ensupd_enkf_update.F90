@@ -65,7 +65,8 @@ module clsm_ensupd_enkf_update
   
   use LDAS_TilecoordType,               ONLY:     &
        tile_coord_type,                           &
-       grid_def_type
+       grid_def_type,                             &
+       init_grid_def_type
   
   use catch_bias_types,                 ONLY:     &
        obs_bias_type
@@ -278,12 +279,12 @@ contains
     integer, dimension(:,:),   pointer     :: N_tile_in_cell_ij_f
     integer, dimension(:,:,:), pointer     :: tile_num_in_cell_ij_f
 
-    ! grid that goes with N_tile_in_cell_ij_f and tile_num_in_cell_ij_f:
-    !  pert_grid_f, or tile_grid_f for cube-sphere tile space (amfox, 6 Nov 2026)
+    ! obs2tile_grid_f is the grid that goes with N_tile_in_cell_ij_f and tile_num_in_cell_ij_f:
+    !  pert_grid_f for EASE and LatLon tile space, or tile_grid_f for cube-sphere tile space (amfox, 6 Nov 2026)
 
     type(grid_def_type)                    :: obs2tile_grid_f
 
-    logical, save                          :: c3_tile_grid_checked = .false.
+    logical, save                          :: c3_tile_grid_checked = .false.     ! initialize
 
     integer :: i, n, n_e
 
@@ -399,17 +400,17 @@ contains
        ! - by root process (because of call to read_obs() in collect_obs())
        ! - by all processes if FOV>~0 ("tile_num_in_circle" needed in get_obs_pred())
 
-       obs2tile_grid_f = pert_grid_f    ! for cube-sphere tile space see below
-
+       call init_grid_def_type( obs2tile_grid_f )        ! initialize to undefined grid
+       
        if ( (root_proc)                                        .or.              &
             (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
 
           if (index(tile_grid_g%gridtype,'c3')/=0) then
-
-             ! cube-sphere tile space:  map obs to tiles on the cube-sphere tile_grid_f,
-             !  not on the lat/lon pert_grid_f, because tiles do not nest in the cells of
-             !  pert_grid_f; each tile is inside the tile_grid_f cell given by
-             !  tile_coord%i_indg and tile_coord%j_indg (see get_tile_num_from_latlon())
+             
+             ! Cube-sphere tile space: Use the cube-sphere tile_grid_f as hash grid for mapping obs to
+             !   tile space.  Obs-to-tile mapping requires that tiles nest perfectly in the hash grid.
+             !   (Cube-sphere tiles do not nest in the LatLon pert_grid_f used for perturbations 
+             !   when tile space is cube-sphere.)
              !
              ! tile_grid_f is identical to tile_grid_g for cube-sphere tile space
              !  (get_minExtent_grid() does not zoom in for cube-sphere grids)
@@ -444,22 +445,29 @@ contains
              call get_number_of_tiles_in_cell_ij( N_catf,                        &
                   tile_coord_f%i_indg, tile_coord_f%j_indg,                      &
                   obs2tile_grid_f, N_tile_in_cell_ij_f )
+             
              ! second call: find out which tiles are in each tile_grid_f cell
-
              call get_tile_num_in_cell_ij( N_catf,                               &
                   tile_coord_f%i_indg, tile_coord_f%j_indg,                      &
                   obs2tile_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
 
           else
 
+             ! EASE or LatLon tile space: use pert_grid_f as hash grid for mapping obs to tile space
+             !
+             ! pert_grid_f is an EASE grid for EASE tile space and a LatLon grid for LatLon tile space,
+             !   so tiles always nest perfectly in pert_grid_f
+             
+             obs2tile_grid_f = pert_grid_f
+             
              allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
 
              ! first call: count how many tiles are in each pert_grid_f cell
              call get_number_of_tiles_in_cell_ij( N_catf,                           &
                   tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
                   pert_grid_f, N_tile_in_cell_ij_f )
+             
              ! second call: find out which tiles are in each pert_grid_f cell
-
              call get_tile_num_in_cell_ij( N_catf,                                  &
                   tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
                   pert_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
@@ -2219,8 +2227,7 @@ contains
     ! reichle,  2 May 2013
     ! reichle, 11 Dec 2013 - added 'SMOS_fit_Tb*' obs species
     !                        (needed for L4_SM_SMOS prototype product)
-    ! amfox,    6 Nov 2026 - renamed pert_grid_f to obs2tile_grid_f, which is tile_grid_f
-    !                        for cube-sphere tile space (see get_enkf_increments())
+    ! amfox,    6 Nov 2026 - renamed pert_grid_f to obs2tile_grid_f (only passed through to collect_obs())
     !
     ! -------------------------------------------------------------------
 
