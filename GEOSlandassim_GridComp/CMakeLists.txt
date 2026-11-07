@@ -19,7 +19,7 @@ find_library(HDF4_DF_LIBRARY NAMES df REQUIRED)
 esma_add_library (${this}
   SRCS ${SRCS}
   SUBCOMPONENTS ${alldirs}
-  DEPENDENCIES GEOS_LdasShared GEOSensavg_GridComp GEOSlandpert_GridComp GEOSland_GridComp makebcs MAPL NCEP_bufr_r4i4 GMAO_gfio_r4 hdf5hl_fortran hdf5_fortran ${HDF4_MFHDF_LIBRARY} ${HDF4_DF_LIBRARY} ${NETCDF_LIBRARIES}
+  DEPENDENCIES GEOS_LdasShared GEOSensavg_GridComp GEOSlandpert_GridComp GEOSland_GridComp makebcs MAPL GMAO_gfio_r4 hdf5hl_fortran hdf5_fortran ${HDF4_MFHDF_LIBRARY} ${HDF4_DF_LIBRARY} ${NETCDF_LIBRARIES}
   INCLUDES ${INC_ESMF} ${INC_HDF5} ${HDF4_INCLUDE_DIR})
 
 target_compile_definitions (${this} PRIVATE LDAS_MPI)

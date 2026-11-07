@@ -2263,6 +2263,8 @@ obs_param_nml(48)%adapt          = 0
 
 ! --------------------------------------------------------------------------------------------------------------
 !
+! *** support DISCONTINUED for ASCAT_MET[x]_SM species, disabled BUFR reader, 6 Nov 2026 ***
+!
 ! ASCAT_MET[X]_SM soil moisture observations from EUMETSAT (BUFR)
 !
 ! Collection identity (ID) EO:EUM:DAT:METOP:SOMO25   [used in Fox et al 2025 doi:10.1175/jhm-d-24-0139.1]
