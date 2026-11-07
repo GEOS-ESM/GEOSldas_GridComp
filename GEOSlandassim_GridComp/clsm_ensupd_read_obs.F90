@@ -14,6 +14,8 @@
 
 ! *********************************************************************
 
+#undef BUFR_AVAILABLE    ! GEOSldas no longer provides NCEP_bufr_r4i4 library from NCEP_Shared, Nov 2026
+
 module clsm_ensupd_read_obs
   
   use, intrinsic :: iso_c_binding,      ONLY:     &
