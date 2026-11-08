@@ -1024,10 +1024,12 @@ contains
     !     neighboring grid cell.  Grid cells that were already searched are skipped.
     !
     ! 3.) If there is still no such tile, loop through all tiles within the grid
-    !     cells identified in 1.) and 2.) and find minimum distance (Minkowski norm).
+    !     cells identified in 1.) and 2.) and find minimum distance (Minkowski norm)
+    !     among the tiles whose center-of-mass is within max_dist_x and max_dist_y
+    !     of lat/lon.
     !
     ! The tiles identified in this way are still subject to the bounding box and
-    !   max_dist checks of get_tile_num_from_latlon().
+    !   max_dist checks of get_tile_num_from_latlon(), which they pass by construction.
     !
     ! If there are no land tiles in these grid cells, tile_num will not change
     ! from its initialized value.
@@ -1039,6 +1041,9 @@ contains
     ! amfox, 6 Nov 2026
     ! amfox, 8 Nov 2026 - moved here from get_tile_num_from_latlon(); grid cells from
     !                     MAPL_GetGlobalHorzIJIndex() (no copied cube-sphere geometry)
+    ! amfox, 8 Nov 2026 - Step 3.) considers only tiles within max_dist (otherwise the
+    !                     closest tile could fail the max_dist check while another tile
+    !                     within max_dist would pass it)
 
     implicit none
 
@@ -1206,7 +1211,7 @@ contains
                tile_num(n), min_dist, min_dist_x(ind_nbr(nn)), min_dist_y(ind_nbr(nn)) )
 
           ! Step 3.): no bounding box contains lat/lon:  find closest tile among those
-          !           in all grid cells identified above
+          !           in all grid cells identified above that are within max_dist
 
           if (tile_num(n)==nodata_tilenum) then
 
@@ -1218,6 +1223,10 @@ contains
 
                    tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
                    tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                   ! skip tile that is too far away (see bounding box and max_dist check below)
+
+                   if (tmp_dist_x > max_dist_x(n) .or. tmp_dist_y > max_dist_y)  cycle
 
                    tmp_dist   = tmp_dist_x + tmp_dist_y    ! "closest": Minkowski norm
 
