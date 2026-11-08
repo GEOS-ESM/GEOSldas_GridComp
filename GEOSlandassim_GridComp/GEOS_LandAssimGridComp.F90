@@ -1488,6 +1488,7 @@ contains
 
     integer                           :: N_adapt_R
     type(MAPL_LocStream)              :: locstream
+    type(ESMF_Grid)                   :: tile_space_grid   ! grid attached to locstream (cube-sphere grid for c3)
 
     integer,              dimension(:),     allocatable :: obs_pert_adapt_param
     real,                 dimension(:,:),   allocatable :: Pert_adapt_R
@@ -1612,6 +1613,10 @@ contains
     call MAPL_LocStreamGet(locstream, NT_LOCAL=N_catl,rc=status)
     _VERIFY(status)
     
+    ! Get grid of tile space (needed to map obs to tiles in cube-sphere tile space)
+    call MAPL_LocStreamGet(locstream, ATTACHEDGRID=tile_space_grid, rc=status)
+    _VERIFY(status)
+
     ! Pointers to internals
     !----------------------
 
@@ -1931,7 +1936,8 @@ contains
          cat_progn_incr, fresh_incr,                                       &
          N_obsf, N_obsl, Observations_l,                                   &
          ! below  are dummy for now
-         N_adapt_R, obs_pert_adapt_param, Pert_adapt_R)
+         N_adapt_R, obs_pert_adapt_param, Pert_adapt_R,                    &
+         c3_grid=tile_space_grid )
     
     if (fresh_incr) then
        ! apply EnKF increments (incl. call to catch_calc_soil_moist but not to recompute_diagS())

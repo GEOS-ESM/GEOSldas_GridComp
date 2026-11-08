@@ -74,8 +74,11 @@ module clsm_ensupd_enkf_update
   use LDAS_TilecoordRoutines,           ONLY:     &
        get_number_of_tiles_in_cell_ij,            &
        get_tile_num_in_cell_ij,                   &
-       check_c3_tile_grid,                        &
+       init_c3_grid,                              &
        grid2tile
+
+  use ESMF,                             ONLY:     &
+       ESMF_Grid
 
   use nr_ran2_gasdev,                   ONLY:     &
        NRANDSEED
@@ -163,12 +166,16 @@ contains
        cat_progn_incr, fresh_incr,                                       &
        N_obsf, N_obsl, Observations_l,                                   &
        N_adapt_R, obs_pert_adapt_param, Pert_adapt_R,                    &
-       Obs_pert )
+       Obs_pert, c3_grid )
 
     ! -------------------------------------------------------------
 
     ! return increments instead of updated cat_progn
     ! reichle, 18 Oct 2005
+    !
+    ! added optional input c3_grid (ESMF grid of tile space), needed (only) to map obs
+    !  to tiles in cube-sphere tile space
+    ! amfox, 8 Nov 2026
 
     implicit none
 
@@ -251,6 +258,8 @@ contains
 
     real, dimension(N_obsl_max,N_ens), intent(out), optional :: Obs_pert
 
+    type(ESMF_Grid), intent(in), optional :: c3_grid    ! needed for cube-sphere tile space
+
     ! ----------------------------------------------
 
     ! local variables
@@ -284,7 +293,7 @@ contains
 
     type(grid_def_type)                    :: obs2tile_grid_f
 
-    logical, save                          :: c3_tile_grid_checked = .false.     ! initialize
+    logical, save                          :: c3_grid_initialized = .false.     ! initialize
 
     integer :: i, n, n_e
 
@@ -402,6 +411,25 @@ contains
 
        call init_grid_def_type( obs2tile_grid_f )        ! initialize to undefined grid
        
+       ! Cube-sphere tile space: prepare (once) the cube-sphere ESMF grid for mapping obs to
+       !   tiles, which is done by root_proc only (in read_obs()).  This must be done by ALL
+       !   processes (see init_c3_grid()).  - amfox, 8 Nov 2026
+
+       if ( (index(tile_grid_g%gridtype,'c3')/=0) .and. (.not. c3_grid_initialized) ) then
+
+          if (.not. present(c3_grid)) then
+
+             err_msg = 'cube-sphere tile space requires optional input c3_grid (ESMF grid)'
+             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+          end if
+
+          call init_c3_grid( c3_grid, tile_grid_g )
+
+          c3_grid_initialized = .true.
+
+       end if
+
        if ( (root_proc)                                        .or.              &
             (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
 
@@ -418,7 +446,7 @@ contains
              ! keep lat/lon extent of pert_grid_f because get_tile_num_from_latlon()
              !  ignores obs outside of this extent, as needed for obs perturbations
              !  (see get_obs_pert()); the extent is not used to find the cube-sphere
-             !  grid cell of an obs (see get_ij_ind_from_latlon())
+             !  grid cell of an obs (see get_ij_ind_from_latlon_c3())
              !
              ! amfox, 6 Nov 2026
 
@@ -428,16 +456,6 @@ contains
              obs2tile_grid_f%ll_lat = pert_grid_f%ll_lat
              obs2tile_grid_f%ur_lon = pert_grid_f%ur_lon
              obs2tile_grid_f%ur_lat = pert_grid_f%ur_lat
-
-             ! check (once) the cube-sphere geometry of get_ij_ind_from_latlon()
-
-             if (root_proc .and. (.not. c3_tile_grid_checked)) then
-
-                call check_c3_tile_grid( N_catf, tile_coord_f, tile_grid_g )
-
-                c3_tile_grid_checked = .true.
-
-             end if
 
              allocate(N_tile_in_cell_ij_f(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat))
 
@@ -492,7 +510,8 @@ contains
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
             tile_coord_f, tile_grid_g, obs2tile_grid_f,                            &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
-            N_obs_param, obs_param, Observations_l, cat_param, cat_progn  )
+            N_obs_param, obs_param, Observations_l, cat_param, cat_progn,          &
+            c3_grid=c3_grid )
 
        ! check for observations, found_obs_f=.true. if obs availalbe
 
@@ -503,7 +522,7 @@ contains
             N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,               &
             N_catl_vec, low_ind, l2f,                                 &
             N_obs_param, obs_param, N_obsl_max, out_obslog,           &
-            N_obsl, Observations_l, found_obs_f )
+            N_obsl, Observations_l, found_obs_f, c3_grid=c3_grid )
 
 
        ! --------------------------------------------------------------------
@@ -2217,7 +2236,7 @@ contains
        N_ens, N_catl, N_catf, N_obsl_max,                               &
        tile_coord_f, tile_grid_g, obs2tile_grid_f,                              &
        N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,    &
-       N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
+       N_obs_param, obs_param, Observations_l, cat_param, cat_progn, c3_grid )
 
     ! wrapper for output of original (unscaled) SMAP Tb observations into
     ! SMAP L4_SM "aup" (analysis update)
@@ -2228,6 +2247,7 @@ contains
     ! reichle, 11 Dec 2013 - added 'SMOS_fit_Tb*' obs species
     !                        (needed for L4_SM_SMOS prototype product)
     ! amfox,    6 Nov 2026 - renamed pert_grid_f to obs2tile_grid_f (only passed through to collect_obs())
+    ! amfox,    8 Nov 2026 - added optional c3_grid (only passed through to collect_obs())
     !
     ! -------------------------------------------------------------------
 
@@ -2265,6 +2285,8 @@ contains
 
     type(cat_param_type),  dimension(N_catl),        intent(in) :: cat_param
     type(cat_progn_type),  dimension(N_catl,N_ens),  intent(in) :: cat_progn
+
+    type(ESMF_Grid),                       optional, intent(in) :: c3_grid
 
     ! ------------------------------------------
 
@@ -2324,7 +2346,7 @@ contains
          N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
          N_catl_vec, low_ind, l2f,                                               &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), N_obsl_max, .false., &
-         N_obsl_tmp, Observations_l, found_obs_f )
+         N_obsl_tmp, Observations_l, found_obs_f, c3_grid=c3_grid )
 
     ! write appropriate fields (according to 'option') into file
 
