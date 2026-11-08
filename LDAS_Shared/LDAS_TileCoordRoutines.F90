@@ -1013,6 +1013,87 @@ contains
                 
              end if
              
+          elseif (index(tile_grid%gridtype, 'c3')/=0) then
+
+             ! Cube-sphere tile space (gridtype 'LatLon_c3', see get_enkf_increments();
+             ! must be checked before 'LatLon'):  tiles do not nest within the cells of the
+             ! lat/lon tile_grid (pert_grid), and N_tile_in_cell_ij lists each tile in all cells
+             ! that overlap its bounding box (see get_tile_num_in_cell_ij_bbox()).
+             !
+             ! 1.) Among the tiles whose bounding box contains lat/lon, pick the tile with
+             !     the smallest distance between lat/lon and tile center-of-mass, normalized
+             !     by the half-width and half-height of the bounding box.  Tiles are listed
+             !     in ascending order of tile number, so ties go to the lower tile number.
+             !
+             ! 2.) If no bounding box contains lat/lon, pick the nearest tile (Minkowski norm),
+             !     as for LatLon tile space (subject to max_dist, see below).
+             !
+             ! If there are no land tiles in given grid cell, tile_num will not change
+             ! from its initialized value.
+             !
+             ! - amfox, 6 Nov 2026; restructured, amfox, 8 Nov 2026
+
+             min_dist_bbox = 1.e10   ! initialize
+
+             do k=1,N_tile_in_cell_ij(i_ind,j_ind)
+
+                this_tile_num = tile_num_in_cell_ij(i_ind,j_ind,k)
+
+                if ( tile_coord(this_tile_num)%min_lon <= lon(n)  .and.     &
+                     tile_coord(this_tile_num)%max_lon >= lon(n)  .and.     &
+                     tile_coord(this_tile_num)%min_lat <= lat(n)  .and.     &
+                     tile_coord(this_tile_num)%max_lat >= lat(n)         ) then
+
+                   tmp_hx = 0.5*(tile_coord(this_tile_num)%max_lon - tile_coord(this_tile_num)%min_lon)
+                   tmp_hy = 0.5*(tile_coord(this_tile_num)%max_lat - tile_coord(this_tile_num)%min_lat)
+
+                   tmp_hx = max( tmp_hx, min_half_width )
+                   tmp_hy = max( tmp_hy, min_half_width )
+
+                   tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                   tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                   tmp_dist   = (tmp_dist_x/tmp_hx)**2 + (tmp_dist_y/tmp_hy)**2
+
+                   if (tmp_dist<min_dist_bbox) then
+
+                      min_dist_bbox = tmp_dist
+                      min_dist_x    = tmp_dist_x
+                      min_dist_y    = tmp_dist_y
+
+                      tile_num(n)   = this_tile_num
+
+                   end if
+
+                end if
+
+             end do
+
+             if (tile_num(n)==nodata_tilenum) then
+
+                do k=1,N_tile_in_cell_ij(i_ind,j_ind)
+
+                   this_tile_num = tile_num_in_cell_ij(i_ind,j_ind,k)
+
+                   tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                   tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                   tmp_dist   = tmp_dist_x + tmp_dist_y    ! Minkowski norm
+
+                   if (tmp_dist<min_dist) then
+
+                      min_dist    = tmp_dist
+                      min_dist_x  = tmp_dist_x
+                      min_dist_y  = tmp_dist_y
+
+                      tile_num(n) = this_tile_num
+
+                   end if
+
+                end do
+
+             end if
+
           elseif (index(tile_grid%gridtype, 'LatLon')/=0) then
              
              ! Loop through all tiles within grid cell that contain lat/lon and
@@ -1040,57 +1121,6 @@ contains
                 end if
                 
              end do
-
-             ! Cube-sphere tile space: tiles do not nest within the cells of the lat/lon
-             ! tile_grid (pert_grid), and N_tile_in_cell_ij lists each tile in all cells
-             ! that overlap its bounding box (see get_tile_num_in_cell_ij_bbox()).
-             ! Among the tiles whose bounding box contains lat/lon, pick the tile with
-             ! the smallest distance between lat/lon and tile center-of-mass, normalized
-             ! by the half-width and half-height of the bounding box.  Tiles are listed
-             ! in ascending order of tile number, so ties go to the lower tile number.
-             ! If no bounding box contains lat/lon, keep the nearest tile from above
-             ! (subject to max_dist, see below).
-             ! - amfox, 6 Nov 2026
-
-             if (index(tile_grid%gridtype, 'c3')/=0) then
-
-                min_dist_bbox = 1.e10   ! initialize
-
-                do k=1,N_tile_in_cell_ij(i_ind,j_ind)
-
-                   this_tile_num = tile_num_in_cell_ij(i_ind,j_ind,k)
-
-                   if ( tile_coord(this_tile_num)%min_lon <= lon(n)  .and.     &
-                        tile_coord(this_tile_num)%max_lon >= lon(n)  .and.     &
-                        tile_coord(this_tile_num)%min_lat <= lat(n)  .and.     &
-                        tile_coord(this_tile_num)%max_lat >= lat(n)         ) then
-
-                      tmp_hx = 0.5*(tile_coord(this_tile_num)%max_lon - tile_coord(this_tile_num)%min_lon)
-                      tmp_hy = 0.5*(tile_coord(this_tile_num)%max_lat - tile_coord(this_tile_num)%min_lat)
-
-                      tmp_hx = max( tmp_hx, min_half_width )
-                      tmp_hy = max( tmp_hy, min_half_width )
-
-                      tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
-                      tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
-
-                      tmp_dist   = (tmp_dist_x/tmp_hx)**2 + (tmp_dist_y/tmp_hy)**2
-
-                      if (tmp_dist<min_dist_bbox) then
-
-                         min_dist_bbox = tmp_dist
-                         min_dist_x    = tmp_dist_x
-                         min_dist_y    = tmp_dist_y
-
-                         tile_num(n)   = this_tile_num
-
-                      end if
-
-                   end if
-
-                end do
-
-             end if
 
           else
              
