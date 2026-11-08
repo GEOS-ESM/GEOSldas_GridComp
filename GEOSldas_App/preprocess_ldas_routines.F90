@@ -2918,7 +2918,9 @@ end block
     
 
     if (isNC4 ) then
+
        N_tiles_land_g  = count(iTable(:,0) == MAPL_LAND .or.  iTable(:,0) == (MAPL_LAND + ExcludeFromDomain))
+
        tile_coord_r(:)%typ     = iTable(r2g, 0)
        tile_coord_r(:)%i_indg  = iTable(r2g, 2) 
        tile_coord_r(:)%j_indg  = iTable(r2g, 3)
@@ -2930,11 +2932,11 @@ end block
        tile_coord_r(:)%pfaf_index= iTable(r2g, 4) 
        tile_coord_r(:)%com_lon   = rTable(r2g, 1)
        tile_coord_r(:)%com_lat   = rTable(r2g, 2)
-       ! MAPL_ReadTilingNC4() returns "area" in [radian2] and, where frac_cell/=0,
-       !  area/frac_cell (i.e., the area of the grid cell) instead of frac_cell;
-       !  convert to frac_cell and area [km^2] as read from *.til file (see below)
-       ! - amfox, 6 Nov 2026
 
+       ! MAPL convention for rTable from MAPL_ReadTilingNC4():
+       ! rTable(:,3) = area of tile
+       ! rTable(:,4) = area of atm grid cell
+    
        do k=1,size(r2g)
           if (rTable(r2g(k),4)/=0.d0) then
              tile_coord_r(k)%frac_cell = rTable(r2g(k),3)/rTable(r2g(k),4)
@@ -2943,10 +2945,12 @@ end block
           end if
        end do
 
+       ! MAPL_ReadTilingNC4() returns area in [radian2], but tile_coord unit convention is [km2]
+
        if (ease_grid) then
-          tile_coord_r(:)%area = ease_cell_area*tile_coord_r(:)%frac_cell/1000./1000.  ! [km^2]
+          tile_coord_r(:)%area = ease_cell_area*tile_coord_r(:)%frac_cell/1000./1000.  ! [km2]
        else
-          tile_coord_r(:)%area = rTable(r2g, 3)*MAPL_RADIUS*MAPL_RADIUS/1000./1000.    ! [km^2]
+          tile_coord_r(:)%area = rTable(r2g, 3)*MAPL_RADIUS*MAPL_RADIUS/1000./1000.    ! [km2]
        end if
 
        tile_coord_r(:)%min_lon   = rTable(r2g, 6)
@@ -2958,7 +2962,9 @@ end block
        tile_coord_r%frac_pfaf    =      nodata_generic
        tile_coord_r%pert_i_indg  = nint(nodata_generic)
        tile_coord_r%pert_j_indg  = nint(nodata_generic)
+
     else
+
        allocate(tile_coord(n_tiles))
        allocate(r2g_tmp(n_tiles))
        
@@ -3088,10 +3094,12 @@ end block
        
        deallocate(tile_coord) 
        deallocate(r2g_tmp)
+
        ! pert_[x]_indg is not written into the tile_coord file and not needed in preprocessing
        tile_coord_r%pert_i_indg = nint(nodata_generic)
        tile_coord_r%pert_j_indg = nint(nodata_generic)
        tile_coord_r%elev        =      nodata_generic
+
        call read_catchment_def( catch_def_file, N_tiles_land_g, tile_coord_r )
        
        ! ----------------------------------------------------------------------
