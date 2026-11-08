@@ -104,7 +104,6 @@ module clsm_ensupd_enkf_update
        get_ind_obs_assim,                         &
        get_ind_obs_lat_lon_box,                   &
        halo_type,                                 &
-       FOV_threshold,                             &
        get_halo_around_tile,                      &
        TileNnzObs
 
@@ -405,9 +404,10 @@ contains
        ! -----------------------------------------------------------------
        !
        ! Get additional grid/tile information that is needed to map obs
-       ! from lat/lon to tiles.  This needs to be done:
-       ! - by root process (because of call to read_obs() in collect_obs())
-       ! - by all processes if FOV>~0 ("tile_num_in_circle" needed in get_obs_pred())
+       ! from lat/lon to tiles.  This needs to be done only by root process
+       ! (because of call to read_obs() in collect_obs()).
+       ! (For FOV>~0, get_obs_pred() computes its own N_tile_in_cell_ij_lH and
+       !  tile_num_in_cell_ij_lH for get_tile_num_in_ellipse(); amfox, 8 Nov 2026)
 
        call init_grid_def_type( obs2tile_grid_f )        ! initialize to undefined grid
        
@@ -430,8 +430,7 @@ contains
 
        end if
 
-       if ( (root_proc)                                        .or.              &
-            (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
+       if (root_proc) then
 
           if (index(tile_grid_g%gridtype,'c3')/=0) then
              
@@ -2273,8 +2272,7 @@ contains
     integer,               dimension(N_catl),        intent(in) :: l2f
 
     ! N_tile_in_cell_ij and tile_num_in_cell_ij are on the "full" domain
-    !  and guaranteed to be allocated ONLY for the root_proc
-    !  (but may be allocated on all processors depending on obs_param%FOV)
+    !  and guaranteed to be allocated ONLY for the root_proc (see get_enkf_increments())
 
     integer, dimension(:,:),   pointer :: N_tile_in_cell_ij_f   ! input
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij_f ! input

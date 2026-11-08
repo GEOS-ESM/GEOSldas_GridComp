@@ -3729,9 +3729,6 @@ contains
     integer,       dimension(N_obs_param) :: select_species_smTb, select_species_Tb, select_species_asnow  ! alloc max possible length
 
     integer, dimension(:), allocatable    :: select_tilenum
-    
-    integer, dimension(:,:),   pointer    :: N_tile_in_cell_ij      => null()
-    integer, dimension(:,:,:), pointer    :: tile_num_in_cell_ij    => null()
 
     character(len=*),  parameter          :: Iam = 'cat_enkf_increments'
     character(len=400)                    :: err_msg
@@ -5558,9 +5555,6 @@ contains
     if (allocated( select_tilenum ))     deallocate( select_tilenum )
     
     if (allocated( Obs_cov        ))     deallocate( Obs_cov )
-    
-    if (associated(N_tile_in_cell_ij  )) deallocate( N_tile_in_cell_ij   )
-    if (associated(tile_num_in_cell_ij)) deallocate( tile_num_in_cell_ij )
         
     ! NO checks of prognostics after update, this is now done after 
     ! increments have been applied.

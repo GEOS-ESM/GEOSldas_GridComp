@@ -11426,8 +11426,7 @@ contains
     type(grid_def_type),                          intent(in)  :: tile_grid_f
     
     ! N_tile_in_cell_ij and tile_num_in_cell_ij are on the "full" domain
-    !  and guaranteed to be allocated ONLY for the root_proc
-    !  (but may be allocated on all processors depending on obs_param%FOV)
+    !  and guaranteed to be allocated ONLY for the root_proc (see get_enkf_increments())
 
     integer, dimension(:,:),   pointer :: N_tile_in_cell_ij_f   ! input 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij_f ! input 
