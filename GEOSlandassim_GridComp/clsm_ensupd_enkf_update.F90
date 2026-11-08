@@ -278,7 +278,7 @@ contains
     integer, dimension(:,:),   pointer     :: N_tile_in_cell_ij_f
     integer, dimension(:,:,:), pointer     :: tile_num_in_cell_ij_f
 
-    type(grid_def_type)                    :: pert_grid_obs_f   ! pert_grid_f for mapping obs to tiles
+    type(grid_def_type)                    :: obs2tile_grid_f   ! grid for mapping obs to tiles (copy of pert_grid_f)
 
     integer :: i, n, n_e
 
@@ -401,16 +401,16 @@ contains
        ! rule.  No change for other tile spaces (EASE, LatLon) and other processes.
        ! - amfox, 6 Nov 2026
 
-       pert_grid_obs_f = pert_grid_f
+       obs2tile_grid_f = pert_grid_f
 
        if     ( (root_proc) .and. (index(tile_grid_g%gridtype,'c3')/=0) ) then
 
-          pert_grid_obs_f%gridtype = 'LatLon_c3'
+          obs2tile_grid_f%gridtype = 'LatLon_c3'
 
           allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
 
           call get_tile_num_in_cell_ij_bbox( N_catf, tile_coord_f,                &
-               pert_grid_obs_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f )
+               obs2tile_grid_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f )
 
        elseif ( (root_proc)                                        .or.              &
             (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
@@ -443,7 +443,7 @@ contains
        if (out_smapL4SMaup)                                                        &
             call output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,   &
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
-            tile_coord_f, tile_grid_g, pert_grid_obs_f,                            &
+            tile_coord_f, tile_grid_g, obs2tile_grid_f,                            &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
             N_obs_param, obs_param, Observations_l, cat_param, cat_progn  )
 
@@ -452,7 +452,7 @@ contains
        call collect_obs(                                              &
             work_path, exp_id, date_time, dtstep_assim,               &
             N_catl,                                                   &
-            N_catf, tile_coord_f, pert_grid_obs_f,                    &
+            N_catf, tile_coord_f, obs2tile_grid_f,                    &
             N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,               &
             N_catl_vec, low_ind, l2f,                                 &
             N_obs_param, obs_param, N_obsl_max, out_obslog,           &
