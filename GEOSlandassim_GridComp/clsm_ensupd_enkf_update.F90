@@ -2129,9 +2129,9 @@ contains
             met_force, lai, cat_param, cat_progn, mwRTM_param, &
             N_obsl_tmp, Observations_l, Obs_pred_l )
 
-       ! NOTE: c3_tile_space is not needed here; obs that fail the QC of Tb for non-land
-       !       surfaces were removed in the call to get_obs_pred() before the EnKF update
-       !       (amfox, 6 Nov 2026)
+       ! NOTE: no need to pass c3_tile_space into get_obs_pred() here; obs that fail the QC 
+       !       of Tb for non-land surfaces were already removed in the call to get_obs_pred() 
+       !       before the EnKF update (amfox, 6 Nov 2026)
 
        ! clean up
 

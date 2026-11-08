@@ -1061,7 +1061,7 @@ contains
    
     real,                   intent(in),                       optional :: fcsterr_inflation_fac      
     
-    ! "tile_grid_g" is the pert grid (lat/lon for cube-sphere tile space), so tell
+    ! "tile_grid_g" is the pert grid (which is lat/lon for cube-sphere tile space), so tell
     !  get_obs_pred() whether the tile space is cube-sphere (default: .false.)
 
     logical,                intent(in),                       optional :: c3_tile_space
@@ -1074,7 +1074,7 @@ contains
     
     real,    parameter                      :: fac_search_FOV_km     = 2.   ! [-]
     
-    real,    parameter                      :: EASE_max_water_frac   = 0.05 ! [-]
+    real,    parameter                      :: Tb_max_nonland_frac   = 0.05 ! [-]
     real,    parameter                      :: SM_max_peat_frac      = 0.10 ! [-]
 
     integer                                 :: N_catlH, n_e, i, j, k, N_tmp, ii, jj
@@ -1149,7 +1149,7 @@ contains
     integer, dimension(:),     allocatable  :: ind_tmp
 
     real,    dimension(:),     allocatable  :: tmp_ndst2, tmp_wFOV, tmp_weights, tmp_data
-    real,    dimension(:),     allocatable  :: tmp_wcell           ! cube-sphere tile space only
+    real,    dimension(:),     allocatable  :: tmp_wtmp            ! cube-sphere tile space only
                                                              
     ! dimension "N_catlH-[by-N_XXXX-]by-N_ens"  
     ! (need to be communicated between processors)
@@ -1608,6 +1608,10 @@ contains
        ind_j_min = minval(tile_coord_f%j_indg)
        ind_j_max = maxval(tile_coord_f%j_indg)
 
+       ! get land_frac for each cube-sphere grid cell, with cube-sphere grid
+       !   here being stored on the 2d array consistent with the [i,j]_indg
+       !   indices of tilecoord
+       
        allocate(land_frac_cell_ij(ind_i_min:ind_i_max,ind_j_min:ind_j_max))
 
        land_frac_cell_ij = 0.
@@ -1618,6 +1622,8 @@ contains
                land_frac_cell_ij(tile_coord_f(k)%i_indg,tile_coord_f(k)%j_indg) +      &
                tile_coord_f(k)%frac_cell
        end do
+
+       ! for each tile in halo domain, record land_frac of parent cube-sphere grid cell
 
        allocate(land_frac_cell_lH(N_catlH))
 
@@ -1729,7 +1735,8 @@ contains
     allocate(tmp_wFOV(   N_catlH))
     allocate(tmp_weights(N_catlH))
     allocate(tmp_data(   N_catlH))
-    if (c3_tile_space_tmp)  allocate(tmp_wcell(N_catlH))
+
+    if (c3_tile_space_tmp)  allocate(tmp_wtmp(N_catlH))
 
     do i=1,N_obsl
        
@@ -1930,11 +1937,9 @@ contains
                    
                 end if
                 
-                ! for EASE grids *ONLY*: screen for non-land surfaces (e.g., lakes)
-                ! - reichle, 28 Mar 2015
-                !
-                ! and for cube-sphere tile space (see below)
-                ! - amfox, 6 Nov 2026
+                ! for EASE and cube-sphere grids *ONLY*: screen for non-land surfaces (e.g., lakes)
+                ! - reichle, 28 Mar 2015 (EASE)
+                ! - amfox, 6 Nov 2026 (cube-sphere)
                 
                 if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
                    
@@ -1955,7 +1960,7 @@ contains
                    ! check whether there is too much non-land in FOV 
                    !  (typically water, but could be land-ice)
                    
-                   tmpWater = ( 1. - tmp_fraccell > EASE_max_water_frac )
+                   tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
                    
                 elseif (c3_tile_space_tmp) then
 
@@ -1964,21 +1969,32 @@ contains
                    !  the grid cells in the FOV (FOV-weighted) and count each grid cell once
                    !  by weighting each tile with its share of the land in its grid cell
                    !  (identical to EASE grids if there is one tile per grid cell)
+                   !
+                   ! ASSUMPTION: 
+                   !  - grid cells have the same area (or at least have nearly identical
+                   !     areas) in the neighborhood surrounding the obs;  
+                   !     regular cube-sphere grid cellcell areas differ by ~1-2% within ~0.5 deg;
+                   !     NEEDS REVISITING for stretched cube-sphere grids
+                   !
                    ! - amfox, 6 Nov 2026
 
                    tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
+                   
+                   ! weight each tile's contribution by (1) FOV and (2) area fraction of land tile w.r.t. all land in grid cell
+                   
+                   tmp_wtmp(1:N_tmp) =                                                                    &
+                        ( tmp_wFOV(1:N_tmp)                                                               &    ! (1)
+                        * tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell / max( tmp_data(1:N_tmp), 1.e-10 ) )       ! (2)
+                   
+                   call tile2obs_helper(                                                                  &
+                        N_tmp, tmp_wtmp(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
 
-                   tmp_wcell(1:N_tmp) = tmp_wFOV(1:N_tmp)                                &
-                        * tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell / max( tmp_data(1:N_tmp), 1.e-10 )
-
-                   call tile2obs_helper(                                               &
-                        N_tmp, tmp_wcell(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
-
-                   tmpWater = ( 1. - tmp_fraccell > EASE_max_water_frac )
+                   tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
 
                 else
-                   
-                   tmpWater = .false.
+
+                   err_msg = 'Tb QC for non-land frac not implemented for this grid type'
+                   call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
                    
                 end if
                 
@@ -2099,7 +2115,7 @@ contains
     if (allocated(tmp_wFOV))                 deallocate(tmp_wFOV)   ! fix memory leak
     if (allocated(tmp_weights))              deallocate(tmp_weights)
     if (allocated(tmp_data))                 deallocate(tmp_data)
-    if (allocated(tmp_wcell))                deallocate(tmp_wcell)
+    if (allocated(tmp_wtmp))                 deallocate(tmp_wtmp)
     if (allocated(land_frac_cell_lH))        deallocate(land_frac_cell_lH)
 
     if (allocated(peat_lH))                  deallocate(peat_lH)
