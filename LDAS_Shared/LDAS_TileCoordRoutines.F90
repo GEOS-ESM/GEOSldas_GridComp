@@ -38,7 +38,8 @@ module LDAS_TileCoordRoutines
        MAPL_GetGlobalHorzIJIndex
 
   use ESMF,                             ONLY:     &
-       ESMF_Grid
+       ESMF_Grid,                                 &
+       ESMF_AttributeGet
 
   use LDAS_ExceptionsMod,               ONLY:     &
        ldas_abort,                                &
@@ -1022,9 +1023,12 @@ contains
     !     that contain (i) the 8 lat/lon points at +/- half a grid cell (approx.) around
     !     lat/lon, because the bounding box of a tile can extend into a
     !     neighboring grid cell, and (ii) the points of a lattice that covers
-    !     lat/lon +/- max_dist, with a spacing of at most a quarter grid cell (approx.),
-    !     so that Step 3.) can find all tiles within max_dist.  Grid cells that were
-    !     already searched are skipped.
+    !     lat/lon +/- max_dist, with a spacing of at most a quarter grid cell (approx.).
+    !     The lattice finds nearly all grid cells within max_dist, but it can miss a grid
+    !     cell that overlaps only a small corner of the lat/lon +/- max_dist rectangle
+    !     (3 of 83,645 Step 3.) cases in an offline test for CF0360 with FOV 20 and 50 km;
+    !     another tile within max_dist was then chosen).  Grid cells that were already
+    !     searched are skipped.
     !
     ! 3.) If there is still no such tile, loop through all tiles within the grid
     !     cells identified in 1.) and 2.) and find minimum distance (Minkowski norm)
@@ -1540,8 +1544,8 @@ contains
     !
     ! MAPL_GetGlobalHorzIJIndex() needs the ESMF grid and returns *global*, *1-based*
     !  indices i=1,...,N and j=1,...,6*N (6 faces stacked in j), as in tile_coord%i_indg
-    !  and tile_coord%j_indg.  It supports stretched grids and fails for grids that it
-    !  cannot handle.
+    !  and tile_coord%j_indg.  It fails for grids that it cannot handle.  (It also handles
+    !  stretched grids, but init_c3_grid() rejects them, see there.)
     !
     ! NOTE: Each call of MAPL_GetGlobalHorzIJIndex() checks the grid, and the MAPL subroutine
     !       allocates ~100 bytes per lat/lon --> call with many, but not too many, lat/lon.
@@ -1630,6 +1634,12 @@ contains
     !  attributes and are local.  Here, MAPL_GetGlobalHorzIJIndex() is called for zero
     !  lat/lon, which only checks the grid.
     !
+    ! Stretched cube-sphere grids are not supported:  MAPL_GetGlobalHorzIJIndex() handles
+    !  them, but the search for nearby grid cells in get_tile_num_from_latlon_c3() uses the
+    !  grid spacing of an unstretched grid (tile_grid%dlon) and misses many tiles where the
+    !  stretched grid is finer.  MAPL marks a stretched grid with the attributes
+    !  STRETCH_FACTOR, TARGET_LON and TARGET_LAT (see MAPL_Reverse_Schmidt()).
+    !
     ! amfox, 8 Nov 2026
 
     implicit none
@@ -1649,6 +1659,8 @@ contains
     integer, dimension(3)                 :: dims
 
     integer                               :: status
+
+    logical                               :: has_factor, has_lon, has_lat
 
     character(len=*),  parameter :: Iam = 'init_c3_grid'
     character(len=400)           :: err_msg
@@ -1674,6 +1686,28 @@ contains
 
        write (err_msg,'(A,2i8,A,2i8)') 'size of ESMF grid ', dims(1:2),       &
             ' does not match size of cube-sphere tile_grid ', tile_grid%N_lon, tile_grid%N_lat
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+    end if
+
+    ! reject stretched grid (see above)
+
+    call ESMF_AttributeGet( tmp_grid, name='STRETCH_FACTOR', isPresent=has_factor, rc=status )
+    if (status==0)                                                                       &
+         call ESMF_AttributeGet( tmp_grid, name='TARGET_LON', isPresent=has_lon,    rc=status )
+    if (status==0)                                                                       &
+         call ESMF_AttributeGet( tmp_grid, name='TARGET_LAT', isPresent=has_lat,    rc=status )
+
+    if (status/=0) then
+
+       err_msg = 'ESMF_AttributeGet() failed'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+    end if
+
+    if (has_factor .and. has_lon .and. has_lat) then
+
+       err_msg = 'stretched cube-sphere grid not supported for mapping obs to tiles (obs assimilation)'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
 
     end if
