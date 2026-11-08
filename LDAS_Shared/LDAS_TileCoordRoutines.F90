@@ -1019,9 +1019,12 @@ contains
     !     are half the width and height of the bounding box.
     !
     ! 2.) If there is no such tile, repeat 1.) for all tiles within the grid cells
-    !     that contain the 8 lat/lon points at +/- half a grid cell (approx.) around
+    !     that contain (i) the 8 lat/lon points at +/- half a grid cell (approx.) around
     !     lat/lon, because the bounding box of a tile can extend into a
-    !     neighboring grid cell.  Grid cells that were already searched are skipped.
+    !     neighboring grid cell, and (ii) the points of a lattice that covers
+    !     lat/lon +/- max_dist, with a spacing of at most a quarter grid cell (approx.),
+    !     so that Step 3.) can find all tiles within max_dist.  Grid cells that were
+    !     already searched are skipped.
     !
     ! 3.) If there is still no such tile, loop through all tiles within the grid
     !     cells identified in 1.) and 2.) and find minimum distance (Minkowski norm)
@@ -1036,7 +1039,8 @@ contains
     !
     ! The grid cells are obtained from MAPL_GetGlobalHorzIJIndex() (see
     !  get_ij_ind_from_latlon_c3()), which has a fixed cost per call.  lat/lon are
-    !  therefore processed in chunks, with one call for 1.) and one call for 2.) per chunk.
+    !  therefore processed in chunks, with one call for 1.) and one call per batch of at
+    !  most N_pts_max points for 2.).
     !
     ! amfox, 6 Nov 2026
     ! amfox, 8 Nov 2026 - moved here from get_tile_num_from_latlon(); grid cells from
@@ -1044,6 +1048,8 @@ contains
     ! amfox, 8 Nov 2026 - Step 3.) considers only tiles within max_dist (otherwise the
     !                     closest tile could fail the max_dist check while another tile
     !                     within max_dist would pass it)
+    ! amfox, 8 Nov 2026 - Step 2.) also searches the grid cells within max_dist (the 8 points
+    !                     alone can miss grid cells with tiles within max_dist)
 
     implicit none
 
@@ -1072,17 +1078,25 @@ contains
 
     integer, parameter           :: N_chunk        = 10000   ! max number of lat/lon per chunk
 
-    integer                      :: n, nn, k, kk, ii, jj, this_tile_num
+    integer, parameter           :: N_lattice_max  = 20      ! max lattice intervals on either side
+                                                             !  of lat/lon (Step 2.)
+
+    integer, parameter           :: N_cell_max     = 9 + (2*N_lattice_max+1)**2
+
+    integer, parameter           :: N_pts_max      = 100000  ! max number of points per batch (Step 2.)
+
+    integer                      :: n, nn, k, kk, ii, jj, mm, this_tile_num
     integer                      :: ind_start, ind_end, N_tmp, N_nbr, N_cell
+    integer                      :: nn_start, nn_end, N_x, N_y
 
     logical                      :: outside_bbox, too_far_away
 
     real                         :: tmp_dist,   min_dist
-    real                         :: tmp_dist_x, tmp_dist_y, tmp_dlon, tmp_dlat
+    real                         :: tmp_dist_x, tmp_dist_y, tmp_dlon, tmp_dlat, tmp_slon, tmp_slat
 
-    integer, dimension(9)        :: i_cell_c3, j_cell_c3
+    integer, dimension(N_cell_max) :: i_cell_c3, j_cell_c3
 
-    integer, dimension(:),   allocatable :: i_ind, j_ind, ind_nbr, i_ind_nbr, j_ind_nbr
+    integer, dimension(:),   allocatable :: i_ind, j_ind, ind_nbr, N_pts_nbr, i_ind_nbr, j_ind_nbr
 
     real,    dimension(:),   allocatable :: min_dist_x, min_dist_y, tmp_lat, tmp_lon
 
@@ -1090,9 +1104,9 @@ contains
 
     tile_num = nodata_tilenum          ! initialize to negative value
 
-    allocate( i_ind(N_chunk), j_ind(N_chunk), ind_nbr(N_chunk) )
+    allocate( i_ind(N_chunk), j_ind(N_chunk), ind_nbr(N_chunk), N_pts_nbr(N_chunk) )
     allocate( min_dist_x(N_chunk), min_dist_y(N_chunk) )
-    allocate( i_ind_nbr(8*N_chunk), j_ind_nbr(8*N_chunk), tmp_lat(8*N_chunk), tmp_lon(8*N_chunk) )
+    allocate( i_ind_nbr(N_pts_max), j_ind_nbr(N_pts_max), tmp_lat(N_pts_max), tmp_lon(N_pts_max) )
 
     ! loop through chunks of observations
 
@@ -1145,106 +1159,157 @@ contains
 
        end do
 
-       ! Step 2.): add grid cells that contain 8 lat/lon points around lat/lon
-       !  (tile_grid%dlon = 360/(4*N) is the approximate grid spacing, see LDAS_create_grid_g())
+       ! Step 2.): add grid cells that contain points around lat/lon:
+       !
+       !  (i)  8 points at +/- half a grid cell (approx.) around lat/lon
+       !       (tile_grid%dlon = 360/(4*N) is the approximate grid spacing, see LDAS_create_grid_g())
+       !
+       !  (ii) points of a lattice that covers lat/lon +/- max_dist, with a spacing of at most
+       !       a quarter grid cell (approx.); the number of lattice intervals on either side of
+       !       lat/lon is limited to N_lattice_max (only for very large max_dist or near the poles)
+       !
+       ! points are processed in batches of at most N_pts_max points (one MAPL call per batch)
 
-       kk = 0
+       nn_start = 1
 
-       do nn=1,N_nbr
+       do while (nn_start<=N_nbr)
 
-          n = ind_start - 1 + ind_nbr(nn)
+          ! points for lat/lon ind_nbr(nn_start:nn_end)
 
-          tmp_dlat = 0.5*tile_grid%dlon
-          tmp_dlon = tmp_dlat / max( cos( MAPL_PI/180. * lat(n) ), 0.1 )
+          kk     = 0
+          nn_end = nn_start - 1
 
-          do ii=-1,1
-             do jj=-1,1
+          do nn=nn_start,N_nbr
 
-                if (ii==0 .and. jj==0) cycle
+             n = ind_start - 1 + ind_nbr(nn)
+
+             tmp_dlat = 0.5*tile_grid%dlon
+             tmp_dlon = tmp_dlat / max( cos( MAPL_PI/180. * lat(n) ), 0.1 )
+
+             tmp_slat = 0.25*tile_grid%dlon
+             tmp_slon = tmp_slat / max( cos( MAPL_PI/180. * lat(n) ), 0.1 )
+
+             N_y = ceiling( min( max_dist_y   /tmp_slat, real(N_lattice_max) ) )
+             N_x = ceiling( min( max_dist_x(n)/tmp_slon, real(N_lattice_max) ) )
+
+             N_pts_nbr(nn) = 8 + (2*N_x+1)*(2*N_y+1)
+
+             if (kk+N_pts_nbr(nn) > N_pts_max)  exit     ! batch is full
+
+             ! (i) 8 points at +/- half a grid cell
+
+             do ii=-1,1
+                do jj=-1,1
+
+                   if (ii==0 .and. jj==0) cycle
+
+                   kk = kk + 1
+
+                   tmp_lat(kk) = lat(n) + real(jj)*tmp_dlat
+                   tmp_lon(kk) = lon(n) + real(ii)*tmp_dlon
+
+                end do
+             end do
+
+             ! (ii) lattice over lat/lon +/- max_dist (just lat/lon if max_dist=0)
+
+             do ii=-N_x,N_x
+                do jj=-N_y,N_y
+
+                   kk = kk + 1
+
+                   tmp_lat(kk) = lat(n)
+                   tmp_lon(kk) = lon(n)
+
+                   if (N_y>0)  tmp_lat(kk) = lat(n) + real(jj)*(max_dist_y   /real(N_y))
+                   if (N_x>0)  tmp_lon(kk) = lon(n) + real(ii)*(max_dist_x(n)/real(N_x))
+
+                end do
+             end do
+
+             nn_end = nn
+
+          end do
+
+          call get_ij_ind_from_latlon_c3( c3_grid, tile_grid, kk,               &
+               tmp_lat(1:kk), tmp_lon(1:kk), i_ind_nbr(1:kk), j_ind_nbr(1:kk) )
+
+          kk = 0
+
+          do nn=nn_start,nn_end
+
+             n = ind_start - 1 + ind_nbr(nn)
+
+             ! list of unique grid cells, starting with the grid cell that contains lat/lon
+
+             N_cell       = 1
+
+             i_cell_c3(1) = i_ind(ind_nbr(nn))
+             j_cell_c3(1) = j_ind(ind_nbr(nn))
+
+             do k=1,N_pts_nbr(nn)
 
                 kk = kk + 1
 
-                tmp_lat(kk) = lat(n) + real(jj)*tmp_dlat
-                tmp_lon(kk) = lon(n) + real(ii)*tmp_dlon
+                if (any( i_cell_c3(1:N_cell)==i_ind_nbr(kk) .and.               &
+                         j_cell_c3(1:N_cell)==j_ind_nbr(kk)       ))  cycle  ! already in list
+
+                N_cell            = N_cell + 1
+
+                i_cell_c3(N_cell) = i_ind_nbr(kk)
+                j_cell_c3(N_cell) = j_ind_nbr(kk)
 
              end do
-          end do
 
-       end do
+             ! Step 2.): tiles within additional grid cells (grid cell 1 was searched in Step 1.)
 
-       call get_ij_ind_from_latlon_c3( c3_grid, tile_grid, kk,                  &
-            tmp_lat(1:kk), tmp_lon(1:kk), i_ind_nbr(1:kk), j_ind_nbr(1:kk) )
+             min_dist = 1.e10    ! initialize
 
-       do nn=1,N_nbr
+             if (N_cell>1)                                                       &
+                  call get_tile_num_in_bbox_c3( lat(n), lon(n), N_cell-1,        &
+                  i_cell_c3(2:N_cell), j_cell_c3(2:N_cell),                      &
+                  tile_coord, tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, &
+                  tile_num(n), min_dist, min_dist_x(ind_nbr(nn)), min_dist_y(ind_nbr(nn)) )
 
-          n = ind_start - 1 + ind_nbr(nn)
+             ! Step 3.): no bounding box contains lat/lon:  find closest tile among those
+             !           in all grid cells identified above that are within max_dist
 
-          ! list of unique grid cells, starting with the grid cell that contains lat/lon
+             if (tile_num(n)==nodata_tilenum) then
 
-          N_cell       = 1
+                do mm=1,N_cell
 
-          i_cell_c3(1) = i_ind(ind_nbr(nn))
-          j_cell_c3(1) = j_ind(ind_nbr(nn))
+                   do k=1,N_tile_in_cell_ij(i_cell_c3(mm),j_cell_c3(mm))
 
-          do k=1,8
+                      this_tile_num = tile_num_in_cell_ij(i_cell_c3(mm),j_cell_c3(mm),k)
 
-             kk = 8*(nn-1) + k
+                      tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                      tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
 
-             if (any( i_cell_c3(1:N_cell)==i_ind_nbr(kk) .and.                  &
-                      j_cell_c3(1:N_cell)==j_ind_nbr(kk)       ))  cycle  ! already in list
+                      ! skip tile that is too far away (see bounding box and max_dist check below)
 
-             N_cell            = N_cell + 1
+                      if (tmp_dist_x > max_dist_x(n) .or. tmp_dist_y > max_dist_y)  cycle
 
-             i_cell_c3(N_cell) = i_ind_nbr(kk)
-             j_cell_c3(N_cell) = j_ind_nbr(kk)
+                      tmp_dist   = tmp_dist_x + tmp_dist_y    ! "closest": Minkowski norm
 
-          end do
+                      if (tmp_dist<min_dist) then
 
-          ! Step 2.): tiles within neighboring grid cells (grid cell 1 was searched in Step 1.)
+                         min_dist                 = tmp_dist
+                         min_dist_x(ind_nbr(nn))  = tmp_dist_x
+                         min_dist_y(ind_nbr(nn))  = tmp_dist_y
 
-          min_dist = 1.e10    ! initialize
+                         tile_num(n)              = this_tile_num
 
-          if (N_cell>1)                                                          &
-               call get_tile_num_in_bbox_c3( lat(n), lon(n), N_cell-1,           &
-               i_cell_c3(2:N_cell), j_cell_c3(2:N_cell),                         &
-               tile_coord, tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij,    &
-               tile_num(n), min_dist, min_dist_x(ind_nbr(nn)), min_dist_y(ind_nbr(nn)) )
+                      end if
 
-          ! Step 3.): no bounding box contains lat/lon:  find closest tile among those
-          !           in all grid cells identified above that are within max_dist
-
-          if (tile_num(n)==nodata_tilenum) then
-
-             do kk=1,N_cell
-
-                do k=1,N_tile_in_cell_ij(i_cell_c3(kk),j_cell_c3(kk))
-
-                   this_tile_num = tile_num_in_cell_ij(i_cell_c3(kk),j_cell_c3(kk),k)
-
-                   tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
-                   tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
-
-                   ! skip tile that is too far away (see bounding box and max_dist check below)
-
-                   if (tmp_dist_x > max_dist_x(n) .or. tmp_dist_y > max_dist_y)  cycle
-
-                   tmp_dist   = tmp_dist_x + tmp_dist_y    ! "closest": Minkowski norm
-
-                   if (tmp_dist<min_dist) then
-
-                      min_dist                 = tmp_dist
-                      min_dist_x(ind_nbr(nn))  = tmp_dist_x
-                      min_dist_y(ind_nbr(nn))  = tmp_dist_y
-
-                      tile_num(n)              = this_tile_num
-
-                   end if
+                   end do
 
                 end do
 
-             end do
+             end if
 
-          end if
+          end do
+
+          nn_start = nn_end + 1
 
        end do
 
@@ -1277,7 +1342,7 @@ contains
 
     end do
 
-    deallocate( i_ind, j_ind, ind_nbr, min_dist_x, min_dist_y )
+    deallocate( i_ind, j_ind, ind_nbr, N_pts_nbr, min_dist_x, min_dist_y )
     deallocate( i_ind_nbr, j_ind_nbr, tmp_lat, tmp_lon )
 
   end subroutine get_tile_num_from_latlon_c3
