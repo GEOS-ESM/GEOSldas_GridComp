@@ -1025,13 +1025,14 @@ contains
              !     by the half-width and half-height of the bounding box.  Tiles are listed
              !     in ascending order of tile number, so ties go to the lower tile number.
              !
-             ! 2.) If no bounding box contains lat/lon, pick the nearest tile (Minkowski norm),
-             !     as for LatLon tile space (subject to max_dist, see below).
+             ! 2.) If no bounding box contains lat/lon, pick the nearest tile (Minkowski norm)
+             !     among the tiles that are within max_dist_x and max_dist_y of lat/lon.
+             !     (Picking the nearest tile first and then checking max_dist, as for LatLon
+             !     tile space, can drop an obs even though another tile is within max_dist.)
              !
-             ! If there are no land tiles in given grid cell, tile_num will not change
-             ! from its initialized value.
+             ! If there are no such tiles, tile_num will not change from its initialized value.
              !
-             ! - amfox, 6 Nov 2026; restructured, amfox, 8 Nov 2026
+             ! - amfox, 6 Nov 2026; restructured and fixed step 2.), amfox, 8 Nov 2026
 
              min_dist_bbox = 1.e10   ! initialize
 
@@ -1078,15 +1079,20 @@ contains
                    tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
                    tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
 
-                   tmp_dist   = tmp_dist_x + tmp_dist_y    ! Minkowski norm
+                   if ( tmp_dist_x <= max_dist_tmp_x(n)  .and.                 &
+                        tmp_dist_y <= max_dist_tmp_y            ) then
 
-                   if (tmp_dist<min_dist) then
+                      tmp_dist   = tmp_dist_x + tmp_dist_y    ! Minkowski norm
 
-                      min_dist    = tmp_dist
-                      min_dist_x  = tmp_dist_x
-                      min_dist_y  = tmp_dist_y
+                      if (tmp_dist<min_dist) then
 
-                      tile_num(n) = this_tile_num
+                         min_dist    = tmp_dist
+                         min_dist_x  = tmp_dist_x
+                         min_dist_y  = tmp_dist_y
+
+                         tile_num(n) = this_tile_num
+
+                      end if
 
                    end if
 
