@@ -100,7 +100,6 @@ module clsm_ensupd_enkf_update
        get_ind_obs_assim,                         &
        get_ind_obs_lat_lon_box,                   &
        halo_type,                                 &
-       FOV_threshold,                             &
        get_halo_around_tile,                      &
        TileNnzObs
 
@@ -390,9 +389,10 @@ contains
        ! -----------------------------------------------------------------
        !
        ! Get additional grid/tile information that is needed to map obs
-       ! from lat/lon to tiles.  This needs to be done:
-       ! - by root process (because of call to read_obs() in collect_obs())
-       ! - by all processes if FOV>~0 ("tile_num_in_circle" needed in get_obs_pred())
+       ! from lat/lon to tiles.  This needs to be done only by the root process
+       ! (because of call to read_obs() in collect_obs()).  The FOV footprint
+       ! search in get_obs_pred() uses its own tables (incl. halo).
+       ! - amfox, 8 Nov 2026 (no longer done by all processes if FOV>~0)
        !
        ! For cube-sphere tile space, tiles do not nest within the cells of the lat/lon
        ! pert_grid_f.  On root, list each tile in all pert_grid_f cells that overlap
@@ -412,8 +412,7 @@ contains
           call get_tile_num_in_cell_ij_bbox( N_catf, tile_coord_f,                &
                obs2tile_grid_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f )
 
-       elseif ( (root_proc)                                        .or.              &
-            (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
+       elseif (root_proc) then
 
           allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
 
