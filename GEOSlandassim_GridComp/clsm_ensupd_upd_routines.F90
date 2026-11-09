@@ -1149,7 +1149,6 @@ contains
     integer, dimension(:),     allocatable  :: ind_tmp
 
     real,    dimension(:),     allocatable  :: tmp_ndst2, tmp_wFOV, tmp_weights, tmp_data
-    real,    dimension(:),     allocatable  :: tmp_wtmp            ! cube-sphere tile space only
                                                              
     ! dimension "N_catlH-[by-N_XXXX-]by-N_ens"  
     ! (need to be communicated between processors)
@@ -1594,7 +1593,10 @@ contains
     ! for cube-sphere tile space, get the land fraction of the (cube-sphere) grid cell
     !  of each tile in the local halo domain ("lH") for the QC of Tb for non-land surfaces
     !  (below); a grid cell contains several tiles, whose frac_cell add up to the land
-    !  fraction of the grid cell (tile_coord_f must contain all tiles of the grid cell)
+    !  fraction of the grid cell;
+    !  near the edge of the domain, land_frac might be underestimated if non-land tiles
+    !  in a given grid cell are within the (full) domain, leading to more aggressive
+    !  screening of Tb obs; this is acceptable because typically the domain is global 
     ! - amfox, 6 Nov 2026
 
     c3_tile_space_tmp = .false.
@@ -1735,8 +1737,6 @@ contains
     allocate(tmp_wFOV(   N_catlH))
     allocate(tmp_weights(N_catlH))
     allocate(tmp_data(   N_catlH))
-
-    if (c3_tile_space_tmp)  allocate(tmp_wtmp(N_catlH))
 
     do i=1,N_obsl
        
@@ -1916,11 +1916,17 @@ contains
 
              case('Tb')
                 
-                ! start with QC based on model *soil* temperature, motivated by RFI
+                ! start with model-based QC
                 ! (requires model estimates *and* observation together;
                 !  only performed before the EnKF update b/c not needed afterwards)
                 
+                tmpRFI   = .false.                
+                
+                tmpWater = .false.
+                
                 if (beforeEnKFupdate) then
+
+                   ! QC based on model *soil* temperature, motivated by RFI
                    
                    tmp_data(1:N_tmp) = stemp_lH( ind_tmp(1:N_tmp), n_e ) 
                    
@@ -1931,84 +1937,68 @@ contains
                    
                    tmpRFI = ((Observations_l(i)%obs-tmp_stemp) > Tbobs_minus_stemp_max)
                    
-                else
-                   
-                   tmpRFI = .false.
-                   
-                end if
-                
-                ! for EASE and cube-sphere grids *ONLY*: screen for non-land surfaces (e.g., lakes)
-                ! - reichle, 28 Mar 2015 (EASE)
-                ! - amfox, 6 Nov 2026 (cube-sphere)
-                
-                if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
-                   
-                   ! ASSUMPTIONS: 
-                   !  - at most one land tile per grid cell
-                   !  - grid cells have the same area (or at least have nearly
-                   !     identical areas in the surrounding region; that is, 
-                   !     a regular lat/lon grid with just one tile per grid
-                   !     cell would be ok if that property could be asserted here)
-                   
-                   ! compute FOV-weighted average "frac_cell"
-                   
-                   tmp_data(1:N_tmp) = tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell
-                   
-                   call tile2obs_helper(                                               &
-                        N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
-                   
-                   ! check whether there is too much non-land in FOV 
-                   !  (typically water, but could be land-ice)
-                   
-                   tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
-                   
-                elseif (c3_tile_space_tmp) then
+                   ! ---------------------
 
-                   ! cube-sphere tile space: screen for non-land surfaces as for EASE grids,
-                   !  but a grid cell contains several tiles; average the land fraction of
-                   !  the grid cells in the FOV (FOV-weighted) and count each grid cell once
-                   !  by weighting each tile with its share of the land in its grid cell
-                   !  (identical to EASE grids if there is one tile per grid cell)
-                   !
-                   ! ASSUMPTION: 
-                   !  - grid cells have the same area (or at least have nearly identical
-                   !     areas) in the neighborhood surrounding the obs;  
-                   !     regular cube-sphere grid cellcell areas differ by ~1-2% within ~0.5 deg;
-                   !     NEEDS REVISITING for stretched cube-sphere grids
-                   !
-                   ! - amfox, 6 Nov 2026
+                   ! screen for non-land surfaces (e.g., lakes, landice)
+                   ! *ONLY* implemented for EASE and cube-sphere grids
+                   ! - reichle, 28 Mar 2015 (EASE)
+                   ! - amfox, 6 Nov 2026 (cube-sphere)
+                                      
+                   if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
 
-                   tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
+                      ! ASSUMPTIONS: 
+                      !  - at most one land tile per grid cell
+                      !  - grid cells have the same area (or at least have nearly
+                      !     identical areas in the surrounding region; that is, 
+                      !     a regular lat/lon grid with just one tile per grid
+                      !     cell would be ok if that property could be asserted here)
+
+                      ! compute FOV-weighted average "frac_cell"
+
+                      tmp_data(1:N_tmp) = tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell
+
+                      call tile2obs_helper(                                               &
+                           N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
+
+                      ! check whether there is too much non-land in FOV 
+                      !  (typically water, but could be land-ice)
+
+                      tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
+
+                   elseif (c3_tile_space_tmp) then
+
+                      ! cube-sphere tile space: screen for non-land surfaces as for EASE grids,
+                      !  but a grid cell contains several tiles; average the land fraction of
+                      !  the grid cells in the FOV (FOV-weighted) and count each grid cell once
+                      !  by weighting each tile with its share of the land in its grid cell
+                      !  (identical to EASE grids if there is one tile per grid cell)
+                      !
+                      ! ASSUMPTION: 
+                      !  - grid cells have the same area (or at least have nearly identical
+                      !     areas) in the neighborhood surrounding the obs;  
+                      !     regular cube-sphere grid cellcell areas differ by ~1-2% within ~0.5 deg;
+                      !     NEEDS REVISITING for stretched cube-sphere grids
+                      !
+                      ! - amfox, 6 Nov 2026
+
+                      tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
+
+                      ! compute average land_frac_cell weighted by each tile's area and contribution to FOV 
+                                            
+                      call tile2obs_helper(                                                     &
+                           N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area,       &
+                           tmp_data(1:N_tmp), tmp_fraccell)
+                      
+                      tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
+
+                   else
+
+                      err_msg = 'Tb QC for non-land frac not implemented for this grid type'
+                      call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+                   end if
                    
-                   ! weight each tile's contribution by (1) FOV and (2) area fraction of land tile w.r.t. all land in grid cell
-                   
-                   tmp_wtmp(1:N_tmp) =                                                                    &
-                        ( tmp_wFOV(1:N_tmp)                                                               &    ! (1)
-                        * tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell / max( tmp_data(1:N_tmp), 1.e-10 ) )       ! (2)
-                   
-                   call tile2obs_helper(                                                                  &
-                        N_tmp, tmp_wtmp(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
-
-                   tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
-
-                elseif (.not. beforeEnKFupdate) then
-
-                   ! after the EnKF update, get_obs_pred() is called without c3_tile_space
-                   !  (see output_ObsFcstAna_wrapper()), so that tile_grid_g (pert grid) is
-                   !  LatLon for cube-sphere tile space; obs that failed the QC of Tb for
-                   !  non-land surfaces were already removed before the EnKF update, and grid
-                   !  types without this QC were rejected there (see below)
-                   ! - amfox, 8 Nov 2026
-
-                   tmpWater = .false.
-
-                else
-
-                   err_msg = 'Tb QC for non-land frac not implemented for this grid type'
-                   call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-                   
-                end if
-                
+                end if                  ! beforeEnKFupdate
                 
                 ! compute Obs_pred
                 
@@ -2126,7 +2116,6 @@ contains
     if (allocated(tmp_wFOV))                 deallocate(tmp_wFOV)   ! fix memory leak
     if (allocated(tmp_weights))              deallocate(tmp_weights)
     if (allocated(tmp_data))                 deallocate(tmp_data)
-    if (allocated(tmp_wtmp))                 deallocate(tmp_wtmp)
     if (allocated(land_frac_cell_lH))        deallocate(land_frac_cell_lH)
 
     if (allocated(peat_lH))                  deallocate(peat_lH)
