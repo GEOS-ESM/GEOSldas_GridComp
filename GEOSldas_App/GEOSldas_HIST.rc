@@ -660,6 +660,9 @@ EASEv2_M36.LM:           1
                                  'ICETHICK'   , 'ISSM' ,
                                  'ICEVX'      , 'ISSM' ,
                                  'ICEVY'      , 'ISSM' ,
+                                 'DHDT'       , 'ISSM' ,
+                                 'DIVQ'       , 'ISSM' ,
+                                 'ICESMB_ISSM', 'ISSM',
                                  ::
 
 # ========================== EOF ==============================================================
