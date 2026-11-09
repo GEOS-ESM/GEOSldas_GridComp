@@ -1044,7 +1044,9 @@ contains
     ! The grid cells are obtained from MAPL_GetGlobalHorzIJIndex() (see
     !  get_ij_ind_from_latlon_c3()), which has a fixed cost per call.  lat/lon are
     !  therefore processed in chunks, with one call for 1.) and one call per batch of at
-    !  most N_pts_max points for 2.).
+    !  most N_pts_max points for 2.).  The fixed cost grows with the grid resolution (~4x
+    !  per doubling; ~0.1 s per call for C2880), whereas the cost per point is small
+    !  (~0.05 us), hence the large chunks and batches.
     !
     ! amfox, 6 Nov 2026
     ! amfox, 8 Nov 2026 - moved here from get_tile_num_from_latlon(); grid cells from
@@ -1054,6 +1056,7 @@ contains
     !                     within max_dist would pass it)
     ! amfox, 8 Nov 2026 - Step 2.) also searches the grid cells within max_dist (the 8 points
     !                     alone can miss grid cells with tiles within max_dist)
+    ! amfox, 9 Nov 2026 - larger N_chunk and N_pts_max (fewer MAPL calls for high-res grids)
 
     implicit none
 
@@ -1080,14 +1083,14 @@ contains
 
     integer, parameter           :: nodata_tilenum = -9999
 
-    integer, parameter           :: N_chunk        = 10000   ! max number of lat/lon per chunk
+    integer, parameter           :: N_chunk        = 100000  ! max number of lat/lon per chunk
 
     integer, parameter           :: N_lattice_max  = 20      ! max lattice intervals on either side
                                                              !  of lat/lon (Step 2.)
 
     integer, parameter           :: N_cell_max     = 9 + (2*N_lattice_max+1)**2
 
-    integer, parameter           :: N_pts_max      = 100000  ! max number of points per batch (Step 2.)
+    integer, parameter           :: N_pts_max      = 1000000 ! max number of points per batch (Step 2.)
 
     integer                      :: n, nn, k, kk, ii, jj, mm, this_tile_num
     integer                      :: ind_start, ind_end, N_tmp, N_nbr, N_cell
