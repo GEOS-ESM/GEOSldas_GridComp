@@ -1991,6 +1991,17 @@ contains
 
                    tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
 
+                elseif (.not. beforeEnKFupdate) then
+
+                   ! after the EnKF update, get_obs_pred() is called without c3_tile_space
+                   !  (see output_ObsFcstAna_wrapper()), so that tile_grid_g (pert grid) is
+                   !  LatLon for cube-sphere tile space; obs that failed the QC of Tb for
+                   !  non-land surfaces were already removed before the EnKF update, and grid
+                   !  types without this QC were rejected there (see below)
+                   ! - amfox, 8 Nov 2026
+
+                   tmpWater = .false.
+
                 else
 
                    err_msg = 'Tb QC for non-land frac not implemented for this grid type'
