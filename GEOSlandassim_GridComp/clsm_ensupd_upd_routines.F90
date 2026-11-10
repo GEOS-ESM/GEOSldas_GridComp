@@ -1943,15 +1943,23 @@ contains
                    ! *ONLY* implemented for EASE and cube-sphere grids
                    ! - reichle, 28 Mar 2015 (EASE)
                    ! - amfox, 6 Nov 2026 (cube-sphere)
-                                      
+
+                   ! ASSUMPTION: 
+                   !  - all grid cells in FOV contain at least some land; grid cells
+                   !     that are entirely non-land are not considered because the
+                   !     calculations use only land tile properties                   
+                   
                    if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
 
-                      ! ASSUMPTIONS: 
+                      ! ADDITIONAL ASSUMPTIONS: 
                       !  - at most one land tile per grid cell
                       !  - grid cells have the same area (or at least have nearly
                       !     identical areas in the surrounding region; that is, 
                       !     a regular lat/lon grid with just one tile per grid
                       !     cell would be ok if that property could be asserted here)
+                      !  - all grid cells in FOV contain at least some land; grid cells
+                      !     that are entirely non-land are not considered because the
+                      !     calculations use only land tile properties                   
 
                       ! compute FOV-weighted average "frac_cell"
 
@@ -1973,20 +1981,14 @@ contains
                       !  by weighting each tile with its share of the land in its grid cell
                       !  (identical to EASE grids if there is one tile per grid cell)
                       !
-                      ! ASSUMPTION: 
-                      !  - grid cells have the same area (or at least have nearly identical
-                      !     areas) in the neighborhood surrounding the obs;  
-                      !     regular cube-sphere grid cellcell areas differ by ~1-2% within ~0.5 deg;
-                      !     NEEDS REVISITING for stretched cube-sphere grids
-                      !
                       ! - amfox, 6 Nov 2026
 
                       tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
 
                       ! compute average land_frac_cell weighted by each tile's area and contribution to FOV 
                                             
-                      call tile2obs_helper(                                                     &
-                           N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area,       &
+                      call tile2obs_helper(                                                                              &
+                           N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area/max(land_frac_cell,1.e-10),     &
                            tmp_data(1:N_tmp), tmp_fraccell)
                       
                       tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
