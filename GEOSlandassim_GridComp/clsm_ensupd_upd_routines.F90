@@ -1090,7 +1090,7 @@ contains
 
     real, dimension(numprocs)               :: xhalo, yhalo, tmplatvec, tmprx
     
-    real                                    :: tmpreal, tmp_stemp, tmp_fraccell, tmp_peatfrac
+    real                                    :: tmpreal, tmp_stemp, tmp_nonland_frac, tmp_peat_frac
     real                                    :: tmpsum_w
 
     logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
@@ -1851,38 +1851,113 @@ contains
              
           end if
 
-          ! screen surface soil moisture observations if too much of the FOV is peatland
+          ! ---------------------------------------------------
+          !
+          ! model-based QC that depends on static information (e.g., peat or non-land area fraction);
+          ! requires model info *and* observation info together;
+          ! only performed before the EnKF update b/c not needed afterwards.
 
-          tmpPeat = .false.
+          tmpPeat  = .false.
+          
+          tmpWater = .false.
+          
+          if (beforeEnKFupdate) then
+             
+             ! screen surface soil moisture observations if too much of the FOV is peatland
+             
+             if (get_peat_lH .and.                                                      &
+                  (trim(obs_param(this_species)%varname)=='sfmc' .or.                   &
+                  trim(obs_param(this_species)%varname)=='sfds')) then
+                
+                tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
+                
+                ! FOV- and area-weighted peat fraction over tiles with valid porosity
 
-          if (get_peat_lH .and.                                                &
-               (trim(obs_param(this_species)%varname)=='sfmc' .or.             &
-                trim(obs_param(this_species)%varname)=='sfds')) then
+                tmpsum_w = sum( merge( tmp_weights(1:N_tmp), 0.,                        &
+                     abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )
 
-             tmp_data(1:N_tmp) = peat_lH(ind_tmp(1:N_tmp))
+                if (tmpsum_w > 0.) then
+                   
+                   tmp_peat_frac = sum( merge(                                          &
+                        tmp_weights(1:N_tmp)*tmp_data(1:N_tmp), 0.,                     &
+                        abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )   &
+                        / tmpsum_w
+                   
+                   tmpPeat = (tmp_peat_frac > =SM_max_peat_frac)
+                   
+                else
+                   
+                   tmpPeat = .true.   ! no valid porosity anywhere in FOV
 
-             ! FOV- and area-weighted peat fraction over tiles with valid porosity
-
-             tmpsum_w = sum( merge( tmp_weights(1:N_tmp), 0.,                    &
-                  abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )
-
-             if (tmpsum_w > 0.) then
-
-                tmp_peatfrac = sum( merge(                                       &
-                     tmp_weights(1:N_tmp)*tmp_data(1:N_tmp), 0.,                 &
-                     abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )&
-                     / tmpsum_w
-
-                tmpPeat = (tmp_peatfrac>=SM_max_peat_frac)
-
-             else
-
-                tmpPeat = .true.   ! no valid porosity anywhere in FOV
-
+                end if
+                
              end if
 
-          end if
-          
+             ! ---------------------
+
+             ! screen Tb obs for non-land surfaces (lake, landice) in FOV;
+             ! *ONLY* implemented for EASE and cube-sphere grids
+             ! - reichle, 28 Mar 2015 (EASE)
+             ! - amfox,    6 Nov 2026 (cube-sphere)
+                          
+             if (get_Tb_lH) then
+
+                ! ASSUMPTION: 
+                !  - all grid cells in FOV contain at least some land; grid cells
+                !     that are entirely non-land are not considered because the
+                !     calculations use only land tile properties                   
+                
+                if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
+
+                   ! ADDITIONAL ASSUMPTIONS: 
+                   !  - at most one land tile per grid cell
+                   !  - grid cells have the same area (true for EASE) or at least have nearly
+                   !     identical areas in the surrounding region; that is, 
+                   !     a regular lat/lon grid with just one tile per grid
+                   !     cell would be ok if that property could be asserted here
+                   
+                   ! compute FOV-weighted average "frac_cell"
+
+                   tmp_data(1:N_tmp) = tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell
+
+                   call tile2obs_helper(                                               &
+                        N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_nonland_frac)
+
+                elseif (c3_tile_space_tmp) then
+
+                   ! a cube-sphere grid cell can contain several tiles;
+                   ! average the land fraction of the grid cells with at least one land tile in the FOV,
+                   !  which misses grid cells that have no land at all (as for EASE);
+                   ! average is weighted by the following land tile properites:
+                   !  1) relative contribution to FOV (tmp_wFOV)
+                   !  2) relative share of the land area in grid cell (frac_cell/land_frac)
+                   !  3) grid cell area
+                   ! total weight = tmp_wFOV * frac_cell/land_frac_cell * grid-cell-area
+                   !              = tmp_wFOV * frac_cell/land_frac_cell * tile-area/frac_cell
+                   !              = tmp_wFOV *         1/land_frac_cell * tile-area
+
+                   tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
+
+                   call tile2obs_helper(                                                                              &
+                        N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area/max(tmp_data(1:N_tmp),1.e-10),  &
+                        tmp_data(1:N_tmp), tmp_nonland_frac)
+
+                else
+
+                   err_msg = 'Tb QC for non-land frac not implemented for this grid type'
+                   call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+
+                end if
+
+                ! check whether there is too much non-land in FOV 
+                !  (typically water, but could be land-ice)
+
+                tmpWater = ( 1. - tmp_nonland_frac > Tb_max_nonland_frac )
+
+             end if   ! if get_Tb_lH
+             
+          end if      ! if beforeEnKFupdate
+                
           do n_e=1,N_ens
              
              ! -----------------------------------------
@@ -1916,14 +1991,12 @@ contains
 
              case('Tb')
                 
-                ! start with model-based QC
-                ! (requires model estimates *and* observation together;
-                !  only performed before the EnKF update b/c not needed afterwards)
+                ! model-based QC that depends on ensemble member-specific dynamic states (e.g., soil temperature);
+                ! requires model estimates *and* observation together;
+                ! only performed before the EnKF update b/c not needed afterwards
                 
                 tmpRFI   = .false.                
-                
-                tmpWater = .false.
-                
+                                
                 if (beforeEnKFupdate) then
 
                    ! QC based on model *soil* temperature, motivated by RFI
@@ -1936,69 +2009,6 @@ contains
                    ! if Tb is too warm, RFI is likely
                    
                    tmpRFI = ((Observations_l(i)%obs-tmp_stemp) > Tbobs_minus_stemp_max)
-                   
-                   ! ---------------------
-
-                   ! screen for non-land surfaces (e.g., lakes, landice)
-                   ! *ONLY* implemented for EASE and cube-sphere grids
-                   ! - reichle, 28 Mar 2015 (EASE)
-                   ! - amfox, 6 Nov 2026 (cube-sphere)
-
-                   ! ASSUMPTION: 
-                   !  - all grid cells in FOV contain at least some land; grid cells
-                   !     that are entirely non-land are not considered because the
-                   !     calculations use only land tile properties                   
-                   
-                   if (index(tile_grid_g%gridtype, 'EASEv')  /=0) then
-
-                      ! ADDITIONAL ASSUMPTIONS: 
-                      !  - at most one land tile per grid cell
-                      !  - grid cells have the same area (or at least have nearly
-                      !     identical areas in the surrounding region; that is, 
-                      !     a regular lat/lon grid with just one tile per grid
-                      !     cell would be ok if that property could be asserted here)
-                      !  - all grid cells in FOV contain at least some land; grid cells
-                      !     that are entirely non-land are not considered because the
-                      !     calculations use only land tile properties                   
-
-                      ! compute FOV-weighted average "frac_cell"
-
-                      tmp_data(1:N_tmp) = tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell
-
-                      call tile2obs_helper(                                               &
-                           N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_fraccell)
-
-                      ! check whether there is too much non-land in FOV 
-                      !  (typically water, but could be land-ice)
-
-                      tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
-
-                   elseif (c3_tile_space_tmp) then
-
-                      ! cube-sphere tile space: screen for non-land surfaces as for EASE grids,
-                      !  but a grid cell contains several tiles; average the land fraction of
-                      !  the grid cells in the FOV (FOV-weighted) and count each grid cell once
-                      !  by weighting each tile with its share of the land in its grid cell
-                      !  (identical to EASE grids if there is one tile per grid cell)
-                      !
-                      ! - amfox, 6 Nov 2026
-
-                      tmp_data(1:N_tmp)  = land_frac_cell_lH(ind_tmp(1:N_tmp))
-
-                      ! compute average land_frac_cell weighted by each tile's area and contribution to FOV 
-                                            
-                      call tile2obs_helper(                                                                              &
-                           N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area/max(tmp_data(1:N_tmp),1.e-10),  &
-                           tmp_data(1:N_tmp), tmp_fraccell)
-                      
-                      tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
-
-                   else
-
-                      err_msg = 'Tb QC for non-land frac not implemented for this grid type'
-                      call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-
-                   end if
                    
                 end if                  ! beforeEnKFupdate
                 
