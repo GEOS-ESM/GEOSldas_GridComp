@@ -1883,7 +1883,7 @@ contains
                         abs(tmp_data(1:N_tmp)-nodata_generic)>=nodata_tol_generic ) )   &
                         / tmpsum_w
                    
-                   tmpPeat = (tmp_peat_frac > =SM_max_peat_frac)
+                   tmpPeat = (tmp_peat_frac >= SM_max_peat_frac)
                    
                 else
                    
