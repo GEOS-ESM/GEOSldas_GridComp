@@ -1090,7 +1090,7 @@ contains
 
     real, dimension(numprocs)               :: xhalo, yhalo, tmplatvec, tmprx
     
-    real                                    :: tmpreal, tmp_stemp, tmp_nonland_frac, tmp_peat_frac
+    real                                    :: tmpreal, tmp_stemp, tmp_land_frac, tmp_peat_frac
     real                                    :: tmpsum_w
 
     logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
@@ -1900,7 +1900,7 @@ contains
              ! - reichle, 28 Mar 2015 (EASE)
              ! - amfox,    6 Nov 2026 (cube-sphere)
                           
-             if (get_Tb_lH) then
+             if (get_Tb_lH .and. trim(obs_param(this_species)%varname)=='Tb') then
 
                 ! ASSUMPTION: 
                 !  - all grid cells in FOV contain at least some land; grid cells
@@ -1921,14 +1921,14 @@ contains
                    tmp_data(1:N_tmp) = tile_coord_lH(ind_tmp(1:N_tmp))%frac_cell
 
                    call tile2obs_helper(                                               &
-                        N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_nonland_frac)
+                        N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_land_frac)
 
                 elseif (c3_tile_space_tmp) then
 
                    ! a cube-sphere grid cell can contain several tiles;
                    ! average the land fraction of the grid cells with at least one land tile in the FOV,
                    !  which misses grid cells that have no land at all (as for EASE);
-                   ! average is weighted by the following land tile properites:
+                   ! average is weighted by the following land tile properties:
                    !  1) relative contribution to FOV (tmp_wFOV)
                    !  2) relative share of the land area in grid cell (frac_cell/land_frac)
                    !  3) grid cell area
@@ -1940,7 +1940,7 @@ contains
 
                    call tile2obs_helper(                                                                              &
                         N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area/max(tmp_data(1:N_tmp),1.e-10),  &
-                        tmp_data(1:N_tmp), tmp_nonland_frac)
+                        tmp_data(1:N_tmp), tmp_land_frac)
 
                 else
 
@@ -1952,7 +1952,7 @@ contains
                 ! check whether there is too much non-land in FOV 
                 !  (typically water, but could be land-ice)
 
-                tmpWater = ( 1. - tmp_nonland_frac > Tb_max_nonland_frac )
+                tmpWater = ( 1. - tmp_land_frac > Tb_max_nonland_frac )
 
              end if   ! if get_Tb_lH
              
