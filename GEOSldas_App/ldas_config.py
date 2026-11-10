@@ -443,6 +443,15 @@ class LdasConfig:
 
         self._verifyResourceInputs()
 
+        # optional 2d processor layout: ntasks_model = NX*NY
+        if 'NX' in self.RmInputs or 'NY' in self.RmInputs:
+           require('NX' in self.RmInputs and 'NY' in self.RmInputs, 'NX and NY must be specified together')
+           npes_nx = int(self.RmInputs['NX'])
+           npes_ny = int(self.RmInputs['NY'])
+           require(npes_nx >= 1 and npes_ny >= 1, 'NX and NY must be >= 1')
+           require(npes_nx*npes_ny == int(self.RmInputs['ntasks_model']),
+              'ntasks_model (%s) must equal NX*NY (%d*%d)' % (self.RmInputs['ntasks_model'], npes_nx, npes_ny))
+
         # print rm inputs
         if self.verbose:
             print ('\n\nInputs for resource manager:')

@@ -12,7 +12,8 @@ program main
        createZoominRestart,                  &
        correctEase,                          &
        convert_pert_rst,                     &
-       optimize_latlon
+       optimize_latlon,                      &
+       optimize_latlon_2d
   
   implicit none
   
@@ -151,6 +152,12 @@ program main
      
      call get_tile_types(trim(arg5), int_types) 
      call optimize_latlon(arg1,arg2, arg3, arg4, int_types)
+     
+  else if (trim(option) == "optimize_2d") then
+
+     ! arg1: tile file, arg2: NX, arg3: NY, arg4: optimized_file, arg5: run_dir, arg6: tile types
+     call get_tile_types(trim(arg6), int_types) 
+     call optimize_latlon_2d(arg1, arg2, arg3, arg4, arg5, int_types)
      
   else
      

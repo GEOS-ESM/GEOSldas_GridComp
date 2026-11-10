@@ -77,24 +77,41 @@ class LdasRc:
     # -----------------------------------------------------------------------------------
     def _optimize_layout(self):
         """
-        Run preprocess_ldas.x optimize: writes IMS.rc/JMS.rc to rundir and returns the
-        NX/NY layout (dict).  For cube-sphere tile space, ntasks_model may be adjusted.
+        Run preprocess_ldas.x optimize (1d) or optimize_2d (NX-by-NY): writes IMS.rc and/or
+        JMS.rc to rundir and returns the NX/NY layout (dict).  ntasks_model may be adjusted.
         """
+        # 2d decomposition (NX-by-NY) unless NX and NY are not specified or the requested layout is
+        # the 1d layout (cube-sphere: NX=1; lat-lon/EASE: NY=1)
+        decomp_2d = False
+        if 'NX' in self.RmInputs:
+           is_cs     = '-CF' in self.ExeInputs['GRIDNAME']
+           npes_nx   = int(self.RmInputs['NX'])
+           npes_ny   = int(self.RmInputs['NY'])
+           decomp_2d = not ((is_cs and npes_nx == 1) or (not is_cs and npes_ny == 1))
+           if is_cs:
+              require(npes_ny % 6 == 0, 'NY (%d) must be a multiple of 6 for cube-sphere grid' % npes_ny)
+
         tmp_ = tempfile.NamedTemporaryFile(delete=False)
         tmp_.close()
         try:
             print  ("Optimizing... decomposition of processes.... \n")
-            print ("IMS.rc or JMS.rc would be generated on " + self.rundir)
-            run_cmd(self.bindir + '/preprocess_ldas.x optimize '+ self.inpdir+'/tile.data '
-                    + str(self.RmInputs['ntasks_model']) + ' ' + tmp_.name + ' ' + self.rundir + ' '
-                    + '_'.join(self.tile_types))
+            print ("IMS.rc and/or JMS.rc would be generated on " + self.rundir)
+            if decomp_2d:
+                run_cmd(self.bindir + '/preprocess_ldas.x optimize_2d '+ self.inpdir+'/tile.data '
+                        + str(npes_nx) + ' ' + str(npes_ny) + ' ' + tmp_.name + ' ' + self.rundir + ' '
+                        + '_'.join(self.tile_types))
+            else:
+                run_cmd(self.bindir + '/preprocess_ldas.x optimize '+ self.inpdir+'/tile.data '
+                        + str(self.RmInputs['ntasks_model']) + ' ' + tmp_.name + ' ' + self.rundir + ' '
+                        + '_'.join(self.tile_types))
             optinxny = parseInputFile(tmp_.name)
         finally:
             os.remove(tmp_.name)
-        if (int(optinxny['NX']) == 1):
-            if int(optinxny['NY']) != int(self.RmInputs['ntasks_model']):
-                self.RmInputs['ntasks_model']=optinxny['NY']
-                print ('adjust ntasks_model %d for cubed-sphere grid' % int(self.RmInputs['ntasks_model']))
+        require('NX' in optinxny and 'NY' in optinxny, 'Optimization of domain decomposition failed')
+        ntasks_opt = int(optinxny['NX'])*int(optinxny['NY'])
+        if ntasks_opt != int(self.RmInputs['ntasks_model']):
+            self.RmInputs['ntasks_model'] = ntasks_opt
+            print ('adjust ntasks_model %d for cubed-sphere grid' % int(self.RmInputs['ntasks_model']))
         return optinxny
 
     # -----------------------------------------------------------------------------------

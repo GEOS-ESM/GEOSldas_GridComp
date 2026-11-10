@@ -228,31 +228,64 @@ endif
 #######################################################################
 #                      Domain Decomposition
 #######################################################################
-set npes_nx = `grep NX: LDAS.rc | cut -d':' -f2 `
-set npes_ny = `grep NY: LDAS.rc | cut -d':' -f2 `
-@ numprocs = $npes_nx * $npes_ny
-if( -e IMS.rc ) then
-   set oldtasks = `head -n 1 IMS.rc`
-   if($numprocs != $oldtasks) then
-      $GEOSBIN/preprocess_ldas.x optimize ../input/tile.data $numprocs nothing nothing nothing
-   endif
-endif
+# Re-optimize the domain decomposition if NX or NY in LDAS.rc do not match the layout
+# stored in IMS.rc/JMS.rc (lat-lon/EASE) or in JMS.rc/GEOSldas.IMS (cube-sphere).
+# 1d layout (cube-sphere: NX=1; lat-lon/EASE: NY=1) uses "optimize", otherwise "optimize_2d".
 
-if( -e JMS.rc ) then
-   set oldtasks = `head -n 1 JMS.rc | cut -c1-5`
-   if($numprocs != $oldtasks) then
-      $GEOSBIN/preprocess_ldas.x optimize ../input/tile.data $numprocs nothing nothing nothing
-   endif
-endif
+set npes_nx = `grep '^NX:' LDAS.rc | cut -d':' -f2 `
+set npes_ny = `grep '^NY:' LDAS.rc | cut -d':' -f2 `
 
 set gridname = `grep GEOSldas.GRIDNAME LDAS.rc | cut -d':' -f2 | cut -d'-'  -f2 | awk '{{print $1}}'`
-if ( "$gridname" == "CF" ) then
-   set new_ny = `echo "NY:  "$numprocs`
-   sed -i "/NY:/c\\\\$new_ny" LDAS.rc
-else
-   set new_nx = `echo "NX:  "$numprocs`
-   sed -i "/NX:/c\\\\$new_nx" LDAS.rc
+
+set old_nx = 1
+set old_ny = 1
+if ( -e IMS.rc ) set old_nx = `head -n 1 IMS.rc | awk '{{print $1}}'`
+if ( -e JMS.rc ) set old_ny = `head -n 1 JMS.rc | awk '{{print $1}}'`
+set ims_list = `grep '^GEOSldas.IMS:' LDAS.rc | cut -d':' -f2`
+if ( $#ims_list > 0 ) set old_nx = $#ims_list
+
+if ( $npes_nx != $old_nx || $npes_ny != $old_ny ) then
+
+   echo "re-optimizing domain decomposition for NX = $npes_nx, NY = $npes_ny"
+
+   /bin/rm -f IMS.rc JMS.rc optimized_distribution.rc
+
+   set is_1d = 0
+   if ( "$gridname" == "CF" && $npes_nx == 1 ) set is_1d = 1
+   if ( "$gridname" != "CF" && $npes_ny == 1 ) set is_1d = 1
+
+   if ( $is_1d == 1 ) then
+      @ numprocs = $npes_nx * $npes_ny
+      $GEOSBIN/preprocess_ldas.x optimize    ../input/tile.data $numprocs          optimized_distribution.rc . {MY_TILE_TYPES}
+   else
+      $GEOSBIN/preprocess_ldas.x optimize_2d ../input/tile.data $npes_nx $npes_ny optimized_distribution.rc . {MY_TILE_TYPES}
+   endif
+
+   if ( ! -e optimized_distribution.rc ) then
+      echo "ERROR: optimization of domain decomposition failed"
+      exit
+   endif
+
+   # replace domain decomposition entries in LDAS.rc
+   sed -i -e '/^GEOSldas.IMS:/d' -e '/^GEOSldas.IMS_FILE:/d' -e '/^GEOSldas.JMS_FILE:/d' LDAS.rc
+   foreach line ( "`cat optimized_distribution.rc`" )
+      set key = `echo "$line" | awk '{{print $1}}'`
+      sed -i "/^${{key}}/d" LDAS.rc
+      echo "$line" >> LDAS.rc
+   end
+   /bin/rm -f optimized_distribution.rc
+
+   # keep run directory consistent
+   /bin/rm -f $HOMDIR/IMS.rc $HOMDIR/JMS.rc
+   /bin/cp -f LDAS.rc $HOMDIR/
+   if ( -e IMS.rc ) /bin/cp -f IMS.rc $HOMDIR/
+   if ( -e JMS.rc ) /bin/cp -f JMS.rc $HOMDIR/
+
+   set npes_nx = `grep '^NX:' LDAS.rc | cut -d':' -f2 `
+   set npes_ny = `grep '^NY:' LDAS.rc | cut -d':' -f2 `
 endif
+
+@ numprocs = $npes_nx * $npes_ny
 
 #######################################################################
 #         Create Strip Utility to Remove Multiple Blank Spaces

@@ -155,6 +155,7 @@ class ldas(LdasConfig, LdasStaging, LdasRc):
                   MY_ENSEMBLE_FORCING= self.ExeInputs.get('ENSEMBLE_FORCING', 'NO').upper(),
                   MY_ADAS_EXPDIR     = self.adas_expdir,
                   MY_EXPDIR          = self.expdir,
+                  MY_TILE_TYPES      = '_'.join(self.tile_types),
                   DETECTED_MPI_STACK = "@MPI_STACK@",
                   )
 

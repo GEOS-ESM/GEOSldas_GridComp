@@ -110,6 +110,7 @@ module preprocess_ldas_routines
   public :: createZoominVegRestart
   public :: correctEase
   public :: optimize_latlon
+  public :: optimize_latlon_2d
   public :: convert_pert_rst
 
   character(10), private :: tmpstring10
@@ -2564,6 +2565,997 @@ end block
     
   end subroutine optimize_latlon
   
+  ! ********************************************************************
+  !
+  ! subroutine to optimize the 2d domain decomposition (processor layout NX-by-NY)
+  !
+  ! Extends optimize_latlon() from a 1d layout (N_proc-by-1 or 1-by-N_proc) to a 2d layout
+  ! with N_proc = NX*NY processors (or tasks), excl. OSERVER tasks:
+  !   - the domain is cut into NX stripes in the i (longitude) direction and
+  !      NY stripes in the j (latitude) direction
+  !   - each stripe must be at least two grid cells thick
+  !   - the stripes are chosen such that the maximum number of land *tiles* per process
+  !      is minimized (load balance):
+  !        * for given i stripes, the optimal j stripes (and, for cube-sphere, the optimal 
+  !          no. of j stripes per face) are computed exactly, and vice versa
+  !        * local search on the i and j stripe boundaries, starting from several initial 
+  !          guesses and random perturbations (iterated local search, reproducible)
+  !   - NOTE: The decomposition is a tensor product of the i and j stripes (MAPL/ESMF 
+  !      convention; for cube-sphere, the i stripes are also the same on all faces).
+  !      Because land tiles are distributed very unevenly, the load balance of a 2d
+  !      decomposition is typically worse than that of a 1d decomposition with the same
+  !      number of processes.
+  !
+  ! For lat-lon and EASE grid tile spaces:
+  !   - IMS(k), k=1:NX, IMS(k)>=2, is written into file IMS.rc
+  !   - JMS(k), k=1:NY, JMS(k)>=2, is written into file JMS.rc
+  ! For cube-sphere grid tile spaces:
+  !   - NY must be a multiple of 6 (MAPL convention)
+  !   - the NY stripes are distributed among the 6 faces (at least 1 stripe per face), and
+  !      a process never has grid cells from more than one face
+  !   - IMS(k), k=1:NX, IMS(k)>=2, is the same for all faces (MAPL convention) and is
+  !      written as GEOSldas.IMS into optimized_file
+  !   - JMS(k), k=1:NY, JMS(k)>=2, is written face by face into file JMS.rc
+  !
+  !         cube-sphere           lat-lon/EASE
+  ! ---------------------------------------------------
+  ! NX:     NX                    NX
+  ! NY:     NY                    NY
+  !         IMS (rc), JMS.rc      IMS.rc, JMS.rc
+  
+  subroutine optimize_latlon_2d(fname_tilefile, NX_string, NY_string, optimized_file, run_dir, types)
+    
+    character(*),           intent(in) :: fname_tilefile  ! file name (with path) of tile file (*.til)
+    character(*),           intent(in) :: NX_string       ! *string* w/ no. of processors in i direction
+    character(*),           intent(in) :: NY_string       ! *string* w/ no. of processors in j direction
+    character(*),           intent(in) :: optimized_file  
+    character(*),           intent(in) :: run_dir  
+    integer,      optional, intent(in) :: types(:)
+
+    ! local variables
+    integer, parameter :: min_width = 2   ! min no. of grid cells per process in each direction
+    integer, parameter :: max_iter    = 20    ! max iterations of local search
+    integer, parameter :: max_perturb = 50    ! max no. of random perturbations
+    integer, parameter :: max_fail    = 10    ! stop after max_fail perturbations w/o improvement
+
+    integer :: NX, NY, N_lon, N_lat, ni, nj, i0, n_zones, L, max_rows
+    integer :: n, i, j, k, z, s1, istart, b, best, maxload, total_tile, lower_bound, amp, d, n_fail
+    integer(kind=8) :: seed
+    integer, allocatable :: typs(:), II(:), JJ(:), ti(:), tj(:), tile_types(:)
+    integer, allocatable :: colW(:,:), rowW(:,:), xb(:), yb(:), Pi(:,:), Pj(:,:)
+    integer, allocatable :: IMS(:), JMS(:), best_IMS(:), best_JMS(:)
+    integer, allocatable :: zone_rows(:), best_zone_rows(:), zone_land(:)
+    integer, allocatable :: local_tile(:,:)
+    logical :: isCS, isEASE, use_prefix
+    character(len=128) :: gridname
+    character(len=:), allocatable :: IMS_file, JMS_file
+    character(len=*), parameter :: Iam = 'optimize_latlon_2d'
+    character(len=400)          :: err_msg
+
+    ! -----------------------------
+
+    read (NX_string,*) NX
+    read (NY_string,*) NY
+
+    if (present(types)) then
+       tile_types = types
+    else
+       tile_types = [MAPL_LAND]
+    endif
+
+    call read_tile_types_ij(fname_tilefile, gridname, N_lon, N_lat, typs, II, JJ)
+
+    isCS   = (index(gridname,"CF")   /= 0)
+    isEASE = (index(gridname,"EASE") /= 0)
+
+    ni = N_lon
+    nj = N_lat
+
+    if (isCS) then
+       ! cube-sphere: e.g., N_lon=180, N_lat=1080 for c180
+       if (nj/6 /= ni) then
+          err_msg = 'wrong im, jm'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       end if
+       n_zones = 6        ! a "zone" is a cube face
+       L       = ni       ! no. of grid cells in j direction per zone
+    else
+       n_zones = 1
+       L       = nj
+    endif
+
+    ! EASE grid indices are 0-based
+    i0 = 1
+    if (isEASE) i0 = 0
+
+    ! keep only tiles of requested types; convert to 1-based grid indices
+
+    total_tile = count([(any(tile_types == typs(n)), n=1,size(typs))])
+    allocate(ti(total_tile), tj(total_tile))
+    k = 0
+    do n = 1, size(typs)
+       if (any(tile_types == typs(n))) then
+          k = k + 1
+          ti(k) = II(n) - i0 + 1
+          tj(k) = JJ(n) - i0 + 1
+       endif
+    enddo
+    deallocate(typs, II, JJ)
+
+    if (any(ti < 1) .or. any(ti > ni) .or. any(tj < 1) .or. any(tj > nj)) then
+       err_msg = 'tile (i,j) index outside of grid'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+
+    print*, "total tiles: ", total_tile
+
+    ! check processor layout
+
+    ! MAPL currently assumes that NY is a multiple of 6 for cube-sphere grids
+    if (isCS .and. mod(NY,6) /= 0) then
+       err_msg = 'NY must be a multiple of 6 for cube-sphere grid'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+
+    max_rows = L/min_width
+
+    if (NX < 1 .or. NY < n_zones) then
+       err_msg = 'NX or NY too small'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+    if (NX*min_width > ni) then
+       err_msg = 'Each processor must have at least 2 cells in i direction. Request smaller NX.'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+    if (NY > n_zones*max_rows) then
+       err_msg = 'Each processor must have at least 2 cells in j direction. Request smaller NY.'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+
+    print*, "NX, NY: ", NX, NY
+
+    allocate(zone_rows(n_zones), zone_land(n_zones))
+    do z = 1, n_zones
+       zone_land(z) = count( tj > (z-1)*L .and. tj <= z*L )
+    enddo
+
+    allocate(IMS(NX), JMS(NY), xb(ni), yb(nj))
+    allocate(rowW(nj, NX), colW(ni, NY))
+
+    ! prefix sums of the no. of tiles along i for each j line (Pi) and along j for each
+    ! i line (Pj), used to quickly compute the no. of tiles of each j (i) line within each
+    ! i (j) stripe (skipped if too large)
+
+    use_prefix = (real(ni+1)*real(nj+1) <= 1.25e8)
+    if (use_prefix) then
+       allocate(Pi(nj, 0:ni), source=0)
+       allocate(Pj(ni, 0:nj), source=0)
+       do n = 1, total_tile
+          Pi(tj(n), ti(n)) = Pi(tj(n), ti(n)) + 1
+          Pj(ti(n), tj(n)) = Pj(ti(n), tj(n)) + 1
+       enddo
+       do i = 1, ni
+          Pi(:,i) = Pi(:,i) + Pi(:,i-1)
+       enddo
+       do j = 1, nj
+          Pj(:,j) = Pj(:,j) + Pj(:,j-1)
+       enddo
+    endif
+
+    ! lower bound for the max no. of tiles per process:
+    !   average no. of tiles per process, and for cube-sphere each face must have at least
+    !   one j stripe, i.e., each face has at most NY-5 j stripes
+    lower_bound = ceiling(real(total_tile)/real(NX*NY))
+    if (n_zones > 1) then
+       do z = 1, n_zones
+          lower_bound = max(lower_bound, ceiling(real(zone_land(z))/real(NX*min(max_rows,NY-n_zones+1))))
+       enddo
+    endif
+
+    ! minimize the maximum no. of tiles per process (load balance)
+    !
+    ! starting from different initial i stripes:
+    !   1: i stripes with balanced no. of tiles (as in 1d decomposition)
+    !   2: i stripes of equal width
+    ! followed by random perturbations of the best i stripes found so far 
+    ! (iterated local search)
+
+    best   = huge(1)
+    n_fail = 0
+    seed   = 20240101_8
+
+    do istart = 1, 2+max_perturb
+
+       if (best <= lower_bound) exit
+
+       select case (istart)
+       case (1)
+          colW(:,1) = 0
+          do n = 1, total_tile
+             colW(ti(n),1) = colW(ti(n),1) + 1
+          enddo
+          call minmax_partition(colW(:,1:1), IMS, min_width, b)
+       case (2)
+          IMS = ni/NX
+          IMS(1:mod(ni,NX)) = IMS(1:mod(ni,NX)) + 1
+       case default
+          IMS = best_IMS
+          do k = 1, NX-1
+             ! shift boundary between i stripes k and k+1 by a random no. of cells
+             amp = max(1, (IMS(k)+IMS(k+1))/4)
+             d   = random_int(-amp, amp)
+             d   = max(d, min_width - IMS(k))
+             d   = min(d, IMS(k+1) - min_width)
+             IMS(k)   = IMS(k)   + d
+             IMS(k+1) = IMS(k+1) - d
+          enddo
+       end select
+
+       call improve_decomposition(IMS, JMS, zone_rows, maxload)
+
+       if (maxload < best) then
+          if (istart > 2) print*, "perturbation, max tiles per process: ", istart-2, maxload
+          best           = maxload
+          best_IMS       = IMS
+          best_JMS       = JMS
+          best_zone_rows = zone_rows
+          n_fail         = 0
+       else if (istart > 2) then
+          n_fail = n_fail + 1
+          if (n_fail >= max_fail) exit
+       endif
+
+       if (istart <= 2) print*, "initial guess, max tiles per process: ", istart, maxload
+
+    enddo
+
+    IMS       = best_IMS
+    JMS       = best_JMS
+    zone_rows = best_zone_rows
+
+    ! verify the decomposition
+
+    if (sum(IMS) /= ni .or. any(IMS < min_width)) then
+       err_msg = 'wrong domain distribution in i direction'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+    if (any(JMS < min_width)) then
+       err_msg = 'wrong domain distribution in j direction'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+    ! each zone (cube face) must be covered exactly by its j stripes
+    s1 = 0
+    do z = 1, n_zones
+       if (sum(JMS(s1+1:s1+zone_rows(z))) /= L) then
+          err_msg = 'one or more processes may have tiles from two or more faces'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       endif
+       s1 = s1 + zone_rows(z)
+    enddo
+
+    call widths_to_blocks(IMS, xb)
+    call widths_to_blocks(JMS, yb)
+    allocate(local_tile(NX,NY), source=0)
+    do n = 1, total_tile
+       local_tile(xb(ti(n)), yb(tj(n))) = local_tile(xb(ti(n)), yb(tj(n))) + 1
+    enddo
+
+    if (sum(local_tile) /= total_tile) then
+       err_msg = 'wrong distribution'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+
+    print*, "Average tiles per process: ", real(total_tile)/real(NX*NY)
+    print*, "Max     tiles per process: ", maxval(local_tile)
+    print*, "Min     tiles per process: ", minval(local_tile)
+    print*, "Lower bound of max tiles : ", lower_bound
+    print*, "Load balance (avg/max)   : ", real(total_tile)/real(NX*NY)/real(max(maxval(local_tile),1))
+    print*, "IMS: ", IMS
+    print*, "JMS: ", JMS
+    if (isCS) print*, "j stripes per face: ", zone_rows
+
+    ! write output
+
+    if (isCS) then
+
+       open(10,file=optimized_file,action='write')
+       write(10,'(A)')    "GEOSldas.GRIDNAME:  " // trim(gridname)
+       write(10,'(A)')    "GEOSldas.GRID_TYPE:  Cubed-Sphere"
+       write(10,'(A)')    "GEOSldas.NF:  6"
+       write(10,'(A,I6)') "GEOSldas.IM_WORLD: ", ni
+       write(10,'(A)')    "GEOSldas.LM:   1"
+       write(10,'(A,I5)') "NX: ", NX
+       write(10,'(A,I5)') "NY: ", NY
+       write(10,'(A,*(I6))') "GEOSldas.IMS: ", IMS
+       write(10,'(A)')    "GEOSldas.JMS_FILE:    JMS.rc"
+       close(10)
+
+       JMS_file = trim(run_dir)//"/JMS.rc"
+       open(10,file=JMS_file ,action='write')
+       write(10,'(I5,I5)') NY, maxval(zone_rows)
+       do n = 1, NY
+          write(10,'(I8)') JMS(n)
+       enddo
+       close(10)
+
+    else
+
+       if (index(gridname, 'SMAP') /=0 ) then
+          gridname = trim(adjustl(gridname))
+          gridname = gridname(6:)
+          gridname(7:7) = '_' ! replace '-' with '_'
+       endif
+
+       open(10,file=optimized_file, action='write')
+       write(10,'(A)')    "GEOSldas.GRID_TYPE:  EASE"
+       write(10,'(A)')    "GEOSldas.GRIDNAME:   "//trim(gridname)
+       write(10,'(A)')    "GEOSldas.LM:         1"
+       write(10,'(A)')    "GEOSldas.POLE:       XY"
+       write(10,'(A)')    "GEOSldas.DATELINE:   DE"
+       write(10,'(A,I6)') "GEOSldas.IM_WORLD:   ", N_lon
+       write(10,'(A,I6)') "GEOSldas.JM_WORLD:   ", N_lat
+       write(10,'(A,I5)') "NX:                  ", NX
+       write(10,'(A,I5)') "NY:                  ", NY
+       write(10,'(A)')    "GEOSldas.IMS_FILE:   IMS.rc"
+       write(10,'(A)')    "GEOSldas.JMS_FILE:   JMS.rc"
+       close(10)
+
+       IMS_file = trim(run_dir)//"/IMS.rc"
+       open(10,file=IMS_file,action='write')
+       write(10,'(I5)') NX
+       do n = 1, NX
+          write(10,'(I8)') IMS(n)
+       enddo
+       close(10)
+
+       JMS_file = trim(run_dir)//"/JMS.rc"
+       open(10,file=JMS_file,action='write')
+       write(10,'(I5)') NY
+       do n = 1, NY
+          write(10,'(I8)') JMS(n)
+       enddo
+       close(10)
+
+    endif
+
+  contains
+
+    ! ---------------------------------------------------
+
+    integer function random_int(lo, hi)
+
+      ! reproducible pseudo-random integer in [lo,hi] (linear congruential generator)
+
+      integer, intent(in) :: lo, hi
+
+      seed       = mod(1103515245_8*seed + 12345_8, 2147483648_8)
+      random_int = lo + int(mod(seed/65536_8, int(hi-lo+1,8)))
+
+    end function random_int
+
+    ! ---------------------------------------------------
+
+    subroutine improve_decomposition(IMS, JMS, zr, F)
+
+      ! starting from i stripes IMS, minimize the max no. of tiles per process F by
+      ! alternating optimization of i and j stripes and local search on the i stripes
+
+      integer, intent(inout) :: IMS(:)
+      integer, intent(out)   :: JMS(:), zr(:), F
+
+      integer :: trial_IMS(size(IMS)), trial_JMS(size(JMS)), trial_zr(size(zr))
+      integer :: Ft, b, t, d, sgn, iter, z, s
+      logical :: improved
+
+      call rows_given_cols(IMS, JMS, zr, F)
+
+      do iter = 1, max_iter
+
+         if (F <= lower_bound) exit
+
+         improved = .false.
+
+         ! i stripes given j stripes
+
+         call cols_given_rows(JMS, trial_IMS, b, F-1)
+         if (b < F) then
+            call rows_given_cols(trial_IMS, trial_JMS, trial_zr, Ft, F-1)
+            if (Ft < F) then
+               IMS = trial_IMS ; JMS = trial_JMS ; zr = trial_zr ; F = Ft
+               improved = .true.
+            endif
+         endif
+
+         ! local search: shift the boundary between i stripes t and t+1 by +/-1, 2, 4, ...
+         ! cells, with optimal j stripes for each trial
+
+         do t = 1, size(IMS)-1
+            d = 1
+            do while (d < max(IMS(t), IMS(t+1)))
+               do sgn = -1, 1, 2
+                  trial_IMS      = IMS
+                  trial_IMS(t)   = IMS(t)   + sgn*d
+                  trial_IMS(t+1) = IMS(t+1) - sgn*d
+                  if (min(trial_IMS(t), trial_IMS(t+1)) < min_width) cycle
+                  call rows_given_cols(trial_IMS, trial_JMS, trial_zr, Ft, F-1)
+                  if (Ft < F) then
+                     IMS = trial_IMS ; JMS = trial_JMS ; zr = trial_zr ; F = Ft
+                     improved = .true.
+                  endif
+               enddo
+               d = 2*d
+            enddo
+         enddo
+
+         ! local search: shift the boundary between j stripes t and t+1 (of the same face) by
+         ! +/-1, 2, 4, ... cells, with optimal i stripes for each trial
+
+         z = 1
+         s = zr(1)      ! last j stripe of face z
+         do t = 1, size(JMS)-1
+            if (t == s) then
+               ! j stripes t and t+1 are on different faces
+               z = z + 1
+               s = s + zr(z)
+               cycle
+            endif
+            d = 1
+            do while (d < max(JMS(t), JMS(t+1)))
+               do sgn = -1, 1, 2
+                  trial_JMS      = JMS
+                  trial_JMS(t)   = JMS(t)   + sgn*d
+                  trial_JMS(t+1) = JMS(t+1) - sgn*d
+                  if (min(trial_JMS(t), trial_JMS(t+1)) < min_width) cycle
+                  call cols_given_rows(trial_JMS, trial_IMS, Ft, F-1)
+                  if (Ft < F) then
+                     IMS = trial_IMS ; JMS = trial_JMS ; F = Ft
+                     improved = .true.
+                  endif
+               enddo
+               d = 2*d
+            enddo
+         enddo
+
+         if (.not. improved) exit
+
+      enddo
+
+    end subroutine improve_decomposition
+
+    ! ---------------------------------------------------
+
+    subroutine rows_given_cols(IMS, JMS, zr, F, upper)
+
+      ! optimal j stripes JMS (and, for cube-sphere, optimal no. of j stripes per face zr) 
+      ! for given i stripes IMS; F is the resulting max no. of tiles per process
+      !
+      ! If upper is present, only decompositions with F <= upper are of interest; if there
+      ! is none, F=upper+1 is returned and JMS, zr are undefined.
+
+      integer, intent(in)           :: IMS(:)
+      integer, intent(out)          :: JMS(:), zr(:), F
+      integer, intent(in), optional :: upper
+
+      integer :: z, s, j, lo, hi, mid, b
+      integer :: fmin(n_zones), fmax(n_zones)
+      integer, allocatable :: Pz(:,:,:)
+
+      call build_rowW(IMS)
+
+      if (n_zones == 1) then
+         zr(1) = size(JMS)
+         call minmax_partition(rowW, JMS, min_width, F, upper)
+         return
+      endif
+
+      ! prefix sums along j for each face
+      allocate(Pz(size(IMS), 0:L, n_zones))
+      do z = 1, n_zones
+         Pz(:,0,z) = 0
+         do j = 1, L
+            Pz(:,j,z) = Pz(:,j-1,z) + rowW((z-1)*L+j,:)
+         enddo
+      enddo
+
+      ! bisection on the max load: the smallest load for which the NY j stripes can be
+      ! distributed among the faces, i.e., sum(fmin) <= NY <= sum(fmax), where fmin/fmax is
+      ! the min/max no. of j stripes of a face for the given max load
+
+      lo = 0
+      hi = maxval(Pz(:,L,:))
+
+      if (present(upper)) then
+         if (upper < hi) then
+            if (.not. faces_feasible(Pz, upper, min_width, NY)) then
+               F = upper + 1
+               return
+            endif
+            hi = upper
+         endif
+      endif
+
+      do while (lo < hi)
+         mid = lo + (hi-lo)/2
+         if (faces_feasible(Pz, mid, min_width, NY)) then
+            hi = mid
+         else
+            lo = mid + 1
+         endif
+      enddo
+
+      do z = 1, n_zones
+         call count_segments(Pz(:,:,z), lo, min_width, fmin(z), fmax(z))
+      enddo
+      zr = fmin
+
+      ! remaining j stripes go to the faces with the most tiles per stripe
+      do while (sum(zr) < NY)
+         z = maxloc(real(zone_land)/real(zr), DIM=1, MASK = zr < fmax)
+         zr(z) = zr(z) + 1
+      enddo
+
+      F = 0
+      s = 0
+      do z = 1, n_zones
+         call minmax_partition(rowW((z-1)*L+1:z*L,:), JMS(s+1:s+zr(z)), min_width, b)
+         F = max(F, b)
+         s = s + zr(z)
+      enddo
+
+    end subroutine rows_given_cols
+
+
+    ! ---------------------------------------------------
+
+    subroutine cols_given_rows(JMS, IMS, F, upper)
+
+      ! optimal i stripes IMS (same for all faces) for given j stripes JMS
+      ! (see minmax_partition for upper)
+
+      integer, intent(in)           :: JMS(:)
+      integer, intent(out)          :: IMS(:), F
+      integer, intent(in), optional :: upper
+
+      integer :: n, y, s
+
+      if (use_prefix) then
+         s = 0
+         do y = 1, size(JMS)
+            colW(:,y) = Pj(:,s+JMS(y)) - Pj(:,s)
+            s = s + JMS(y)
+         enddo
+      else
+         call widths_to_blocks(JMS, yb)
+         colW = 0
+         do n = 1, total_tile
+            colW(ti(n), yb(tj(n))) = colW(ti(n), yb(tj(n))) + 1
+         enddo
+      endif
+      call minmax_partition(colW, IMS, min_width, F, upper)
+
+    end subroutine cols_given_rows
+
+    ! ---------------------------------------------------
+
+    subroutine build_rowW(IMS)
+
+      ! rowW(j,x): no. of tiles of j line within i stripe x
+
+      integer, intent(in) :: IMS(:)
+
+      integer :: n, x, s
+
+      if (use_prefix) then
+         s = 0
+         do x = 1, size(IMS)
+            rowW(:,x) = Pi(:,s+IMS(x)) - Pi(:,s)
+            s = s + IMS(x)
+         enddo
+      else
+         call widths_to_blocks(IMS, xb)
+         rowW = 0
+         do n = 1, total_tile
+            rowW(tj(n), xb(ti(n))) = rowW(tj(n), xb(ti(n))) + 1
+         enddo
+      endif
+
+    end subroutine build_rowW
+
+    ! ---------------------------------------------------
+
+    subroutine widths_to_blocks(widths, blk)
+
+      ! map each grid index to the stripe (block) that contains it
+
+      integer, intent(in)  :: widths(:)
+      integer, intent(out) :: blk(:)
+
+      integer :: m, s
+
+      s = 0
+      do m = 1, size(widths)
+         blk(s+1:s+widths(m)) = m
+         s = s + widths(m)
+      enddo
+
+    end subroutine widths_to_blocks
+
+  end subroutine optimize_latlon_2d
+
+  ! ********************************************************************
+
+  subroutine minmax_partition(W, widths, min_width, bottleneck, upper)
+
+    ! Partition the n=size(W,1) lines of W into k=size(widths) contiguous segments, each at
+    ! least min_width lines wide, such that the maximum (across segments and across the
+    ! m=size(W,2) blocks) of the segment sums of W(:,block) is minimized.
+    !
+    ! Exact.  Requires W>=0.  Bisection on the bottleneck value; for a given value, the range 
+    ! of feasible no. of segments is computed with dynamic programming (count_segments), and
+    ! the partition with exactly k segments is obtained with partition_k.
+    !
+    ! If upper is present, only partitions with bottleneck <= upper are of interest; if there
+    ! is none, bottleneck=upper+1 is returned and widths is undefined.
+
+    integer, intent(in)           :: W(:,:)
+    integer, intent(out)          :: widths(:)
+    integer, intent(in)           :: min_width
+    integer, intent(out)          :: bottleneck
+    integer, intent(in), optional :: upper
+
+    integer, allocatable :: P(:,:)
+    integer :: n, m, k, j, lo, hi, mid
+    logical :: ok
+    character(len=*), parameter :: Iam = 'minmax_partition'
+    character(len=400)          :: err_msg
+
+    n = size(W,1)
+    m = size(W,2)
+    k = size(widths)
+
+    if (k < 1 .or. n < k*min_width) then
+       err_msg = 'too many partitions for the number of grid cells'
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+    endif
+
+    ! prefix sums, P(:,j) = sum of lines 1:j
+    allocate(P(m,0:n))
+    P(:,0) = 0
+    do j = 1, n
+       P(:,j) = P(:,j-1) + W(j,:)
+    enddo
+
+    lo = 0
+    hi = maxval(P(:,n))
+
+    if (present(upper)) then
+       if (upper < hi) then
+          if (.not. k_in_range(upper)) then
+             bottleneck = upper + 1
+             return
+          endif
+          hi = upper
+       endif
+    endif
+
+    do while (lo < hi)
+       mid = lo + (hi-lo)/2
+       if (k_in_range(mid)) then
+          hi = mid
+       else
+          lo = mid + 1
+       endif
+    enddo
+
+    call partition_k(P, lo, min_width, widths, ok)
+
+    if (.not. ok) then
+       ! not all no. of segments between the min and max no. of segments are feasible (rare);
+       ! continue bisection with exact test for k segments
+       hi = maxval(P(:,n))
+       if (present(upper)) hi = min(hi, upper)
+       lo = lo + 1
+       do while (lo < hi)
+          mid = lo + (hi-lo)/2
+          call partition_k(P, mid, min_width, widths, ok)
+          if (ok) then
+             hi = mid
+          else
+             lo = mid + 1
+          endif
+       enddo
+       call partition_k(P, lo, min_width, widths, ok)
+       if (.not. ok) then
+          if (present(upper)) then
+             bottleneck = upper + 1
+             return
+          endif
+          err_msg = 'partition failed'
+          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
+       endif
+    endif
+
+    bottleneck = lo
+
+  contains
+
+    logical function k_in_range(B)
+      integer, intent(in) :: B
+      integer :: fmin, fmax
+      call count_segments(P, B, min_width, fmin, fmax)
+      k_in_range = (fmin <= k .and. k <= fmax)
+    end function k_in_range
+
+  end subroutine minmax_partition
+
+  ! ********************************************************************
+
+  logical function faces_feasible(Pz, B, min_width, NY)
+
+    ! cube-sphere: NY j stripes can be distributed among the faces with max load B, i.e.,
+    ! sum(fmin) <= NY <= sum(fmax), where fmin/fmax is the min/max no. of j stripes of
+    ! a face for max load B
+
+    integer, intent(in) :: Pz(:,0:,:)   ! prefix sums along j for each face, Pz(1:m,0:L,1:6)
+    integer, intent(in) :: B
+    integer, intent(in) :: min_width
+    integer, intent(in) :: NY
+
+    integer :: z, smin, smax, fmin, fmax
+
+    smin = 0
+    smax = 0
+    do z = 1, size(Pz,3)
+       call count_segments(Pz(:,:,z), B, min_width, fmin, fmax)
+       smin = smin + fmin
+       smax = smax + max(fmax,0)
+       if (fmax < 0 .or. smin > NY) then
+          faces_feasible = .false.
+          return
+       endif
+    enddo
+    faces_feasible = (smin <= NY .and. NY <= smax)
+
+  end function faces_feasible
+
+  ! ********************************************************************
+
+  subroutine max_reach(P, B, g)
+
+    ! g(s): last line e such that the segment s:e does not exceed B in any block
+    ! (g(s)=s-1 if line s alone exceeds B); g is non-decreasing
+
+    integer, intent(in)  :: P(:,0:)   ! prefix sums, P(1:m,0:n)
+    integer, intent(in)  :: B
+    integer, intent(out) :: g(:)
+
+    integer :: n, s, e
+
+    n = size(P,2) - 1
+    e = 0
+    do s = 1, n
+       e = max(e, s-1)
+       do while (e < n)
+          if (any(P(:,e+1) - P(:,s-1) > B)) exit
+          e = e + 1
+       enddo
+       g(s) = e
+    enddo
+
+  end subroutine max_reach
+
+  ! ********************************************************************
+
+  subroutine count_segments(P, B, min_width, fmin, fmax)
+
+    ! Minimum (fmin) and maximum (fmax) no. of contiguous segments, each at least min_width
+    ! lines wide, of the n lines with prefix sums P such that no segment exceeds B in any
+    ! block.  fmin=n+1 and fmax=-1 if impossible.
+    !
+    ! Dynamic programming over the end line e of segments; segment s:e is valid if
+    ! s0(e) <= s <= e-min_width+1, where s0(e) is the first s with g(s)>=e.  The window
+    ! minimum/maximum is computed with monotone queues, i.e., O(n) operations.
+
+    integer, intent(in)  :: P(:,0:)   ! prefix sums, P(1:m,0:n)
+    integer, intent(in)  :: B
+    integer, intent(in)  :: min_width
+    integer, intent(out) :: fmin, fmax
+
+    integer, allocatable :: g(:), lmin(:), lmax(:), qmin(:), qmax(:)
+    integer :: n, e, q, s0, hmin, tmin, hmax, tmax
+
+    n = size(P,2) - 1
+
+    allocate(g(n), lmin(0:n), lmax(0:n), qmin(n+1), qmax(n+1))
+    call max_reach(P, B, g)
+
+    lmin    = n + 1     ! unreachable
+    lmax    = -1        ! unreachable
+    lmin(0) = 0
+    lmax(0) = 0
+
+    hmin = 1 ; tmin = 0
+    hmax = 1 ; tmax = 0
+    s0   = 1
+
+    do e = min_width, n
+
+       ! candidate end of previous segment q=s-1 with s=e-min_width+1
+       q = e - min_width
+       if (lmin(q) <= n) then
+          do while (tmin >= hmin)
+             if (lmin(qmin(tmin)) < lmin(q)) exit
+             tmin = tmin - 1
+          enddo
+          tmin = tmin + 1 ; qmin(tmin) = q
+       endif
+       if (lmax(q) >= 0) then
+          do while (tmax >= hmax)
+             if (lmax(qmax(tmax)) > lmax(q)) exit
+             tmax = tmax - 1
+          enddo
+          tmax = tmax + 1 ; qmax(tmax) = q
+       endif
+
+       do while (s0 <= n)
+          if (g(s0) >= e) exit
+          s0 = s0 + 1
+       enddo
+
+       ! remove q < s0-1
+       do while (hmin <= tmin)
+          if (qmin(hmin) >= s0-1) exit
+          hmin = hmin + 1
+       enddo
+       do while (hmax <= tmax)
+          if (qmax(hmax) >= s0-1) exit
+          hmax = hmax + 1
+       enddo
+
+       if (hmin <= tmin) lmin(e) = lmin(qmin(hmin)) + 1
+       if (hmax <= tmax) lmax(e) = lmax(qmax(hmax)) + 1
+
+    enddo
+
+    fmin = lmin(n)
+    fmax = lmax(n)
+
+  end subroutine count_segments
+
+  ! ********************************************************************
+
+  subroutine partition_k(P, B, min_width, widths, ok)
+
+    ! Partition of the n lines with prefix sums P into exactly k=size(widths) contiguous 
+    ! segments, each at least min_width lines wide, such that no segment exceeds B in 
+    ! any block.  ok=.false. if impossible.  Dynamic programming, O(k*n) operations.
+
+    integer, intent(in)  :: P(:,0:)   ! prefix sums, P(1:m,0:n)
+    integer, intent(in)  :: B
+    integer, intent(in)  :: min_width
+    integer, intent(out) :: widths(:)
+    logical, intent(out) :: ok
+
+    integer, allocatable :: g(:), s0(:), C(:)
+    logical, allocatable :: reach(:,:)
+    integer :: n, k, e, ip, q, s, lo, hi
+
+    n = size(P,2) - 1
+    k = size(widths)
+
+    allocate(g(n), s0(n), C(-1:n), reach(0:n,0:k))
+    call max_reach(P, B, g)
+
+    ! s0(e): first s with g(s) >= e  (n+1 if none)
+    s = 1
+    do e = 1, n
+       do while (s <= n)
+          if (g(s) >= e) exit
+          s = s + 1
+       enddo
+       s0(e) = s
+    enddo
+
+    ! reach(e,ip): lines 1:e can be partitioned into ip valid segments
+    reach      = .false.
+    reach(0,0) = .true.
+    do ip = 1, k
+       C(-1) = 0
+       do q = 0, n
+          C(q) = C(q-1)
+          if (reach(q,ip-1)) C(q) = C(q) + 1
+       enddo
+       do e = min_width, n
+          lo = s0(e) - 1
+          hi = e - min_width
+          if (lo <= hi) reach(e,ip) = (C(hi) - C(lo-1) > 0)
+       enddo
+    enddo
+
+    ok = reach(n,k)
+    if (.not. ok) return
+
+    ! trace back
+    e = n
+    do ip = k, 1, -1
+       do q = e - min_width, s0(e) - 1, -1
+          if (reach(q,ip-1)) exit
+       enddo
+       widths(ip) = e - q
+       e = q
+    enddo
+
+  end subroutine partition_k
+
+  ! ********************************************************************
+
+  subroutine read_tile_types_ij(fname_tilefile, gridname, N_lon, N_lat, typs, II, JJ)
+
+    ! read tile type and (i,j) grid indices of all tiles from tile file (ASCII or nc4)
+
+    character(*),         intent(in)  :: fname_tilefile
+    character(*),         intent(out) :: gridname
+    integer,              intent(out) :: N_lon, N_lat
+    integer, allocatable, intent(out) :: typs(:), II(:), JJ(:)
+
+    integer :: n_tiles, n_grids, file_type, status, n, IM(2), JM(2)
+    integer, allocatable :: iTable(:,:)
+    character(len=128) :: GNames(2)
+    character(len=256) :: tmpLine
+    real    :: tmpreal
+    logical :: file_exist
+    character(len=*), parameter :: Iam = 'read_tile_types_ij'
+    character(len=400)          :: err_msg
+
+    inquire(file=trim(fname_tilefile),exist=file_exist)
+    if( .not. file_exist) then
+       err_msg = 'tile file does not exist: ' //trim(fname_tilefile)
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)       
+    end if
+
+    call MAPL_NCIOGetFileType(trim(fname_tilefile), file_type, rc=status)
+
+    if (file_type == MAPL_FILETYPE_NC4) then
+
+       call MAPL_ReadTilingNC4(trim(fname_tilefile), GridName=GNames, im=IM, jm=JM, n_Grids=n_grids, n_tiles=n_tiles, &
+                               iTable=iTable, rc=status)
+       gridname = GNames(1)
+       N_lon    = IM(1)
+       N_lat    = JM(1)
+       typs     = iTable(:,0)
+       II       = iTable(:,2)
+       JJ       = iTable(:,3)
+
+    else
+
+       open (10, file=trim(fname_tilefile), form='formatted', action='read')
+       read (10,*) n_tiles
+       read (10,*) n_grids
+       read (10,*) gridname
+       read (10,*) N_lon
+       read (10,*) N_lat
+
+       allocate(typs(n_tiles), II(n_tiles), JJ(n_tiles))
+
+       ! skip info of second (ocean) grid; some EASE *.til files state "n_grids=1" but
+       ! still include the three header lines of the second grid (see correctEase())
+       read (10,'(A)') tmpLine
+       if (n_grids == 2 .or. index(tmpLine,'OCEAN') /= 0) then
+          read (10,*)
+          read (10,*)
+          read (10,'(A)') tmpLine
+       endif
+
+       read (tmpLine,*) typs(1), tmpreal, tmpreal, tmpreal, II(1), JJ(1)
+       do n = 2, n_tiles
+          read (10,*)   typs(n), tmpreal, tmpreal, tmpreal, II(n), JJ(n)
+       enddo
+       close(10)
+
+    endif
+
+  end subroutine read_tile_types_ij
+
   ! ********************************************************************
   
   subroutine convert_pert_rst(pfile_name,pfile_nc4,in_path,exp_id)

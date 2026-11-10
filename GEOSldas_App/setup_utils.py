@@ -362,7 +362,7 @@ def getResourceKeys(option):
    # Required resource manager input fields
    # ------
    RmInpKeys ={'required' : ['account', 'walltime', 'ntasks_model'],
-               'optional' : ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'ntasks-per-node', 'constraint']
+               'optional' : ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'ntasks-per-node', 'constraint', 'NX', 'NY']
               }
    require(option in RmInpKeys, ' "%s" option is not supported' % option)
 
@@ -401,6 +401,11 @@ def printResourceInputSampleFile():
    print ('# - ntasks-per-node  = requesting fewer ntasks-per-node than total number of cores per node increases allocated memory;')
    print ('#                        ntasks_model should be a multiple of ntasks-per-node') 
    print ('# - constraint       = name of chip set(s) (NCCS default is "[mil|cas]", NAS default is "cas_ait")')
+   print ('# - NX, NY           = 2d processor layout (NX-by-NY) for domain decomposition; must be specified together,')
+   print ('#                        and ntasks_model must equal NX*NY;')
+   print ('#                        default is a 1d layout (cube-sphere: 1-by-ntasks_model; lat-lon/EASE: ntasks_model-by-1);')
+   print ('#                        each process must have at least 2 grid cells in each direction;')
+   print ('#                        for cube-sphere grids, NY must be a multiple of 6')
    print ('#')
    for key in optionalKeys:
        print ('#'+key + ':')
