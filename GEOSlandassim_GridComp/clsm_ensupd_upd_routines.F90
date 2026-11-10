@@ -1988,7 +1988,7 @@ contains
                       ! compute average land_frac_cell weighted by each tile's area and contribution to FOV 
                                             
                       call tile2obs_helper(                                                                              &
-                           N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area/max(land_frac_cell,1.e-10),     &
+                           N_tmp, tmp_wFOV(1:N_tmp)*tile_coord_lH(ind_tmp(1:N_tmp))%area/max(tmp_data(1:N_tmp),1.e-10),  &
                            tmp_data(1:N_tmp), tmp_fraccell)
                       
                       tmpWater = ( 1. - tmp_fraccell > Tb_max_nonland_frac )
