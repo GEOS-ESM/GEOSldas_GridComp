@@ -151,6 +151,13 @@ def list_py_modules(commit):
     return [os.path.basename(l) for l in out.split() if l.endswith('.py')]
 
 
+LEGACY_SETRLIMIT   = b"resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))"
+PORTABLE_SETRLIMIT = b"""_, stack_hard = resource.getrlimit(resource.RLIMIT_STACK)
+    try:
+        resource.setrlimit(resource.RLIMIT_STACK, (stack_hard, stack_hard))
+    except (ValueError, OSError):
+        print('WARNING: cannot raise stack limit; using current limit', file=sys.stderr)"""
+
 DISCOVER_BCS   = b"/discover/nobackup/projects/gmao/bcs_shared/fvInput/ExtData/esm/tiles"
 DISCOVER_MWRTM = b"/discover/nobackup/projects/gmao/smap/LDAS_inputs_for_LADAS/RTM_params/RTMParam_SMAP_L4SM_v006/"
 
@@ -169,6 +176,8 @@ def make_install(dest, commit, site='NCCS', data_root=None):
             data = git_show(commit, f)
         # emulate cmake configure_file(@ONLY) for all files (only ldas.py has placeholders)
         data = data.replace(b'@GEOS_SITE@', site.encode()).replace(b'@MPI_STACK@', b'openmpi')
+        # older ldas_setup (ref commits) requests an unlimited hard stack limit, which fails on macOS
+        data = data.replace(LEGACY_SETRLIMIT, PORTABLE_SETRLIMIT)
         if data_root:
             data = data.replace(DISCOVER_BCS,   os.path.join(data_root, 'bcs').encode())
             data = data.replace(DISCOVER_MWRTM, os.path.join(data_root, 'mwrtm').encode() + b'/')
@@ -304,7 +313,7 @@ def cases(D):
                          'MWRTM_PATH': os.path.join(D['root'], 'mwrtm'),
                          'ENSEMBLE_FORCING': 'YES',
                          'MET_PATH': os.path.join(D['root'], 'met', 'ensmet')})
-    add('r1_zoom_ens_assim', {'NUM_LDAS_ENSEMBLE': '2', 'LAND_ASSIM': 'YES',
+    add('r1_zoom_ens_assim', {'NUM_LDAS_ENSEMBLE': '2', 'LAND_ASSIM': 'YES', 'PERTURBATIONS': '1',
                               'MWRTM_PATH': os.path.join(D['root'], 'mwrtm'),
                               'MINLAT': '20.', 'MAXLAT': '50.'})
     add('r3_catchcn', {'RESTART': '3', 'LSM_CHOICE': '2'})
@@ -321,10 +330,10 @@ def cases(D):
                 'oserver_nodes': '1', 'writers-per-node': '3'})
     add('tile_txt', {'TILE_FILE_FORMAT': 'TXT'})
     # restart staging edge cases (phase 4)
-    add('r3_ens3_fallback', {'RESTART': '3', 'NUM_LDAS_ENSEMBLE': '3'})          # no ens0002 -> member-0 files
-    add('r1_ens2_all_types', {'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20', 'DO_ISSM': '1',
+    add('r3_ens3_fallback', {'RESTART': '3', 'NUM_LDAS_ENSEMBLE': '3', 'PERTURBATIONS': '1'})          # no ens0002 -> member-0 files
+    add('r1_ens2_all_types', {'NUM_LDAS_ENSEMBLE': '2', 'PERTURBATIONS': '1', 'TILE_TYPES': '100 19 20', 'DO_ISSM': '1',
                               'RUN_ROUTE': '1'})
-    add('r2_ens2_all_types', {'RESTART': '2', 'NUM_LDAS_ENSEMBLE': '2', 'TILE_TYPES': '100 19 20',
+    add('r2_ens2_all_types', {'RESTART': '2', 'NUM_LDAS_ENSEMBLE': '2', 'PERTURBATIONS': '1', 'TILE_TYPES': '100 19 20',
                               'DO_ISSM': '1', 'RUN_ROUTE': '1'})
     add('r1_lake_only_zoom', {'TILE_TYPES': '19', 'MINLAT': '20.'})
     add('rM_lake', {'RESTART': 'M', 'TILE_TYPES': '100 19'})
@@ -363,6 +372,11 @@ def _last_error(exphome):
     return (errs or log or [''])[-1]
 
 
+# temporary file names: /tmp on Linux, $TMPDIR (/var/folders/...) on macOS
+_TMP_DIRS = sorted({'/tmp', tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir())}, key=len, reverse=True)
+TMP_RE    = r'(?:/private)?(?:%s)/+tmp[^\s/]*' % '|'.join(re.escape(d.rstrip('/')) for d in _TMP_DIRS)
+
+
 def compare_logs(ref_log, new_log, same=(), out=sys.stdout):
     """Compare setup output, ignoring per-run roots and temporary file names."""
     pairs = [(os.path.abspath(ref), os.path.abspath(new)) for ref, new in same]
@@ -370,7 +384,7 @@ def compare_logs(ref_log, new_log, same=(), out=sys.stdout):
     def normalize(log, which):
         for i, (ref, new) in enumerate(pairs):
             log = log.replace((ref, new)[which], '<SAME%d>' % i)
-        return re.sub(r'/tmp/tmp[^\s/]*', '<TMP>', log).splitlines()
+        return re.sub(TMP_RE, '<TMP>', log).splitlines()
 
     with open(ref_log, errors='replace') as f:
         ref_lines = normalize(f.read(), 0)
@@ -433,10 +447,11 @@ def main(argv):
             return os.path.join(work, which, name, 'testexp')
         names = o.case or list(C)
         if not o.case:
-            # 'ldas_setup sample' output must be identical
+            # 'ldas_setup sample' output must be identical (stdout only: stderr has python
+            # warnings with install-specific paths)
             for opt in ['--exeinp', '--batinp']:
                 outs = [sp.run([sys.executable, os.path.join(inst(w, 'NCCS'), 'ldas_setup'), 'sample', opt],
-                               stdout=sp.PIPE, stderr=sp.STDOUT).stdout for w in ['ref', 'new']]
+                               stdout=sp.PIPE, stderr=sp.DEVNULL).stdout for w in ['ref', 'new']]
                 same = outs[0] == outs[1] and len(outs[0]) > 1000 if opt == '--exeinp' else outs[0] == outs[1]
                 print('== %-24s %s' % ('sample ' + opt, 'IDENTICAL' if same else 'DIFFERS'))
                 ok = ok and same

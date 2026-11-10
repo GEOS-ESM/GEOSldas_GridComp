@@ -143,7 +143,13 @@ def parseCmdLine():
 
 def main():
 
-    resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+    # raise the stack limit to the hard limit (unlimited at NCCS, NAS); macOS rejects
+    # changes of the stack limit from within python, in which case keep the default
+    _, stack_hard = resource.getrlimit(resource.RLIMIT_STACK)
+    try:
+        resource.setrlimit(resource.RLIMIT_STACK, (stack_hard, stack_hard))
+    except (ValueError, OSError):
+        print('WARNING: cannot raise stack limit; using current limit', file=sys.stderr)
     #convert command line to dictionary
     args = vars(parseCmdLine())
 
