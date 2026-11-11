@@ -294,6 +294,8 @@ contains
 
     logical, save                          :: c3_grid_initialized = .false.     ! initialize
 
+    integer, dimension(N_catf)             :: tmp_i_indg, tmp_j_indg
+    
     integer :: i, n, n_e
 
     ! obs bias variables
@@ -458,16 +460,9 @@ contains
 
              allocate(N_tile_in_cell_ij_f(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat))
 
-             ! first call: count how many tiles are in each tile_grid_f cell
-             call get_number_of_tiles_in_cell_ij( N_catf,                        &
-                  tile_coord_f%i_indg, tile_coord_f%j_indg,                      &
-                  obs2tile_grid_f, N_tile_in_cell_ij_f )
+             tmp_i_indg = tile_coord_f%i_indg
+             tmp_j_indg = tile_coord_f%j_indg
              
-             ! second call: find out which tiles are in each tile_grid_f cell
-             call get_tile_num_in_cell_ij( N_catf,                               &
-                  tile_coord_f%i_indg, tile_coord_f%j_indg,                      &
-                  obs2tile_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
-
           else
 
              ! EASE or LatLon tile space: use pert_grid_f as hash grid for mapping obs to tile space
@@ -479,17 +474,21 @@ contains
              
              allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
 
-             ! first call: count how many tiles are in each pert_grid_f cell
-             call get_number_of_tiles_in_cell_ij( N_catf,                           &
-                  tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
-                  pert_grid_f, N_tile_in_cell_ij_f )
-             
-             ! second call: find out which tiles are in each pert_grid_f cell
-             call get_tile_num_in_cell_ij( N_catf,                                  &
-                  tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
-                  pert_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+             tmp_i_indg = tile_coord_f%pert_i_indg
+             tmp_j_indg = tile_coord_f%pert_j_indg
 
           end if
+
+          ! first call: count how many tiles are in each tile_grid_f cell
+          call get_number_of_tiles_in_cell_ij( N_catf,                                &
+               tmp_i_indg, tmp_j_indg,                                                &
+               obs2tile_grid_f, N_tile_in_cell_ij_f )
+          
+          ! second call: find out which tiles are in each tile_grid_f cell
+          call get_tile_num_in_cell_ij( N_catf,                                       &
+               tmp_i_indg, tmp_j_indg,                                                &
+               obs2tile_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+          
        else
           allocate(N_tile_in_cell_ij_f(0,0))  ! for debugging
        end if
