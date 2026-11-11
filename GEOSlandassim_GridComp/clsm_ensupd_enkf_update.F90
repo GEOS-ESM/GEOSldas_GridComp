@@ -508,8 +508,7 @@ contains
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
             tile_coord_f, tile_grid_g, obs2tile_grid_f,                            &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
-            N_obs_param, obs_param, Observations_l, cat_param, cat_progn,          &
-            tile_grid_g_ESMF=tile_grid_g_ESMF )
+            N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
 
        ! check for observations, found_obs_f=.true. if obs availalbe
 
@@ -2236,10 +2235,10 @@ contains
   ! **********************************************************************
 
   subroutine output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,    &
-       N_ens, N_catl, N_catf, N_obsl_max,                               &
+       N_ens, N_catl, N_catf, N_obsl_max,                                       &
        tile_coord_f, tile_grid_g, obs2tile_grid_f,                              &
        N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,    &
-       N_obs_param, obs_param, Observations_l, cat_param, cat_progn, tile_grid_g_ESMF )
+       N_obs_param, obs_param, Observations_l, cat_param, cat_progn          )
 
     ! wrapper for output of original (unscaled) SMAP Tb observations into
     ! SMAP L4_SM "aup" (analysis update)
@@ -2250,7 +2249,6 @@ contains
     ! reichle, 11 Dec 2013 - added 'SMOS_fit_Tb*' obs species
     !                        (needed for L4_SM_SMOS prototype product)
     ! amfox,    6 Nov 2026 - renamed pert_grid_f to obs2tile_grid_f (only passed through to collect_obs())
-    ! amfox,    8 Nov 2026 - added optional tile_grid_g_ESMF (only passed through to collect_obs())
     !
     ! -------------------------------------------------------------------
 
@@ -2287,8 +2285,6 @@ contains
 
     type(cat_param_type),  dimension(N_catl),        intent(in) :: cat_param
     type(cat_progn_type),  dimension(N_catl,N_ens),  intent(in) :: cat_progn
-
-    type(ESMF_Grid),                       optional, intent(in) :: tile_grid_g_ESMF
 
     ! ------------------------------------------
 
@@ -2348,7 +2344,7 @@ contains
          N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
          N_catl_vec, low_ind, l2f,                                               &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), N_obsl_max, .false., &
-         N_obsl_tmp, Observations_l, found_obs_f, tile_grid_g_ESMF=tile_grid_g_ESMF )
+         N_obsl_tmp, Observations_l, found_obs_f )
 
     ! write appropriate fields (according to 'option') into file
 
