@@ -7,7 +7,7 @@
 ! reichle,   5 Apr 2013 - added EASEv2 grid, minimal change to max lat/lon for EASE (v1)  
 ! amfox,     6 Nov 2026 - added cube-sphere grid ("c3") case to get_tile_num_from_latlon()
 ! amfox,     8 Nov 2026 - map lat/lon to cube-sphere grid cells with MAPL_GetGlobalHorzIJIndex()
-!                         and the ESMF grid (get_ij_ind_from_latlon_c3(), init_c3_grid())
+!                         and the ESMF grid (get_ij_ind_from_latlon_c3(), init_tile_grid_g_ESMF_c3())
 !
 ! ========================================================================
 
@@ -59,7 +59,7 @@ module LDAS_TileCoordRoutines
   public :: get_tile_num_from_latlon
   public :: get_ij_ind_from_latlon
   public :: get_ij_ind_from_latlon_c3
-  public :: init_c3_grid
+  public :: init_tile_grid_g_ESMF_c3
   public :: tile2grid_simple
   public :: grid2tile
   public :: tile_mask_grid
@@ -514,7 +514,7 @@ contains
     
     integer :: this_i_indg, this_j_indg
     integer , allocatable :: i_indg_(:), j_indg_(:)
-    logical :: c3_grid 
+
     character(len=*), parameter :: Iam = 'get_minExtent_grid'
     character(len=400) :: err_msg
 
@@ -776,7 +776,7 @@ contains
   
   subroutine get_tile_num_from_latlon(N_catd, tile_coord,                      &
        tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
-       tile_num, max_dist_x, max_dist_y, c3_grid )
+       tile_num, max_dist_x, max_dist_y, tile_grid_g_ESMF )
 
     ! bug fix re. "check that lat/lon is inside tile_grid"
     ! - reichle, 2005/11/17
@@ -790,7 +790,7 @@ contains
     ! - reichle, 2014/12/23
     !
     ! added cube-sphere ("c3") tile_grid, see get_tile_num_from_latlon_c3();
-    !  requires optional input "c3_grid" (ESMF grid of cube-sphere tile space)
+    !  requires optional input "tile_grid_g_ESMF" (ESMF grid of cube-sphere tile space)
     ! - amfox, 8 Nov 2026
     
     implicit none
@@ -812,7 +812,7 @@ contains
     real,    dimension(N_latlon),              optional, intent(in)  :: max_dist_x  ! vector [deg]
     real,                                      optional, intent(in)  :: max_dist_y  ! scalar [deg]
     
-    type(ESMF_Grid),                           optional, intent(in)  :: c3_grid     ! for "c3" tile_grid
+    type(ESMF_Grid),                           optional, intent(in)  :: tile_grid_g_ESMF     ! for "c3" tile_grid
 
     ! local variables
     
@@ -847,15 +847,15 @@ contains
 
     if (index(tile_grid%gridtype, 'c3')/=0) then
 
-       if (.not. present(c3_grid)) then
+       if (.not. present(tile_grid_g_ESMF)) then
 
-          err_msg = 'cube-sphere ("c3") tile_grid requires optional input c3_grid (ESMF grid)'
+          err_msg = 'cube-sphere ("c3") tile_grid requires optional input tile_grid_g_ESMF (ESMF grid)'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
 
        end if
 
-       call get_tile_num_from_latlon_c3( c3_grid, tile_coord,                     &
-            tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon, &
+       call get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,              &
+            tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
             max_dist_tmp_x, max_dist_tmp_y, tile_num )
 
        return
@@ -998,7 +998,7 @@ contains
   
   ! *******************************************************************
   
-  subroutine get_tile_num_from_latlon_c3( c3_grid, tile_coord,                 &
+  subroutine get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,        &
        tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
        max_dist_x, max_dist_y, tile_num )
 
@@ -1007,7 +1007,7 @@ contains
     ! tiles do not nest in the cells of a lat/lon grid, so for cube-sphere tile space,
     !  tile_grid must be the cube-sphere grid that defines the tile space (and
     !  N_tile_in_cell_ij, tile_num_in_cell_ij must be obtained from tile_coord%i_indg and
-    !  tile_coord%j_indg).  c3_grid is the ESMF grid of the cube-sphere tile space.
+    !  tile_coord%j_indg).  tile_grid_g_ESMF is the ESMF grid of the cube-sphere tile space.
     !
     ! Each tile is inside the cube-sphere grid cell given by tile_coord%i_indg and
     ! tile_coord%j_indg, but a tile can be much smaller than the grid cell, and lat/lon is
@@ -1060,7 +1060,7 @@ contains
 
     implicit none
 
-    type(ESMF_Grid),                                     intent(in)  :: c3_grid
+    type(ESMF_Grid),                                     intent(in)  :: tile_grid_g_ESMF
 
     type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
 
@@ -1128,7 +1128,7 @@ contains
 
        ! determine grid cells that contain lat/lon
 
-       call get_ij_ind_from_latlon_c3( c3_grid, tile_grid, N_tmp,               &
+       call get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid, N_tmp,                    &
             lat(ind_start:ind_end), lon(ind_start:ind_end), i_ind(1:N_tmp), j_ind(1:N_tmp) )
 
        ! Step 1.): tiles within grid cell that contains lat/lon
@@ -1238,7 +1238,7 @@ contains
 
           end do
 
-          call get_ij_ind_from_latlon_c3( c3_grid, tile_grid, kk,               &
+          call get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid, kk,               &
                tmp_lat(1:kk), tmp_lon(1:kk), i_ind_nbr(1:kk), j_ind_nbr(1:kk) )
 
           kk = 0
@@ -1537,7 +1537,7 @@ contains
   
   ! *******************************************************************
 
-  subroutine get_ij_ind_from_latlon_c3( c3_grid, tile_grid, N_latlon, lat, lon, i_ind, j_ind )
+  subroutine get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid, N_latlon, lat, lon, i_ind, j_ind )
 
     ! find i/j_ind of cube-sphere ("c3") grid cells that contain lat/lon
     !
@@ -1548,19 +1548,19 @@ contains
     ! MAPL_GetGlobalHorzIJIndex() needs the ESMF grid and returns *global*, *1-based*
     !  indices i=1,...,N and j=1,...,6*N (6 faces stacked in j), as in tile_coord%i_indg
     !  and tile_coord%j_indg.  It fails for grids that it cannot handle.  (It also handles
-    !  stretched grids, but init_c3_grid() rejects them, see there.)
+    !  stretched grids, but init_tile_grid_g_ESMF_c3() rejects them, see there.)
     !
     ! NOTE: Each call of MAPL_GetGlobalHorzIJIndex() checks the grid, and the MAPL subroutine
     !       allocates ~100 bytes per lat/lon --> call with many, but not too many, lat/lon.
     !
     ! NOTE: Before this subroutine is called by root_proc only (e.g., in obs readers),
-    !       init_c3_grid() must have been called by all processors.
+    !       init_tile_grid_g_ESMF_c3() must have been called by all processors.
     !
     ! amfox, 8 Nov 2026
 
     implicit none
 
-    type(ESMF_Grid),              intent(in)  :: c3_grid
+    type(ESMF_Grid),              intent(in)  :: tile_grid_g_ESMF
 
     type(grid_def_type),          intent(in)  :: tile_grid
 
@@ -1593,9 +1593,9 @@ contains
     tmp_lon = real(lon,8)*(MAPL_PI_R8/180.d0)
 
     ! MAPL_GetGlobalHorzIJIndex() needs intent(inout) for the grid (to store the grid corners
-    !  as attributes, see init_c3_grid()) --> pass a copy of the ESMF grid handle (same grid)
+    !  as attributes, see init_tile_grid_g_ESMF_c3()) --> pass a copy of the ESMF grid handle (same grid)
 
-    tmp_grid = c3_grid
+    tmp_grid = tile_grid_g_ESMF
 
     call MAPL_GetGlobalHorzIJIndex( N_latlon, i_ind, j_ind, lonR8=tmp_lon, latR8=tmp_lat,   &
          Grid=tmp_grid, rc=status )
@@ -1623,7 +1623,7 @@ contains
 
   ! *******************************************************************
 
-  subroutine init_c3_grid( c3_grid, tile_grid )
+  subroutine init_tile_grid_g_ESMF_c3( tile_grid_g_ESMF, tile_grid )
 
     ! prepare cube-sphere ("c3") ESMF grid for get_ij_ind_from_latlon_c3() and check that
     !  the grid matches the global cube-sphere tile_grid (tile_grid_g)
@@ -1647,7 +1647,7 @@ contains
 
     implicit none
 
-    type(ESMF_Grid),              intent(in)  :: c3_grid
+    type(ESMF_Grid),              intent(in)  :: tile_grid_g_ESMF
 
     type(grid_def_type),          intent(in)  :: tile_grid
 
@@ -1665,12 +1665,12 @@ contains
 
     logical                               :: has_factor, has_lon, has_lat
 
-    character(len=*),  parameter :: Iam = 'init_c3_grid'
+    character(len=*),  parameter :: Iam = 'init_tile_grid_g_ESMF_c3'
     character(len=400)           :: err_msg
 
     ! -------------------------------------------------------------
 
-    tmp_grid = c3_grid         ! copy of ESMF grid handle (same grid), see get_ij_ind_from_latlon_c3()
+    tmp_grid = tile_grid_g_ESMF         ! copy of ESMF grid handle (same grid), see get_ij_ind_from_latlon_c3()
 
     ! check grid size (N-by-6*N for cube-sphere grid)
 
@@ -1727,10 +1727,10 @@ contains
 
     end if
 
-    if (logit) write (logunit,*) trim(Iam), ': cube-sphere grid ready for obs-to-tile mapping, size = ', dims(1:2)
+    if (logit) write (logunit,*) trim(Iam), ': cube-sphere tile_grid_g_ESMF is ready for obs-to-tile mapping, size = ', dims(1:2)
     if (logit) write (logunit,*)
 
-  end subroutine init_c3_grid
+  end subroutine init_tile_grid_g_ESMF_c3
 
   ! *******************************************************************
 
