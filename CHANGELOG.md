@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added logging of original (pre-renaming) file names of MODIS SCF obs ([PR #239](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/239)).
  
 ### Changed
+- Refactored ldas_setup
 - Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   

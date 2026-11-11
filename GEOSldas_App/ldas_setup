@@ -3,8 +3,8 @@
 import sys
 import argparse
 import resource
-from setup_utils import *
-from ldas        import *
+from setup_utils import printInputSampleFile, LdasSetupError
+from ldas        import ldas
 
 def parseCmdLine():
     """
@@ -141,38 +141,40 @@ def parseCmdLine():
 
     return p.parse_args()
 
-if __name__=='__main__':
+def main():
 
     resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
     #convert command line to dictionary
     args = vars(parseCmdLine())
-   
+
     #./ldas_setup sample sub-command
-    # print input sample file then exit 
+    # print input sample file then exit
     if 'exeinp' in args:
       printInputSampleFile(args)
-      sys.exit(0)
+      return
 
     # start ./ldas_setup setup sub-command
 
     ldasObj = ldas(args)
 
     print ("creating dir structure")
-    status = ldasObj.createDirStructure()
-    assert(status)
+    ldasObj.createDirStructure()
 
     print ("creating links to restarts, BCs, met forcing, ...")
-    status = ldasObj.createLnRstBc()
-    assert(status)
+    ldasObj.createLnRstBc()
 
     print ("creating RC Files")
-    status = ldasObj.createRCFiles()
-    assert(status)
+    ldasObj.createRCFiles()
 
     print ("creating gcm style batch Run scripts lenkf.j")
-    status = ldasObj.createRunScripts()
-    assert(status)
-    
+    ldasObj.createRunScripts()
+
     print ("creating batch Run scripts")
-    status = ldasObj.createBatchRun()
-    assert (status)
+    ldasObj.createBatchRun()
+
+if __name__=='__main__':
+    try:
+        main()
+    except LdasSetupError as e:
+        sys.stderr.write('\nldas_setup ERROR: %s\n\n' % e)
+        sys.exit(1)
