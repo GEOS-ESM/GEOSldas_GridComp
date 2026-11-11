@@ -5,6 +5,7 @@
 ! reichle,  14 Apr 2006 - split tile_coord.F90 into 2 files to avoid 
 !                         having more than one module per file
 ! reichle,   5 Apr 2013 - added EASEv2 grid, minimal change to max lat/lon for EASE (v1)  
+! amfox,     6 Nov 2026 - fixed mapping of obs to tiles for cube-sphere tile space
 !
 ! ========================================================================
 
@@ -44,6 +45,7 @@ module LDAS_TileCoordRoutines
   public :: get_minExtent_grid
   public :: get_number_of_tiles_in_cell_ij
   public :: get_tile_num_in_cell_ij
+  public :: get_tile_num_in_cell_ij_bbox
   public :: get_tile_num_in_ellipse
   public :: get_tile_num_from_latlon
   public :: get_ij_ind_from_latlon
@@ -759,6 +761,127 @@ contains
     
   end subroutine get_tile_num_in_cell_ij
   
+  ! **********************************************************************
+
+  subroutine get_tile_num_in_cell_ij_bbox( N_tile, tile_coord, tile_grid,   &
+       N_tile_in_cell_ij, tile_num_in_cell_ij )
+
+    ! amfox, 6 Nov 2026
+    !
+    ! find out how many tiles and which tiles overlap a given grid cell
+    !
+    ! same as get_number_of_tiles_in_cell_ij() and get_tile_num_in_cell_ij() combined,
+    !  except that each tile is listed in *all* cells of tile_grid that overlap the
+    !  bounding box of the tile (min_lon, max_lon, min_lat, max_lat), and not only in
+    !  the cell that contains the tile
+    !
+    ! needed for mapping obs to tiles in cube-sphere tile space, where tiles do not nest
+    !  within the cells of the lat/lon grid (pert_grid) that is used for the mapping
+    !  (see get_enkf_increments() and get_tile_num_from_latlon())
+    !
+    ! the cells are found with get_ij_ind_from_latlon() for the corners of the bounding
+    !  box, so that any lat/lon within the bounding box of a tile falls into a cell
+    !  that lists the tile
+    !
+    ! within each cell, tiles are listed in ascending order of tile number
+    !
+    ! NOTE: the pointer tile_num_in_cell_ij is an output argument that is allocated here;
+    !       its size is set by the cell with the most tiles (~250 MB for global CF0360)
+    !
+    ! TO DO: more compact storage of tile_num_in_cell_ij?
+    !
+    ! ----------------------------------------------------------
+
+    implicit none
+
+    integer,                                             intent(in)  :: N_tile
+
+    type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
+
+    type(grid_def_type),                                 intent(in)  :: tile_grid
+
+    integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(out) :: N_tile_in_cell_ij
+
+    integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij ! output
+
+    ! locals
+
+    integer, parameter :: nodata = -9999
+
+    integer :: i_ind_ll, i_ind_ur, i_min, i_max
+    integer :: j_ind_ll, j_ind_ur, j_min, j_max
+
+    integer :: ii, jj, mm, nn
+
+    ! -----------------------------------------------------------------
+    !
+    ! mm=1: count how many tiles are in each cell
+    ! mm=2: allocate tile_num_in_cell_ij and find out which tiles are in each cell
+
+    do mm=1,2
+
+       if (mm==2) then
+
+          allocate(tile_num_in_cell_ij(tile_grid%N_lon,tile_grid%N_lat,   &
+               maxval(N_tile_in_cell_ij)))
+
+          tile_num_in_cell_ij = nodata
+
+       end if
+
+       ! (re-)initialize
+
+       N_tile_in_cell_ij = 0
+
+       do nn=1,N_tile
+
+          ! find i,j indices of two opposite corners (lower left and upper right)
+          ! of bounding box
+
+          call get_ij_ind_from_latlon( tile_grid,                           &
+               tile_coord(nn)%min_lat, tile_coord(nn)%min_lon, i_ind_ll, j_ind_ll )
+
+          call get_ij_ind_from_latlon( tile_grid,                           &
+               tile_coord(nn)%max_lat, tile_coord(nn)%max_lon, i_ind_ur, j_ind_ur )
+
+          ! restrict i_ind_* and j_ind_* to fall within tile_grid
+
+          i_ind_ll = min( tile_grid%N_lon, max( 1, i_ind_ll ))
+          j_ind_ll = min( tile_grid%N_lat, max( 1, j_ind_ll ))
+          i_ind_ur = min( tile_grid%N_lon, max( 1, i_ind_ur ))
+          j_ind_ur = min( tile_grid%N_lat, max( 1, j_ind_ur ))
+
+          ! find smaller and larger of the two indices
+          ! (index may run north-to-south/west-to-east depending on i_dir/j_dir)
+
+          i_min = min( i_ind_ll, i_ind_ur )
+          i_max = max( i_ind_ll, i_ind_ur )
+
+          j_min = min( j_ind_ll, j_ind_ur )
+          j_max = max( j_ind_ll, j_ind_ur )
+
+          ! add tile to all cells that overlap bounding box
+
+          do ii=i_min,i_max
+             do jj=j_min,j_max
+
+                N_tile_in_cell_ij(ii,jj) = N_tile_in_cell_ij(ii,jj) + 1
+
+                if (mm==2) tile_num_in_cell_ij(ii,jj,N_tile_in_cell_ij(ii,jj)) = nn
+
+             end do
+          end do
+
+       end do
+
+    end do
+
+    if (logit) write (logunit,*) &
+         'Maximum number of tiles (bounding boxes) in grid cell = ', maxval(N_tile_in_cell_ij)
+    if (logit) write (logunit,*)
+
+  end subroutine get_tile_num_in_cell_ij_bbox
+
   ! *******************************************************************
   
   subroutine get_tile_num_from_latlon(N_catd, tile_coord,                      &
@@ -775,6 +898,10 @@ contains
     ! distance units are in [deg]; added functionality for latitude-dependent
     !  meridional max distance (max_dist_x)
     ! - reichle, 2014/12/23
+    !
+    ! added selection rule for cube-sphere tile space (gridtype 'LatLon_c3'; for use
+    !  with get_tile_num_in_cell_ij_bbox(), see get_enkf_increments())
+    ! - amfox, 6 Nov 2026
     
     implicit none
     
@@ -808,6 +935,10 @@ contains
     real                         :: tmp_dist_y, min_dist_y, max_dist_tmp_y
     real                         :: tmp_dist_x, min_dist_x
     real, dimension(N_latlon)    ::                         max_dist_tmp_x 
+
+    real                         :: tmp_hx, tmp_hy, min_dist_bbox
+
+    real,              parameter :: min_half_width = 1.e-6  ! [deg]
     
     character(len=*),  parameter :: Iam = 'get_tile_num_from_latlon'
     character(len=400)           :: err_msg
@@ -882,6 +1013,93 @@ contains
                 
              end if
              
+          elseif (index(tile_grid%gridtype, 'c3')/=0) then
+
+             ! Cube-sphere tile space (gridtype 'LatLon_c3', see get_enkf_increments();
+             ! must be checked before 'LatLon'):  tiles do not nest within the cells of the
+             ! lat/lon tile_grid (pert_grid), and N_tile_in_cell_ij lists each tile in all cells
+             ! that overlap its bounding box (see get_tile_num_in_cell_ij_bbox()).
+             !
+             ! 1.) Among the tiles whose bounding box contains lat/lon, pick the tile with
+             !     the smallest distance between lat/lon and tile center-of-mass, normalized
+             !     by the half-width and half-height of the bounding box.  Tiles are listed
+             !     in ascending order of tile number, so ties go to the lower tile number.
+             !
+             ! 2.) If no bounding box contains lat/lon, pick the nearest tile (Minkowski norm)
+             !     among the tiles that are within max_dist_x and max_dist_y of lat/lon.
+             !     (Picking the nearest tile first and then checking max_dist, as for LatLon
+             !     tile space, can drop an obs even though another tile is within max_dist.)
+             !
+             ! If there are no such tiles, tile_num will not change from its initialized value.
+             !
+             ! - amfox, 6 Nov 2026; restructured and fixed step 2.), amfox, 8 Nov 2026
+
+             min_dist_bbox = 1.e10   ! initialize
+
+             do k=1,N_tile_in_cell_ij(i_ind,j_ind)
+
+                this_tile_num = tile_num_in_cell_ij(i_ind,j_ind,k)
+
+                if ( tile_coord(this_tile_num)%min_lon <= lon(n)  .and.     &
+                     tile_coord(this_tile_num)%max_lon >= lon(n)  .and.     &
+                     tile_coord(this_tile_num)%min_lat <= lat(n)  .and.     &
+                     tile_coord(this_tile_num)%max_lat >= lat(n)         ) then
+
+                   tmp_hx = 0.5*(tile_coord(this_tile_num)%max_lon - tile_coord(this_tile_num)%min_lon)
+                   tmp_hy = 0.5*(tile_coord(this_tile_num)%max_lat - tile_coord(this_tile_num)%min_lat)
+
+                   tmp_hx = max( tmp_hx, min_half_width )
+                   tmp_hy = max( tmp_hy, min_half_width )
+
+                   tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                   tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                   tmp_dist   = (tmp_dist_x/tmp_hx)**2 + (tmp_dist_y/tmp_hy)**2
+
+                   if (tmp_dist<min_dist_bbox) then
+
+                      min_dist_bbox = tmp_dist
+                      min_dist_x    = tmp_dist_x
+                      min_dist_y    = tmp_dist_y
+
+                      tile_num(n)   = this_tile_num
+
+                   end if
+
+                end if
+
+             end do
+
+             if (tile_num(n)==nodata_tilenum) then
+
+                do k=1,N_tile_in_cell_ij(i_ind,j_ind)
+
+                   this_tile_num = tile_num_in_cell_ij(i_ind,j_ind,k)
+
+                   tmp_dist_x = abs(lon(n) - tile_coord(this_tile_num)%com_lon)
+                   tmp_dist_y = abs(lat(n) - tile_coord(this_tile_num)%com_lat)
+
+                   if ( tmp_dist_x <= max_dist_tmp_x(n)  .and.                 &
+                        tmp_dist_y <= max_dist_tmp_y            ) then
+
+                      tmp_dist   = tmp_dist_x + tmp_dist_y    ! Minkowski norm
+
+                      if (tmp_dist<min_dist) then
+
+                         min_dist    = tmp_dist
+                         min_dist_x  = tmp_dist_x
+                         min_dist_y  = tmp_dist_y
+
+                         tile_num(n) = this_tile_num
+
+                      end if
+
+                   end if
+
+                end do
+
+             end if
+
           elseif (index(tile_grid%gridtype, 'LatLon')/=0) then
              
              ! Loop through all tiles within grid cell that contain lat/lon and

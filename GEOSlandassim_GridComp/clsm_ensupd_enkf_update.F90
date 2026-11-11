@@ -73,6 +73,7 @@ module clsm_ensupd_enkf_update
   use LDAS_TilecoordRoutines,           ONLY:     &
        get_number_of_tiles_in_cell_ij,            &
        get_tile_num_in_cell_ij,                   &
+       get_tile_num_in_cell_ij_bbox,              &
        grid2tile
 
   use nr_ran2_gasdev,                   ONLY:     &
@@ -99,7 +100,6 @@ module clsm_ensupd_enkf_update
        get_ind_obs_assim,                         &
        get_ind_obs_lat_lon_box,                   &
        halo_type,                                 &
-       FOV_threshold,                             &
        get_halo_around_tile,                      &
        TileNnzObs
 
@@ -277,6 +277,8 @@ contains
     integer, dimension(:,:),   pointer     :: N_tile_in_cell_ij_f
     integer, dimension(:,:,:), pointer     :: tile_num_in_cell_ij_f
 
+    type(grid_def_type)                    :: obs2tile_grid_f   ! grid for mapping obs to tiles (copy of pert_grid_f)
+
     integer :: i, n, n_e
 
     ! obs bias variables
@@ -387,11 +389,30 @@ contains
        ! -----------------------------------------------------------------
        !
        ! Get additional grid/tile information that is needed to map obs
-       ! from lat/lon to tiles.  This needs to be done:
-       ! - by root process (because of call to read_obs() in collect_obs())
-       ! - by all processes if FOV>~0 ("tile_num_in_circle" needed in get_obs_pred())
-       if ( (root_proc)                                        .or.              &
-            (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
+       ! from lat/lon to tiles.  This needs to be done only by the root process
+       ! (because of call to read_obs() in collect_obs()).  The FOV footprint
+       ! search in get_obs_pred() uses its own tables (incl. halo).
+       ! - amfox, 8 Nov 2026 (no longer done by all processes if FOV>~0)
+       !
+       ! For cube-sphere tile space, tiles do not nest within the cells of the lat/lon
+       ! pert_grid_f.  On root, list each tile in all pert_grid_f cells that overlap
+       ! the bounding box of the tile, and tag the grid that is passed into collect_obs()
+       ! as 'LatLon_c3' so that get_tile_num_from_latlon() uses the matching selection
+       ! rule.  No change for other tile spaces (EASE, LatLon) and other processes.
+       ! - amfox, 6 Nov 2026
+
+       obs2tile_grid_f = pert_grid_f
+
+       if     ( (root_proc) .and. (index(tile_grid_g%gridtype,'c3')/=0) ) then
+
+          obs2tile_grid_f%gridtype = 'LatLon_c3'
+
+          allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
+
+          call get_tile_num_in_cell_ij_bbox( N_catf, tile_coord_f,                &
+               obs2tile_grid_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f )
+
+       elseif (root_proc) then
 
           allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
 
@@ -421,7 +442,7 @@ contains
        if (out_smapL4SMaup)                                                        &
             call output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,   &
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
-            tile_coord_f, tile_grid_g, pert_grid_f,                                &
+            tile_coord_f, tile_grid_g, obs2tile_grid_f,                            &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
             N_obs_param, obs_param, Observations_l, cat_param, cat_progn  )
 
@@ -430,7 +451,7 @@ contains
        call collect_obs(                                              &
             work_path, exp_id, date_time, dtstep_assim,               &
             N_catl,                                                   &
-            N_catf, tile_coord_f, pert_grid_f,                        &
+            N_catf, tile_coord_f, obs2tile_grid_f,                    &
             N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,               &
             N_catl_vec, low_ind, l2f,                                 &
             N_obs_param, obs_param, N_obsl_max, out_obslog,           &
