@@ -14,6 +14,9 @@
 
 ! *********************************************************************
 
+! GEOSldas no longer provides NCEP_bufr_r4i4 library from NCEP_Shared, Nov 2026
+#undef BUFR_AVAILABLE
+
 module clsm_ensupd_read_obs
   
   use, intrinsic :: iso_c_binding,      ONLY:     &
@@ -1561,6 +1564,13 @@ contains
   
   ! ****************************************************************************
 
+
+#ifdef BUFR_AVAILABLE
+
+  ! Old ASCAT_EUMETSAT obs version requires BUFR utilities from NCEP_Shared repo.
+  ! Disabled obs reader to avoid NCEP_Shared dependency.
+  ! -reichle, 6 Nov 2026
+  
   subroutine read_obs_sm_ASCAT_EUMET(                                         &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
        tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
@@ -2155,6 +2165,9 @@ contains
     
   end subroutine read_obs_sm_ASCAT_EUMET
 
+#endif
+
+  
   ! ****************************************************************************
 
   subroutine read_obs_sm_ASCAT_HSAF(                                          &
@@ -9995,15 +10008,20 @@ contains
                tmp_obs, tmp_std_obs )
           
        end if
-       
+
+
     case ('ASCAT_META_SM','ASCAT_METB_SM','ASCAT_METC_SM' )
 
+#ifdef BUFR_AVAILABLE
        call read_obs_sm_ASCAT_EUMET(                                  &
             date_time, dtstep_assim, N_catd, tile_coord,              &
             tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
             tmp_time)
+#else
+       call ldas_abort(LDAS_GENERIC_ERROR, Iam, "ASCAT_MET[x]_SM obs species disabled; requires BUFR reader")   
+#endif
 
        ! scale observations to model climatology
 
@@ -10017,6 +10035,7 @@ contains
 
        end if
 
+       
     case ('ASCAT_HSAF_META_SM','ASCAT_HSAF_METB_SM','ASCAT_HSAF_METC_SM' )
 
        call read_obs_sm_ASCAT_HSAF(                                   &

@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
   
 ### Removed
+- Removed support for obsolete ASCAT_MET[x]_SM obs species to avoid dependency on BUFR and NCEP_Shared ([PR #250](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/250)).
 
 ### Deprecated
  
