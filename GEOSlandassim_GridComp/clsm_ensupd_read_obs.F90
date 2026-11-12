@@ -432,8 +432,8 @@ contains
   
   subroutine read_obs_ae_l2_sm(                                  &
        work_path, exp_id,                                        &
-       date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, tile_grid_g_ESMF,                            &
+       date_time, dtstep_assim, N_catf, tile_coord_f,            &
+       obs2tile_grid_f, tile_grid_g_ESMF,                        &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
        found_obs, ae_l2_sm, std_ae_l2_sm )
@@ -447,7 +447,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 25 Jul 2005
     !
@@ -462,15 +462,15 @@ contains
 
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space    
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -479,8 +479,8 @@ contains
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: ae_l2_sm
-    real,    intent(out), dimension(N_catd) :: std_ae_l2_sm
+    real,    intent(out), dimension(N_catf) :: ae_l2_sm
+    real,    intent(out), dimension(N_catf) :: std_ae_l2_sm
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -512,7 +512,7 @@ contains
     real,    dimension(:), pointer :: tmp_obs, tmp_lat, tmp_lon
     integer, dimension(:), pointer :: tmp_tile_num
     
-    integer, dimension(N_catd) :: N_obs_in_tile    
+    integer, dimension(N_catf) :: N_obs_in_tile    
 
     character(len=*), parameter :: Iam = 'read_obs_ae_l2_sm'
 
@@ -659,8 +659,8 @@ contains
        
        allocate(tmp_tile_num(N_tmp))
        
-       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, tile_grid_g_ESMF,                           &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+            obs2tile_grid_f, tile_grid_g_ESMF,                       &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
@@ -677,7 +677,7 @@ contains
        
        do i=1,N_tmp
           
-          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
           
           if (ind>0) then         ! this step eliminates obs outside domain
              
@@ -691,7 +691,7 @@ contains
        
        ! normalize
        
-       do i=1,N_catd
+       do i=1,N_catf
           
           if (N_obs_in_tile(i)>1) then
              
@@ -713,7 +713,7 @@ contains
        
        ! set observation error standard deviation
        
-       do i=1,N_catd
+       do i=1,N_catf
           std_ae_l2_sm(i) = this_obs_param%errstd
        end do
        
@@ -947,8 +947,8 @@ contains
   
   subroutine read_obs_ae_sm_LPRM(                                &
        work_path, exp_id,                                        &
-       date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, tile_grid_g_ESMF,                            &
+       date_time, dtstep_assim, N_catf, tile_coord_f,            &
+       obs2tile_grid_f, tile_grid_g_ESMF,                        &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
        found_obs, ae_sm_LPRM, std_ae_sm_LPRM )
@@ -963,7 +963,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 20 Feb 2009
     !
@@ -978,15 +978,15 @@ contains
 
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space    
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -995,8 +995,8 @@ contains
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: ae_sm_LPRM
-    real,    intent(out), dimension(N_catd) :: std_ae_sm_LPRM
+    real,    intent(out), dimension(N_catf) :: ae_sm_LPRM
+    real,    intent(out), dimension(N_catf) :: std_ae_sm_LPRM
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -1028,7 +1028,7 @@ contains
     real,    dimension(:), pointer :: tmp_obs, tmp_lat, tmp_lon
     integer, dimension(:), pointer :: tmp_tile_num
     
-    integer, dimension(N_catd) :: N_obs_in_tile    
+    integer, dimension(N_catf) :: N_obs_in_tile    
 
     character(len=*), parameter :: Iam = 'read_obs_ae_sm_LPRM'
 
@@ -1178,8 +1178,8 @@ contains
        
        allocate(tmp_tile_num(N_tmp))
        
-       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, tile_grid_g_ESMF,                           &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+            obs2tile_grid_f, tile_grid_g_ESMF,                       &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
@@ -1196,7 +1196,7 @@ contains
        
        do i=1,N_tmp
           
-          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
           
           if (ind>0) then         ! this step eliminates obs outside domain
              
@@ -1210,7 +1210,7 @@ contains
        
        ! normalize
        
-       do i=1,N_catd
+       do i=1,N_catf
           
           if (N_obs_in_tile(i)>1) then
              
@@ -1232,7 +1232,7 @@ contains
        
        ! set observation error standard deviation
        
-       do i=1,N_catd
+       do i=1,N_catf
           std_ae_sm_LPRM(i) = this_obs_param%errstd
        end do
        
@@ -1262,8 +1262,8 @@ contains
 
   subroutine read_obs_sm_ASCAT(                                  &
        work_path, exp_id,                                        &
-       date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, tile_grid_g_ESMF,                            &
+       date_time, dtstep_assim, N_catf, tile_coord_f,            &
+       obs2tile_grid_f, tile_grid_g_ESMF,                        &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
        found_obs, sm_ASCAT, std_sm_ASCAT )
@@ -1292,15 +1292,15 @@ contains
 
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -1309,8 +1309,8 @@ contains
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: sm_ASCAT
-    real,    intent(out), dimension(N_catd) :: std_sm_ASCAT
+    real,    intent(out), dimension(N_catf) :: sm_ASCAT
+    real,    intent(out), dimension(N_catf) :: std_sm_ASCAT
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -1340,7 +1340,7 @@ contains
     real,    dimension(:), pointer :: tmp_obs, tmp_lat, tmp_lon
     integer, dimension(:), pointer :: tmp_tile_num
     
-    integer, dimension(N_catd) :: N_obs_in_tile    
+    integer, dimension(N_catf) :: N_obs_in_tile    
 
     real, parameter :: tol = 1e-2
 
@@ -1495,8 +1495,8 @@ contains
        
        allocate(tmp_tile_num(N_tmp))
        
-       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, tile_grid_g_ESMF,                           &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+            obs2tile_grid_f, tile_grid_g_ESMF,                       &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
@@ -1513,7 +1513,7 @@ contains
        
        do i=1,N_tmp
           
-          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
           
           if (ind>0) then         ! this step eliminates obs outside domain
              
@@ -1527,7 +1527,7 @@ contains
        
        ! normalize
        
-       do i=1,N_catd
+       do i=1,N_catf
           
           if (N_obs_in_tile(i)>1) then
              
@@ -1549,7 +1549,7 @@ contains
        
        ! set observation error standard deviation
 
-         do i=1,N_catd
+         do i=1,N_catf
 	      std_sm_ASCAT(i) = this_obs_param%errstd
          enddo
        ! --------------------------------
@@ -1576,10 +1576,10 @@ contains
   
   ! ****************************************************************************
 
-  subroutine read_obs_sm_ASCAT_EUMET(                                         &
-       date_time, dtstep_assim, N_catd, tile_coord,                           &
-       tile_grid_d, tile_grid_g_ESMF, N_tile_in_cell_ij, tile_num_in_cell_ij, &
-       this_obs_param,                                                        &
+  subroutine read_obs_sm_ASCAT_EUMET(                                             &
+       date_time, dtstep_assim, N_catf, tile_coord_f,                             &
+       obs2tile_grid_f, tile_grid_g_ESMF, N_tile_in_cell_ij, tile_num_in_cell_ij, &
+       this_obs_param,                                                            &
        found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
     
     !---------------------------------------------------------------------
@@ -1613,15 +1613,15 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -1632,10 +1632,10 @@ contains
    
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: ASCAT_sm              ! sfds obs          [fraction]  (i.e., 0-1)
-    real,    intent(out), dimension(N_catd) :: ASCAT_sm_std          ! sfds obs err std  [fraction]  (i.e., 0-1)
-    real,    intent(out), dimension(N_catd) :: ASCAT_lon, ASCAT_lat
-    real*8,  intent(out), dimension(N_catd) :: ASCAT_time            ! J2000 seconds
+    real,    intent(out), dimension(N_catf) :: ASCAT_sm              ! sfds obs          [fraction]  (i.e., 0-1)
+    real,    intent(out), dimension(N_catf) :: ASCAT_sm_std          ! sfds obs err std  [fraction]  (i.e., 0-1)
+    real,    intent(out), dimension(N_catf) :: ASCAT_lon, ASCAT_lat
+    real*8,  intent(out), dimension(N_catf) :: ASCAT_time            ! J2000 seconds
     
     ! ---------------
     
@@ -1705,7 +1705,7 @@ contains
 
     integer,   dimension(:),     pointer        :: tmp_tile_num
 
-    integer,   dimension(N_catd)                :: N_obs_in_tile    
+    integer,   dimension(N_catf)                :: N_obs_in_tile    
 
     character(len=*),  parameter :: Iam = 'read_obs_sm_ASCAT_EUMET'
     character(len=400)           :: err_msg
@@ -2078,8 +2078,8 @@ contains
        
        allocate(tmp_tile_num(N_tmp))
        
-       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, tile_grid_g_ESMF,                           &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+            obs2tile_grid_f, tile_grid_g_ESMF,                       &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
@@ -2100,7 +2100,7 @@ contains
        
        do ii=1,N_tmp
           
-          ind = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+          ind = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
           
           if (ind>0) then         ! this step eliminates obs outside domain
              
@@ -2117,7 +2117,7 @@ contains
 
        ! normalize and set obs error std-dev
 
-       do ii=1,N_catd
+       do ii=1,N_catf
           
           ! set observation error standard deviation 
          
@@ -2176,8 +2176,8 @@ contains
   ! ****************************************************************************
 
   subroutine read_obs_sm_ASCAT_HSAF(                                          &
-       date_time, dtstep_assim, N_catd, tile_coord,                           &
-       tile_grid_d, tile_grid_g_ESMF,                                         &
+       date_time, dtstep_assim, N_catf, tile_coord_f,                         &
+       obs2tile_grid_f, tile_grid_g_ESMF,                                     &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                                &
        this_obs_param, write_obslog,                                          &
        found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
@@ -2226,15 +2226,15 @@ contains
 
     type(date_time_type), intent(in) :: date_time
 
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
 
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
 
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -2247,10 +2247,10 @@ contains
 
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: ASCAT_sm               ! degree of saturation (sfds) [fraction 0-1]
-    real,    intent(out), dimension(N_catd) :: ASCAT_sm_std           ! sfds obs error std          [fraction 0-1]
-    real,    intent(out), dimension(N_catd) :: ASCAT_lon, ASCAT_lat
-    real*8,  intent(out), dimension(N_catd) :: ASCAT_time             ! J2000 seconds
+    real,    intent(out), dimension(N_catf) :: ASCAT_sm               ! degree of saturation (sfds) [fraction 0-1]
+    real,    intent(out), dimension(N_catf) :: ASCAT_sm_std           ! sfds obs error std          [fraction 0-1]
+    real,    intent(out), dimension(N_catf) :: ASCAT_lon, ASCAT_lat
+    real*8,  intent(out), dimension(N_catf) :: ASCAT_time             ! J2000 seconds
 
     ! ---------------
 
@@ -2343,7 +2343,7 @@ contains
     integer, dimension(:), pointer :: tmp_tile_num
 
     ! tile accumulation across all files
-    integer, dimension(N_catd)     :: N_obs_in_tile
+    integer, dimension(N_catf)     :: N_obs_in_tile
 
     ! optional thinning of tile obs
     integer,    allocatable :: ind_tile(:), indx(:)
@@ -2652,8 +2652,8 @@ contains
        tmp_lon   = tmp1_lon(  1:N_valid)
        tmp_jtime = tmp1_jtime(1:N_valid)
 
-       call get_tile_num_for_obs(N_catd, tile_coord,                      &
-            tile_grid_d, tile_grid_g_ESMF,                                &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,                    &
+            obs2tile_grid_f, tile_grid_g_ESMF,                            &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                       &
             N_valid, tmp_lat, tmp_lon,                                    &
             this_obs_param,                                               &
@@ -2706,7 +2706,7 @@ contains
     !
     ! normalise tile super-obs and set obs error std-dev
 
-    do ii = 1, N_catd
+    do ii = 1, N_catf
 
        ASCAT_sm_std(ii) = this_obs_param%errstd / 100.   ! % -> fraction
 
@@ -2749,7 +2749,7 @@ contains
 
        kk = 0
 
-       do ii = 1, N_catd
+       do ii = 1, N_catf
 
           if (N_obs_in_tile(ii) > 0) then
 
@@ -2814,8 +2814,8 @@ contains
   ! ****************************************************************************
 
   subroutine read_obs_sm_CYGNSS(                                                  &
-       date_time, dtstep_assim, N_catd, tile_coord,                               &
-       tile_grid_d, tile_grid_g_ESMF, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+       date_time, dtstep_assim, N_catf, tile_coord_f,                             &
+       obs2tile_grid_f, tile_grid_g_ESMF, N_tile_in_cell_ij, tile_num_in_cell_ij, &
        this_obs_param, write_obslog,                                              &
        found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
 
@@ -2846,15 +2846,15 @@ contains
 
     type(date_time_type), intent(in) :: date_time
 
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
 
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
 
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space    
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
        N_tile_in_cell_ij
 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -2867,10 +2867,10 @@ contains
 
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: CYGNSS_sm              ! sm obs          [cm3 cm-3]
-    real,    intent(out), dimension(N_catd) :: CYGNSS_sm_std          ! sm obs err std  [cm3 cm-3]
-    real,    intent(out), dimension(N_catd) :: CYGNSS_lon, CYGNSS_lat
-    real*8,  intent(out), dimension(N_catd) :: CYGNSS_time            ! J2000 seconds
+    real,    intent(out), dimension(N_catf) :: CYGNSS_sm              ! sm obs          [cm3 cm-3]
+    real,    intent(out), dimension(N_catf) :: CYGNSS_sm_std          ! sm obs err std  [cm3 cm-3]
+    real,    intent(out), dimension(N_catf) :: CYGNSS_lon, CYGNSS_lat
+    real*8,  intent(out), dimension(N_catf) :: CYGNSS_time            ! J2000 seconds
     
     ! -------------------------------------------------------------------
     ! local variables:
@@ -2909,7 +2909,7 @@ contains
     real,    dimension(:), pointer :: tmp_lon(:), tmp_lat(:), tmp_obs(:), tmp_err(:), tmp_jtime(:)
     integer, dimension(:), pointer :: tmp_tile_num
 
-    integer, dimension(N_catd)     :: N_obs_in_tile          
+    integer, dimension(N_catf)     :: N_obs_in_tile          
 
     real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
     real, allocatable    :: time(:), timeslices(:,:)
@@ -3244,8 +3244,8 @@ contains
        
       allocate(tmp_tile_num(N_obs))
       
-      call get_tile_num_for_obs(N_catd, tile_coord,                 &
-           tile_grid_d, tile_grid_g_ESMF,                           &
+      call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+           obs2tile_grid_f, tile_grid_g_ESMF,                       &
            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
            N_obs, tmp_lat, tmp_lon,                                 &
            this_obs_param,                                          &
@@ -3265,7 +3265,7 @@ contains
       
       do ii=1,N_obs
          
-         ind = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+         ind = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
          
          if (ind>0) then         ! this step eliminates obs outside domain
             
@@ -3282,7 +3282,7 @@ contains
 
       ! normalize and set obs error std-dev
 
-      do ii=1,N_catd
+      do ii=1,N_catf
          
          ! set observation error standard deviation 
         
@@ -3538,8 +3538,8 @@ contains
   ! *****************************************************************
   
   subroutine read_obs_LaRC_Tskin(                                &
-       date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, tile_grid_g_ESMF,                            &
+       date_time, dtstep_assim, N_catf, tile_coord_f,            &
+       obs2tile_grid_f, tile_grid_g_ESMF,                        &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
        found_obs, ts_LARC, std_ts_LARC )
@@ -3557,15 +3557,15 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer, intent(in) :: dtstep_assim, N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space        
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -3574,8 +3574,8 @@ contains
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: ts_LARC
-    real,    intent(out), dimension(N_catd) :: std_ts_LARC
+    real,    intent(out), dimension(N_catf) :: ts_LARC
+    real,    intent(out), dimension(N_catf) :: std_ts_LARC
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -3603,7 +3603,7 @@ contains
     
     real,           dimension(:),      pointer :: tmp_obs, tmp_lat, tmp_lon
     
-    integer,        dimension(N_catd)          :: N_obs_in_tile
+    integer,        dimension(N_catf)          :: N_obs_in_tile
     
     integer,        dimension(:),      pointer :: tmp_tile_num
     
@@ -3738,8 +3738,8 @@ contains
        
        allocate(tmp_tile_num(N_tmp))
        
-       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, tile_grid_g_ESMF,                           &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+            obs2tile_grid_f, tile_grid_g_ESMF,                       &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
@@ -3757,7 +3757,7 @@ contains
        
        do i=1,N_tmp
           
-          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
           
           if (ind>0) then         ! this step eliminates obs outside domain
              
@@ -3777,7 +3777,7 @@ contains
        
        ! normalize
        
-       do i=1,N_catd
+       do i=1,N_catf
           
           if (N_obs_in_tile(i)>1) then
              
@@ -3793,7 +3793,7 @@ contains
        
        if (associated(tmp_tile_num)) deallocate(tmp_tile_num)
        
-       do i=1,N_catd
+       do i=1,N_catf
           
           std_ts_LARC(i) = this_obs_param%errstd
           
@@ -4254,8 +4254,8 @@ contains
 
   ! *****************************************************************
     
-  subroutine read_obs_RedArkOSSE_sm(                             &
-       date_time, N_catd, tile_coord, this_obs_param,            &
+  subroutine read_obs_RedArkOSSE_sm(                               &
+       date_time, N_catf, tile_coord_f, this_obs_param,            &
        found_obs, RedArkOSSE_sm, std_RedArkOSSE_sm )
     
     ! Read observations of surface soil moisture from Wade Crow's
@@ -4268,7 +4268,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 25 May 2006
     ! reichle, 26 Sep 2006 - added iostat to open statement
@@ -4281,16 +4281,16 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: RedArkOSSE_sm
-    real,    intent(out), dimension(N_catd) :: std_RedArkOSSE_sm
+    real,    intent(out), dimension(N_catf) :: RedArkOSSE_sm
+    real,    intent(out), dimension(N_catf) :: std_RedArkOSSE_sm
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -4329,7 +4329,7 @@ contains
     real,    dimension(:), allocatable :: tmp_obs
     integer, dimension(:), allocatable :: tmp_tile_num
     
-    integer, dimension(N_catd) :: N_obs_in_tile    
+    integer, dimension(N_catf) :: N_obs_in_tile    
 
     character(len=*), parameter :: Iam = 'read_obs_RedArkOSSE_sm'
     character(len=400) :: err_msg
@@ -4404,10 +4404,10 @@ contains
              ! check tile_id for consistency
              
              if (p2t(i)>0) then           ! if statement added 1 May 2007, reichle
-                if (tmp_tile_id/=tile_coord(p2t(i))%tile_id) then
+                if (tmp_tile_id/=tile_coord_f(p2t(i))%tile_id) then
                    
                    !write (logunit,*) 'read_obs_RedArkOSSE(): something is wrong (p2t)'
-                   !!!write (logunit,*) i, p2t(i), tmp_tile_id, tile_coord(p2t(i))%tile_id
+                   !!!write (logunit,*) i, p2t(i), tmp_tile_id, tile_coord_f(p2t(i))%tile_id
                    !stop
 
                    err_msg = 'something is wrong (p2t)'
@@ -4430,7 +4430,7 @@ contains
              
              read(10,*) t2p(i,1:2), tmp_tile_id  ! pixel_num, tile_num, tile_id
              
-             if (tmp_tile_id/=tile_coord(t2p(i,2))%tile_id) then
+             if (tmp_tile_id/=tile_coord_f(t2p(i,2))%tile_id) then
                 err_msg = 'something is wrong (t2p)'
                 call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
              end if
@@ -4479,7 +4479,7 @@ contains
           
           do i=1,N_tmp
              
-             ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+             ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
              
              if (ind>0) then         ! this step eliminates obs outside domain
                 
@@ -4497,7 +4497,7 @@ contains
           
           ! normalize
           
-          do i=1,N_catd
+          do i=1,N_catf
              
              if (N_obs_in_tile(i)>1) then
                 
@@ -4515,7 +4515,7 @@ contains
           
           ! set observation error standard deviation
           
-          do i=1,N_catd
+          do i=1,N_catf
              std_RedArkOSSE_sm(i) = this_obs_param%errstd
           end do
           
@@ -4544,7 +4544,7 @@ contains
   
   ! *******************************************************************
   
-  subroutine read_obs_RedArkOSSE_CLSMsynthSM( date_time, N_catd,       &
+  subroutine read_obs_RedArkOSSE_CLSMsynthSM( date_time, N_catf,       &
        this_obs_param,                                                 &
        found_obs, RedArkOSSE_CLSMsynthSM, std_RedArkOSSE_CLSMsynthSM )
     
@@ -4558,7 +4558,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 16 Feb 2006
     ! reichle,  5 Apr 2007 - use obs std from default nml input 
@@ -4572,14 +4572,14 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: RedArkOSSE_CLSMsynthSM
-    real,    intent(out), dimension(N_catd) :: std_RedArkOSSE_CLSMsynthSM
+    real,    intent(out), dimension(N_catf) :: RedArkOSSE_CLSMsynthSM
+    real,    intent(out), dimension(N_catf) :: std_RedArkOSSE_CLSMsynthSM
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -4637,8 +4637,8 @@ contains
           
           tmp_obs_std = this_obs_param%errstd
           
-          RedArkOSSE_CLSMsynthSM(    1:N_catd) = nodata
-          std_RedArkOSSE_CLSMsynthSM(1:N_catd) = tmp_obs_std
+          RedArkOSSE_CLSMsynthSM(    1:N_catf) = nodata
+          std_RedArkOSSE_CLSMsynthSM(1:N_catf) = tmp_obs_std
           
           do i=1,N_tmp
              
@@ -4665,7 +4665,7 @@ contains
 
   ! *****************************************************************
   
-  subroutine read_obs_VivianaOK_CLSMsynthSM( date_time, N_catd,      &
+  subroutine read_obs_VivianaOK_CLSMsynthSM( date_time, N_catf,      &
        this_obs_param,                                               &
        found_obs, VivianaOK_CLSMsynthSM, std_VivianaOK_CLSMsynthSM )
     
@@ -4677,7 +4677,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! vmaggion + reichle,  4 Aug 2008:
     !    adapted from read_obs_RedArkOSSE_CLSMsynthSM
@@ -4691,14 +4691,14 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: VivianaOK_CLSMsynthSM
-    real,    intent(out), dimension(N_catd) :: std_VivianaOK_CLSMsynthSM
+    real,    intent(out), dimension(N_catf) :: VivianaOK_CLSMsynthSM
+    real,    intent(out), dimension(N_catf) :: std_VivianaOK_CLSMsynthSM
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -4752,10 +4752,10 @@ contains
           
           tmp_obs_std = this_obs_param%errstd
           
-          VivianaOK_CLSMsynthSM(    1:N_catd) = nodata
-          std_VivianaOK_CLSMsynthSM(1:N_catd) = tmp_obs_std
+          VivianaOK_CLSMsynthSM(    1:N_catf) = nodata
+          std_VivianaOK_CLSMsynthSM(1:N_catf) = tmp_obs_std
           
-          do i=1,N_catd
+          do i=1,N_catf
              
              read(10,*) tmp_obs
              
@@ -4781,7 +4781,7 @@ contains
   ! *****************************************************************
   
   subroutine read_obs_RedArkOSSE_truth(                             &
-       date_time, N_catd, this_obs_param,                           &
+       date_time, N_catf, this_obs_param,                           &
        found_obs, RedArkOSSE_truth, std_RedArkOSSE_truth )
     
     ! Read "observations" of true surface soil moisture from Wade Crow's
@@ -4791,7 +4791,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 18 Sep 2006
     !
@@ -4803,14 +4803,14 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: RedArkOSSE_truth
-    real,    intent(out), dimension(N_catd) :: std_RedArkOSSE_truth
+    real,    intent(out), dimension(N_catf) :: RedArkOSSE_truth
+    real,    intent(out), dimension(N_catf) :: std_RedArkOSSE_truth
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -4860,7 +4860,7 @@ contains
        
        if (istat==0) then
           
-          do i=1,N_catd
+          do i=1,N_catf
              
              read(10,*) tmp_real
              
@@ -4872,7 +4872,7 @@ contains
           
           ! set observation error standard deviation
           
-          do i=1,N_catd
+          do i=1,N_catf
              std_RedArkOSSE_truth(i) = this_obs_param%errstd
           end do
           
@@ -4886,8 +4886,8 @@ contains
   ! *****************************************************************
   
   subroutine read_obs_isccp_tskin_gswp2_v1(                        &
-       date_time, N_catd, tile_coord,                              &
-       tile_grid_d, tile_grid_g_ESMF,                              &
+       date_time, N_catf, tile_coord_f,                            &
+       obs2tile_grid_f, tile_grid_g_ESMF,                          &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                     &
        this_obs_param,                                             &
        found_obs, isccp_tskin_gswp2_v1, std_isccp_tskin_gswp2_v1 )
@@ -4902,7 +4902,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 26 Sep 2005
     !
@@ -4914,15 +4914,15 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type), intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -4931,8 +4931,8 @@ contains
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: isccp_tskin_gswp2_v1
-    real,    intent(out), dimension(N_catd) :: std_isccp_tskin_gswp2_v1
+    real,    intent(out), dimension(N_catf) :: isccp_tskin_gswp2_v1
+    real,    intent(out), dimension(N_catf) :: std_isccp_tskin_gswp2_v1
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -4973,7 +4973,7 @@ contains
     
     real,    dimension(N_gswp2_compressed) :: tmp_obs, tmp_lat, tmp_lon
     
-    integer, dimension(N_catd) :: N_obs_in_tile    
+    integer, dimension(N_catf) :: N_obs_in_tile    
     
     ! -------------------------------------------------------------------
     
@@ -5055,8 +5055,8 @@ contains
     
     if (N_tmp>0) then
        
-       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, tile_grid_g_ESMF,                           &
+       call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+            obs2tile_grid_f, tile_grid_g_ESMF,                       &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat(1:N_tmp), tmp_lon(1:N_tmp),               &
             this_obs_param,                                          &
@@ -5072,7 +5072,7 @@ contains
        
        do i=1,N_tmp
           
-          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+          ind = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
           
           if (ind>0) then         ! this step eliminates obs outside domain
              
@@ -5086,7 +5086,7 @@ contains
        
        ! normalize
        
-       do i=1,N_catd
+       do i=1,N_catf
           
           if (N_obs_in_tile(i)>1) then
              
@@ -5106,7 +5106,7 @@ contains
        
        ! set observation error standard deviation
        
-       do i=1,N_catd
+       do i=1,N_catf
           std_isccp_tskin_gswp2_v1(i) = this_obs_param%errstd
        end do
        
@@ -5129,7 +5129,7 @@ contains
   ! *****************************************************************
   
   subroutine read_obs_isccp_tskin_ceop3n4(                       &
-       date_time, N_catd, tile_coord,                            &
+       date_time, N_catf, tile_coord_f,                          &
        this_obs_param,                                           &
        found_obs, isccp_tskin_gswp2_v1, std_isccp_tskin_gswp2_v1 )
     
@@ -5142,7 +5142,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 27 Jan 2009
     !
@@ -5154,16 +5154,16 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: isccp_tskin_gswp2_v1
-    real,    intent(out), dimension(N_catd) :: std_isccp_tskin_gswp2_v1
+    real,    intent(out), dimension(N_catf) :: isccp_tskin_gswp2_v1
+    real,    intent(out), dimension(N_catf) :: std_isccp_tskin_gswp2_v1
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -5256,7 +5256,7 @@ contains
     
     ! -------------------------------------------------------------------
 
-    if (N_catd/=N_tiles) then
+    if (N_catf/=N_tiles) then
        err_msg = 'error 1 -- use only for CEOP3n4_by_tile_144x91 domain'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
@@ -5305,7 +5305,7 @@ contains
           
           ! double-check tile ids
           
-          if (GEOS5_to_ISCCP(1,i)/=tile_coord(i)%tile_id) then          
+          if (GEOS5_to_ISCCP(1,i)/=tile_coord_f(i)%tile_id) then          
              
              !write (logunit,*) 'error 2 -- only for CEOP3n4_by_tile_144x91 domain'
              !stop
@@ -5339,7 +5339,7 @@ contains
        
        ! set observation error standard deviation
        
-       do i=1,N_catd
+       do i=1,N_catf
           std_isccp_tskin_gswp2_v1(i) = this_obs_param%errstd
        end do
        
@@ -5356,9 +5356,9 @@ contains
   ! *****************************************************************
   ! *****************************************************************
   
-  subroutine read_obs_isccp_ts_ceop3n4_hdASC(          &
-       date_time, N_catd, tile_coord,                            &
-       this_obs_param,                                           &
+  subroutine read_obs_isccp_ts_ceop3n4_hdASC(                      &
+       date_time, N_catf, tile_coord_f,                            &
+       this_obs_param,                                             &
        found_obs, isccp_tskin_halfdeg, std_isccp_tskin_halfdeg )
     
     ! *** ONLY for "CEOP3n4_by_tile_FV_144x91" domain ***
@@ -5373,7 +5373,7 @@ contains
     !
     ! inputs to this subroutine:
     !  date_time = current model date and time 
-    !  N_catd    = number of catchments in domain
+    !  N_catf    = number of catchments in domain
     !
     ! reichle, 1 Apr 2010
     !
@@ -5385,16 +5385,16 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
     
-    real,    intent(out), dimension(N_catd) :: isccp_tskin_halfdeg
-    real,    intent(out), dimension(N_catd) :: std_isccp_tskin_halfdeg
+    real,    intent(out), dimension(N_catf) :: isccp_tskin_halfdeg
+    real,    intent(out), dimension(N_catf) :: std_isccp_tskin_halfdeg
     logical, intent(out)                    :: found_obs
     
     ! ---------------
@@ -5475,7 +5475,7 @@ contains
     
     ! -------------------------------------------------------------------
 
-    if (N_catd/=N_tiles) then
+    if (N_catf/=N_tiles) then
        err_msg = 'error 1 -- use only for CEOP3n4_by_tile_144x91 domain'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
@@ -5523,7 +5523,7 @@ contains
           
           ! double-check tile ids
           
-          if (GEOS5_to_ISCCP(1,i)/=tile_coord(i)%tile_id) then          
+          if (GEOS5_to_ISCCP(1,i)/=tile_coord_f(i)%tile_id) then          
              
              !write (logunit,*) 'error 2 -- only for CEOP3n4_by_tile_144x91 domain'
              !stop
@@ -5565,7 +5565,7 @@ contains
        
        ! set observation error standard deviation
        
-       do i=1,N_catd
+       do i=1,N_catf
           std_isccp_tskin_halfdeg(i) = this_obs_param%errstd
        end do
        
@@ -5580,9 +5580,9 @@ contains
   
   ! *****************************************************************
 
-  subroutine read_obs_SMOS( date_time, N_catd, this_obs_param,      &
-       dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,     &
-       N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,        &
+  subroutine read_obs_SMOS( date_time, N_catf, this_obs_param,        &
+       dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF, &
+       N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,          &
        found_obs, SMOS_data, std_SMOS_data, SMOS_lon, SMOS_lat )
 
     ! reader for preprocessed SMOS Tb and soil moisture (SM) files
@@ -5625,15 +5625,15 @@ contains
     type(date_time_type), intent(in) :: date_time
     type(obs_param_type), intent(in) :: this_obs_param
     
-    integer,              intent(in) :: dtstep_assim, N_catd
+    integer,              intent(in) :: dtstep_assim, N_catf
 
-    type(grid_def_type),  intent(in) :: tile_grid_d
+    type(grid_def_type),  intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space        
 
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
 
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -5644,8 +5644,8 @@ contains
 
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: SMOS_data, std_SMOS_data
-    real,    intent(out), dimension(N_catd) :: SMOS_lon, SMOS_lat
+    real,    intent(out), dimension(N_catf) :: SMOS_data, std_SMOS_data
+    real,    intent(out), dimension(N_catf) :: SMOS_lon, SMOS_lat
 
     ! --------------------------------------
 
@@ -5710,7 +5710,7 @@ contains
     character( 80)       :: tmpstr80
     character(300)       :: tmpfname
     
-    integer,        dimension(N_catd)           :: N_obs_in_tile
+    integer,        dimension(N_catf)           :: N_obs_in_tile
 
     character(300), dimension(:),   allocatable :: fnames
 
@@ -6212,8 +6212,8 @@ contains
              ! (center of M36 grid cell is equidistant from at least two M09 model 
              !  tiles) -- reichle, 23 Aug 2013
              
-             call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                  tile_grid_d, tile_grid_g_ESMF,                           &
+             call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+                  obs2tile_grid_f, tile_grid_g_ESMF,                       &
                   N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                   N_obs, tmp_lat, tmp_lon,                                 &
                   this_obs_param,                                          &
@@ -6248,16 +6248,16 @@ contains
              !  ! - reichle, 3 Feb 2016
              !  
              !  if   (                                                               &
-             !       (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
-             !       (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
+             !       (index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0) .or.           &
+             !       (index(obs2tile_grid_f%gridtype, 'EASEv2_M36')  /=0)       )  then
              !     
              !     do ii=1,N_obs
              !     
              !        if (tmp_tile_num(ii)>0) then
              !           
              !           call MAPL_ease_convert('EASEv2_M36',        &
-             !                tile_coord(tmp_tile_num(ii))%com_lat,  &
-             !                tile_coord(tmp_tile_num(ii))%com_lon,  &
+             !                tile_coord_f(tmp_tile_num(ii))%com_lat,  &
+             !                tile_coord_f(tmp_tile_num(ii))%com_lon,  &
              !                M36_col_ind_tile, M36_row_ind_tile  )
              !           
              !           call MAPL_ease_convert('EASEv2_M36',        &
@@ -6288,7 +6288,7 @@ contains
              
              do i=1,N_obs
                 
-                ind_tile = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+                ind_tile = tmp_tile_num(i)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
                 
                 if (ind_tile>0) then         ! this step eliminates obs outside domain
                    
@@ -6304,7 +6304,7 @@ contains
              
              ! normalize
              
-             do i=1,N_catd
+             do i=1,N_catf
                 
                 if (N_obs_in_tile(i)>1) then
                    
@@ -6332,7 +6332,7 @@ contains
              
              ! set observation error standard deviation
              
-             do i=1,N_catd
+             do i=1,N_catf
                 std_SMOS_data(i) = this_obs_param%errstd
              end do
              
@@ -6409,8 +6409,8 @@ contains
   ! *****************************************************************
 
   subroutine read_obs_MODIS_SCF(                                   &
-       date_time, dtstep_assim, N_catd, tile_coord,                &
-       tile_grid_d, tile_grid_g_ESMF,                              &
+       date_time, dtstep_assim, N_catf, tile_coord_f,              &
+       obs2tile_grid_f, tile_grid_g_ESMF,                          &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                     &
        this_obs_param, write_obslog,                               &
        found_obs, MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat )
@@ -6436,15 +6436,15 @@ contains
     type(date_time_type),                    intent(in)   :: date_time
     
     integer,                                 intent(in)   :: dtstep_assim           ! [seconds]
-    integer,                                 intent(in)   :: N_catd
+    integer,                                 intent(in)   :: N_catf
     
-    type(tile_coord_type), dimension(:),     pointer      :: tile_coord             ! input
+    type(tile_coord_type), dimension(:),     pointer      :: tile_coord_f             ! input
     
-    type(grid_def_type),                     intent(in)   :: tile_grid_d
+    type(grid_def_type),                     intent(in)   :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer,               dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: N_tile_in_cell_ij
+    integer,               dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: N_tile_in_cell_ij
     
     integer,               dimension(:,:,:), pointer      :: tile_num_in_cell_ij    ! input
 
@@ -6456,7 +6456,7 @@ contains
 
     logical,                                  intent(out) :: found_obs
 
-    real,                  dimension(N_catd), intent(out) :: MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat
+    real,                  dimension(N_catf), intent(out) :: MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat
 
     ! ------------------------------------------------------------------------
     
@@ -6509,7 +6509,7 @@ contains
 
     integer, dimension(:),     allocatable :: tmp_tile_num
 
-    integer, dimension(N_catd)             :: N_obs_in_tile
+    integer, dimension(N_catf)             :: N_obs_in_tile
     
     character(len=*),          parameter   :: Iam = 'read_obs_MODIS_SCF'
     character(len=400)                     :: err_msg
@@ -6570,7 +6570,7 @@ contains
     
     ! determine longitude band associated with assimilation window and local overpass hour
     !
-    ! observations will be returned only for tiles with lon_end < tile_coord%com_lon <= lon_beg
+    ! observations will be returned only for tiles with lon_end < tile_coord_f%com_lon <= lon_beg
     
     call localtime2longitude( date_time_beg, overpass_hour, lon_beg, delta_day_beg )
     call localtime2longitude( date_time_end, overpass_hour, lon_end, delta_day_end )
@@ -6580,11 +6580,11 @@ contains
     !
     ! --> because tiles have a non-zero extent, need to read MODIS obs in CMG grid cells located 
     !     in a wider band (lon_min-delta:lon_max+delta),
-    !     where delta should be somewhat larger than max( tile_coord%max_lon - tile_coord%min_lon )
+    !     where delta should be somewhat larger than max( tile_coord_f%max_lon - tile_coord_f%min_lon )
     
-    tmp_delta = 3.*maxval( tile_coord(1:N_catd)%max_lon - tile_coord(1:N_catd)%min_lon )   ! [degrees]
+    tmp_delta = 3.*maxval( tile_coord_f(1:N_catf)%max_lon - tile_coord_f(1:N_catf)%min_lon )   ! [degrees]
     
-    tmp_delta = tmp_delta/360.*86400.                                                      ! [seconds]
+    tmp_delta = tmp_delta/360.*86400.                                                          ! [seconds]
     
     date_time_beg_MODIS = date_time_beg
     date_time_end_MODIS = date_time_end
@@ -6686,8 +6686,8 @@ contains
 
     ! determine latitude band covered by domain (no need to read obs outside domain)
 
-    lat_min = minval( tile_coord(1:N_catd)%min_lat )
-    lat_max = maxval( tile_coord(1:N_catd)%max_lat )
+    lat_min = minval( tile_coord_f(1:N_catf)%min_lat )
+    lat_max = maxval( tile_coord_f(1:N_catf)%max_lat )
 
     
     ! determine N_lat and N_lon[_vec] (# CMG grid cells in lat/lon bands )
@@ -6829,8 +6829,8 @@ contains
     
     allocate(tmp_tile_num(N_CMG_obs))
     
-    call get_tile_num_for_obs( N_catd, tile_coord,                 &
-         tile_grid_d, tile_grid_g_ESMF,                            &
+    call get_tile_num_for_obs( N_catf, tile_coord_f,               &
+         obs2tile_grid_f, tile_grid_g_ESMF,                        &
          N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
          N_CMG_obs, CMG_lat(1:N_CMG_obs), CMG_lon(1:N_CMG_obs),    &
          this_obs_param,                                           &
@@ -6847,7 +6847,7 @@ contains
     
     do kk=1,N_CMG_obs
        
-       ind = tmp_tile_num(kk)          ! 1<=tmp_tile_num<=N_catd (unless nodata)
+       ind = tmp_tile_num(kk)          ! 1<=tmp_tile_num<=N_catf (unless nodata)
        
        if (ind>0) then                 ! this condition eliminates obs outside domain
           
@@ -6863,7 +6863,7 @@ contains
     
     ! normalize
     
-    do kk=1,N_catd
+    do kk=1,N_catf
        if (N_obs_in_tile(kk)>0) then
           
           tmp_real      = real(N_obs_in_tile(kk))
@@ -6908,9 +6908,9 @@ contains
        
        ! need only one longitude band (keep obs when lon_end<com_lon<=lon_beg)
        
-       do kk=1,N_catd
+       do kk=1,N_catf
           
-          if ( (tile_coord(kk)%com_lon<=lon_end) .or. (tile_coord(kk)%com_lon>lon_beg) )  &
+          if ( (tile_coord_f(kk)%com_lon<=lon_end) .or. (tile_coord_f(kk)%com_lon>lon_beg) )  &
                MODIS_obs(kk) = this_obs_param%nodata
           
        end do
@@ -6919,9 +6919,9 @@ contains
        
        ! longitude band wraps around dateline (keep obs when -180<=com_lon<=lon_beg or lon_end<com_lon<=180)
        
-       do kk=1,N_catd
+       do kk=1,N_catf
           
-          if ( (tile_coord(kk)%com_lon>lon_beg) .and. (tile_coord(kk)%com_lon<=lon_end) )  &
+          if ( (tile_coord_f(kk)%com_lon>lon_beg) .and. (tile_coord_f(kk)%com_lon<=lon_end) )  &
                MODIS_obs(kk) = this_obs_param%nodata
           
        end do
@@ -7476,8 +7476,8 @@ contains
 
   ! *****************************************************************
  
-  subroutine read_obs_SMAP_FT( date_time, N_catd, this_obs_param,            &
-       dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,              &
+  subroutine read_obs_SMAP_FT( date_time, N_catf, this_obs_param,            &
+       dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,        &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &
        found_obs, SMAP_data, std_SMAP_data, SMAP_lon, SMAP_lat, SMAP_time )
     
@@ -7495,17 +7495,17 @@ contains
     
     type(date_time_type), intent(in) :: date_time
     
-    integer,              intent(in) :: N_catd, dtstep_assim
+    integer,              intent(in) :: N_catf, dtstep_assim
 
     type(obs_param_type), intent(in) :: this_obs_param
 
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type),  intent(in) :: tile_grid_d
+    type(grid_def_type),  intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space        
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -7516,9 +7516,9 @@ contains
     
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: SMAP_data, std_SMAP_data
-    real,    intent(out), dimension(N_catd) :: SMAP_lon,  SMAP_lat
-    real*8,  intent(out), dimension(N_catd) :: SMAP_time                 ! J2000 seconds
+    real,    intent(out), dimension(N_catf) :: SMAP_data, std_SMAP_data
+    real,    intent(out), dimension(N_catf) :: SMAP_lon,  SMAP_lat
+    real*8,  intent(out), dimension(N_catf) :: SMAP_time                 ! J2000 seconds
 
     ! --------------------------------------
 
@@ -7585,7 +7585,7 @@ contains
 
     integer,        dimension(7)                   :: dset_size
     integer,        dimension(N_fnames_max)        :: N_obs_kept
-    integer,        dimension(N_catd)              :: N_obs_in_tile
+    integer,        dimension(N_catf)              :: N_obs_in_tile
 
     real,           dimension(:),     allocatable  :: tmp_lon, tmp_lat
     
@@ -7974,8 +7974,8 @@ contains
               
              allocate(tmp_tile_num(N_obs_kept(kk)))
              
-             call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                  tile_grid_d, tile_grid_g_ESMF,                           &
+             call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+                  obs2tile_grid_f, tile_grid_g_ESMF,                       &
                   N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                   N_obs_kept(kk),                                          &
                   tmp_lat(1:N_obs_kept(kk)),                               &
@@ -8021,16 +8021,16 @@ contains
              !  ! - reichle, 3 Feb 2016
              !  
              !  if   (                                                               &
-             !       (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
-             !       (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
+             !       (index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0) .or.           &
+             !       (index(obs2tile_grid_f%gridtype, 'EASEv2_M36')  /=0)       )  then
              !     
              !     do ii=1,N_obs_kept(kk)
              !        
              !        if (tmp_tile_num(ii)>0) then
              !           
              !           call MAPL_ease_convert('EASEv2_M09',        &
-             !                tile_coord(tmp_tile_num(ii))%com_lat,  &
-             !                tile_coord(tmp_tile_num(ii))%com_lon,  &
+             !                tile_coord_f(tmp_tile_num(ii))%com_lat,  &
+             !                tile_coord_f(tmp_tile_num(ii))%com_lon,  &
              !                M09_col_ind_tile, M09_row_ind_tile  )
              !           
              !           call MAPL_ease_convert('EASEv2_M09',        &
@@ -8056,7 +8056,7 @@ contains
              
              do ii=1,N_obs_kept(kk)
                 
-                ind_tile = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+                ind_tile = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
                 
                 if (ind_tile>0) then          ! this step eliminates obs outside domain
                 
@@ -8087,7 +8087,7 @@ contains
           
        ! normalize
        
-       do  ii=1,N_catd
+       do  ii=1,N_catf
           
           if (N_obs_in_tile(ii)>1) then
              
@@ -8113,7 +8113,7 @@ contains
        
        ! set observation error standard deviation
        
-       do ii=1,N_catd
+       do ii=1,N_catf
           std_SMAP_data(ii) = this_obs_param%errstd
        end do
        
@@ -8164,8 +8164,8 @@ contains
 
   ! *****************************************************************
   
-  subroutine read_obs_SMAP_halforbit_Tb( date_time, N_catd, this_obs_param,  &
-       dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,              &
+  subroutine read_obs_SMAP_halforbit_Tb( date_time, N_catf, this_obs_param,  &
+       dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,        &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &
        found_obs, SMAP_data, std_SMAP_data, SMAP_lon, SMAP_lat, SMAP_time )
     
@@ -8196,17 +8196,17 @@ contains
 
     type(date_time_type), intent(in) :: date_time
 
-    integer,              intent(in) :: N_catd, dtstep_assim
+    integer,              intent(in) :: N_catf, dtstep_assim
 
     type(obs_param_type), intent(in) :: this_obs_param
 
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_f_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type),  intent(in) :: tile_grid_d
+    type(grid_def_type),  intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -8217,9 +8217,9 @@ contains
     
     logical, intent(out)                    :: found_obs
 
-    real,    intent(out), dimension(N_catd) :: SMAP_data, std_SMAP_data
-    real,    intent(out), dimension(N_catd) :: SMAP_lon,  SMAP_lat
-    real*8,  intent(out), dimension(N_catd) :: SMAP_time                 ! J2000 seconds
+    real,    intent(out), dimension(N_catf) :: SMAP_data, std_SMAP_data
+    real,    intent(out), dimension(N_catf) :: SMAP_lon,  SMAP_lat
+    real*8,  intent(out), dimension(N_catf) :: SMAP_time                 ! J2000 seconds
 
     ! --------------------------------------
 
@@ -8309,7 +8309,7 @@ contains
 
     integer,        dimension(7)                   :: dset_size
     integer,        dimension(N_fnames_max)        :: N_obs_kept
-    integer,        dimension(N_catd)              :: N_obs_in_tile
+    integer,        dimension(N_catf)              :: N_obs_in_tile
 
     real,           dimension(:),     allocatable  :: tmp_lon, tmp_lat
 
@@ -9075,15 +9075,15 @@ contains
              
              ! shift M36 obs lat/lon for proper assignment of M09 tile?
              
-             if ( L1C_files .and. (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0 .or. index(tile_grid_d%gridtype, 'EASEv2-M09')  /=0 )) then
+             if ( L1C_files .and. (index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0 .or. index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0 )) then
                 
                 ! temporarily shift lat/lon of obs for computation of nearest tile to
                 ! avoid ambiguous assignment of M09 model tile within M36 obs grid cell
                 ! (center of M36 grid cell is equidistant from at least two M09 model 
                 !  tiles) -- reichle, 23 Aug 2013
                 
-                call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                     tile_grid_d, tile_grid_g_ESMF,                           &
+                call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+                     obs2tile_grid_f, tile_grid_g_ESMF,                       &
                      N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                      N_obs_kept(kk),                                          &
                      tmp_lat(1:N_obs_kept(kk)),                               &
@@ -9094,8 +9094,8 @@ contains
                 
              else
                 
-                call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                     tile_grid_d, tile_grid_g_ESMF,                           &
+                call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+                     obs2tile_grid_f, tile_grid_g_ESMF,                       &
                      N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                      N_obs_kept(kk),                                          &
                      tmp_lat(1:N_obs_kept(kk)),                               &
@@ -9142,16 +9142,16 @@ contains
              !  ! - reichle, 3 Feb 2016
              !  
              !  if   (                                                               &
-             !       (index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0) .or.           &
-             !       (index(tile_grid_d%gridtype, 'EASEv2_M36')  /=0)       )  then
+             !       (index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0) .or.           &
+             !       (index(obs2tile_grid_f%gridtype, 'EASEv2_M36')  /=0)       )  then
              !     
              !     do ii=1,N_obs_kept(kk)
              !        
              !        if (tmp_tile_num(ii)>0) then
              !           
              !           call MAPL_ease_convert('EASEv2_M36',        &
-             !                tile_coord(tmp_tile_num(ii))%com_lat,  &
-             !                tile_coord(tmp_tile_num(ii))%com_lon,  &
+             !                tile_coord_f(tmp_tile_num(ii))%com_lat,  &
+             !                tile_coord_f(tmp_tile_num(ii))%com_lon,  &
              !                M36_col_ind_tile, M36_row_ind_tile  )
              !           
              !           call MAPL_ease_convert('EASEv2_M36',        &
@@ -9177,7 +9177,7 @@ contains
              
              do ii=1,N_obs_kept(kk)
                 
-                ind_tile = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catd (unless nodata)
+                ind_tile = tmp_tile_num(ii)   ! 1<=tmp_tile_num<=N_catf (unless nodata)
                 
                 if (ind_tile>0) then          ! this step eliminates obs outside domain
                 
@@ -9215,7 +9215,7 @@ contains
           
        ! normalize
        
-       do  ii=1,N_catd
+       do  ii=1,N_catf
           
           if (N_obs_in_tile(ii)>1) then
              
@@ -9241,7 +9241,7 @@ contains
        
        ! set observation error standard deviation
        
-       do ii=1,N_catd
+       do ii=1,N_catf
           std_SMAP_data(ii) = this_obs_param%errstd
        end do
        
@@ -9893,8 +9893,8 @@ contains
   
   subroutine read_obs(                                               &
        work_path, exp_id,                                            &
-       date_time, dtstep_assim, N_catd, tile_coord,                  &
-       tile_grid_d, tile_grid_g_ESMF,                                &
+       date_time, dtstep_assim, N_catf, tile_coord_f,                &
+       obs2tile_grid_f, tile_grid_g_ESMF,                            &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                       &
        this_obs_param, write_obslog,                                 &
        found_obs, scaled_obs,                                        &
@@ -9908,7 +9908,7 @@ contains
     !               in connection with get_obs_pred())
     ! 22 Nov 2011 - minor clean-up, renamed scale_obs_*() subroutines
     ! 23 Aug 2013 - added possibility of using lat/lon of obs from reader  
-    !                (rather than using lat/lon from model tile_coord)
+    !                (rather than using lat/lon from model tile_coord_f)
     ! 31 Jan 2014 - added output of time stamp ("tmp_time")
     ! 14 Jul 2014 - added summary diagnostic "scaled_obs" 
     !                (indicates whether any of the founds obs were scaled)
@@ -9925,15 +9925,15 @@ contains
 
     type(date_time_type),  intent(in) :: date_time
     
-    integer,               intent(in) :: dtstep_assim, N_catd
+    integer,               intent(in) :: dtstep_assim, N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
-    type(grid_def_type),   intent(in) :: tile_grid_d
+    type(grid_def_type),   intent(in) :: obs2tile_grid_f
 
     type(ESMF_Grid),       intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
@@ -9944,12 +9944,12 @@ contains
 
     ! outputs:
 
-    real,    intent(out), dimension(N_catd) :: tmp_obs
-    real,    intent(out), dimension(N_catd) :: tmp_std_obs
-    real,    intent(out), dimension(N_catd) :: tmp_lon
-    real,    intent(out), dimension(N_catd) :: tmp_lat
-    real*8,  intent(out), dimension(N_catd) :: tmp_time
-    logical, intent(out), dimension(N_catd) :: tmp_assim
+    real,    intent(out), dimension(N_catf) :: tmp_obs
+    real,    intent(out), dimension(N_catf) :: tmp_std_obs
+    real,    intent(out), dimension(N_catf) :: tmp_lon
+    real,    intent(out), dimension(N_catf) :: tmp_lat
+    real*8,  intent(out), dimension(N_catf) :: tmp_time
+    logical, intent(out), dimension(N_catf) :: tmp_assim
 
     logical, intent(out)                    :: found_obs, scaled_obs
 
@@ -9969,8 +9969,8 @@ contains
 
     ! initialize lat/lon/time info (may later be overwritten by individual reader)
     
-    tmp_lon  = tile_coord%com_lon
-    tmp_lat  = tile_coord%com_lat
+    tmp_lon  = tile_coord_f%com_lon
+    tmp_lat  = tile_coord_f%com_lat
 
     ! obs time stamp in LDASsa *must* be in J2000 seconds with 'TT12' epoch
     ! (see enkf_types.F90)
@@ -9988,8 +9988,8 @@ contains
        
        call read_obs_ae_l2_sm(                                        &
             work_path, exp_id,                                        &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
@@ -10000,7 +10000,7 @@ contains
 
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
           
        end if
@@ -10010,8 +10010,8 @@ contains
        
        call read_obs_ae_sm_LPRM(                                      &
             work_path, exp_id,                                        &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
@@ -10022,7 +10022,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
 
        end if
@@ -10032,8 +10032,8 @@ contains
        
        call read_obs_sm_ASCAT(                                        &
             work_path, exp_id,                                        &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
@@ -10044,7 +10044,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
           
        end if
@@ -10052,8 +10052,8 @@ contains
     case ('ASCAT_META_SM','ASCAT_METB_SM','ASCAT_METC_SM' )
 
        call read_obs_sm_ASCAT_EUMET(                                  &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
@@ -10065,7 +10065,7 @@ contains
 
           scaled_obs = .true.
 
-          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+          call scale_obs_sfmc_zscore( N_catf, tile_coord_f,           &
                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
                tmp_obs, tmp_std_obs )
 
@@ -10074,8 +10074,8 @@ contains
     case ('ASCAT_HSAF_META_SM','ASCAT_HSAF_METB_SM','ASCAT_HSAF_METC_SM' )
 
        call read_obs_sm_ASCAT_HSAF(                                   &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
@@ -10087,7 +10087,7 @@ contains
 
           scaled_obs = .true.
 
-          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+          call scale_obs_sfmc_zscore( N_catf, tile_coord_f,           &
                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
                tmp_obs, tmp_std_obs )
 
@@ -10096,8 +10096,8 @@ contains
     case ('CYGNSS_SM_6hr','CYGNSS_SM_daily')
        
        call read_obs_sm_CYGNSS(                                       &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
@@ -10109,7 +10109,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_sfmc_zscore( N_catd, tile_coord,             &
+          call scale_obs_sfmc_zscore( N_catf, tile_coord_f,           &
                date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time, &
                tmp_obs, tmp_std_obs )
           
@@ -10118,8 +10118,8 @@ contains
     case ('isccp_tskin_gswp2_v1')
        
        call read_obs_isccp_tskin_gswp2_v1(                            &
-            date_time, N_catd, tile_coord,                            &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, N_catf, tile_coord_f,                          &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
@@ -10128,7 +10128,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_tskin_zscore( N_catd, tile_coord,          &
+          call scale_obs_tskin_zscore( N_catf, tile_coord_f,          &
                date_time, this_obs_param,  tmp_obs, tmp_std_obs )
           
        end if
@@ -10136,7 +10136,7 @@ contains
     case ('isccp_tskin_ceop3n4')
               
        call read_obs_isccp_tskin_ceop3n4(                             &
-            date_time, N_catd, tile_coord,                            &
+            date_time, N_catf, tile_coord_f,                          &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
        
@@ -10144,7 +10144,7 @@ contains
           
           scaled_obs = .true.
 
-          call scale_obs_tskin_zscore( N_catd, tile_coord,          &
+          call scale_obs_tskin_zscore( N_catf, tile_coord_f,          &
                date_time, this_obs_param,  tmp_obs, tmp_std_obs )
        
        end if
@@ -10152,7 +10152,7 @@ contains
     case ('isccp_tskin_ceop3n4_hdASC')
        
        call read_obs_isccp_ts_ceop3n4_hdASC(                          &
-            date_time, N_catd, tile_coord,                            &
+            date_time, N_catf, tile_coord_f,                          &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
        
@@ -10160,7 +10160,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_tskin_zscore( N_catd, tile_coord,          &
+          call scale_obs_tskin_zscore( N_catf, tile_coord_f,          &
                date_time, this_obs_param,  tmp_obs, tmp_std_obs )
 
        end if
@@ -10168,7 +10168,7 @@ contains
     case ('RedArkOSSE_sm')
        
        call read_obs_RedArkOSSE_sm(                                   &
-            date_time, N_catd, tile_coord, this_obs_param,            &
+            date_time, N_catf, tile_coord_f, this_obs_param,          &
             found_obs, tmp_obs, tmp_std_obs )
        
        ! scale observations to model climatology (use AMSR-E subroutine)
@@ -10177,7 +10177,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
 
        end if
@@ -10185,7 +10185,7 @@ contains
     case ('RedArkOSSE_CLSMsynthSM')
        
        call read_obs_RedArkOSSE_CLSMsynthSM(                          &
-            date_time, N_catd, this_obs_param,                        &
+            date_time, N_catf, this_obs_param,                        &
             found_obs, tmp_obs, tmp_std_obs )
        
        ! scale observations to model climatology (use AMSR-E subroutine)
@@ -10194,7 +10194,7 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
 
        end if
@@ -10202,7 +10202,7 @@ contains
     case ('RedArkOSSE_truth_50mm','RedArkOSSE_truth_400mm')
        
        call read_obs_RedArkOSSE_truth(                                   &
-            date_time, N_catd, this_obs_param,                           &
+            date_time, N_catf, this_obs_param,                           &
             found_obs, tmp_obs, tmp_std_obs )
 
        ! scale observations to model climatology (use AMSR-E subroutine)
@@ -10211,7 +10211,7 @@ contains
       
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
 
        end if
@@ -10227,7 +10227,7 @@ contains
     case ('VivianaOK_CLSMsynthSM')
        
        call read_obs_VivianaOK_CLSMsynthSM(                           &
-            date_time, N_catd, this_obs_param,                        &
+            date_time, N_catf, this_obs_param,                        &
             found_obs, tmp_obs, tmp_std_obs )
        
        ! scale observations to model climatology (use AMSR-E subroutine)
@@ -10236,17 +10236,17 @@ contains
           
           scaled_obs = .true.
           
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
           
        end if
 
     case('SMOS_SM_A','SMOS_SM_D')
        
-       call read_obs_SMOS(                                            &
-            date_time, N_catd, this_obs_param,                        &
-            dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,  &
-            N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,     &
+       call read_obs_SMOS(                                                  &
+            date_time, N_catf, this_obs_param,                              &
+            dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,  &
+            N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
        
        ! scale observations to model climatology
@@ -10255,7 +10255,7 @@ contains
 
           scaled_obs = .true.
 
-          call scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,   &
+          call scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,   &
                tmp_obs, tmp_std_obs )
           
        end if
@@ -10263,10 +10263,10 @@ contains
     case('SMOS_reg_Tbh_A','SMOS_reg_Tbh_D','SMOS_reg_Tbv_A','SMOS_reg_Tbv_D', &
          'SMOS_fit_Tbh_A','SMOS_fit_Tbh_D','SMOS_fit_Tbv_A','SMOS_fit_Tbv_D')
        
-       call read_obs_SMOS(                                            &
-            date_time, N_catd, this_obs_param,                        &
-            dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,  &
-            N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,     &
+       call read_obs_SMOS(                                                  &
+            date_time, N_catf, this_obs_param,                              &
+            dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,  &
+            N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
        
        ! scale observations to model climatology
@@ -10275,7 +10275,7 @@ contains
 
           scaled_obs = .true.
 
-          call scale_obs_Tb_zscore( N_catd, tile_coord, date_time,  &
+          call scale_obs_Tb_zscore( N_catf, tile_coord_f, date_time,  &
                this_obs_param, tmp_obs, tmp_std_obs, tmp_assim )
           
        end if
@@ -10283,8 +10283,8 @@ contains
     case ('MOD10C1','MYD10C1')
        
        call read_obs_MODIS_SCF(                                       &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
@@ -10299,8 +10299,8 @@ contains
          'SMAP_L2AP_Tbh_D',    'SMAP_L2AP_Tbv_D' )
 
        call read_obs_SMAP_halforbit_Tb(                                     &
-            date_time, N_catd, this_obs_param,                              &
-            dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,        &
+            date_time, N_catf, this_obs_param,                              &
+            dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,  &
             N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time )
        
@@ -10310,7 +10310,7 @@ contains
 
           scaled_obs = .true.
           
-          call scale_obs_Tb_zscore( N_catd, tile_coord, date_time,  &
+          call scale_obs_Tb_zscore( N_catf, tile_coord_f, date_time,  &
                this_obs_param, tmp_obs, tmp_std_obs, tmp_assim )
 
        end if
@@ -10319,8 +10319,8 @@ contains
          'LaRC_tskin-FY2E-', 'LaRC_tskin-MTST2')
               
        call read_obs_LaRC_Tskin(                                      &
-            date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, tile_grid_g_ESMF,                            &
+            date_time, dtstep_assim, N_catf, tile_coord_f,            &
+            obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs )
@@ -10340,7 +10340,7 @@ contains
     
   ! *****************************************************************
   
-  subroutine scale_obs_sfmc_cdf( N_catd, tile_coord, this_obs_param,  &
+  subroutine scale_obs_sfmc_cdf( N_catf, tile_coord_f, this_obs_param,  &
        tmp_obs, tmp_std_obs )
     
     ! scale sfmc obs to model climatology via cdf matching
@@ -10367,20 +10367,20 @@ contains
     !
     ! reichle, 22 Nov 2011 - renamed subroutine, minor clean-up, added comments
     ! reichle,  9 Nov 2012 - edited to enable use of stats file that do not 
-    !                         perfectly match current domain (as in tile_coord)
+    !                         perfectly match current domain (as in tile_coord_f)
     
     implicit none
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
         
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
         
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! inout
     
-    real,    intent(inout), dimension(N_catd) :: tmp_obs
-    real,    intent(inout), dimension(N_catd) :: tmp_std_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_std_obs
     
     ! local variables
     
@@ -10421,7 +10421,7 @@ contains
     
     ! minimal consistency check
     
-    if (N_catd>N_sclprm) then
+    if (N_catf>N_sclprm) then
        err_msg = 'N_sclprm too small'
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
     end if
@@ -10446,7 +10446,7 @@ contains
     
     ! scale observations
     
-    do i=1,N_catd
+    do i=1,N_catf
        
        ! check for no-data-values in observation
        !  (any negative number could be no-data-value for observations)
@@ -10455,7 +10455,7 @@ contains
           
           ! find ind for current tile id in scaling parameters
           
-          if (tmp_tile_id(i)==tile_coord(i)%tile_id) then
+          if (tmp_tile_id(i)==tile_coord_f(i)%tile_id) then
              
              ind = i  ! educated guess for global domain
              
@@ -10463,7 +10463,7 @@ contains
              
              do ind=1,N_sclprm
                 
-                if (tmp_tile_id(ind)==tile_coord(i)%tile_id)  exit
+                if (tmp_tile_id(ind)==tile_coord_f(i)%tile_id)  exit
                 
              end do
              
@@ -10566,8 +10566,8 @@ contains
   
   ! *****************************************************************
   
-  subroutine scale_obs_tskin_zscore( N_catd, tile_coord,   &
-       date_time, this_obs_param,                          &
+  subroutine scale_obs_tskin_zscore( N_catf, tile_coord_f,   &
+       date_time, this_obs_param,                            &
        tmp_obs, tmp_std_obs )
 
     ! scale tskin obs to model climatology via standard-normal-deviate (zscore)
@@ -10585,9 +10585,9 @@ contains
     
     implicit none
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
         
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
     type(date_time_type), intent(in) :: date_time
     
@@ -10595,8 +10595,8 @@ contains
     
     ! inout
     
-    real,    intent(inout), dimension(N_catd) :: tmp_obs
-    real,    intent(inout), dimension(N_catd) :: tmp_std_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_std_obs
     
     ! ----------------------------------------------------------
     
@@ -10667,7 +10667,7 @@ contains
     
     ! minimal consistency check
     
-    if (N_catd>N_sclprm) then
+    if (N_catf>N_sclprm) then
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'something is wrong')
     end if
     
@@ -10677,7 +10677,7 @@ contains
     ! isccp_tskin_gswp2_v1 because of the way the subroutine is called
     ! from subroutine read_obs())
     
-    do i=1,N_catd
+    do i=1,N_catf
        
        ! check for no-data-values in observation (any neg Tskin is no_data)
        
@@ -10687,14 +10687,14 @@ contains
           
           do ind=1,N_sclprm
              
-             if (sclprm_tile_id(ind)==tile_coord(i)%tile_id)  exit
+             if (sclprm_tile_id(ind)==tile_coord_f(i)%tile_id)  exit
              
           end do
           
           ! sanity check (against accidental use of wrong tile space)
           
-          if ( abs(tile_coord(i)%com_lat-sclprm_lat(ind))>tol  .or.             &
-               abs(tile_coord(i)%com_lon-sclprm_lon(ind))>tol        ) then
+          if ( abs(tile_coord_f(i)%com_lat-sclprm_lat(ind))>tol  .or.             &
+               abs(tile_coord_f(i)%com_lon-sclprm_lon(ind))>tol        ) then
              err_msg = 'something wrong'
              call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
           end if
@@ -10745,7 +10745,7 @@ contains
  
   ! *****************************************************************
   
-  subroutine scale_obs_sfmc_zscore( N_catd, tile_coord,         &
+  subroutine scale_obs_sfmc_zscore( N_catf, tile_coord_f,       &
        date_time, this_obs_param, tmp_lon, tmp_lat, tmp_time,   &
        tmp_obs, tmp_std_obs )
     
@@ -10790,21 +10790,21 @@ contains
     use netcdf   
     implicit none
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
     
-    type(tile_coord_type), dimension(:), pointer :: tile_coord    ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f    ! input
     
     type(date_time_type), intent(in) :: date_time
     
     type(obs_param_type), intent(in) :: this_obs_param
 
-    real,    intent(in),    dimension(N_catd) :: tmp_lon, tmp_lat
-    real*8,  intent(in),    dimension(N_catd) :: tmp_time         ! J2000 seconds
+    real,    intent(in),    dimension(N_catf) :: tmp_lon, tmp_lat
+    real*8,  intent(in),    dimension(N_catf) :: tmp_time         ! J2000 seconds
         
     ! inout
     
-    real,    intent(inout), dimension(N_catd) :: tmp_obs
-    real,    intent(inout), dimension(N_catd) :: tmp_std_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_std_obs
        
     ! -------------------
     
@@ -10920,7 +10920,7 @@ contains
     ! Scale observations (at this point all obs are of same type because
     ! of the way the subroutine is called from subroutine read_obs()
     
-    do i=1,N_catd
+    do i=1,N_catf
        
        ! Check for no-data-values in observation (any neg value is no_data)
 
@@ -10993,7 +10993,7 @@ contains
   
   ! ********************************************************************************
   
-  subroutine scale_obs_Tb_zscore( N_catd, tile_coord, date_time, this_obs_param,   &
+  subroutine scale_obs_Tb_zscore( N_catf, tile_coord_f, date_time, this_obs_param,   &
        tmp_obs, tmp_std_obs, tmp_assim )
     
     ! Scale Tb obs to model climatology via standard-normal-deviate (zscore)
@@ -11012,12 +11012,12 @@ contains
     ! global input scaling files for each pentad.
     !    
     ! Note that the tiles in the input scaling parameter files do NOT need
-    ! to be in the same order  as in the domain tile_coord vector (although
+    ! to be in the same order  as in the domain tile_coord_f vector (although
     ! the fastest execution is obtained when the scaling parameter files
-    ! and the domain tile_coord vector are for exactly the same tiles in 
+    ! and the domain tile_coord_f vector are for exactly the same tiles in 
     ! the same order.
     !
-    ! The vector "tmp_obs" is of length N_catd.  The observations in "tmp_obs"
+    ! The vector "tmp_obs" is of length N_catf.  The observations in "tmp_obs"
     ! are mapped into tile space ONLY for book-keeping (each observation has
     ! been assigned to a model tile).  The observations are not necessarily
     ! representative of the assigned tile and could be for a larger area.
@@ -11034,9 +11034,9 @@ contains
 
     implicit none
     
-    integer, intent(in) :: N_catd
+    integer, intent(in) :: N_catf
         
-    type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
     type(date_time_type), intent(in) :: date_time
     
@@ -11044,9 +11044,9 @@ contains
     
     ! inout
     
-    real,    intent(inout), dimension(N_catd) :: tmp_obs
-    real,    intent(inout), dimension(N_catd) :: tmp_std_obs
-    logical, intent(inout), dimension(N_catd) :: tmp_assim
+    real,    intent(inout), dimension(N_catf) :: tmp_obs
+    real,    intent(inout), dimension(N_catf) :: tmp_std_obs
+    logical, intent(inout), dimension(N_catf) :: tmp_assim
     
     ! ----------------------------------------------------------
     
@@ -11303,7 +11303,7 @@ contains
     ! scale observations (at this point all obs are of type Tb because 
     ! of the way the subroutine is called from subroutine read_obs())
     
-    do i=1,N_catd
+    do i=1,N_catf
        
        ! check for no-data-values in observation (any neg Tb is no_data)
        
@@ -11313,11 +11313,11 @@ contains
 
           ind = -9999  ! initialize to negative integer
           
-          if (N_sclprm==N_catd) then
+          if (N_sclprm==N_catf) then
              
              ! try an educated guess (to avoid an additional loop)
              
-             if (sclprm_tile_id(i)==tile_coord(i)%tile_id)  ind = i  
+             if (sclprm_tile_id(i)==tile_coord_f(i)%tile_id)  ind = i  
              
           end if
           
@@ -11325,7 +11325,7 @@ contains
              
              do ind=1,N_sclprm
                 
-                if (sclprm_tile_id(ind)==tile_coord(i)%tile_id)  exit
+                if (sclprm_tile_id(ind)==tile_coord_f(i)%tile_id)  exit
                 
              end do
 
@@ -11351,8 +11351,8 @@ contains
              
              ! sanity check (against accidental use of wrong tile space)
              
-             if ( abs(tile_coord(i)%com_lat-sclprm_lat(ind))>tol .or.            &
-                  abs(tile_coord(i)%com_lon-sclprm_lon(ind))>tol       ) then
+             if ( abs(tile_coord_f(i)%com_lat-sclprm_lat(ind))>tol .or.            &
+                  abs(tile_coord_f(i)%com_lon-sclprm_lon(ind))>tol       ) then
                 call ldas_abort(LDAS_GENERIC_ERROR, Iam, 'something wrong')
              end if
 
@@ -11413,7 +11413,7 @@ contains
   subroutine collect_obs(                                                             &
        work_path, exp_id, date_time, dtstep_assim,                                    &
        N_catl,                                                                        &
-       N_catf, tile_coord_f, tile_grid_f, tile_grid_g_ESMF,                           &
+       N_catf, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,                       &
        N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                                    &
        N_catl_vec, low_ind, l2f,                                                      &
        N_obs_param, obs_param, N_obsl_max, write_obslog,                              &
@@ -11451,7 +11451,7 @@ contains
     
     type(tile_coord_type), dimension(:), pointer ::  tile_coord_f  ! input
     
-    type(grid_def_type),                          intent(in)  :: tile_grid_f
+    type(grid_def_type),                          intent(in)  :: obs2tile_grid_f
 
     type(ESMF_Grid),                              intent(in)  :: tile_grid_g_ESMF  ! needed for obs-to-tile mapping in cube-sphere tile space
     
@@ -11537,7 +11537,7 @@ contains
           call read_obs(                                                               &
                work_path, exp_id,                                                      &
                date_time, dtstep_assim, N_catf, tile_coord_f,                          &
-               tile_grid_f, tile_grid_g_ESMF,                                          &
+               obs2tile_grid_f, tile_grid_g_ESMF,                                      &
                N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
                obs_param(species), write_obslog,                                       &
                found_obs, scaled_obs,                                                  &
@@ -11771,7 +11771,7 @@ contains
   
   ! **************************************************************
 
-  subroutine put_into_Observations( this_obs_param, N_obs_max, N_catd, l2f,   &
+  subroutine put_into_Observations( this_obs_param, N_obs_max, N_catf, l2f,   &
        tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim,           &
        obs_count, Observations )
     
@@ -11793,15 +11793,15 @@ contains
     
     type(obs_param_type), intent(in)  :: this_obs_param
     
-    integer, intent(in) :: N_obs_max, N_catd 
+    integer, intent(in) :: N_obs_max, N_catf 
 
-    integer, dimension(N_catd), intent(in) :: l2f
+    integer, dimension(N_catf), intent(in) :: l2f
 
-    real,    dimension(N_catd), intent(in) :: tmp_obs, tmp_std_obs, tmp_lon, tmp_lat
+    real,    dimension(N_catf), intent(in) :: tmp_obs, tmp_std_obs, tmp_lon, tmp_lat
 
-    real*8,  dimension(N_catd), intent(in) :: tmp_time
+    real*8,  dimension(N_catf), intent(in) :: tmp_time
 
-    logical, dimension(N_catd), intent(in) :: tmp_assim
+    logical, dimension(N_catf), intent(in) :: tmp_assim
     
     integer,                              intent(inout) :: obs_count
     
@@ -11819,7 +11819,7 @@ contains
     
     tol = abs(nodatavalue*nodata_tolfrac_generic)
    
-    do i=1,N_catd
+    do i=1,N_catf
 
        if (abs(tmp_obs(i)-nodatavalue) > tol) then  ! check for no-data-value
            
@@ -11923,8 +11923,8 @@ contains
   
   ! *****************************************************************
   
-  subroutine get_tile_num_for_obs(N_catd, tile_coord,                          &
-       tile_grid, tile_grid_g_ESMF,                                            &
+  subroutine get_tile_num_for_obs(N_catf, tile_coord_f,                        &
+       obs2tile_grid, tile_grid_g_ESMF,                                        &
        N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,             &
        this_obs_param,                                                         &
        tile_num,                                                               &
@@ -11942,15 +11942,15 @@ contains
     
     implicit none
     
-    integer,                                             intent(in)  :: N_catd, N_latlon
+    integer,                                             intent(in)  :: N_catf, N_latlon
     
-    type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
+    type(tile_coord_type), dimension(:),                 pointer     :: tile_coord_f ! input
     
-    type(grid_def_type),                                 intent(in)  :: tile_grid    
+    type(grid_def_type),                                 intent(in)  :: obs2tile_grid    
 
     type(ESMF_Grid),                                     intent(in)  :: tile_grid_g_ESMF  ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
+    integer, dimension(obs2tile_grid%N_lon,obs2tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
     
     integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij ! input
     
@@ -12020,8 +12020,8 @@ contains
     
     ! find tile numbers
 
-    call get_tile_num_from_latlon(N_catd, tile_coord,             &
-         tile_grid, tile_grid_g_ESMF,                             &
+    call get_tile_num_from_latlon(N_catf, tile_coord_f,           &
+         obs2tile_grid, tile_grid_g_ESMF,                         &
          N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
          N_latlon, tmp_lat, tmp_lon,                              &
          tile_num, max_dist_x, max_dist_y )
