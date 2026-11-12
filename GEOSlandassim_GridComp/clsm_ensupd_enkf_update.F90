@@ -153,7 +153,8 @@ contains
        work_path, exp_id,                                                &
        met_force, lai, cat_param, mwRTM_param,                           &
        tile_coord_l, tile_coord_f,                                       &
-       tile_grid_g, pert_grid_f, pert_grid_g,                            &
+       tile_grid_g, tile_grid_g_ESMF,                                    &
+       pert_grid_f, pert_grid_g,                                         &
        N_catl_vec, low_ind, l2f, f2l,                                    &
        update_type,                                                      &
        dtstep_assim, pert_choice,                                        &
@@ -165,14 +166,14 @@ contains
        cat_progn_incr, fresh_incr,                                       &
        N_obsf, N_obsl, Observations_l,                                   &
        N_adapt_R, obs_pert_adapt_param, Pert_adapt_R,                    &
-       Obs_pert, tile_grid_g_ESMF )
+       Obs_pert )
 
     ! -------------------------------------------------------------
 
     ! return increments instead of updated cat_progn
     ! reichle, 18 Oct 2005
     !
-    ! added optional input tile_grid_g_ESMF (ESMF grid of tile space), needed (only) to map obs
+    ! added input tile_grid_g_ESMF (ESMF grid of tile space), needed (only) to map obs
     !  to tiles in cube-sphere tile space
     ! amfox, 8 Nov 2026
 
@@ -205,8 +206,10 @@ contains
 
     type(tile_coord_type), dimension(:), pointer :: tile_coord_l, tile_coord_f  ! input
 
-    type(grid_def_type), intent(in) :: tile_grid_g, pert_grid_f, pert_grid_g
+    type(grid_def_type), intent(in) :: tile_grid_g, pert_grid_f, pert_grid_g    ! LDAS grid type
 
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF                         ! ESMF grid type, needed for cube-sphere tile space
+        
     integer, intent(in), dimension(numprocs) :: N_catl_vec, low_ind
 
     integer, intent(in), dimension(N_catl)   :: l2f
@@ -256,8 +259,6 @@ contains
     real, dimension(N_adapt_R,N_catl), intent(in) :: Pert_adapt_R
 
     real, dimension(N_obsl_max,N_ens), intent(out), optional :: Obs_pert
-
-    type(ESMF_Grid), intent(in), optional :: tile_grid_g_ESMF    ! needed for cube-sphere tile space
 
     ! ----------------------------------------------
 
