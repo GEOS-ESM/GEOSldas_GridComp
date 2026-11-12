@@ -11928,7 +11928,7 @@ contains
        N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,             &
        this_obs_param,                                                         &
        tile_num,                                                               &
-       shift_lat, shift_lon, )
+       shift_lat, shift_lon )
     
     ! find one tile for each obs that "administers" the obs 
     !
