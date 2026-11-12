@@ -451,8 +451,6 @@ contains
              obs2tile_grid_f%ur_lon = pert_grid_f%ur_lon
              obs2tile_grid_f%ur_lat = pert_grid_f%ur_lat
 
-             allocate(N_tile_in_cell_ij_f(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat))
-
              tmp_i_indg = tile_coord_f%i_indg
              tmp_j_indg = tile_coord_f%j_indg
              
@@ -465,13 +463,13 @@ contains
              
              obs2tile_grid_f = pert_grid_f
              
-             allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
-
              tmp_i_indg = tile_coord_f%pert_i_indg
              tmp_j_indg = tile_coord_f%pert_j_indg
 
           end if
 
+          allocate(N_tile_in_cell_ij_f(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat))
+          
           ! first call: count how many tiles are in each tile_grid_f cell
           call get_number_of_tiles_in_cell_ij( N_catf,                                &
                tmp_i_indg, tmp_j_indg,                                                &
@@ -2241,7 +2239,6 @@ contains
     ! reichle,  2 May 2013
     ! reichle, 11 Dec 2013 - added 'SMOS_fit_Tb*' obs species
     !                        (needed for L4_SM_SMOS prototype product)
-    ! amfox,    6 Nov 2026 - renamed pert_grid_f to obs2tile_grid_f (only passed through to collect_obs())
     !
     ! -------------------------------------------------------------------
 
@@ -2258,10 +2255,9 @@ contains
 
     type(tile_coord_type), dimension(:),     pointer :: tile_coord_f  ! input
 
-    type(grid_def_type),                             intent(in) :: tile_grid_g
-    type(grid_def_type),                             intent(in) :: obs2tile_grid_f
+    type(grid_def_type),                             intent(in) :: tile_grid_g,      obs2tile_grid_f
 
-    type(ESMF_Grid),                                 intent(in) :: tile_grid_g_ESMF   ! pass-through only to collect_obs(), not needed for L4SMaup output
+    type(ESMF_Grid),                                 intent(in) :: tile_grid_g_ESMF                    ! pass-through only, not used for L4SMaup output
     
     integer,               dimension(numprocs),      intent(in) :: N_catl_vec
     integer,               dimension(numprocs),      intent(in) :: low_ind
