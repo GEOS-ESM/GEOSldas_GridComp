@@ -1339,6 +1339,13 @@ contains
     allocate(rf2f(N_catf))
     allocate(f2rf(N_catf))
     
+    ! tile_coord holds all tiles of the forcing locstream (land, plus lake and landice if requested),
+    !   whereas land_nt_local is the number of land tiles.
+    ! Here and below (l2f, f_num, and tile_coord_l passed with N_catl), only the first land_nt_local entries
+    !   are used, which requires that land tiles come first in tile_coord.
+    _ASSERT(count(tcinternal%tile_coord(:)%typ==MAPL_LAND)==land_nt_local, "LandAssim: number of land tiles in tile_coord does not match land locstream")
+    _ASSERT(all(tcinternal%tile_coord(1:land_nt_local)%typ==MAPL_LAND),    "LandAssim: land tiles must come first in tile_coord")
+
     call MPI_AllGATHERV(tcinternal%l2f,  land_nt_local, MPI_INTEGER,              &
          rf2f, N_catl_vec,    low_ind-1,  MPI_INTEGER,  &
          mpicomm,mpierr)
@@ -1357,7 +1364,7 @@ contains
        l2rf(i) = low_ind(myid+1) + i - 1
     end do
     
-    tcwrap%ptr%tile_coord%f_num = l2rf
+    tcwrap%ptr%tile_coord(1:land_nt_local)%f_num = l2rf   ! land tiles only (see above)
     
     ! invert mapping from local to full grid (get f2l from l2f)
     
