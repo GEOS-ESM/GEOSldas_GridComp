@@ -499,7 +499,7 @@ contains
        if (out_smapL4SMaup)                                                        &
             call output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,   &
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
-            tile_coord_f, tile_grid_g, obs2tile_grid_f, tile_grid_g_ESMF,          &
+            tile_coord_f, tile_grid_g, tile_grid_g_ESMF, obs2tile_grid_f,          &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
             N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
 
@@ -2229,7 +2229,7 @@ contains
 
   subroutine output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,    &
        N_ens, N_catl, N_catf, N_obsl_max,                                       &
-       tile_coord_f, tile_grid_g, obs2tile_grid_f, tile_grid_g_ESMF,            &
+       tile_coord_f, tile_grid_g, tile_grid_g_ESMF, obs2tile_grid_f,            &
        N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,    &
        N_obs_param, obs_param, Observations_l, cat_param, cat_progn          )
 
