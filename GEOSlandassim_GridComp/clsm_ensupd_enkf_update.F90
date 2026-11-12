@@ -173,9 +173,8 @@ contains
     ! return increments instead of updated cat_progn
     ! reichle, 18 Oct 2005
     !
-    ! added input tile_grid_g_ESMF (ESMF grid of tile space), needed (only) to map obs
-    !  to tiles in cube-sphere tile space
-    ! amfox, 8 Nov 2026
+    ! added input tile_grid_g_ESMF (ESMF grid associated with tile space), needed (only) for obs-to-tile mapping in cube-sphere tile space
+    ! - amfox, 8 Nov 2026
 
     implicit none
 
@@ -208,7 +207,7 @@ contains
 
     type(grid_def_type), intent(in) :: tile_grid_g, pert_grid_f, pert_grid_g    ! LDAS grid type
 
-    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF                         ! ESMF grid type, needed for cube-sphere tile space
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF                         ! ESMF grid type, needed for obs-to-tile mapping in cube-sphere tile space
         
     integer, intent(in), dimension(numprocs) :: N_catl_vec, low_ind
 
@@ -420,13 +419,6 @@ contains
 
        if ( (index(tile_grid_g%gridtype,'c3')/=0) .and. (.not. c3_grid_initialized) ) then
 
-          if (.not. present(tile_grid_g_ESMF)) then
-
-             err_msg = 'cube-sphere tile space requires optional input tile_grid_g_ESMF (ESMF grid)'
-             call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-
-          end if
-
           call init_tile_grid_g_ESMF_c3( tile_grid_g_ESMF, tile_grid_g )
 
           c3_grid_initialized = .true.
@@ -507,7 +499,7 @@ contains
        if (out_smapL4SMaup)                                                        &
             call output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,   &
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
-            tile_coord_f, tile_grid_g, obs2tile_grid_f,                            &
+            tile_coord_f, tile_grid_g, obs2tile_grid_f, tile_grid_g_ESMF,          &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
             N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
 
@@ -516,11 +508,11 @@ contains
        call collect_obs(                                              &
             work_path, exp_id, date_time, dtstep_assim,               &
             N_catl,                                                   &
-            N_catf, tile_coord_f, obs2tile_grid_f,                    &
+            N_catf, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,  &
             N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,               &
             N_catl_vec, low_ind, l2f,                                 &
             N_obs_param, obs_param, N_obsl_max, out_obslog,           &
-            N_obsl, Observations_l, found_obs_f, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            N_obsl, Observations_l, found_obs_f )
 
 
        ! --------------------------------------------------------------------
@@ -2237,7 +2229,7 @@ contains
 
   subroutine output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,    &
        N_ens, N_catl, N_catf, N_obsl_max,                                       &
-       tile_coord_f, tile_grid_g, obs2tile_grid_f,                              &
+       tile_coord_f, tile_grid_g, obs2tile_grid_f, tile_grid_g_ESMF,            &
        N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,    &
        N_obs_param, obs_param, Observations_l, cat_param, cat_progn          )
 
@@ -2269,6 +2261,8 @@ contains
     type(grid_def_type),                             intent(in) :: tile_grid_g
     type(grid_def_type),                             intent(in) :: obs2tile_grid_f
 
+    type(ESMF_Grid),                                 intent(in) :: tile_grid_g_ESMF   ! pass-through only to collect_obs(), not needed for L4SMaup output
+    
     integer,               dimension(numprocs),      intent(in) :: N_catl_vec
     integer,               dimension(numprocs),      intent(in) :: low_ind
 
@@ -2341,7 +2335,7 @@ contains
     call collect_obs(                                                            &
          work_path, exp_id, date_time, dtstep_assim,                             &
          N_catl,                                                                 &
-         N_catf, tile_coord_f, obs2tile_grid_f,                                  &
+         N_catf, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,                &
          N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
          N_catl_vec, low_ind, l2f,                                               &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), N_obsl_max, .false., &
@@ -2349,7 +2343,7 @@ contains
 
     ! write appropriate fields (according to 'option') into file
 
-    call write_smapL4SMaup( 'orig_obs', date_time, exp_id, N_ens,     &
+    call write_smapL4SMaup( 'orig_obs', date_time, exp_id, N_ens,                &
          N_catl, N_catf, N_obsl_tmp, tile_coord_f, tile_grid_g,                  &
          N_catl_vec, low_ind,                                                    &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), Observations_l,      &

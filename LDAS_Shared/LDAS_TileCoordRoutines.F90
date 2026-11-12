@@ -774,9 +774,10 @@ contains
   
   ! *******************************************************************
   
-  subroutine get_tile_num_from_latlon(N_catd, tile_coord,                      &
-       tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
-       tile_num, max_dist_x, max_dist_y, tile_grid_g_ESMF )
+  subroutine get_tile_num_from_latlon( N_catd, tile_coord,             &
+       tile_grid, tile_grid_g_ESMF,                                    &
+       N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,     &
+       tile_num, max_dist_x, max_dist_y )
 
     ! bug fix re. "check that lat/lon is inside tile_grid"
     ! - reichle, 2005/11/17
@@ -789,8 +790,8 @@ contains
     !  meridional max distance (max_dist_x)
     ! - reichle, 2014/12/23
     !
-    ! added cube-sphere ("c3") tile_grid, see get_tile_num_from_latlon_c3();
-    !  requires optional input "tile_grid_g_ESMF" (ESMF grid of cube-sphere tile space)
+    ! added case for cube-sphere ("c3") tile space, see get_tile_num_from_latlon_c3();
+    !  requires input "tile_grid_g_ESMF" (ESMF grid associated with cube-sphere tile space)
     ! - amfox, 8 Nov 2026
     
     implicit none
@@ -800,10 +801,12 @@ contains
     type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
     
     type(grid_def_type),                                 intent(in)  :: tile_grid    
+
+    type(ESMF_Grid),                                     intent(in)  :: tile_grid_g_ESMF     ! needed for "c3" tile_grid
     
     integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
     
-    integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij ! input    
+    integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij  ! input    
     
     real,    dimension(N_latlon),                        intent(in)  :: lat, lon
     
@@ -812,8 +815,6 @@ contains
     real,    dimension(N_latlon),              optional, intent(in)  :: max_dist_x  ! vector [deg]
     real,                                      optional, intent(in)  :: max_dist_y  ! scalar [deg]
     
-    type(ESMF_Grid),                           optional, intent(in)  :: tile_grid_g_ESMF     ! for "c3" tile_grid
-
     ! local variables
     
     integer, parameter           :: nodata_tilenum = -9999
@@ -846,13 +847,6 @@ contains
     !  use bounding boxes of tiles (amfox, 8 Nov 2026)
 
     if (index(tile_grid%gridtype, 'c3')/=0) then
-
-       if (.not. present(tile_grid_g_ESMF)) then
-
-          err_msg = 'cube-sphere ("c3") tile_grid requires optional input tile_grid_g_ESMF (ESMF grid)'
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-
-       end if
 
        call get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,              &
             tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &

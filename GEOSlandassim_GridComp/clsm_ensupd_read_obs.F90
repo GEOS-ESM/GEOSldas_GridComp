@@ -433,9 +433,10 @@ contains
   subroutine read_obs_ae_l2_sm(                                  &
        work_path, exp_id,                                        &
        date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+       tile_grid_d, tile_grid_g_ESMF,                            &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
-       found_obs, ae_l2_sm, std_ae_l2_sm, tile_grid_g_ESMF )
+       found_obs, ae_l2_sm, std_ae_l2_sm )
     
     ! Read observations of surface soil moisture from AMSR-E L2 files
     ! Set flag "found_obs" to true if observations are available 
@@ -466,14 +467,14 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space    
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
@@ -659,10 +660,11 @@ contains
        allocate(tmp_tile_num(N_tmp))
        
        call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+            tile_grid_d, tile_grid_g_ESMF,                           &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
-            tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num )
        
        
        ! ----------------------------------------------------------------
@@ -943,12 +945,13 @@ contains
   
   ! *****************************************************************
   
-  subroutine read_obs_ae_sm_LPRM(                                 &
+  subroutine read_obs_ae_sm_LPRM(                                &
        work_path, exp_id,                                        &
        date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+       tile_grid_d, tile_grid_g_ESMF,                            &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
-       found_obs, ae_sm_LPRM, std_ae_sm_LPRM, tile_grid_g_ESMF )
+       found_obs, ae_sm_LPRM, std_ae_sm_LPRM )
     
     ! Read observations of surface soil moisture from AMSR-E sm LPRM files
     ! (Richard de Jeu, Vrije Universiteit Amsterdam)
@@ -980,14 +983,14 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space    
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
@@ -1176,10 +1179,11 @@ contains
        allocate(tmp_tile_num(N_tmp))
        
        call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+            tile_grid_d, tile_grid_g_ESMF,                           &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
-            tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num )
 
        
        ! ----------------------------------------------------------------
@@ -1259,9 +1263,10 @@ contains
   subroutine read_obs_sm_ASCAT(                                  &
        work_path, exp_id,                                        &
        date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+       tile_grid_d, tile_grid_g_ESMF,                            &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
-       found_obs, sm_ASCAT, std_sm_ASCAT, tile_grid_g_ESMF )
+       found_obs, sm_ASCAT, std_sm_ASCAT )
     
     !---------------------------------------------------------------------
     ! 
@@ -1292,14 +1297,14 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
@@ -1491,10 +1496,11 @@ contains
        allocate(tmp_tile_num(N_tmp))
        
        call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+            tile_grid_d, tile_grid_g_ESMF,                           &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
-            tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num )
  
        
        ! ----------------------------------------------------------------
@@ -1572,9 +1578,9 @@ contains
 
   subroutine read_obs_sm_ASCAT_EUMET(                                         &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
+       tile_grid_d, tile_grid_g_ESMF, N_tile_in_cell_ij, tile_num_in_cell_ij, &
        this_obs_param,                                                        &
-       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time, tile_grid_g_ESMF )
+       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
     
     !---------------------------------------------------------------------
     ! 
@@ -1612,14 +1618,14 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
@@ -2073,10 +2079,11 @@ contains
        allocate(tmp_tile_num(N_tmp))
        
        call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+            tile_grid_d, tile_grid_g_ESMF,                           &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
-            tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num )
        
        
        ! ----------------------------------------------------------------
@@ -2170,9 +2177,10 @@ contains
 
   subroutine read_obs_sm_ASCAT_HSAF(                                          &
        date_time, dtstep_assim, N_catd, tile_coord,                           &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
+       tile_grid_d, tile_grid_g_ESMF,                                         &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                                &
        this_obs_param, write_obslog,                                          &
-       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time, tile_grid_g_ESMF )
+       found_obs, ASCAT_sm, ASCAT_sm_std, ASCAT_lon, ASCAT_lat, ASCAT_time )
 
     ! Read H SAF ASCAT SSM CDR (H121) and ICDR (H139) from netCDF swath files.
     !
@@ -2224,12 +2232,12 @@ contains
 
     type(grid_def_type), intent(in) :: tile_grid_d
 
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
+    
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
-
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
 
     type(obs_param_type), intent(in) :: this_obs_param
 
@@ -2645,10 +2653,11 @@ contains
        tmp_jtime = tmp1_jtime(1:N_valid)
 
        call get_tile_num_for_obs(N_catd, tile_coord,                      &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
+            tile_grid_d, tile_grid_g_ESMF,                                &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                       &
             N_valid, tmp_lat, tmp_lon,                                    &
             this_obs_param,                                               &
-            tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num )
 
        do ii = 1, N_valid
 
@@ -2804,11 +2813,11 @@ contains
 
   ! ****************************************************************************
 
-  subroutine read_obs_sm_CYGNSS(                                              &
-       date_time, dtstep_assim, N_catd, tile_coord,                           &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
-       this_obs_param, write_obslog,                                          &
-       found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time, tile_grid_g_ESMF )
+  subroutine read_obs_sm_CYGNSS(                                                  &
+       date_time, dtstep_assim, N_catd, tile_coord,                               &
+       tile_grid_d, tile_grid_g_ESMF, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+       this_obs_param, write_obslog,                                              &
+       found_obs, CYGNSS_sm, CYGNSS_sm_std, CYGNSS_lon, CYGNSS_lat, CYGNSS_time )
 
     !---------------------------------------------------------------------
     ! 
@@ -2843,12 +2852,12 @@ contains
 
     type(grid_def_type), intent(in) :: tile_grid_d
 
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space    
+    
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
        N_tile_in_cell_ij
 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
-
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
 
     type(obs_param_type), intent(in) :: this_obs_param
 
@@ -3236,10 +3245,11 @@ contains
       allocate(tmp_tile_num(N_obs))
       
       call get_tile_num_for_obs(N_catd, tile_coord,                 &
-           tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+           tile_grid_d, tile_grid_g_ESMF,                           &
+           N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
            N_obs, tmp_lat, tmp_lon,                                 &
            this_obs_param,                                          &
-           tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+           tmp_tile_num )
       
       ! ----------------------------------------------------------------
       !
@@ -3529,9 +3539,10 @@ contains
   
   subroutine read_obs_LaRC_Tskin(                                &
        date_time, dtstep_assim, N_catd, tile_coord,              &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+       tile_grid_d, tile_grid_g_ESMF,                            &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
        this_obs_param,                                           &
-       found_obs, ts_LARC, std_ts_LARC, tile_grid_g_ESMF )
+       found_obs, ts_LARC, std_ts_LARC )
 
     !---------------------------------------------------------------------
     ! 
@@ -3551,14 +3562,14 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord ! input
     
     type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space        
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
 
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
@@ -3728,10 +3739,11 @@ contains
        allocate(tmp_tile_num(N_tmp))
        
        call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+            tile_grid_d, tile_grid_g_ESMF,                           &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat, tmp_lon,                                 &
             this_obs_param,                                          &
-            tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num )
      
 
        ! ----------------------------------------------------------------
@@ -4873,11 +4885,12 @@ contains
 
   ! *****************************************************************
   
-  subroutine read_obs_isccp_tskin_gswp2_v1(                      &
-       date_time, N_catd, tile_coord,                            &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
-       this_obs_param,                                           &
-       found_obs, isccp_tskin_gswp2_v1, std_isccp_tskin_gswp2_v1, tile_grid_g_ESMF )
+  subroutine read_obs_isccp_tskin_gswp2_v1(                        &
+       date_time, N_catd, tile_coord,                              &
+       tile_grid_d, tile_grid_g_ESMF,                              &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                     &
+       this_obs_param,                                             &
+       found_obs, isccp_tskin_gswp2_v1, std_isccp_tskin_gswp2_v1 )
     
     ! Read observations of land skin temperature from ISCCP data
     ! produced by Sarith on GSWP-2 grid
@@ -4906,14 +4919,14 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type), intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type), intent(in) :: this_obs_param
     
     ! outputs:
@@ -5043,10 +5056,11 @@ contains
     if (N_tmp>0) then
        
        call get_tile_num_for_obs(N_catd, tile_coord,                 &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+            tile_grid_d, tile_grid_g_ESMF,                           &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
             N_tmp, tmp_lat(1:N_tmp), tmp_lon(1:N_tmp),               &
             this_obs_param,                                          &
-            tmp_tile_num(1:N_tmp), tile_grid_g_ESMF=tile_grid_g_ESMF )
+            tmp_tile_num(1:N_tmp) )
        
        ! ----------------------------------------------------------------
        !
@@ -5567,9 +5581,9 @@ contains
   ! *****************************************************************
 
   subroutine read_obs_SMOS( date_time, N_catd, this_obs_param,      &
-       dtstep_assim, tile_coord, tile_grid_d,                       &
+       dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,     &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,        &
-       found_obs, SMOS_data, std_SMOS_data, SMOS_lon, SMOS_lat, tile_grid_g_ESMF )
+       found_obs, SMOS_data, std_SMOS_data, SMOS_lon, SMOS_lat )
 
     ! reader for preprocessed SMOS Tb and soil moisture (SM) files
     !
@@ -5615,14 +5629,14 @@ contains
 
     type(grid_def_type),  intent(in) :: tile_grid_d
 
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space        
+
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
 
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
-
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
 
     logical,              intent(in) :: write_obslog
 
@@ -6199,11 +6213,12 @@ contains
              !  tiles) -- reichle, 23 Aug 2013
              
              call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                  tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+                  tile_grid_d, tile_grid_g_ESMF,                           &
+                  N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                   N_obs, tmp_lat, tmp_lon,                                 &
                   this_obs_param,                                          &
                   tmp_tile_num, &
-                  tmp_shift_lat, tmp_shift_lon, tile_grid_g_ESMF=tile_grid_g_ESMF )
+                  tmp_shift_lat, tmp_shift_lon )
 
              ! --------------------------------------------------------------------------
              !
@@ -6395,9 +6410,10 @@ contains
 
   subroutine read_obs_MODIS_SCF(                                   &
        date_time, dtstep_assim, N_catd, tile_coord,                &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,        &
+       tile_grid_d, tile_grid_g_ESMF,                              &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                     &
        this_obs_param, write_obslog,                               &
-       found_obs, MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat, tile_grid_g_ESMF )
+       found_obs, MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat )
     
     ! read MODIS snow cover fraction observations on MODIS 0.05-degree climate
     ! modeling grid (CMG)
@@ -6425,13 +6441,13 @@ contains
     type(tile_coord_type), dimension(:),     pointer      :: tile_coord             ! input
     
     type(grid_def_type),                     intent(in)   :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer,               dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: N_tile_in_cell_ij
     
     integer,               dimension(:,:,:), pointer      :: tile_num_in_cell_ij    ! input
 
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
-    
     type(obs_param_type),                    intent(in)   :: this_obs_param
 
     logical,                                 intent(in)   :: write_obslog
@@ -6814,11 +6830,11 @@ contains
     allocate(tmp_tile_num(N_CMG_obs))
     
     call get_tile_num_for_obs( N_catd, tile_coord,                 &
-         tile_grid_d, N_tile_in_cell_ij,                           &
-         tile_num_in_cell_ij,                                      &
+         tile_grid_d, tile_grid_g_ESMF,                            &
+         N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
          N_CMG_obs, CMG_lat(1:N_CMG_obs), CMG_lon(1:N_CMG_obs),    &
          this_obs_param,                                           &
-         tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+         tmp_tile_num )
     
     
     std_MODIS_obs = this_obs_param%errstd
@@ -7461,9 +7477,9 @@ contains
   ! *****************************************************************
  
   subroutine read_obs_SMAP_FT( date_time, N_catd, this_obs_param,            &
-       dtstep_assim, tile_coord, tile_grid_d,                                &
+       dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,              &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &
-       found_obs, SMAP_data, std_SMAP_data, SMAP_lon, SMAP_lat, SMAP_time, tile_grid_g_ESMF )
+       found_obs, SMAP_data, std_SMAP_data, SMAP_lon, SMAP_lat, SMAP_time )
     
     ! read freeze/thaw (FT) data within the assimilation window from one or more 
     !  SMAP L2_SM_AP half-orbit h5 files  (or L3_FT_A files -- TO BE IMPLEMENTED)
@@ -7486,13 +7502,13 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type),  intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space        
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
-
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
 
     logical,              intent(in) :: write_obslog
 
@@ -7959,12 +7975,13 @@ contains
              allocate(tmp_tile_num(N_obs_kept(kk)))
              
              call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                  tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+                  tile_grid_d, tile_grid_g_ESMF,                           &
+                  N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                   N_obs_kept(kk),                                          &
                   tmp_lat(1:N_obs_kept(kk)),                               &
                   tmp_lon(1:N_obs_kept(kk)),                               &
                   this_obs_param,                                          &
-                  tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF )
+                  tmp_tile_num )
              
              ! --------------------------------------------------------------------------
              !
@@ -8148,9 +8165,9 @@ contains
   ! *****************************************************************
   
   subroutine read_obs_SMAP_halforbit_Tb( date_time, N_catd, this_obs_param,  &
-       dtstep_assim, tile_coord, tile_grid_d,                                &
+       dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,              &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &
-       found_obs, SMAP_data, std_SMAP_data, SMAP_lon, SMAP_lat, SMAP_time, tile_grid_g_ESMF )
+       found_obs, SMAP_data, std_SMAP_data, SMAP_lon, SMAP_lat, SMAP_time )
     
     ! read brightness temperature data within the assimilation window from one or more 
     !  SMAP half-orbit h5 files (L1C, L1CE (Enhanced), or L2AP)
@@ -8186,13 +8203,13 @@ contains
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
     type(grid_def_type),  intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
-
-    type(ESMF_Grid), optional, intent(in) :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
 
     logical,              intent(in) :: write_obslog
 
@@ -9066,23 +9083,25 @@ contains
                 !  tiles) -- reichle, 23 Aug 2013
                 
                 call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                     tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+                     tile_grid_d, tile_grid_g_ESMF,                           &
+                     N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                      N_obs_kept(kk),                                          &
                      tmp_lat(1:N_obs_kept(kk)),                               &
                      tmp_lon(1:N_obs_kept(kk)),                               &
                      this_obs_param,                                          &
                      tmp_tile_num,                                            &
-                     tmp_shift_lat, tmp_shift_lon, tile_grid_g_ESMF=tile_grid_g_ESMF )
+                     tmp_shift_lat, tmp_shift_lon )
                 
              else
                 
                 call get_tile_num_for_obs(N_catd, tile_coord,                 &
-                     tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+                     tile_grid_d, tile_grid_g_ESMF,                           &
+                     N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
                      N_obs_kept(kk),                                          &
                      tmp_lat(1:N_obs_kept(kk)),                               &
                      tmp_lon(1:N_obs_kept(kk)),                               &
                      this_obs_param,                                          &
-                     tmp_tile_num, tile_grid_g_ESMF=tile_grid_g_ESMF)
+                     tmp_tile_num )
                 
              end if
              
@@ -9875,10 +9894,11 @@ contains
   subroutine read_obs(                                               &
        work_path, exp_id,                                            &
        date_time, dtstep_assim, N_catd, tile_coord,                  &
-       tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
+       tile_grid_d, tile_grid_g_ESMF,                                &
+       N_tile_in_cell_ij, tile_num_in_cell_ij,                       &
        this_obs_param, write_obslog,                                 &
        found_obs, scaled_obs,                                        &
-       tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim, tile_grid_g_ESMF )
+       tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tmp_assim )
     
     ! read observations and optionally scale observations to model clim
     !
@@ -9894,34 +9914,33 @@ contains
     !                (indicates whether any of the founds obs were scaled)
     !  6 Jun 2016 - added functionality to keep obs that cannot be scaled
     !                (but will not be assimilated; SMAP/SMOS Tb only for now)
-    !  8 Nov 2026 - added optional input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space)
-    !                (amfox)
+    !  8 Nov 2026 - added input tile_grid_g_ESMF (ESMF grid associated with cube-sphere tile space) (amfox)
 
     implicit none
 
     ! inputs:
     
-    character(*), intent(in) :: work_path
-    character(*),  intent(in) :: exp_id
+    character(*),          intent(in) :: work_path
+    character(*),          intent(in) :: exp_id
 
-    type(date_time_type), intent(in) :: date_time
+    type(date_time_type),  intent(in) :: date_time
     
-    integer, intent(in) :: dtstep_assim, N_catd
+    integer,               intent(in) :: dtstep_assim, N_catd
     
     type(tile_coord_type), dimension(:), pointer :: tile_coord  ! input
     
-    type(grid_def_type), intent(in) :: tile_grid_d
+    type(grid_def_type),   intent(in) :: tile_grid_d
+
+    type(ESMF_Grid),       intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer, dimension(tile_grid_d%N_lon,tile_grid_d%N_lat), intent(in) :: &
          N_tile_in_cell_ij
     
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij   ! input
     
-    type(obs_param_type), intent(in) :: this_obs_param
+    type(obs_param_type),  intent(in) :: this_obs_param
 
-    logical,              intent(in) :: write_obslog
-
-    type(ESMF_Grid),      intent(in), optional :: tile_grid_g_ESMF   ! needed for cube-sphere tile space
+    logical,               intent(in) :: write_obslog
 
     ! outputs:
 
@@ -9970,9 +9989,10 @@ contains
        call read_obs_ae_l2_sm(                                        &
             work_path, exp_id,                                        &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
-            found_obs, tmp_obs, tmp_std_obs, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs )
        
        ! scale observations to model climatology
        
@@ -9991,9 +10011,10 @@ contains
        call read_obs_ae_sm_LPRM(                                      &
             work_path, exp_id,                                        &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
-            found_obs, tmp_obs, tmp_std_obs, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs )
        
        ! scale observations to model climatology
        
@@ -10012,9 +10033,10 @@ contains
        call read_obs_sm_ASCAT(                                        &
             work_path, exp_id,                                        &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
-            found_obs, tmp_obs, tmp_std_obs, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs )
        
        ! scale observations to model climatology
        
@@ -10031,10 +10053,11 @@ contains
 
        call read_obs_sm_ASCAT_EUMET(                                  &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-            tmp_time, tile_grid_g_ESMF=tile_grid_g_ESMF)
+            tmp_time )
 
        ! scale observations to model climatology
 
@@ -10052,10 +10075,11 @@ contains
 
        call read_obs_sm_ASCAT_HSAF(                                   &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-            tmp_time, tile_grid_g_ESMF=tile_grid_g_ESMF)
+            tmp_time )
 
        ! scale observations to model climatology
 
@@ -10073,10 +10097,11 @@ contains
        
        call read_obs_sm_CYGNSS(                                       &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param, write_obslog,                             &
             found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat,        &
-            tmp_time, tile_grid_g_ESMF=tile_grid_g_ESMF)
+            tmp_time )
        
        ! scale observations to model climatology
        
@@ -10094,9 +10119,10 @@ contains
        
        call read_obs_isccp_tskin_gswp2_v1(                            &
             date_time, N_catd, tile_coord,                            &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
-            found_obs, tmp_obs, tmp_std_obs, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs )
        
        if (this_obs_param%scale .and. found_obs) then
           
@@ -10219,9 +10245,9 @@ contains
        
        call read_obs_SMOS(                                            &
             date_time, N_catd, this_obs_param,                        &
-            dtstep_assim, tile_coord, tile_grid_d,                    &
+            dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,  &
             N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,     &
-            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
        
        ! scale observations to model climatology
        
@@ -10239,9 +10265,9 @@ contains
        
        call read_obs_SMOS(                                            &
             date_time, N_catd, this_obs_param,                        &
-            dtstep_assim, tile_coord, tile_grid_d,                    &
+            dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,  &
             N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,     &
-            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
        
        ! scale observations to model climatology
        
@@ -10258,9 +10284,10 @@ contains
        
        call read_obs_MODIS_SCF(                                       &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param, write_obslog,                             &
-            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
    
     case('SMAP_L1C_Tbh_A',     'SMAP_L1C_Tbv_A',        &
          'SMAP_L1C_Tbh_D',     'SMAP_L1C_Tbv_D',        &
@@ -10273,9 +10300,9 @@ contains
 
        call read_obs_SMAP_halforbit_Tb(                                     &
             date_time, N_catd, this_obs_param,                              &
-            dtstep_assim, tile_coord, tile_grid_d,                          &
+            dtstep_assim, tile_coord, tile_grid_d, tile_grid_g_ESMF,        &
             N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,           &
-            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat, tmp_time )
        
        ! scale observations to model climatology
        
@@ -10293,9 +10320,10 @@ contains
               
        call read_obs_LaRC_Tskin(                                      &
             date_time, dtstep_assim, N_catd, tile_coord,              &
-            tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
+            tile_grid_d, tile_grid_g_ESMF,                            &
+            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
             this_obs_param,                                           &
-            found_obs, tmp_obs, tmp_std_obs, tile_grid_g_ESMF=tile_grid_g_ESMF )
+            found_obs, tmp_obs, tmp_std_obs )
 
        ! NOT IMPLEMENTED: scale observations to model climatology
 
@@ -11385,10 +11413,11 @@ contains
   subroutine collect_obs(                                                             &
        work_path, exp_id, date_time, dtstep_assim,                                    &
        N_catl,                                                                        &
-       N_catf, tile_coord_f, tile_grid_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f, &
+       N_catf, tile_coord_f, tile_grid_f, tile_grid_g_ESMF,                           &
+       N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                                    &
        N_catl_vec, low_ind, l2f,                                                      &
        N_obs_param, obs_param, N_obsl_max, write_obslog,                              &
-       N_obsl, Observations_l, found_obs_f, tile_grid_g_ESMF )
+       N_obsl, Observations_l, found_obs_f )
     
     ! check for observations that must be assimilated, 
     ! collect into measurement vector
@@ -11402,13 +11431,12 @@ contains
     ! 31 Dec 2014 - added time stamp to Observations
     ! 21 Mar 2014 - sort Observations_l by tilenum and then species to avoid lay-out 
     !                dependency for MPI parallel execution
-    !  8 Nov 2026 - added optional input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space)
-    !               (amfox)
+    !  8 Nov 2026 - added input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space) (amfox)
 
     implicit none
     
-    character(*),                                intent(in)  :: work_path
-    character(*),                                intent(in)  :: exp_id
+    character(*),                                 intent(in)  :: work_path
+    character(*),                                 intent(in)  :: exp_id
     
     type(date_time_type),                         intent(in)  :: date_time
     
@@ -11424,6 +11452,8 @@ contains
     type(tile_coord_type), dimension(:), pointer ::  tile_coord_f  ! input
     
     type(grid_def_type),                          intent(in)  :: tile_grid_f
+
+    type(ESMF_Grid),                              intent(in)  :: tile_grid_g_ESMF  ! needed for obs-to-tile mapping in cube-sphere tile space
     
     ! N_tile_in_cell_ij and tile_num_in_cell_ij are on the "full" domain
     !  and guaranteed to be allocated ONLY for the root_proc (see get_enkf_increments())
@@ -11444,8 +11474,6 @@ contains
     type(obs_type), dimension(N_obsl_max),        intent(out) :: Observations_l
     
     logical,                                      intent(out) :: found_obs_f
-
-    type(ESMF_Grid),                    optional, intent(in)  :: tile_grid_g_ESMF  ! needed for cube-sphere tile space
 
     ! ----------------------------
     
@@ -11509,10 +11537,11 @@ contains
           call read_obs(                                                               &
                work_path, exp_id,                                                      &
                date_time, dtstep_assim, N_catf, tile_coord_f,                          &
-               tile_grid_f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                &
+               tile_grid_f, tile_grid_g_ESMF,                                          &
+               N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
                obs_param(species), write_obslog,                                       &
                found_obs, scaled_obs,                                                  &
-               tmp_obs_f, tmp_std_obs_f, tmp_lon_f, tmp_lat_f, tmp_time_f, tmp_assim_f, tile_grid_g_ESMF=tile_grid_g_ESMF)
+               tmp_obs_f, tmp_std_obs_f, tmp_lon_f, tmp_lat_f, tmp_time_f, tmp_assim_f )
           
           if (scaled_obs)  any_scaled_obs = .true.
 
@@ -11895,10 +11924,11 @@ contains
   ! *****************************************************************
   
   subroutine get_tile_num_for_obs(N_catd, tile_coord,                          &
-       tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
+       tile_grid, tile_grid_g_ESMF,                                            &
+       N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,             &
        this_obs_param,                                                         &
        tile_num,                                                               &
-       shift_lat, shift_lon, tile_grid_g_ESMF )
+       shift_lat, shift_lon, )
     
     ! find one tile for each obs that "administers" the obs 
     !
@@ -11907,8 +11937,7 @@ contains
     !
     ! - reichle, 2015/02/20
     !
-    ! added optional input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space), see
-    !  get_tile_num_from_latlon()
+    ! added input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space), see get_tile_num_from_latlon()
     ! - amfox, 8 Nov 2026
     
     implicit none
@@ -11918,6 +11947,8 @@ contains
     type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
     
     type(grid_def_type),                                 intent(in)  :: tile_grid    
+
+    type(ESMF_Grid),                                     intent(in)  :: tile_grid_g_ESMF  ! needed for obs-to-tile mapping in cube-sphere tile space
     
     integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
     
@@ -11932,8 +11963,6 @@ contains
     real,                                     optional,  intent(in)  :: shift_lat
     real,                                     optional,  intent(in)  :: shift_lon
 
-    type(ESMF_Grid),                          optional,  intent(in)  :: tile_grid_g_ESMF  ! for cube-sphere tile space
-    
     ! ------------------------
     
     ! local variables
@@ -11992,9 +12021,10 @@ contains
     ! find tile numbers
 
     call get_tile_num_from_latlon(N_catd, tile_coord,             &
-         tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij,       &
+         tile_grid, tile_grid_g_ESMF,                             &
+         N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
          N_latlon, tmp_lat, tmp_lon,                              &
-         tile_num, max_dist_x, max_dist_y, tile_grid_g_ESMF=tile_grid_g_ESMF )
+         tile_num, max_dist_x, max_dist_y )
 
     
   end subroutine get_tile_num_for_obs
