@@ -405,11 +405,11 @@ contains
 
        ! -----------------------------------------------------------------
        !
-       ! Get additional grid/tile information that is needed to map obs
-       ! from lat/lon to tiles.  This needs to be done only by root process
-       ! (because of call to read_obs() in collect_obs()).
-       ! (For FOV>~0, get_obs_pred() computes its own N_tile_in_cell_ij_lH and
-       !  tile_num_in_cell_ij_lH for get_tile_num_in_ellipse(); amfox, 8 Nov 2026)
+       ! Get additional grid/tile information that is needed to map from obs lat/lon to tiles.
+       !   This needs to be done only by root process because of call to read_obs() in collect_obs().
+       ! 
+       ! For tile2obsFOV mapping when FOV>~0, get_obs_pred() computes its own N_tile_in_cell_ij_lH and
+       !  tile_num_in_cell_ij_lH for get_tile_num_in_ellipse(); amfox, 8 Nov 2026
 
        call init_grid_def_type( obs2tile_grid_f )        ! initialize to undefined grid
        
