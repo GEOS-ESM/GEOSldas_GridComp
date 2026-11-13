@@ -65,7 +65,8 @@ module clsm_ensupd_enkf_update
   
   use LDAS_TilecoordType,               ONLY:     &
        tile_coord_type,                           &
-       grid_def_type
+       grid_def_type,                             &
+       init_grid_def_type
   
   use catch_bias_types,                 ONLY:     &
        obs_bias_type
@@ -73,7 +74,11 @@ module clsm_ensupd_enkf_update
   use LDAS_TilecoordRoutines,           ONLY:     &
        get_number_of_tiles_in_cell_ij,            &
        get_tile_num_in_cell_ij,                   &
+       init_tile_grid_g_ESMF_c3,                  &
        grid2tile
+
+  use ESMF,                             ONLY:     &
+       ESMF_Grid
 
   use nr_ran2_gasdev,                   ONLY:     &
        NRANDSEED
@@ -99,7 +104,6 @@ module clsm_ensupd_enkf_update
        get_ind_obs_assim,                         &
        get_ind_obs_lat_lon_box,                   &
        halo_type,                                 &
-       FOV_threshold,                             &
        get_halo_around_tile,                      &
        TileNnzObs
 
@@ -149,7 +153,8 @@ contains
        work_path, exp_id,                                                &
        met_force, lai, cat_param, mwRTM_param,                           &
        tile_coord_l, tile_coord_f,                                       &
-       tile_grid_g, pert_grid_f, pert_grid_g,                            &
+       tile_grid_g, tile_grid_g_ESMF,                                    &
+       pert_grid_f, pert_grid_g,                                         &
        N_catl_vec, low_ind, l2f, f2l,                                    &
        update_type,                                                      &
        dtstep_assim, pert_choice,                                        &
@@ -167,6 +172,9 @@ contains
 
     ! return increments instead of updated cat_progn
     ! reichle, 18 Oct 2005
+    !
+    ! added input tile_grid_g_ESMF (ESMF grid associated with tile space), needed (only) for obs-to-tile mapping in cube-sphere tile space
+    ! - amfox, 8 Nov 2026
 
     implicit none
 
@@ -197,8 +205,10 @@ contains
 
     type(tile_coord_type), dimension(:), pointer :: tile_coord_l, tile_coord_f  ! input
 
-    type(grid_def_type), intent(in) :: tile_grid_g, pert_grid_f, pert_grid_g
+    type(grid_def_type), intent(in) :: tile_grid_g, pert_grid_f, pert_grid_g    ! LDAS grid type
 
+    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF                         ! ESMF grid type, needed for obs-to-tile mapping in cube-sphere tile space
+        
     integer, intent(in), dimension(numprocs) :: N_catl_vec, low_ind
 
     integer, intent(in), dimension(N_catl)   :: l2f
@@ -277,6 +287,15 @@ contains
     integer, dimension(:,:),   pointer     :: N_tile_in_cell_ij_f
     integer, dimension(:,:,:), pointer     :: tile_num_in_cell_ij_f
 
+    ! obs2tile_grid_f is the grid that goes with N_tile_in_cell_ij_f and tile_num_in_cell_ij_f:
+    !  pert_grid_f for EASE and LatLon tile space, or tile_grid_f for cube-sphere tile space (amfox, 6 Nov 2026)
+
+    type(grid_def_type)                    :: obs2tile_grid_f
+
+    logical, save                          :: c3_grid_initialized = .false.     ! initialize
+
+    integer, dimension(N_catf)             :: tmp_i_indg, tmp_j_indg
+    
     integer :: i, n, n_e
 
     ! obs bias variables
@@ -386,24 +405,81 @@ contains
 
        ! -----------------------------------------------------------------
        !
-       ! Get additional grid/tile information that is needed to map obs
-       ! from lat/lon to tiles.  This needs to be done:
-       ! - by root process (because of call to read_obs() in collect_obs())
-       ! - by all processes if FOV>~0 ("tile_num_in_circle" needed in get_obs_pred())
-       if ( (root_proc)                                        .or.              &
-            (any(obs_param(1:N_obs_param)%FOV>FOV_threshold))        )  then
+       ! Get additional grid/tile information that is needed to map from obs lat/lon to tiles.
+       !   This needs to be done only by root process because of call to read_obs() in collect_obs().
+       ! 
+       ! For tile2obsFOV mapping when FOV>~0, get_obs_pred() computes its own N_tile_in_cell_ij_lH and
+       !  tile_num_in_cell_ij_lH for get_tile_num_in_ellipse(); amfox, 8 Nov 2026
 
-          allocate(N_tile_in_cell_ij_f(pert_grid_f%N_lon,pert_grid_f%N_lat))
+       call init_grid_def_type( obs2tile_grid_f )        ! initialize to undefined grid
+       
+       ! Cube-sphere tile space: prepare (once) the cube-sphere ESMF grid for mapping obs to
+       !   tiles, which is done by root_proc only (in read_obs()).  This must be done by ALL
+       !   processes (see init_tile_grid_g_ESMF_c3()).  - amfox, 8 Nov 2026
 
-          ! first call: count how many tiles are in each pert_grid_f cell
-          call get_number_of_tiles_in_cell_ij( N_catf,                           &
-               tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
-               pert_grid_f, N_tile_in_cell_ij_f )
-          ! second call: find out which tiles are in each pert_grid_f cell
+       if ( (index(tile_grid_g%gridtype,'c3')/=0) .and. (.not. c3_grid_initialized) ) then
 
-          call get_tile_num_in_cell_ij( N_catf,                                  &
-               tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,               &
-               pert_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+          call init_tile_grid_g_ESMF_c3( tile_grid_g_ESMF, tile_grid_g )
+
+          c3_grid_initialized = .true.
+
+       end if
+
+       if (root_proc) then
+
+          if (index(tile_grid_g%gridtype,'c3')/=0) then
+             
+             ! Cube-sphere tile space: Use the cube-sphere tile_grid_f as hash grid for mapping obs to
+             !   tile space.  Obs-to-tile mapping requires that tiles nest perfectly in the hash grid.
+             !   (Cube-sphere tiles do not nest in the LatLon pert_grid_f used for perturbations 
+             !   when tile space is cube-sphere.)
+             !
+             ! tile_grid_f is identical to tile_grid_g for cube-sphere tile space
+             !  (get_minExtent_grid() does not zoom in for cube-sphere grids)
+             !
+             ! keep lat/lon extent of pert_grid_f because get_tile_num_from_latlon()
+             !  ignores obs outside of this extent, as needed for obs perturbations
+             !  (see get_obs_pert()); the extent is not used to find the cube-sphere
+             !  grid cell of an obs (see get_ij_ind_from_latlon_c3())
+             !
+             ! amfox, 6 Nov 2026
+
+             obs2tile_grid_f        = tile_grid_g
+
+             obs2tile_grid_f%ll_lon = pert_grid_f%ll_lon
+             obs2tile_grid_f%ll_lat = pert_grid_f%ll_lat
+             obs2tile_grid_f%ur_lon = pert_grid_f%ur_lon
+             obs2tile_grid_f%ur_lat = pert_grid_f%ur_lat
+
+             tmp_i_indg = tile_coord_f%i_indg
+             tmp_j_indg = tile_coord_f%j_indg
+             
+          else
+
+             ! EASE or LatLon tile space: use pert_grid_f as hash grid for mapping obs to tile space
+             !
+             ! pert_grid_f is an EASE grid for EASE tile space and a LatLon grid for LatLon tile space,
+             !   so tiles always nest perfectly in pert_grid_f
+             
+             obs2tile_grid_f = pert_grid_f
+             
+             tmp_i_indg = tile_coord_f%pert_i_indg
+             tmp_j_indg = tile_coord_f%pert_j_indg
+
+          end if
+
+          allocate(N_tile_in_cell_ij_f(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat))
+          
+          ! first call: count how many tiles are in each tile_grid_f cell
+          call get_number_of_tiles_in_cell_ij( N_catf,                                &
+               tmp_i_indg, tmp_j_indg,                                                &
+               obs2tile_grid_f, N_tile_in_cell_ij_f )
+          
+          ! second call: find out which tiles are in each tile_grid_f cell
+          call get_tile_num_in_cell_ij( N_catf,                                       &
+               tmp_i_indg, tmp_j_indg,                                                &
+               obs2tile_grid_f, maxval(N_tile_in_cell_ij_f), tile_num_in_cell_ij_f )
+          
        else
           allocate(N_tile_in_cell_ij_f(0,0))  ! for debugging
        end if
@@ -421,16 +497,16 @@ contains
        if (out_smapL4SMaup)                                                        &
             call output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,   &
             N_ens, N_catl, N_catf, N_obsl_max,                                     &
-            tile_coord_f, tile_grid_g, pert_grid_f,                                &
+            tile_coord_f, tile_grid_g, tile_grid_g_ESMF, obs2tile_grid_f,          &
             N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,  &
-            N_obs_param, obs_param, Observations_l, cat_param, cat_progn  )
+            N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
 
        ! check for observations, found_obs_f=.true. if obs availalbe
 
        call collect_obs(                                              &
             work_path, exp_id, date_time, dtstep_assim,               &
             N_catl,                                                   &
-            N_catf, tile_coord_f, pert_grid_f,                        &
+            N_catf, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,  &
             N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,               &
             N_catl_vec, low_ind, l2f,                                 &
             N_obs_param, obs_param, N_obsl_max, out_obslog,           &
@@ -508,17 +584,22 @@ contains
 
           ! incl. obs bias estimation
 
-          call get_obs_pred(                                      &
-               .true.,                                            & ! -> before EnKF update
-               N_obs_param, N_ens,                                &
-               N_catl, tile_coord_l,                              &
-               N_catf, tile_coord_f, f2l,                         &
-               N_catl_vec, low_ind, pert_grid_g,                  &
-               obs_param,                                         &
-               met_force, lai, cat_param, cat_progn, mwRTM_param, &
-               N_obsl, Observations_l, Obs_pred_l, obsbias_ok,    &
-               fcsterr_inflation_fac,                             &
-               c3_tile_space = (index(tile_grid_g%gridtype,'c3')/=0) )
+          ! call get_obs_pred() with "pert_grid_g" as "tiles2obsFOV_grid_g", which is:
+          !    - LatLon for LatLon      tile space, 
+          !    - EASE   for EASE        tile space,
+          !    - LatLon for cube-sphere tile space, 
+
+          call get_obs_pred(                                       &
+               .true.,                                             &  ! => before EnKF update
+               N_obs_param, N_ens,                                 &
+               N_catl, tile_coord_l,                               &
+               N_catf, tile_coord_f, f2l,                          &
+               N_catl_vec, low_ind,                                &
+               tile_grid_g, pert_grid_g,                           &  ! pert_grid_g => tiles2obsFOV_grid_g    
+               obs_param,                                          &
+               met_force, lai, cat_param, cat_progn, mwRTM_param,  &
+               N_obsl, Observations_l, Obs_pred_l, obsbias_ok,     &
+               fcsterr_inflation_fac )
 
           if (allocated(obsbias_ok)) deallocate(obsbias_ok)
 
@@ -2046,7 +2127,7 @@ contains
        date_time, exp_id,                                                    &
        N_obsl, N_obs_param, N_ens,                                           &
        N_catl, tile_coord_l,                                                 &
-       N_catf, tile_coord_f, pert_grid_g,                                    &
+       N_catf, tile_coord_f, tile_grid_g, tiles2obsFOV_grid_g,               &
        N_catl_vec, low_ind, f2l,                                             &
        update_type, dtstep_assim,                                            &
        obs_param,                                                            &
@@ -2075,7 +2156,8 @@ contains
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_l  ! input
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_f  ! input
 
-    type(grid_def_type),                              intent(in) :: pert_grid_g
+    type(grid_def_type),                              intent(in) :: tile_grid_g
+    type(grid_def_type),                              intent(in) :: tiles2obsFOV_grid_g
 
     integer,                dimension(numprocs),      intent(in) :: N_catl_vec, low_ind
 
@@ -2119,19 +2201,16 @@ contains
 
        N_obsl_tmp = N_obsl ! cannot pass N_obsl into get_obs_pred() b/c of intent(in)
 
-       call get_obs_pred(                                      &
-            .false.,                                           & ! -> after EnKF update
-            N_obs_param, N_ens,                                &
-            N_catl, tile_coord_l,                              &
-            N_catf, tile_coord_f, f2l,                         &
-            N_catl_vec, low_ind, pert_grid_g,                  &
-            obs_param,                                         &
-            met_force, lai, cat_param, cat_progn, mwRTM_param, &
+       call get_obs_pred(                                          &
+            .false.,                                               &  ! => after EnKF update
+            N_obs_param, N_ens,                                    &
+            N_catl, tile_coord_l,                                  &
+            N_catf, tile_coord_f, f2l,                             &
+            N_catl_vec, low_ind,                                   &
+            tile_grid_g, tiles2obsFOV_grid_g,                      &
+            obs_param,                                             &
+            met_force, lai, cat_param, cat_progn, mwRTM_param,     &
             N_obsl_tmp, Observations_l, Obs_pred_l )
-
-       ! NOTE: no need to pass c3_tile_space into get_obs_pred() here; obs that fail the QC 
-       !       of Tb for non-land surfaces were already removed in the call to get_obs_pred() 
-       !       before the EnKF update (amfox, 6 Nov 2026)
 
        ! clean up
 
@@ -2150,10 +2229,10 @@ contains
   ! **********************************************************************
 
   subroutine output_smapL4SMaup( date_time, work_path, exp_id, dtstep_assim,    &
-       N_ens, N_catl, N_catf, N_obsl_max,                               &
-       tile_coord_f, tile_grid_g, pert_grid_f,                                  &
+       N_ens, N_catl, N_catf, N_obsl_max,                                       &
+       tile_coord_f, tile_grid_g, tile_grid_g_ESMF, obs2tile_grid_f,            &
        N_catl_vec, low_ind, l2f, N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,    &
-       N_obs_param, obs_param, Observations_l, cat_param, cat_progn )
+       N_obs_param, obs_param, Observations_l, cat_param, cat_progn          )
 
     ! wrapper for output of original (unscaled) SMAP Tb observations into
     ! SMAP L4_SM "aup" (analysis update)
@@ -2179,17 +2258,17 @@ contains
 
     type(tile_coord_type), dimension(:),     pointer :: tile_coord_f  ! input
 
-    type(grid_def_type),                             intent(in) :: tile_grid_g
-    type(grid_def_type),                             intent(in) :: pert_grid_f
+    type(grid_def_type),                             intent(in) :: tile_grid_g,      obs2tile_grid_f
 
+    type(ESMF_Grid),                                 intent(in) :: tile_grid_g_ESMF                    ! pass-through only, not used for L4SMaup output
+    
     integer,               dimension(numprocs),      intent(in) :: N_catl_vec
     integer,               dimension(numprocs),      intent(in) :: low_ind
 
     integer,               dimension(N_catl),        intent(in) :: l2f
 
     ! N_tile_in_cell_ij and tile_num_in_cell_ij are on the "full" domain
-    !  and guaranteed to be allocated ONLY for the root_proc
-    !  (but may be allocated on all processors depending on obs_param%FOV)
+    !  and guaranteed to be allocated ONLY for the root_proc (see get_enkf_increments())
 
     integer, dimension(:,:),   pointer :: N_tile_in_cell_ij_f   ! input
     integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij_f ! input
@@ -2255,7 +2334,7 @@ contains
     call collect_obs(                                                            &
          work_path, exp_id, date_time, dtstep_assim,                             &
          N_catl,                                                                 &
-         N_catf, tile_coord_f, pert_grid_f,                                      &
+         N_catf, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,                &
          N_tile_in_cell_ij_f, tile_num_in_cell_ij_f,                             &
          N_catl_vec, low_ind, l2f,                                               &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), N_obsl_max, .false., &
@@ -2263,7 +2342,7 @@ contains
 
     ! write appropriate fields (according to 'option') into file
 
-    call write_smapL4SMaup( 'orig_obs', date_time, exp_id, N_ens,     &
+    call write_smapL4SMaup( 'orig_obs', date_time, exp_id, N_ens,                &
          N_catl, N_catf, N_obsl_tmp, tile_coord_f, tile_grid_g,                  &
          N_catl_vec, low_ind,                                                    &
          N_obs_param_tmp, obs_param_tmp(1:N_obs_param_tmp), Observations_l,      &

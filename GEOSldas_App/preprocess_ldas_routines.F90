@@ -434,8 +434,8 @@ contains
       integer :: this_i_indg, this_j_indg
       
       type(grid_def_type) :: tmp_grid_def
-      logical :: c3_grid 
-      character(512) :: fname
+      logical             :: c3_tile_space 
+      character(512)      :: fname
       
       character(len=*), parameter :: Iam = 'domain_setup'
       character(len=400) :: err_msg
@@ -487,8 +487,7 @@ contains
          !
          ! find and count tiles that are in the domain
          
-         c3_grid = .false.
-         if(index(tile_grid_g%gridtype,"c3")/=0) c3_grid = .true.
+         c3_tile_space = (index(tile_grid_g%gridtype,"c3")/=0)
          
          indomain    = 0     ! initialize
 
@@ -498,7 +497,7 @@ contains
             
             this_tileid  = tile_coord_r(n)%tile_id
 
-            if( .not. c3_grid .and. tile_coord_r(n)%typ == MAPL_LAND) then
+            if( .not. c3_tile_space .and. tile_coord_r(n)%typ == MAPL_LAND) then
                this_minlon  = tile_coord_r(n)%min_lon
                this_minlat  = tile_coord_r(n)%min_lat
                this_maxlon  = tile_coord_r(n)%max_lon

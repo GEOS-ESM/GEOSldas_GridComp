@@ -734,14 +734,14 @@ contains
  
           !1) get pert_i_indg, pert_j_indg for tiles in (full) domain relative to pert_grid_g
           do i = 1, N_f
-             call get_ij_ind_from_latlon(pert_grid_g,tile_coord_f(i)%com_lat,tile_coord_f(i)%com_lon, &
-              tile_coord_f(i)%pert_i_indg,tile_coord_f(i)%pert_j_indg)
+             call get_ij_ind_from_latlon( pert_grid_g, tile_coord_f(i)%com_lat, tile_coord_f(i)%com_lon,  &
+                  tile_coord_f(i)%pert_i_indg, tile_coord_f(i)%pert_j_indg)
           enddo
           !2) determine pert_grid_f
-          pert_grid_f = get_minExtent_grid(N_f, tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg, &
-               tile_coord_f%min_lon, tile_coord_f%min_lat, tile_coord_f%max_lon, tile_coord_f%max_lat, &
+          pert_grid_f = get_minExtent_grid( N_f, tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,      &
+               tile_coord_f%min_lon, tile_coord_f%min_lat, tile_coord_f%max_lon, tile_coord_f%max_lat,    &
                pert_grid_g)
-
+          
        else
           
           pert_grid_f = tile_grid_f

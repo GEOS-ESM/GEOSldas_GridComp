@@ -1488,6 +1488,7 @@ contains
 
     integer                           :: N_adapt_R
     type(MAPL_LocStream)              :: locstream
+    type(ESMF_Grid)                   :: tile_grid_g_ESMF   ! grid attached to locstream (cube-sphere grid for c3)
 
     integer,              dimension(:),     allocatable :: obs_pert_adapt_param
     real,                 dimension(:,:),   allocatable :: Pert_adapt_R
@@ -1612,6 +1613,10 @@ contains
     call MAPL_LocStreamGet(locstream, NT_LOCAL=N_catl,rc=status)
     _VERIFY(status)
     
+    ! Get grid associated with tile space (needed to map obs to tiles in cube-sphere tile space)
+    call MAPL_LocStreamGet(locstream, ATTACHEDGRID=tile_grid_g_ESMF, rc=status)
+    _VERIFY(status)
+
     ! Pointers to internals
     !----------------------
 
@@ -1919,7 +1924,8 @@ contains
          trim(out_path), trim(exp_id),                                     &
          met_force, lai, cat_param, mwRTM_param,                           &
          tile_coord_l, tile_coord_rf,                                      &
-         tcinternal%tgrid_g, tcinternal%pgrid_f, tcinternal%pgrid_g,       &
+         tcinternal%tgrid_g, tile_grid_g_ESMF,                             &
+         tcinternal%pgrid_f, tcinternal%pgrid_g,                           &
          N_catl_vec, low_ind, l2rf, rf2l,                                  &
          update_type,                                                      &
          LandAssimDTstep, pert_choice,                                     &
@@ -1930,8 +1936,8 @@ contains
          Pert_rseed, obs_bias,                                             &
          cat_progn_incr, fresh_incr,                                       &
          N_obsf, N_obsl, Observations_l,                                   &
-         ! below  are dummy for now
-         N_adapt_R, obs_pert_adapt_param, Pert_adapt_R)
+         ! below are dummy for now
+         N_adapt_R, obs_pert_adapt_param, Pert_adapt_R )
     
     if (fresh_incr) then
        ! apply EnKF increments (incl. call to catch_calc_soil_moist but not to recompute_diagS())
@@ -1951,16 +1957,17 @@ contains
 
     if (.true.) then  ! replace obsolete check for analysis time with "if true" to keep indents
 
-       call output_ObsFcstAna_wrapper( out_ObsFcstAna,                   &
-            date_time_new, trim(exp_id),                                 &
-            N_obsl, N_obs_param, NUM_ENSEMBLE,                           &
-            N_catl, tile_coord_l,                                        &
-            N_catf, tile_coord_rf, tcinternal%pgrid_g,                   &
-            N_catl_vec, low_ind, rf2l,                                   &
-            update_type, LandAssimDTstep,                                &
-            obs_param,                                                   &
-            met_force, lai,                                              &
-            cat_param, cat_progn, mwRTM_param,                           &
+       call output_ObsFcstAna_wrapper( out_ObsFcstAna, &
+            date_time_new, trim(exp_id),               &
+            N_obsl, N_obs_param, NUM_ENSEMBLE,         &
+            N_catl, tile_coord_l,                      &
+            N_catf, tile_coord_rf,                     &
+            tcinternal%tgrid_g, tcinternal%pgrid_g,    &  ! tcinternal%pgrid_g => tiles2obsFOV_grid_g
+            N_catl_vec, low_ind, rf2l,                 &
+            update_type, LandAssimDTstep,              &
+            obs_param,                                 &
+            met_force, lai,                            &
+            cat_param, cat_progn, mwRTM_param,         &
             Observations_l, rf2f=rf2f )
        
        do ii = 1, N_catl
