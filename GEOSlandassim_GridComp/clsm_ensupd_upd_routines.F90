@@ -1702,7 +1702,7 @@ contains
     ! Get additional grid/tile information that is needed to map from tile
     ! to obs space
 
-    if ( any(obs_param(1:N_obs_param)%FOV>FOV_threshold) )  then
+    if ( any(obs_param(1:N_obs_param)%FOV>=FOV_threshold) )  then
        
        ! determine tiles2obsFOV_grid_lH from tile_coord_lH and tiles2obsFOV_grid_g
        
