@@ -589,16 +589,16 @@ contains
           !    - EASE   for EASE        tile space,
           !    - LatLon for cube-sphere tile space, 
 
-          call get_obs_pred(                                                 &
-               beforeEnKFupdate  = .true.,                                   &   ! -> before EnKF update
-               N_obs_param, N_ens,                                           &
-               N_catl, tile_coord_l,                                         &
-               N_catf, tile_coord_f, f2l,                                    &
-               N_catl_vec, low_ind,                                          &
-               tile_grid_g, tiles2obsFOV_grid_g = pert_grid_g,               &    
-               obs_param,                                                    &
-               met_force, lai, cat_param, cat_progn, mwRTM_param,            &
-               N_obsl, Observations_l, Obs_pred_l, obsbias_ok,               &
+          call get_obs_pred(                                       &
+               .true.,                                             &  ! => before EnKF update
+               N_obs_param, N_ens,                                 &
+               N_catl, tile_coord_l,                               &
+               N_catf, tile_coord_f, f2l,                          &
+               N_catl_vec, low_ind,                                &
+               tile_grid_g, pert_grid_g,                           &  ! pert_grid_g => tiles2obsFOV_grid_g    
+               obs_param,                                          &
+               met_force, lai, cat_param, cat_progn, mwRTM_param,  &
+               N_obsl, Observations_l, Obs_pred_l, obsbias_ok,     &
                fcsterr_inflation_fac )
 
           if (allocated(obsbias_ok)) deallocate(obsbias_ok)
@@ -2201,15 +2201,15 @@ contains
 
        N_obsl_tmp = N_obsl ! cannot pass N_obsl into get_obs_pred() b/c of intent(in)
 
-       call get_obs_pred(                                                 &
-            beforeEnKFupdate=.false.,                                     & ! -> after EnKF update
-            N_obs_param, N_ens,                                           &
-            N_catl, tile_coord_l,                                         &
-            N_catf, tile_coord_f, f2l,                                    &
-            N_catl_vec, low_ind,                                          &
-            tile_grid_g, tiles2obsFOV_grid_g,                             &
-            obs_param,                                                    &
-            met_force, lai, cat_param, cat_progn, mwRTM_param,            &
+       call get_obs_pred(                                          &
+            .false.,                                               &  ! => after EnKF update
+            N_obs_param, N_ens,                                    &
+            N_catl, tile_coord_l,                                  &
+            N_catf, tile_coord_f, f2l,                             &
+            N_catl_vec, low_ind,                                   &
+            tile_grid_g, tiles2obsFOV_grid_g,                      &
+            obs_param,                                             &
+            met_force, lai, cat_param, cat_progn, mwRTM_param,     &
             N_obsl_tmp, Observations_l, Obs_pred_l )
 
        ! clean up

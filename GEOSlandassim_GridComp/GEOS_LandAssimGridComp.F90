@@ -1957,17 +1957,17 @@ contains
 
     if (.true.) then  ! replace obsolete check for analysis time with "if true" to keep indents
 
-       call output_ObsFcstAna_wrapper( out_ObsFcstAna,                   &
-            date_time_new, trim(exp_id),                                 &
-            N_obsl, N_obs_param, NUM_ENSEMBLE,                           &
-            N_catl, tile_coord_l,                                        &
-            N_catf, tile_coord_rf,                                       &
-            tcinternal%tgrid_g, tiles2obsFOV_grid_g=tcinternal%pgrid_g,  &    ! passed through to get_obs_pred()
-            N_catl_vec, low_ind, rf2l,                                   &
-            update_type, LandAssimDTstep,                                &
-            obs_param,                                                   &
-            met_force, lai,                                              &
-            cat_param, cat_progn, mwRTM_param,                           &
+       call output_ObsFcstAna_wrapper( out_ObsFcstAna, &
+            date_time_new, trim(exp_id),               &
+            N_obsl, N_obs_param, NUM_ENSEMBLE,         &
+            N_catl, tile_coord_l,                      &
+            N_catf, tile_coord_rf,                     &
+            tcinternal%tgrid_g, tcinternal%pgrid_g,    &  ! tcinternal%pgrid_g => tiles2obsFOV_grid_g
+            N_catl_vec, low_ind, rf2l,                 &
+            update_type, LandAssimDTstep,              &
+            obs_param,                                 &
+            met_force, lai,                            &
+            cat_param, cat_progn, mwRTM_param,         &
             Observations_l, rf2f=rf2f )
        
        do ii = 1, N_catl
