@@ -66,9 +66,11 @@ module LDAS_TileCoordRoutines
   public :: LDAS_create_grid_g
   public :: io_domain_files
 
-  character(10) :: tmpstring10
-  character(40) :: tmpstring40
-
+  character(10)             :: tmpstring10
+  character(40)             :: tmpstring40
+  
+  integer,       parameter  :: nodata_tilenum = -9999
+    
   interface grid2tile
     module procedure grid2tile_real, grid2tile_real8
   end interface grid2tile
@@ -733,7 +735,7 @@ contains
 
     ! locals 
     
-    integer, parameter :: nodata = -9999.
+    !integer, parameter :: nodata = -9999.    ! note bad int init; replaced with nodata_tilenum, 13 Nov 2026
     
     integer :: i, j, k, n, off_i, off_j
     
@@ -743,7 +745,7 @@ contains
     
     allocate(tile_num_in_cell_ij( my_grid%N_lon, my_grid%N_lat, max_N_tile_in_cells ))
        
-    tile_num_in_cell_ij = nodata
+    tile_num_in_cell_ij = nodata_tilenum
        
     ! adjust for 0-based indexing (eg., EASE grids)
     
@@ -819,8 +821,6 @@ contains
     real,                                      optional, intent(in)  :: max_dist_y  ! scalar [deg]
     
     ! local variables
-    
-    integer, parameter           :: nodata_tilenum = -9999
     
     integer                      :: n, k, i_ind, j_ind, this_tile_num
 
@@ -1077,8 +1077,6 @@ contains
     integer, dimension(N_latlon),                        intent(out) :: tile_num
 
     ! local variables
-
-    integer, parameter           :: nodata_tilenum = -9999
 
     integer, parameter           :: N_chunk        = 100000  ! max number of lat/lon per chunk
 
@@ -1887,10 +1885,12 @@ contains
         
     ! local variables
     
-    integer :: n, i, j, off_i, off_j
-    real, parameter :: no_data= -9999.   
+    integer                     :: n, i, j, off_i, off_j
+
+    !real,             parameter :: no_data= -9999.   ! replaced with nodata_generic, reichle, 13 Nov 2026
+
     character(len=*), parameter :: Iam = 'tile2grid_simple'
-    character(len=400) :: err_msg
+    character(len=400)          :: err_msg
 
     ! ------------------------------------
     
@@ -1906,7 +1906,8 @@ contains
     
     ! loop through tile space
 
-    grid_data = no_data
+    grid_data = nodata_generic
+    
     do n=1,N_tile
        i = i_indgs(n) - off_i
        j = j_indgs(n) - off_j
@@ -2076,7 +2077,9 @@ contains
     real, dimension(tile_grid%N_lon,tile_grid%N_lat) :: grid
         
     ! local variables
-    real, parameter :: no_data= -9999.
+    
+    !real, parameter :: no_data= -9999.      ! replaced with nodata_generic, reichle, 13 Nov 2026
+
     integer :: n, i, j, off_i, off_j
 
     character(len=*), parameter :: Iam = 'tile_mask_grid'
@@ -2089,7 +2092,8 @@ contains
     off_i = tile_grid%i_offg + (tile_grid%ind_base - 1)
     off_j = tile_grid%j_offg + (tile_grid%ind_base - 1)
        
-    grid = no_data
+    grid = nodata_generic
+    
     do n=1,N_tile
        i = i_indgs(n) - off_i
        j = j_indgs(n) - off_j
