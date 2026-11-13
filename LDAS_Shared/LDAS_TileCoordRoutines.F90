@@ -631,18 +631,18 @@ contains
 
   ! **********************************************************************
 
-  subroutine get_number_of_tiles_in_cell_ij( N_tile, tc_i_indg, tc_j_indg, tile_grid, &
+  subroutine get_number_of_tiles_in_cell_ij( N_tile, tc_i_indg, tc_j_indg, my_grid, &
        N_tile_in_cell_ij)
     
-    ! find out how many tiles are in a given tile definition grid cell
+    ! find out how many tiles are in a given grid cell
     ! reichle, 22 Jul 2005
     !
-    ! make sure to pass in consistent tile_coord (tc) and tile_grid_g inputs:
+    ! make sure to pass in consistent tile_coord (tc) and my_grid inputs:
     !
-    !   iff tile_grid_g is the grid that is associated with the tile space definition,
+    !   iff my_grid is the grid that is associated with the tile space definition,
     !   then tc_[x]_indg must be tile_coord%[x]_indg
     !
-    !   iff tile_grid_g is the grid that supports efficient mapping for perts and the EnKF analysis,
+    !   iff my_grid is the grid that supports efficient mapping for perts and obs2tile or tiles2obsFOV mapping in the EnKF analysis,
     !   then tc_[x]_indg must be tile_coord%pert_[x]_indg
     !
     ! wjiang(?) -- split off from LDASsa legacy subroutine get_tile_num_in_cell_ij()
@@ -658,10 +658,9 @@ contains
     
     integer,             intent(in), dimension(N_tile) :: tc_i_indg, tc_j_indg
     
-    type(grid_def_type), intent(in)                    :: tile_grid
+    type(grid_def_type), intent(in)                    :: my_grid
         
-    integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(inout) :: &
-         N_tile_in_cell_ij
+    integer, dimension(my_grid%N_lon,my_grid%N_lat), intent(inout) :: N_tile_in_cell_ij
     
     ! locals 
     
@@ -670,8 +669,8 @@ contains
 
     ! adjust for 0-based indexing (eg., EASE grids)
     
-    off_i = tile_grid%i_offg + (tile_grid%ind_base - 1)
-    off_j = tile_grid%j_offg + (tile_grid%ind_base - 1)
+    off_i = my_grid%i_offg + (my_grid%ind_base - 1)
+    off_j = my_grid%j_offg + (my_grid%ind_base - 1)
     
     ! (re-)initialize
     
@@ -687,33 +686,26 @@ contains
     enddo
 
     if (logit) write (logunit,*) &
-        'Maximum number of tiles in tile def grid cell = ', maxval(N_tile_in_cell_ij)
+        'Maximum number of tiles in grid cell = ', maxval(N_tile_in_cell_ij)
     if (logit) write (logunit,*)
 
   end subroutine get_number_of_tiles_in_cell_ij
 
   ! **********************************************************************
 
-  subroutine get_tile_num_in_cell_ij( N_tile, tc_i_indg, tc_j_indg, tile_grid, &
+  subroutine get_tile_num_in_cell_ij( N_tile, tc_i_indg, tc_j_indg, my_grid, &
        max_N_tile_in_cells, tile_num_in_cell_ij )
     
-    ! find out tile_num in given cells
-    !
-    ! The indices tile_coord%i_indg and tile_coord%j_indg refer to the *global*
-    ! tile definition grid (as obtained from the tile_coord_file).
-    ! Integers "off_i" and "off_j" describe the offset between the global 
-    ! "tile_grid_g" and a smaller "tile_grid_d" for the domain of interest.  
-    ! With these offsets tile2grid() can be used to map from a
-    ! subgrid of "tile_grid_g" to tile space
+    ! find out tile_num indices of tiles in given grid cells
     !
     ! reichle, 22 Jul 2005
     !
-    ! make sure to pass in consistent tile_coord (tc) and tile_grid_g inputs:
+    ! make sure to pass in consistent tile_coord (tc) and my_grid inputs:
     !
-    !   iff tile_grid_g is the grid that is associated with the tile space definition,
+    !   iff my_grid is the grid that is associated with the tile space definition,
     !   then tc_[x]_indg must be tile_coord%[x]_indg
     !
-    !   iff tile_grid_g is the grid that supports efficient mapping for perts and the EnKF analysis,
+    !   iff my_grid is the grid that supports efficient mapping for perts and the EnKF analysis,
     !   then tc_[x]_indg must be tile_coord%pert_[x]_indg
     !
     ! wjiang(?) -- split off from LDASsa legacy subroutine get_tile_num_in_cell_ij()
@@ -729,16 +721,15 @@ contains
     
     integer,             intent(in), dimension(N_tile) :: tc_i_indg, tc_j_indg
     
-    type(grid_def_type), intent(in)                    :: tile_grid
+    type(grid_def_type), intent(in)                    :: my_grid
         
-    integer,             intent(in)                    ::  max_N_tile_in_cells
+    integer,             intent(in)                    :: max_N_tile_in_cells
     
     ! the pointer is an output arguments that is allocated here
     
-    integer, dimension(:,:,:), pointer :: tile_num_in_cell_ij
+    integer, dimension(:,:,:), pointer                 :: tile_num_in_cell_ij
 
-    integer, dimension(tile_grid%N_lon,tile_grid%N_lat) :: &
-         N_tile_in_cell_ij
+    integer, dimension(my_grid%N_lon,my_grid%N_lat)    :: N_tile_in_cell_ij
 
     ! locals 
     
@@ -750,16 +741,14 @@ contains
     !
     ! allocate and initialize pointers if present
     
-       
-    allocate(tile_num_in_cell_ij(tile_grid%N_lon,tile_grid%N_lat,    &
-          max_N_tile_in_cells))
+    allocate(tile_num_in_cell_ij( my_grid%N_lon, my_grid%N_lat, max_N_tile_in_cells ))
        
     tile_num_in_cell_ij = nodata
        
     ! adjust for 0-based indexing (eg., EASE grids)
     
-    off_i = tile_grid%i_offg + (tile_grid%ind_base - 1)
-    off_j = tile_grid%j_offg + (tile_grid%ind_base - 1)
+    off_i = my_grid%i_offg + (my_grid%ind_base - 1)
+    off_j = my_grid%j_offg + (my_grid%ind_base - 1)
     
     ! (re-)initialize
     
@@ -783,10 +772,16 @@ contains
   ! *******************************************************************
   
   subroutine get_tile_num_from_latlon( N_catd, tile_coord,             &
-       tile_grid, tile_grid_g_ESMF,                                    &
+       my_grid, tile_grid_g_ESMF,                                      &
        N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,     &
        tile_num, max_dist_x, max_dist_y )
 
+    ! determine tile_num indices of tiles that "contain" given lat/lon coords
+    !
+    ! "my_grid" could be the grid associated with tile space definition or the hash grid used for
+    ! efficient obs2tile or tiles2obsFOV mapping in the EnKF analysis (i.e., pert_grid).
+    ! "N_tile_in_cell_ij" and "tile_num_in_cell_ij" must be consistent with "my_grid". 
+    !
     ! bug fix re. "check that lat/lon is inside tile_grid"
     ! - reichle, 2005/11/17
     !
@@ -808,11 +803,11 @@ contains
     
     type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
     
-    type(grid_def_type),                                 intent(in)  :: tile_grid    
+    type(grid_def_type),                                 intent(in)  :: my_grid    
 
     type(ESMF_Grid),                                     intent(in)  :: tile_grid_g_ESMF     ! needed for "c3" tile_grid
     
-    integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
+    integer, dimension(my_grid%N_lon,my_grid%N_lat),     intent(in)  :: N_tile_in_cell_ij
     
     integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij  ! input    
     
@@ -851,16 +846,16 @@ contains
     
     tile_num = nodata_tilenum          ! initialize to negative value
     
-    ! cube-sphere tile_grid: tiles do not nest in grid cells of a lat/lon grid,
-    !  use bounding boxes of tiles (amfox, 8 Nov 2026)
-
-    if (index(tile_grid%gridtype, 'c3')/=0) then
-
-       call get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,              &
-            tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
+    if (index(my_grid%gridtype, 'c3')/=0) then
+       
+       ! cube-sphere tile space: tiles do not nest in grid cells of a lat/lon grid,
+       !  use bounding boxes of tiles (amfox, 8 Nov 2026)
+       
+       call get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,            &
+            my_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
             max_dist_tmp_x, max_dist_tmp_y, tile_num )
 
-       return
+       return    ! all done if tile space is cube-sphere 
 
     end if
 
@@ -868,16 +863,16 @@ contains
     
     do n=1,N_latlon
        
-       ! Make sure lat/lon is *inside* tile_grid, otherwise do nothing.
-       ! Do *not* allow obs outside tile_grid because obs perturbations 
+       ! Make sure lat/lon is *inside* my_grid, otherwise do nothing.
+       ! Do *not* allow obs outside my_grid because obs perturbations 
        ! routines are not set up to generate perturbations for such obs, 
        ! and obs_pred would be questionable anyway.
        ! - reichle+csdraper, 29 Jan 2016
 
-       if ( tile_grid%ll_lat   < (lat(n)          )  .and.  &
-            tile_grid%ll_lon   < (lon(n)          )  .and.  &
-            (lat(n)          ) < tile_grid%ur_lat    .and.  &
-            (lon(n)          ) < tile_grid%ur_lon              ) then  
+       if ( my_grid%ll_lat   < (lat(n)        )  .and.  &
+            my_grid%ll_lon   < (lon(n)        )  .and.  &
+            (lat(n)        ) < my_grid%ur_lat    .and.  &
+            (lon(n)        ) < my_grid%ur_lon              ) then  
 
           ! min_dist = distance betw lat/lon in question and center-of-mass of
           !            matching tile 
@@ -888,17 +883,17 @@ contains
           
           ! determine grid cell that contains lat/lon 
           
-          call get_ij_ind_from_latlon( tile_grid, lat(n), lon(n), i_ind, j_ind )
+          call get_ij_ind_from_latlon( my_grid, lat(n), lon(n), i_ind, j_ind )
           
           ! make sure that i/j_ind is still within bounds 
           ! (works in conjunction with if statement above re. ll/ur_lat/lon)
           
-          i_ind = min( max(i_ind, 1), tile_grid%N_lon )
-          j_ind = min( max(j_ind, 1), tile_grid%N_lat )
+          i_ind = min( max(i_ind, 1), my_grid%N_lon )
+          j_ind = min( max(j_ind, 1), my_grid%N_lat )
           
           ! map from i_ind, j_ind to tile_num
           
-          if   ( index(tile_grid%gridtype, 'EASEv')  /=0 ) then
+          if   ( index(my_grid%gridtype, 'EASEv')  /=0 ) then
              
              ! ASSUMPTION: tiles match EASE grid cells exactly
              !             (unless "outside" the domain, eg. water surface)
@@ -922,7 +917,7 @@ contains
                 
              end if
              
-          elseif (index(tile_grid%gridtype, 'LatLon')/=0) then
+          elseif (index(my_grid%gridtype, 'LatLon')/=0) then
              
              ! Loop through all tiles within grid cell that contain lat/lon and
              ! find minimum distance (Minkowski norm).
@@ -958,7 +953,7 @@ contains
                     
 
           ! check whether lat/lon is inside bounding box of given tile
-          ! (if domain consists of a single tile and tile_grid is coarse,
+          ! (if domain consists of a single tile and my_grid is coarse,
           !  it is likely that lat/lon is outside bounding box of tile
           !  even if the lat/lon is inside the tile definition grid cell that
           !  contains the given tile) - reichle, 18 Aug 2005
