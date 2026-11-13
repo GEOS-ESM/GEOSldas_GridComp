@@ -998,11 +998,12 @@ contains
        N_obs_param, N_ens,                                       &
        N_catl, tile_coord_l,                                     &
        N_catf, tile_coord_f, f2l,                                &
-       N_catl_vec, low_ind, tiles2obsFOV_grid_g,                 &
+       N_catl_vec, low_ind,                                      &
+       tile_grid_g, tiles2obsFOV_grid_g,                         &
        obs_param,                                                &
        met_force, lai, cat_param, cat_progn, mwRTM_param,        &
        N_obsl, Observations_l, Obs_pred_l, obsbias_ok,           &
-       fcsterr_inflation_fac, c3_tile_space )
+       fcsterr_inflation_fac )
     
     ! Compute ensemble of measurement predictions from ensemble 
     !  of tile-space Catchment prognostics.
@@ -1025,8 +1026,7 @@ contains
     ! 18 Jun 2012 - reichle: rewritten for better memory management w/ MPI
     ! 26 Mar 2014 - reichle: apply all model-based QC only before EnKF update
     ! 25 Sep 2020 - wjiang+reichle: accommodate processors that have no tiles
-    !  6 Nov 2026 - amfox: added optional input "c3_tile_space" and QC of Tb for non-land
-    !                      surfaces in cube-sphere tile space
+    !  6 Nov 2026 - amfox: added QC of Tb for non-land surfaces in cube-sphere tile space
     
     implicit none
     
@@ -1040,8 +1040,9 @@ contains
     
     integer,                intent(in),    dimension(numprocs)     :: N_catl_vec, low_ind
 
-    type(grid_def_type),    intent(in)                             :: tiles2obsFOV_grid_g    ! hash grid for mapping from tile space to obs FOV
-
+    type(grid_def_type),    intent(in)                             :: tile_grid_g  
+    type(grid_def_type),    intent(in)                             :: tiles2obsFOV_grid_g  ! hash grid to map from tile space to obs FOV
+    
     type(obs_param_type),   intent(in),    dimension(N_obs_param)  :: obs_param
 
     integer,                intent(in),    dimension(N_catf)       :: f2l
@@ -1060,14 +1061,6 @@ contains
     logical,                intent(in),    dimension(N_obsl), optional :: obsbias_ok    
    
     real,                   intent(in),                       optional :: fcsterr_inflation_fac      
-    
-    ! get_obs_pred() is called with "pert_grid_g" as "tiles2obsFOV_grid_g", which is:
-    !    - LatLon for LatLon      tile space,
-    !    - EASE   for EASE        tile space,
-    !    - LatLon for cube-sphere tile space, 
-    ! => need "c3_tile_space" to tell get_obs_pred() whether the tile space is cube-sphere (default: .false.)
-
-    logical,                intent(in),                       optional :: c3_tile_space
 
     ! --------------------------------------------------------------------------------
     !
@@ -1098,7 +1091,6 @@ contains
 
     logical                                 :: tmpRFI, tmpWater, tmpPeat, use_distance_weights
 
-    logical                                 :: c3_tile_space_tmp
     integer                                 :: ind_i_min, ind_i_max, ind_j_min, ind_j_max
 
     real, dimension(1)                      :: tmpmean, tmpvar
@@ -1111,6 +1103,8 @@ contains
     logical                                 :: get_FT_l,     get_FT_lH
     logical                                 :: get_asnow_l,  get_asnow_lH
     logical                                 :: get_peat_lH
+
+    logical                                 :: c3_tile_space
     
     type(grid_def_type)                     :: tiles2obsFOV_grid_lH        
     
@@ -1604,13 +1598,10 @@ contains
     !  near the edge of the domain, land_frac might be underestimated if non-land tiles
     !  in a given grid cell are within the (full) domain, leading to more aggressive
     !  screening of Tb obs; this is acceptable because typically the domain is global 
-    ! - amfox, 6 Nov 2026
-
-    c3_tile_space_tmp = .false.
-
-    if (present(c3_tile_space))  c3_tile_space_tmp = c3_tile_space
-
-    if (c3_tile_space_tmp .and. get_Tb_lH) then
+    
+    c3_tile_space = (index(tile_grid_g%gridtype,'c3')/=0)
+    
+    if (c3_tile_space .and. get_Tb_lH) then
 
        ind_i_min = minval(tile_coord_f%i_indg)
        ind_i_max = maxval(tile_coord_f%i_indg)
@@ -1931,7 +1922,7 @@ contains
                    call tile2obs_helper(                                               &
                         N_tmp, tmp_wFOV(1:N_tmp), tmp_data(1:N_tmp), tmp_land_frac)
 
-                elseif (c3_tile_space_tmp) then
+                elseif (c3_tile_space) then
 
                    ! a cube-sphere grid cell can contain several tiles;
                    ! average the land fraction of the grid cells with at least one land tile in the FOV,

@@ -1961,7 +1961,8 @@ contains
             date_time_new, trim(exp_id),                                 &
             N_obsl, N_obs_param, NUM_ENSEMBLE,                           &
             N_catl, tile_coord_l,                                        &
-            N_catf, tile_coord_rf, tcinternal%pgrid_g,                   &
+            N_catf, tile_coord_rf,                                       &
+            tcinternal%tgrid_g, tiles2obsFOV_grid_g=tcinternal%pgrid_g,  &    ! passed through to get_obs_pred()
             N_catl_vec, low_ind, rf2l,                                   &
             update_type, LandAssimDTstep,                                &
             obs_param,                                                   &

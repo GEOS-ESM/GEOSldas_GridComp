@@ -584,17 +584,22 @@ contains
 
           ! incl. obs bias estimation
 
-          call get_obs_pred(                                      &
-               .true.,                                            & ! -> before EnKF update
-               N_obs_param, N_ens,                                &
-               N_catl, tile_coord_l,                              &
-               N_catf, tile_coord_f, f2l,                         &
-               N_catl_vec, low_ind, pert_grid_g,                  &
-               obs_param,                                         &
-               met_force, lai, cat_param, cat_progn, mwRTM_param, &
-               N_obsl, Observations_l, Obs_pred_l, obsbias_ok,    &
-               fcsterr_inflation_fac,                             &
-               c3_tile_space = (index(tile_grid_g%gridtype,'c3')/=0) )
+          ! call get_obs_pred() with "pert_grid_g" as "tiles2obsFOV_grid_g", which is:
+          !    - LatLon for LatLon      tile space, 
+          !    - EASE   for EASE        tile space,
+          !    - LatLon for cube-sphere tile space, 
+
+          call get_obs_pred(                                                 &
+               beforeEnKFupdate  = .true.,                                   &   ! -> before EnKF update
+               N_obs_param, N_ens,                                           &
+               N_catl, tile_coord_l,                                         &
+               N_catf, tile_coord_f, f2l,                                    &
+               N_catl_vec, low_ind,                                          &
+               tile_grid_g, tiles2obsFOV_grid_g = pert_grid_g,               &    
+               obs_param,                                                    &
+               met_force, lai, cat_param, cat_progn, mwRTM_param,            &
+               N_obsl, Observations_l, Obs_pred_l, obsbias_ok,               &
+               fcsterr_inflation_fac )
 
           if (allocated(obsbias_ok)) deallocate(obsbias_ok)
 
@@ -2122,7 +2127,7 @@ contains
        date_time, exp_id,                                                    &
        N_obsl, N_obs_param, N_ens,                                           &
        N_catl, tile_coord_l,                                                 &
-       N_catf, tile_coord_f, pert_grid_g,                                    &
+       N_catf, tile_coord_f, tile_grid_g, tiles2obsFOV_grid_g,               &
        N_catl_vec, low_ind, f2l,                                             &
        update_type, dtstep_assim,                                            &
        obs_param,                                                            &
@@ -2151,7 +2156,8 @@ contains
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_l  ! input
     type(tile_coord_type),  dimension(:),     pointer :: tile_coord_f  ! input
 
-    type(grid_def_type),                              intent(in) :: pert_grid_g
+    type(grid_def_type),                              intent(in) :: tile_grid_g
+    type(grid_def_type),                              intent(in) :: tiles2obsFOV_grid_g
 
     integer,                dimension(numprocs),      intent(in) :: N_catl_vec, low_ind
 
@@ -2195,19 +2201,16 @@ contains
 
        N_obsl_tmp = N_obsl ! cannot pass N_obsl into get_obs_pred() b/c of intent(in)
 
-       call get_obs_pred(                                      &
-            .false.,                                           & ! -> after EnKF update
-            N_obs_param, N_ens,                                &
-            N_catl, tile_coord_l,                              &
-            N_catf, tile_coord_f, f2l,                         &
-            N_catl_vec, low_ind, pert_grid_g,                  &
-            obs_param,                                         &
-            met_force, lai, cat_param, cat_progn, mwRTM_param, &
+       call get_obs_pred(                                                 &
+            beforeEnKFupdate=.false.,                                     & ! -> after EnKF update
+            N_obs_param, N_ens,                                           &
+            N_catl, tile_coord_l,                                         &
+            N_catf, tile_coord_f, f2l,                                    &
+            N_catl_vec, low_ind,                                          &
+            tile_grid_g, tiles2obsFOV_grid_g,                             &
+            obs_param,                                                    &
+            met_force, lai, cat_param, cat_progn, mwRTM_param,            &
             N_obsl_tmp, Observations_l, Obs_pred_l )
-
-       ! NOTE: no need to pass c3_tile_space into get_obs_pred() here; obs that fail the QC 
-       !       of Tb for non-land surfaces were already removed in the call to get_obs_pred() 
-       !       before the EnKF update (amfox, 6 Nov 2026)
 
        ! clean up
 
