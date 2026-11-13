@@ -456,7 +456,7 @@ contains
     
     if( c3_grid) then
        
-       ! LDAS grid type cannot really represent c3 grid parameters; fill in my_grid as much as possible
+       ! LDAS grid type cannot really represent c3 grid parameters; fill in parameters as much as possible
        
        my_grid%gridtype    = 'c3'
        my_grid%ind_base    =    1
@@ -995,14 +995,14 @@ contains
   
   ! *******************************************************************
   
-  subroutine get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,        &
-       tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
+  subroutine get_tile_num_from_latlon_c3( tile_grid_g_ESMF, tile_coord,          &
+       tile_grid_g, N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,  &
        max_dist_x, max_dist_y, tile_num )
 
     ! find tile_num for lat/lon in cube-sphere ("c3") tile space, see get_tile_num_from_latlon()
     !
     ! tiles do not nest in the cells of a lat/lon grid, so for cube-sphere tile space,
-    !  tile_grid must be the cube-sphere grid that defines the tile space (and
+    !  tile_grid_g must be the cube-sphere grid that defines the tile space (and
     !  N_tile_in_cell_ij, tile_num_in_cell_ij must be obtained from tile_coord%i_indg and
     !  tile_coord%j_indg).  tile_grid_g_ESMF is the ESMF grid of the cube-sphere tile space.
     !
@@ -1061,9 +1061,9 @@ contains
 
     type(tile_coord_type), dimension(:),                 pointer     :: tile_coord ! input
 
-    type(grid_def_type),                                 intent(in)  :: tile_grid
+    type(grid_def_type),                                 intent(in)  :: tile_grid_g
 
-    integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
+    integer, dimension(tile_grid_g%N_lon,tile_grid_g%N_lat), intent(in)  :: N_tile_in_cell_ij
 
     integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij ! input
 
@@ -1125,7 +1125,7 @@ contains
 
        ! determine grid cells that contain lat/lon
 
-       call get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid, N_tmp,                    &
+       call get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid_g, N_tmp,                        &
             lat(ind_start:ind_end), lon(ind_start:ind_end), i_ind(1:N_tmp), j_ind(1:N_tmp) )
 
        ! Step 1.): tiles within grid cell that contains lat/lon
@@ -1139,15 +1139,15 @@ contains
           ! Make sure lat/lon is *inside* tile_grid, otherwise do nothing
           ! (see get_tile_num_from_latlon())
 
-          if ( tile_grid%ll_lat   < (lat(n)          )  .and.  &
-               tile_grid%ll_lon   < (lon(n)          )  .and.  &
-               (lat(n)          ) < tile_grid%ur_lat    .and.  &
-               (lon(n)          ) < tile_grid%ur_lon              ) then
+          if ( tile_grid_g%ll_lat   < (lat(n)            )  .and.  &
+               tile_grid_g%ll_lon   < (lon(n)            )  .and.  &
+               (lat(n)            ) < tile_grid_g%ur_lat    .and.  &
+               (lon(n)            ) < tile_grid_g%ur_lon              ) then
 
              min_dist = 1.e10    ! initialize
 
-             call get_tile_num_in_bbox_c3( lat(n), lon(n), 1, i_ind(nn:nn), j_ind(nn:nn), &
-                  tile_coord, tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij,         &
+             call get_tile_num_in_bbox_c3( lat(n), lon(n), 1, i_ind(nn:nn), j_ind(nn:nn),  &
+                  tile_coord, tile_grid_g, N_tile_in_cell_ij, tile_num_in_cell_ij,         &
                   tile_num(n), min_dist, min_dist_x(nn), min_dist_y(nn) )
 
              if (tile_num(n)==nodata_tilenum) then
@@ -1166,7 +1166,7 @@ contains
        ! Step 2.): add grid cells that contain points around lat/lon:
        !
        !  (i)  8 points at +/- half a grid cell (approx.) around lat/lon
-       !       (tile_grid%dlon = 360/(4*N) is the approximate grid spacing, see LDAS_create_grid_g())
+       !       (tile_grid_g%dlon = 360/(4*N) is the approximate grid spacing, see LDAS_create_grid_g())
        !
        !  (ii) points of a lattice that covers lat/lon +/- max_dist, with a spacing of at most
        !       a quarter grid cell (approx.); the number of lattice intervals on either side of
@@ -1187,10 +1187,10 @@ contains
 
              n = ind_start - 1 + ind_nbr(nn)
 
-             tmp_dlat = 0.5*tile_grid%dlon
+             tmp_dlat = 0.5 *tile_grid_g%dlon
              tmp_dlon = tmp_dlat / max( cos( MAPL_PI/180. * lat(n) ), 0.1 )
 
-             tmp_slat = 0.25*tile_grid%dlon
+             tmp_slat = 0.25*tile_grid_g%dlon
              tmp_slon = tmp_slat / max( cos( MAPL_PI/180. * lat(n) ), 0.1 )
 
              N_y = ceiling( min( max_dist_y   /tmp_slat, real(N_lattice_max) ) )
@@ -1235,7 +1235,7 @@ contains
 
           end do
 
-          call get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid, kk,               &
+          call get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid_g, kk,                 &
                tmp_lat(1:kk), tmp_lon(1:kk), i_ind_nbr(1:kk), j_ind_nbr(1:kk) )
 
           kk = 0
@@ -1269,10 +1269,10 @@ contains
 
              min_dist = 1.e10    ! initialize
 
-             if (N_cell>1)                                                       &
-                  call get_tile_num_in_bbox_c3( lat(n), lon(n), N_cell-1,        &
-                  i_cell_c3(2:N_cell), j_cell_c3(2:N_cell),                      &
-                  tile_coord, tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij, &
+             if (N_cell>1)                                                                  &
+                  call get_tile_num_in_bbox_c3( lat(n), lon(n), N_cell-1,                   &
+                  i_cell_c3(2:N_cell), j_cell_c3(2:N_cell),                                 &
+                  tile_coord, tile_grid_g, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
                   tile_num(n), min_dist, min_dist_x(ind_nbr(nn)), min_dist_y(ind_nbr(nn)) )
 
              ! Step 3.): no bounding box contains lat/lon:  find closest tile among those
@@ -1353,11 +1353,11 @@ contains
 
   ! *******************************************************************
 
-  subroutine get_tile_num_in_bbox_c3( lat, lon, N_cell, i_cell, j_cell,        &
-       tile_coord, tile_grid, N_tile_in_cell_ij, tile_num_in_cell_ij,          &
+  subroutine get_tile_num_in_bbox_c3( lat, lon, N_cell, i_cell, j_cell,      &
+       tile_coord, tile_grid_g, N_tile_in_cell_ij, tile_num_in_cell_ij,      &
        tile_num, min_dist, min_dist_x, min_dist_y )
 
-    ! among the tiles within the given grid cells of the cube-sphere tile_grid, find the
+    ! among the tiles within the given grid cells of the cube-sphere tile_grid_g, find the
     !  tile whose bounding box contains lat/lon and that has the minimum normalized square
     !  distance (dx/hx)**2 + (dy/hy)**2 (< min_dist), where hx and hy are half the width
     !  and height of the bounding box; see get_tile_num_from_latlon_c3()
@@ -1376,9 +1376,9 @@ contains
 
     type(tile_coord_type), dimension(:),                 pointer       :: tile_coord ! input
 
-    type(grid_def_type),                                 intent(in)    :: tile_grid
+    type(grid_def_type),                                 intent(in)    :: tile_grid_g
 
-    integer, dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in)    :: N_tile_in_cell_ij
+    integer, dimension(tile_grid_g%N_lon,tile_grid_g%N_lat), intent(in)    :: N_tile_in_cell_ij
 
     integer, dimension(:,:,:),                           pointer       :: tile_num_in_cell_ij ! input
 
@@ -1438,14 +1438,14 @@ contains
 
   ! *******************************************************************
 
-  subroutine get_ij_ind_from_latlon( tile_grid, lat, lon, i_ind, j_ind )
+  subroutine get_ij_ind_from_latlon( my_grid, lat, lon, i_ind, j_ind )
 
     ! NOTE order of input arguments ("lat", "lon", "lon_ind", "lat_ind")
 
-    ! find i/j_ind of grid cell that contains lat/lon
+    ! find i/j_ind of grid cell in my_grid that contains lat/lon
     !
     ! that is, for given lat/lon, find out corresponding i/j_ind into an array
-    ! of size N_lon-by-N_lat whose lat/lon coordinates are defined by tile_grid
+    ! of size N_lon-by-N_lat whose lat/lon coordinates are defined by my_grid
     
     ! NOTE: ALL arrays in LDASsa are declared with base 1
     
@@ -1456,7 +1456,7 @@ contains
     
     implicit none
     
-    type(grid_def_type), intent(in) :: tile_grid
+    type(grid_def_type), intent(in) :: my_grid
     
     real, intent(in) :: lat, lon
     integer, intent(out) :: i_ind, j_ind
@@ -1475,21 +1475,21 @@ contains
     !
     ! select grid type
     
-    if     (index(tile_grid%gridtype, 'EASEv')/=0) then
+    if     (index(my_grid%gridtype, 'EASEv')/=0) then
 
        ! EASE grid lat/lon to index provides *global*, *0-based* index!
 
-       call MAPL_ease_convert(tile_grid%gridtype, lat, lon, r, s)
+       call MAPL_ease_convert(my_grid%gridtype, lat, lon, r, s)
        
        i_indg = nint(r)    ! i_ind or lon_ind
        j_indg = nint(s)    ! j_ind or lat_ind
 
-       ! convert to index into array defined by tile_grid_d
+       ! convert to index into array defined by my_grid
        
-       i_ind = i_indg - tile_grid%i_offg - (tile_grid%ind_base - 1)
-       j_ind = j_indg - tile_grid%j_offg - (tile_grid%ind_base - 1)
+       i_ind = i_indg - my_grid%i_offg - (my_grid%ind_base - 1)
+       j_ind = j_indg - my_grid%j_offg - (my_grid%ind_base - 1)
        
-    elseif (index(tile_grid%gridtype, 'LatLon')/=0) then
+    elseif (index(my_grid%gridtype, 'LatLon')/=0) then
        
        ! ll_lon and ll_lat refer to lower left  corner of grid cell
        ! ur_lon and ur_lat refer to upper right corner of grid cell
@@ -1497,28 +1497,28 @@ contains
        !
        ! ALL arrays in LDASsa are declared with base 1 (--> use "ceiling")
 
-       if (tile_grid%i_dir==1) then
+       if (my_grid%i_dir==1) then
           
-          i_ind = ceiling( (lon - tile_grid%ll_lon)/tile_grid%dlon )
+          i_ind = ceiling( (lon - my_grid%ll_lon)/my_grid%dlon )
           
        else
           
-          i_ind = ceiling( (tile_grid%ur_lon - lon)/tile_grid%dlon )
+          i_ind = ceiling( (my_grid%ur_lon - lon)/my_grid%dlon )
 
        end if
 
 
-       if (tile_grid%j_dir==1) then
+       if (my_grid%j_dir==1) then
           
-          j_ind = ceiling( (lat - tile_grid%ll_lat)/tile_grid%dlat )
+          j_ind = ceiling( (lat - my_grid%ll_lat)/my_grid%dlat )
           
        else
           
-          j_ind = ceiling( (tile_grid%ur_lat - lat)/tile_grid%dlat )
+          j_ind = ceiling( (my_grid%ur_lat - lat)/my_grid%dlat )
           
        end if
 
-    elseif (index(tile_grid%gridtype, 'c3')/=0) then
+    elseif (index(my_grid%gridtype, 'c3')/=0) then
 
        ! cube-sphere grid requires the ESMF grid (amfox, 8 Nov 2026)
 
@@ -1534,7 +1534,7 @@ contains
   
   ! *******************************************************************
 
-  subroutine get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid, N_latlon, lat, lon, i_ind, j_ind )
+  subroutine get_ij_ind_from_latlon_c3( tile_grid_g_ESMF, tile_grid_g, N_latlon, lat, lon, i_ind, j_ind )
 
     ! find i/j_ind of cube-sphere ("c3") grid cells that contain lat/lon
     !
@@ -1559,7 +1559,7 @@ contains
 
     type(ESMF_Grid),              intent(in)  :: tile_grid_g_ESMF
 
-    type(grid_def_type),          intent(in)  :: tile_grid
+    type(grid_def_type),          intent(in)  :: tile_grid_g
 
     integer,                      intent(in)  :: N_latlon
 
@@ -1604,15 +1604,15 @@ contains
 
     end if
 
-    ! convert to index into array defined by tile_grid
+    ! convert to index into array defined by tile_grid_g
 
-    i_ind = i_ind - tile_grid%i_offg - (tile_grid%ind_base - 1)
-    j_ind = j_ind - tile_grid%j_offg - (tile_grid%ind_base - 1)
+    i_ind = i_ind - tile_grid_g%i_offg - (tile_grid_g%ind_base - 1)
+    j_ind = j_ind - tile_grid_g%j_offg - (tile_grid_g%ind_base - 1)
 
     ! make sure that i/j_ind is within bounds
 
-    i_ind = min( max(i_ind, 1), tile_grid%N_lon )
-    j_ind = min( max(j_ind, 1), tile_grid%N_lat )
+    i_ind = min( max(i_ind, 1), tile_grid_g%N_lon )
+    j_ind = min( max(j_ind, 1), tile_grid_g%N_lat )
 
     deallocate( tmp_lat, tmp_lon )
 
@@ -1620,10 +1620,10 @@ contains
 
   ! *******************************************************************
 
-  subroutine init_tile_grid_g_ESMF_c3( tile_grid_g_ESMF, tile_grid )
+  subroutine init_tile_grid_g_ESMF_c3( tile_grid_g_ESMF, tile_grid_g )
 
     ! prepare cube-sphere ("c3") ESMF grid for get_ij_ind_from_latlon_c3() and check that
-    !  the grid matches the global cube-sphere tile_grid (tile_grid_g)
+    !  the grid matches the (global, cube-sphere) tile grid (tile_grid_g)
     !
     ! MUST be called by ALL processors (once), before get_ij_ind_from_latlon_c3() is
     !  called by root_proc only (e.g., in obs readers):
@@ -1646,7 +1646,7 @@ contains
 
     type(ESMF_Grid),              intent(in)  :: tile_grid_g_ESMF
 
-    type(grid_def_type),          intent(in)  :: tile_grid
+    type(grid_def_type),          intent(in)  :: tile_grid_g
 
     ! local variables
 
@@ -1682,21 +1682,21 @@ contains
 
     end if
 
-    if ( (dims(1)/=tile_grid%N_lon) .or. (dims(2)/=tile_grid%N_lat) ) then
+    if ( (dims(1)/=tile_grid_g%N_lon) .or. (dims(2)/=tile_grid_g%N_lat) ) then
 
-       write (err_msg,'(A,2i8,A,2i8)') 'size of ESMF grid ', dims(1:2),       &
-            ' does not match size of cube-sphere tile_grid ', tile_grid%N_lon, tile_grid%N_lat
+       write (err_msg,'(A,2i8,A,2i8)') 'size of ESMF grid ', dims(1:2),                              &
+            ' does not match size of cube-sphere tile_grid ', tile_grid_g%N_lon, tile_grid_g%N_lat
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
 
     end if
 
     ! reject stretched grid (see above)
 
-    call ESMF_AttributeGet( tmp_grid, name='STRETCH_FACTOR', isPresent=has_factor, rc=status )
-    if (status==0)                                                                       &
-         call ESMF_AttributeGet( tmp_grid, name='TARGET_LON', isPresent=has_lon,    rc=status )
-    if (status==0)                                                                       &
-         call ESMF_AttributeGet( tmp_grid, name='TARGET_LAT', isPresent=has_lat,    rc=status )
+    call ESMF_AttributeGet(      tmp_grid, name='STRETCH_FACTOR', isPresent=has_factor, rc=status )
+    if (status==0)                                                                                   &
+         call ESMF_AttributeGet( tmp_grid, name='TARGET_LON',     isPresent=has_lon,    rc=status )
+    if (status==0)                                                                                   &
+         call ESMF_AttributeGet( tmp_grid, name='TARGET_LAT',     isPresent=has_lat,    rc=status )
 
     if (status/=0) then
 
@@ -1732,7 +1732,7 @@ contains
   ! *******************************************************************
 
   subroutine get_tile_num_in_ellipse( lon, lat, r_x, r_y,                 &
-       N_tile, tile_coord, tile_grid,                                     &
+       N_tile, tile_coord, my_grid,                                       &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                            &
        N_tile_in_ellipse,  tile_num_in_ellipse,  norm_square_distance   )
             
@@ -1742,7 +1742,11 @@ contains
     !  and axes r_x, r_y
     !
     ! also return normalized square distance of tile center-of-mass lat/lon from lat/lon
-
+    !
+    ! "my_grid" could be the grid associated with tile space definition or the hash grid used for
+    ! efficient obs2tile or tiles2obsFOV mapping in the EnKF analysis (i.e., pert_grid).
+    ! "N_tile_in_cell_ij" and "tile_num_in_cell_ij" must be consistent with "my_grid". 
+    
     ! TO DO: what about dateline? poles?  [ignore for now]
     
     ! NOTE: get_tile_num_in_ellipse() returns zero tiles (N_tile_in_ellipse=0)
@@ -1758,9 +1762,9 @@ contains
     
     type(tile_coord_type), dimension(:),      pointer       :: tile_coord ! input
     
-    type(grid_def_type),                      intent(in)    :: tile_grid
+    type(grid_def_type),                      intent(in)    :: my_grid
     
-    integer,               dimension(tile_grid%N_lon,tile_grid%N_lat), intent(in) :: &
+    integer,               dimension(my_grid%N_lon,my_grid%N_lat), intent(in) :: &
          N_tile_in_cell_ij
         
     integer,               dimension(:,:,:),  pointer       :: tile_num_in_cell_ij ! input
@@ -1794,8 +1798,8 @@ contains
     
     ! identify rectangle +/- r_x and +/- r_y around lat/lon
     
-    tmp_dx = tile_grid%dlon  ! broaden rectangle to avoid missing tiles
-    tmp_dy = tile_grid%dlon  ! use *dlon* because for EASE grid *dlat* is ill-defined   
+    tmp_dx = my_grid%dlon  ! broaden rectangle to avoid missing tiles
+    tmp_dy = my_grid%dlon  ! use *dlon* because for EASE grid *dlat* is ill-defined   
     
     minlon = lon - r_x - tmp_dx
     maxlon = lon + r_x + tmp_dx
@@ -1804,15 +1808,15 @@ contains
     
     ! find i,j indices of two opposite corners (lower left and upper right)
     
-    call get_ij_ind_from_latlon( tile_grid, minlat, minlon, i_ind_ll, j_ind_ll )
-    call get_ij_ind_from_latlon( tile_grid, maxlat, maxlon, i_ind_ur, j_ind_ur )
+    call get_ij_ind_from_latlon( my_grid, minlat, minlon, i_ind_ll, j_ind_ll )
+    call get_ij_ind_from_latlon( my_grid, maxlat, maxlon, i_ind_ur, j_ind_ur )
     
-    ! restrict i_ind_* and j_ind_* to fall within tile_grid
+    ! restrict i_ind_* and j_ind_* to fall within my_grid
     
-    i_ind_ll = min( tile_grid%N_lon, max( 1, i_ind_ll ))
-    j_ind_ll = min( tile_grid%N_lat, max( 1, j_ind_ll ))
-    i_ind_ur = min( tile_grid%N_lon, max( 1, i_ind_ur ))
-    j_ind_ur = min( tile_grid%N_lat, max( 1, j_ind_ur ))
+    i_ind_ll = min( my_grid%N_lon, max( 1, i_ind_ll ))
+    j_ind_ll = min( my_grid%N_lat, max( 1, j_ind_ll ))
+    i_ind_ur = min( my_grid%N_lon, max( 1, i_ind_ur ))
+    j_ind_ur = min( my_grid%N_lat, max( 1, j_ind_ur ))
 
     ! find smaller and larger of the two indices
     ! (index may run north-to-south/west-to-east depending on i_dir/j_dir)
