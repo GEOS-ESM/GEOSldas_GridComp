@@ -11924,7 +11924,7 @@ contains
   ! *****************************************************************
   
   subroutine get_tile_num_for_obs(N_catf, tile_coord_f,                        &
-       obs2tile_grid, tile_grid_g_ESMF,                                        &
+       obs2tile_grid_f, tile_grid_g_ESMF,                                      &
        N_tile_in_cell_ij, tile_num_in_cell_ij, N_latlon, lat, lon,             &
        this_obs_param,                                                         &
        tile_num,                                                               &
@@ -11946,11 +11946,11 @@ contains
     
     type(tile_coord_type), dimension(:),                 pointer     :: tile_coord_f ! input
     
-    type(grid_def_type),                                 intent(in)  :: obs2tile_grid    
+    type(grid_def_type),                                 intent(in)  :: obs2tile_grid_f    
 
     type(ESMF_Grid),                                     intent(in)  :: tile_grid_g_ESMF  ! needed for obs-to-tile mapping in cube-sphere tile space
     
-    integer, dimension(obs2tile_grid%N_lon,obs2tile_grid%N_lat), intent(in)  :: N_tile_in_cell_ij
+    integer, dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in)  :: N_tile_in_cell_ij
     
     integer, dimension(:,:,:),                           pointer     :: tile_num_in_cell_ij ! input
     
@@ -12021,7 +12021,7 @@ contains
     ! find tile numbers
 
     call get_tile_num_from_latlon(N_catf, tile_coord_f,           &
-         obs2tile_grid, tile_grid_g_ESMF,                         &
+         obs2tile_grid_f, tile_grid_g_ESMF,                       &
          N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
          N_latlon, tmp_lat, tmp_lon,                              &
          tile_num, max_dist_x, max_dist_y )
