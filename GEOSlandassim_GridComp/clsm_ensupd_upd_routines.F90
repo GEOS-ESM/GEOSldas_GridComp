@@ -1707,7 +1707,7 @@ contains
        ! determine tiles2obsFOV_grid_lH from tile_coord_lH and tiles2obsFOV_grid_g
        
        tiles2obsFOV_grid_lH = get_minExtent_grid(                                                        &
-            N_catlH, tile_coord_lH%pert_i_indg, tile_coord_lH%pert_j_indg,                               &
+            N_catlH, tile_coord_lH%pert_i_indg, tile_coord_lH%pert_j_indg,                               &  ! NOTE: %pert_i_indg, %pert_j_indg
             tile_coord_lH%min_lon, tile_coord_lH%min_lat, tile_coord_lH%max_lon, tile_coord_lH%max_lat,  &
             tiles2obsFOV_grid_g) 
        
