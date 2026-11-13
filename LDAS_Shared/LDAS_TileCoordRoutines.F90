@@ -78,7 +78,7 @@ contains
   ! **********************************************************************  
   
   subroutine io_domain_files( action, work_path, exp_id,               &
-       N_cat_domain, d2g, tile_coord, tile_grid_g, tile_grid_d, rc )
+       N_catf, d2g, tile_coord, tile_grid_g, tile_grid_f, rc )
     
     ! reichle, 23 July 2010
     ! reichle,  7 Jan  2014 - changed tile_coord and tile_grids I/O to binary
@@ -86,19 +86,19 @@ contains
     
     implicit none
     
-    character,                          intent(in)    :: action
+    character,                           intent(in)    :: action
     
-    character(*),                       intent(in)    :: work_path
-    character(*),                       intent(in)    :: exp_id
+    character(*),                        intent(in)    :: work_path
+    character(*),                        intent(in)    :: exp_id
 
-    integer,                             intent(inout) :: N_cat_domain
+    integer,                             intent(inout) :: N_catf
     
     integer,               dimension(:), pointer       :: d2g
 
-    type(tile_coord_type), dimension(:), pointer       :: tile_coord  ! inout
+    type(tile_coord_type), dimension(:), pointer       :: tile_coord   ! inout
 
     type(grid_def_type),                 intent(inout) :: tile_grid_g
-    type(grid_def_type),                 intent(inout) :: tile_grid_d
+    type(grid_def_type),                 intent(inout) :: tile_grid_f
 
     integer,                             intent(  out) :: rc
 
@@ -114,7 +114,7 @@ contains
     character( 40)      :: file_tag, dir_name, file_ext, tmp_action, tmp_status
 
     character(len=*), parameter :: Iam = 'io_domain_files'
-    character(len=400) :: err_msg
+    character(len=400)          :: err_msg
 
     ! -----------------------------------------------------------    
     !
@@ -172,20 +172,20 @@ contains
        
        if (writing) then
           
-          write (unitnumber,*) N_cat_domain
+          write (unitnumber,*) N_catf
           
-          do n=1,N_cat_domain
+          do n=1,N_catf
              write (unitnumber,*) tile_coord(n)%tile_id, d2g(n)
           end do
           
        else
           
-          read  (unitnumber,*) N_cat_domain
+          read  (unitnumber,*) N_catf
 
-          allocate(tile_coord(N_cat_domain))
-          allocate(d2g(       N_cat_domain))
+          allocate(tile_coord(N_catf))
+          allocate(d2g(       N_catf))
 
-          do n=1,N_cat_domain
+          do n=1,N_catf
              read  (unitnumber,*) tile_coord(n)%tile_id, d2g(n)
           end do
           
@@ -225,7 +225,7 @@ contains
        
     else
 
-       call io_tile_coord_type( action, unitnumber, N_cat_domain, tile_coord )
+       call io_tile_coord_type( action, unitnumber, N_catf, tile_coord )
        
        close (unitnumber,status='keep')
        
@@ -264,8 +264,8 @@ contains
        ! read/write 'tile_grid_g'
        call io_grid_def_type( action, unitnumber, tile_grid_g )
        
-       ! read/write 'tile_grid_d'
-       call io_grid_def_type( action, unitnumber, tile_grid_d )
+       ! read/write 'tile_grid_f'
+       call io_grid_def_type( action, unitnumber, tile_grid_f )
        
        close (unitnumber,status='keep')
        
@@ -283,13 +283,15 @@ contains
   ! **********************************************************************
 
   subroutine LDAS_create_grid_g( gridname, n_lon, n_lat,       &
-       tile_grid, i_indg_offset, j_indg_offset, cell_area)
-    
+       my_grid, i_indg_offset, j_indg_offset, cell_area)
+
+    ! assemble LDAS grid type for global grid
+    !
     ! inputs:
     !  gridname, n_lon, n_lat
     !
     ! inouts:
-    !  tile_grid   : parameters of tile definition grid  
+    !  my_grid   : LDAS grid type with parameters according to input args
     ! 
     ! outputs:
     !  offsets
@@ -299,7 +301,7 @@ contains
     
     character(*),                  intent(in)    :: gridname
     integer,                       intent(in)    :: n_lon, n_lat
-    type(grid_def_type),           intent(inout) :: tile_grid
+    type(grid_def_type),           intent(inout) :: my_grid
     integer,                       intent(out)   :: i_indg_offset, j_indg_offset
     real,                optional, intent(out)   :: cell_area
     
@@ -310,27 +312,28 @@ contains
     logical :: ease_grid, c3_grid, latlon_grid
     logical :: file_exist
     integer :: k, rows, cols
+    
     character(len=*),  parameter :: Iam = 'create global ldas_grid '
     character(len=400)           :: err_msg
     
-    ! initialize all fields to no-data values
+    ! ----------------------------------
     
-    i_indg_offset = 0
-    j_indg_offset = 0
+    i_indg_offset          = 0
+    j_indg_offset          = 0
     
-    call init_grid_def_type(tile_grid)
+    call init_grid_def_type(my_grid)
     
-    tile_grid%N_lon = N_lon
-    tile_grid%N_lat = N_lat
+    my_grid%N_lon          = N_lon
+    my_grid%N_lat          = N_lat
     
-    tile_grid%i_offg = 0  ! tile_grid refers to *global* grid
-    tile_grid%j_offg = 0  ! tile_grid refers to *global* grid
+    my_grid%i_offg         = 0  ! my_grid refers to *global* grid
+    my_grid%j_offg         = 0  ! my_grid refers to *global* grid
     
-    date_line_on_center = .false.
-    pole_on_center      = .false.
-    ease_grid           = .false.
-    c3_grid             = .false.
-    latlon_grid         = .true.
+    date_line_on_center    = .false.
+    pole_on_center         = .false.
+    ease_grid              = .false.
+    c3_grid                = .false.
+    latlon_grid            = .true.
     
     if (index(gridname,"DC") /=0) then
        date_line_on_center = .true.
@@ -345,13 +348,13 @@ contains
     endif
     
     if (index(gridname,"EASEv") /=0) then
-       ease_grid      = .true.
-       latlon_grid    = .false.
+       ease_grid           = .true.
+       latlon_grid         = .false.
     endif
     
     if (index(gridname,"CF") /=0) then
-       c3_grid        = .true.
-       latlon_grid    = .false.
+       c3_grid             = .true.
+       latlon_grid         = .false.
     endif
     
     ! special cases , inconsistent of naming
@@ -362,12 +365,12 @@ contains
     
     ! Weiyuan Note, we should fix the tile file and the naming 
     if( index(gridname,"PE_720x360_DE") /=0) then
-       i_indg_offset = 110
-       j_indg_offset = 230
+       i_indg_offset       = 110
+       j_indg_offset       = 230
     endif
     if( index(gridname,"PE_2880x1440_DE") /=0) then
-       i_indg_offset = 440
-       j_indg_offset = 920
+       i_indg_offset       = 440
+       j_indg_offset       = 920
     endif
     
     ! ----------------
@@ -383,69 +386,69 @@ contains
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        end if
        
-       tile_grid%gridtype = trim(gridname(k:))
+       my_grid%gridtype    = trim(gridname(k:))
        
-       tile_grid%ind_base = 0
+       my_grid%ind_base    = 0
        
        ! global cylindrical EASE grid 
        
-       tile_grid%i_dir  = +1
-       tile_grid%j_dir  = -1
+       my_grid%i_dir       = +1
+       my_grid%j_dir       = -1
        
-       call MAPL_ease_extent (              &
-            gridname, cols, rows,           &
-            cell_area = ease_cell_area,     &             ! [m^2]
-            ll_lon    = tile_grid%ll_lon,   &
-            ll_lat    = tile_grid%ll_lat,   &
-            ur_lon    = tile_grid%ur_lon,   &
-            ur_lat    = tile_grid%ur_lat    &
+       call MAPL_ease_extent (            &
+            gridname, cols, rows,         &
+            cell_area = ease_cell_area,   &             ! [m^2]
+            ll_lon    = my_grid%ll_lon,   &
+            ll_lat    = my_grid%ll_lat,   &
+            ur_lon    = my_grid%ur_lon,   &
+            ur_lat    = my_grid%ur_lat    &
             )
 
-       tile_grid%dlon   = 360./real(tile_grid%N_lon) 
-       tile_grid%dlat   = (tile_grid%ur_lat-tile_grid%ll_lat)/real(tile_grid%N_lat) ! *avg* dlat!
+       my_grid%dlon        = 360./real(my_grid%N_lon) 
+       my_grid%dlat        = (my_grid%ur_lat-my_grid%ll_lat)/real(my_grid%N_lat) ! *avg* dlat!
 
        if(present(cell_area)) then
-          cell_area=ease_cell_area
+          cell_area        = ease_cell_area
        endif
        
     endif ! EASE grid
     
     if (latlon_grid) then !  regular LatLon grid
        
-       tile_grid%gridtype = 'LatLon'
+       my_grid%gridtype    = 'LatLon'
        
-       tile_grid%ind_base = 1
+       my_grid%ind_base    = 1
        
-       tile_grid%dlon = 360./real(tile_grid%N_lon)
+       my_grid%dlon        = 360./real(my_grid%N_lon)
        
-       tile_grid%i_dir = +1
-       tile_grid%j_dir = +1
+       my_grid%i_dir       = +1
+       my_grid%j_dir       = +1
        
        if (pole_on_center) then
           
-          tile_grid%dlat   = 180./real(tile_grid%N_lat-1)
+          my_grid%dlat     = 180./real(my_grid%N_lat-1)
           
-          tile_grid%ll_lat = -90. - tile_grid%dlat/2.
-          tile_grid%ur_lat =  90. + tile_grid%dlat/2.
+          my_grid%ll_lat   = -90. - my_grid%dlat/2.
+          my_grid%ur_lat   =  90. + my_grid%dlat/2.
           
        else
           
-          tile_grid%dlat = 180./real(tile_grid%N_lat)
+          my_grid%dlat     = 180./real(my_grid%N_lat)
           
-          tile_grid%ll_lat = -90. 
-          tile_grid%ur_lat =  90. 
+          my_grid%ll_lat   = -90. 
+          my_grid%ur_lat   =  90. 
           
        end if
        
        if (date_line_on_center) then
           
-          tile_grid%ll_lon = -180. - tile_grid%dlon/2.
-          tile_grid%ur_lon =  180. - tile_grid%dlon/2.  ! fixed 20 sep 2010, reichle
+          my_grid%ll_lon   = -180. - my_grid%dlon/2.
+          my_grid%ur_lon   =  180. - my_grid%dlon/2.  ! fixed 20 sep 2010, reichle
           
        else
           
-          tile_grid%ll_lon = -180. 
-          tile_grid%ur_lon =  180. 
+          my_grid%ll_lon   = -180. 
+          my_grid%ur_lon   =  180. 
           
        end if
        
@@ -453,18 +456,20 @@ contains
     
     if( c3_grid) then
        
-       tile_grid%gridtype = 'c3'
-       tile_grid%ind_base =    1
-       tile_grid%i_dir    =   +1
-       tile_grid%j_dir    =   +1
-       tile_grid%ll_lon   = -180. 
-       tile_grid%ur_lon   =  180. 
-       tile_grid%ll_lat   =  -90. 
-       tile_grid%ur_lat   =   90.
+       ! LDAS grid type cannot really represent c3 grid parameters; fill in my_grid as much as possible
+       
+       my_grid%gridtype    = 'c3'
+       my_grid%ind_base    =    1
+       my_grid%i_dir       =   +1
+       my_grid%j_dir       =   +1
+       my_grid%ll_lon      = -180. 
+       my_grid%ur_lon      =  180. 
+       my_grid%ll_lat      =  -90. 
+       my_grid%ur_lat      =   90.
        
        ! dlon and dlat are approximate!
-       tile_grid%dlon     = 360./real(4*tile_grid%N_lon)
-       tile_grid%dlat     = tile_grid%dlon
+       my_grid%dlon        = 360./real(4*my_grid%N_lon)
+       my_grid%dlat        = my_grid%dlon
        
     endif
     
@@ -473,17 +478,19 @@ contains
   ! *******************************************************************
   
   function get_minExtent_grid( N_tile, tc_i_indg, tc_j_indg, tc_minlon, tc_minlat, tc_maxlon, tc_maxlat, &
-       tile_grid_g) result( tile_grid )     
+       my_grid_g) result( my_grid )     
     
-    ! get tile_grid with smallest extent for given set of tiles in tile_coord on (global) tile_grid_g
+    ! get LDAS grid type "my_grid" with smallest extent for given set of tiles, as a subgrid of the global "my_grid_g"
     !
-    ! make sure to pass in consistent tile_coord (tc) and tile_grid_g inputs:
+    ! IMPORTANT: make sure to pass in consistent tile_coord (tc) and my_grid_g inputs:
     !
-    !   iff tile_grid_g is the grid that is associated with the tile space definition,
+    !   iff my_grid_g is the grid that is associated with the tile space definition,
     !   then input tc_[x]_indg must be tile_coord%[x]_indg
     !
-    !   iff tile_grid_g is the grid that supports efficient mapping for perts and the EnKF analysis,
+    !   iff my_grid_g is the grid that supports efficient mapping for perts and or tiles2obsFOV mapping in the EnKF analysis,
     !   then input tc_[x]_indg must be tile_coord%pert_[x]_indg
+    !
+    ! Note: get_minExtent_grid() is not used for obs2tile mapping in the obs readers.
     !
     ! reichle, 20 June 2012 -- moved from within domain_setup() 
     !                           for re-use in get_obs_pred() 
@@ -499,8 +506,8 @@ contains
     real,                  intent(in), dimension(N_tile) :: tc_minlon, tc_minlat
     real,                  intent(in), dimension(N_tile) :: tc_maxlon, tc_maxlat
     
-    type(grid_def_type),   intent(in)                    :: tile_grid_g
-    type(grid_def_type)                                  :: tile_grid
+    type(grid_def_type),   intent(in)                    :: my_grid_g
+    type(grid_def_type)                                  :: my_grid               ! output (result)
     
     ! local variables
     
@@ -513,10 +520,11 @@ contains
     integer :: ind_i_min, ind_i_max, ind_j_min, ind_j_max
     
     integer :: this_i_indg, this_j_indg
+    
     integer , allocatable :: i_indg_(:), j_indg_(:)
 
     character(len=*), parameter :: Iam = 'get_minExtent_grid'
-    character(len=400) :: err_msg
+    character(len=400)          :: err_msg
 
     ! -------------------------------------------------
     
@@ -525,99 +533,99 @@ contains
     max_max_lon = -180.
     max_max_lat =  -90.
     
-    ind_i_min = tile_grid_g%N_lon+1      ! initialize
-    ind_j_min = tile_grid_g%N_lat+1
-    ind_i_max = -1
-    ind_j_max = -1
+    ind_i_min   = my_grid_g%N_lon+1      ! initialize
+    ind_j_min   = my_grid_g%N_lat+1
+    ind_i_max   = -1
+    ind_j_max   = -1
 
-    ! THIS COMMENT SEEMS OUTDATED (reichle, 2 Aug 2020)
-    ! for c3 grid, only get the ll_,ur_ lat and lon, the index is meaningless;
-    ! it will be used in creating the lat_lon pert_grid
-    
-    if(index(tile_grid_g%gridtype,"c3") /=0) then
+    if (index(my_grid_g%gridtype,"c3") /=0) then
 
        ! for cube-sphere grids, do NOT zoom in 
        
-       tile_grid=tile_grid_g
+       my_grid=my_grid_g
        
-       return
+       return                            ! all done if cube-sphere grid
        
-    endif   
-
+    endif
+    
     if (N_tile == 0) then
-      tile_grid=tile_grid_g
-      tile_grid%n_lon = 0
-      tile_grid%n_lat = 0
-      return
+       
+       my_grid       = my_grid_g
+
+       my_grid%n_lon = 0
+       my_grid%n_lat = 0
+
+       return                            ! all done if there are no tiles
+
     endif
 
     do n=1,N_tile
        
-       this_minlon  = tc_minlon(n)
-       this_minlat  = tc_minlat(n)
-       this_maxlon  = tc_maxlon(n)
-       this_maxlat  = tc_maxlat(n)
+       this_minlon    = tc_minlon(n)
+       this_minlat    = tc_minlat(n)
+       this_maxlon    = tc_maxlon(n)
+       this_maxlat    = tc_maxlat(n)
        
-       this_i_indg  = tc_i_indg(n)
-       this_j_indg  = tc_j_indg(n)
+       this_i_indg    = tc_i_indg(n)
+       this_j_indg    = tc_j_indg(n)
        
-       min_min_lon = min( min_min_lon, this_minlon)
-       min_min_lat = min( min_min_lat, this_minlat)
-       max_max_lon = max( max_max_lon, this_maxlon)
-       max_max_lat = max( max_max_lat, this_maxlat)
+       min_min_lon    = min( min_min_lon, this_minlon)
+       min_min_lat    = min( min_min_lat, this_minlat)
+       max_max_lon    = max( max_max_lon, this_maxlon)
+       max_max_lat    = max( max_max_lat, this_maxlat)
        
-       ind_i_min   = min( ind_i_min,   this_i_indg)
-       ind_j_min   = min( ind_j_min,   this_j_indg)
-       ind_i_max   = max( ind_i_max,   this_i_indg)
-       ind_j_max   = max( ind_j_max,   this_j_indg)
+       ind_i_min      = min( ind_i_min,   this_i_indg)
+       ind_j_min      = min( ind_j_min,   this_j_indg)
+       ind_i_max      = max( ind_i_max,   this_i_indg)
+       ind_j_max      = max( ind_j_max,   this_j_indg)
        
     end do
     
-    ! assemble tile_grid (revised 20 Sep 2010, reichle)
+    ! assemble my_grid (revised 20 Sep 2010, reichle)
        
-    tile_grid%N_lon  = ind_i_max - ind_i_min + 1
-    tile_grid%N_lat  = ind_j_max - ind_j_min + 1
+    my_grid%N_lon     = ind_i_max - ind_i_min + 1
+    my_grid%N_lat     = ind_j_max - ind_j_min + 1
     
-    tile_grid%i_offg = ind_i_min - tile_grid_g%ind_base
-    tile_grid%j_offg = ind_j_min - tile_grid_g%ind_base
+    my_grid%i_offg    = ind_i_min - my_grid_g%ind_base
+    my_grid%j_offg    = ind_j_min - my_grid_g%ind_base
        
-    tile_grid%dlon   = tile_grid_g%dlon
+    my_grid%dlon      = my_grid_g%dlon
        
-    if     (index(tile_grid_g%gridtype,'LatLon')/=0) then
+    if     (index(my_grid_g%gridtype,'LatLon')/=0) then
        
-       tile_grid%dlat   = tile_grid_g%dlat
+       my_grid%dlat   = my_grid_g%dlat
        
-       tile_grid%ll_lon = tile_grid_g%ll_lon + real(tile_grid%i_offg)*tile_grid%dlon
-       tile_grid%ll_lat = tile_grid_g%ll_lat + real(tile_grid%j_offg)*tile_grid%dlat
+       my_grid%ll_lon = my_grid_g%ll_lon + real(my_grid%i_offg)*my_grid%dlon
+       my_grid%ll_lat = my_grid_g%ll_lat + real(my_grid%j_offg)*my_grid%dlat
        
-       tile_grid%ur_lon = tile_grid%ll_lon + real(tile_grid%N_lon)*tile_grid%dlon
-       tile_grid%ur_lat = tile_grid%ll_lat + real(tile_grid%N_lat)*tile_grid%dlat
+       my_grid%ur_lon = my_grid%ll_lon   + real(my_grid%N_lon)*my_grid%dlon
+       my_grid%ur_lat = my_grid%ll_lat   + real(my_grid%N_lat)*my_grid%dlat
        
-    elseif ( index(tile_grid_g%gridtype,'EASEv')  /=0 ) then
+    elseif ( index(my_grid_g%gridtype,'EASEv')  /=0 ) then
        
        ! *average* dlat over the domain
        
-       tile_grid%dlat   = (max_max_lat - min_min_lat)/real(tile_grid%N_lat)
+       my_grid%dlat   = (max_max_lat - min_min_lat)/real(my_grid%N_lat)
        
-       tile_grid%ll_lon = min_min_lon
-       tile_grid%ll_lat = min_min_lat
+       my_grid%ll_lon = min_min_lon
+       my_grid%ll_lat = min_min_lat
        
-       tile_grid%ur_lon = max_max_lon
-       tile_grid%ur_lat = max_max_lat
+       my_grid%ur_lon = max_max_lon
+       my_grid%ur_lat = max_max_lat
        
     else
        
-       err_msg = 'not yet implemented for ' // tile_grid_g%gridtype
+       err_msg = 'not yet implemented for ' // my_grid_g%gridtype
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
        
     end if
     
-    tile_grid%gridtype = tile_grid_g%gridtype
+    my_grid%gridtype  = my_grid_g%gridtype
     
-    tile_grid%ind_base = tile_grid_g%ind_base   ! should this be inherited???
+    my_grid%ind_base  = my_grid_g%ind_base   ! should this be inherited???
     
-    tile_grid%i_dir    = tile_grid_g%i_dir
-    tile_grid%j_dir    = tile_grid_g%j_dir
+    my_grid%i_dir     = my_grid_g%i_dir
+    my_grid%j_dir     = my_grid_g%j_dir
     
   end function get_minExtent_grid
 
