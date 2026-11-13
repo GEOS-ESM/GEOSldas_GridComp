@@ -8200,7 +8200,7 @@ contains
 
     type(obs_param_type), intent(in) :: this_obs_param
 
-    type(tile_coord_f_type), dimension(:), pointer :: tile_coord_f  ! input
+    type(tile_coord_type), dimension(:), pointer :: tile_coord_f  ! input
     
     type(grid_def_type),  intent(in) :: obs2tile_grid_f
 
