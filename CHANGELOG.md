@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed string and no-data obs handling in read_GEOSldas.py ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
 - Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
+- Fixed segmentation fault in the generation of perturbations when MKL is not available (e.g., macOS builds) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
+- Fixed `process_hist.csh` for BSD `sed` (macOS) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
   
 ### Removed
 
