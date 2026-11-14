@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
 ### Fixed
+- Fixed NAG build on macOS (GEOSlandassim) ([PR #244](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/244)).
 - Fixed out-of-bounds copies of per-tile data in LandPert (`i_indgs`, `j_indgs`) and LandAssim (`f_num`) when `tile_coord` contains lake and land ice tiles in addition to land tiles ([PR #254](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/254)).
 - Fixed QC of Tb obs for non-land surfaces (water, land ice) in cube-sphere tile space, where it was not applied (not 0-diff for cube-sphere tile space with Tb obs; 0-diff for EASE and lat/lon tile spaces) ([PR #249](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/249)).
 - Fixed `frac_cell` and units of `area` in tile_coord when reading nc4 tile file in preprocessing (not 0-diff for nc4 tile files; 0-diff for *.til ASCII tile files) ([PR #247](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/247)).
