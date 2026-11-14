@@ -1042,8 +1042,11 @@ contains
     VERIFY_(status) 
     allocate(internal%j_indgs(land_nt_local),stat=status)
     VERIFY_(status)
-    internal%i_indgs(:)=tile_coord(:)%pert_i_indg
-    internal%j_indgs(:)=tile_coord(:)%pert_j_indg
+    ! tile_coord holds all tiles of the forcing locstream (land, plus lake and landice if requested),
+    !   whereas land_nt_local is the number of land tiles in LAND's locstream
+    _ASSERT(count(tile_coord(:)%typ==MAPL_LAND)==land_nt_local, "LandPert: number of land tiles in tile_coord does not match land locstream")
+    internal%i_indgs(:)=pack(tile_coord(:)%pert_i_indg, tile_coord(:)%typ==MAPL_LAND)
+    internal%j_indgs(:)=pack(tile_coord(:)%pert_j_indg, tile_coord(:)%typ==MAPL_LAND)
 
     ! Get pert options from *default* namelist files
     ! WARNING: get_force/progn_pert_param() calls allocate memory
