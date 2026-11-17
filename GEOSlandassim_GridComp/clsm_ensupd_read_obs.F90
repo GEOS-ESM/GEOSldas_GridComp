@@ -8021,8 +8021,8 @@ contains
     integer,         parameter :: qc_snow_cover_max   = 100    ! exclude no decision, night, lake, ocean, fill, etc
     integer,         parameter :: qc_clear_index_min  =  20    ! ensure sufficiently clear conditions
     integer,         parameter :: qc_clear_index_max  = 100    ! exclude flag values (e.g., Antarctica)
-    integer,         parameter :: qc_basic_qa_max     =   3    ! data quality (0=good, 1=poor, 2=bad, 3=other)
-    integer,         parameter :: qc_basic_qa_bad     =   2    ! exclude "bad" quality
+    integer,         parameter :: qc_basic_qa_good    =   0    ! keep Basic_QA=0 ("good" quality)
+    integer,         parameter :: qc_basic_qa_other   =   3    ! keep Basic_QA=3 ("other", low illumination)
     
     integer,         parameter :: uint8_min           =   0    
     integer,         parameter :: uint8_max           = 255
@@ -8233,8 +8233,8 @@ contains
                (Snow_Cover( ii,jj) <= qc_snow_cover_max  )  .and.      &  ! 0<=SCF<=100 (1)
                (Clear_Index(ii,jj) >  qc_clear_index_min )  .and.      &  ! sufficiently clear sky (2)
                (Clear_Index(ii,jj) <= qc_clear_index_max )  .and.      &  ! 0<=CI<=100 (3)
-               (Basic_QA(   ii,jj) <= qc_basic_qa_max    )  .and.      &  ! keep "good", "poor", or "other" (4)
-               (Basic_QA(   ii,jj) /= qc_basic_qa_bad    )                !   quality (4)
+               (Basic_QA(   ii,jj) == qc_basic_qa_good   .or.          &  ! keep "good" or "other" (4)
+                Basic_QA(   ii,jj) == qc_basic_qa_other  )                !   quality only (4)
 
           ! (1)  excludes "no decision", "night", "lake", "ocean", "fill", etc; cloud is not
           !       flagged (cloudy cells have low Clear_Index); Antarctica has Snow_Cover=100
@@ -8242,7 +8242,10 @@ contains
           ! (3)  excludes Antarctica (Clear_Index=243) and other flag values
           ! (4)  Basic_QA key as in the CMG file attributes and the VNP10C1 v2 user guide;
           !       "other" = low illumination (70<=SZA<85 deg); must be kept to retain most
-          !       high-latitude winter obs (as with MODIS reader); excludes "bad" and flag values
+          !       high-latitude winter obs (as with MODIS reader); Basic_QA=1 ("poor") and 2 ("bad")
+          !       are excluded, as are flag values: comparison with MODIS (15 Jan 2020,
+          !       VJ110C1 and VNP10C1) shows that Basic_QA=1 obs agree poorly (corr 0.41,
+          !       bias +0.26, rmsd 0.43), whereas Basic_QA=3 obs agree well (corr 0.90, rmsd 0.10)
           
           if (keep_data) then
 
