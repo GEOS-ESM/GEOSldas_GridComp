@@ -5,6 +5,7 @@ function [ana_time, obs_descr, read_obs_subr, N_obs_read, obs_fname] = read_obsl
 %
 % reichle,  2 Jan 2014
 % reichle, 11 Feb 2021 - corrected for post-launch file format
+% amfox,    5 Nov 2026 - read file names in double quotes (e.g., H SAF names contain commas)
 %
 % -------------------------------------------------------------
 
@@ -14,7 +15,10 @@ disp(['reading from ', fname])
 
 fid = fopen( fname );
 
-data = textscan(fid, '%s%s%s%d%s',              ...
+% file name is read with %q: a file name in double quotes may contain commas
+% ("" within quotes is read as "); unquoted file names are read as before
+
+data = textscan(fid, '%s%s%s%d%q',              ...
                 'Delimiter', ',',             ...
                 'HeaderLines', 3   );
 

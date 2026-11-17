@@ -118,5 +118,27 @@ int32_t ldas_h4_sfrdata(int32_t sds_id, const int32_t *start, const int32_t *str
 
     return SDreaddata(sds_id, hdf_start, hdf_stride, hdf_edge, data);
 }
+int32_t ldas_h4_sffattr(int32_t obj_id, const char *name, int32_t name_length)
+{
+    char *c_name = h4_string(name, name_length);
+    int32_t index = FAIL;
+
+    if (c_name != NULL) {
+        index = SDfindattr(obj_id, c_name);
+        free(c_name);
+    }
+    return index;
+}
+int32_t ldas_h4_sfgainfo(int32_t obj_id, int32_t index, char *name, int32_t name_length, int32_t *data_type, int32_t *count)
+{
+    char c_name[H4_MAX_NC_NAME + 1] = {0};
+    int32_t status = SDattrinfo(obj_id, index, c_name, data_type, count);
+
+    if (status == SUCCEED)
+        memcpy(name, c_name, h4_string_length(c_name, (size_t)name_length));
+    return status;
+}
+/* data must hold at least "count" characters (see ldas_h4_sfgainfo); no null terminator is added */
+int32_t ldas_h4_sfrcatt(int32_t obj_id, int32_t index, char *data) { return SDreadattr(obj_id, index, data); }
 int32_t ldas_h4_sfendacc(int32_t sds_id) { return SDendaccess(sds_id); }
 int32_t ldas_h4_sfend(int32_t sd_id) { return SDend(sd_id); }

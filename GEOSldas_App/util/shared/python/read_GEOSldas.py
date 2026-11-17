@@ -7,6 +7,7 @@
 #   - read_ObsFcstAna()
 #   - read_ObsFcstAna_nc4()
 #   - read_catparam()
+#   - read_obslog()
 
 import struct
 import os
@@ -738,6 +739,60 @@ def read_catparam(fname, N_tile, isLDASsa=0):
         raise ValueError('read_catparam: something wrong with file size or format')
     
     return cat_param, cat_param_units
+
+# ----------------------------------------------------------------------------
+#
+# reader for GEOSldas obslog file (ASCII, comma-separated values)
+#
+# Python version of read_obslog.m.  Skips the three header lines and checks that
+# the last line is "EOF".  A file name in double quotes may contain commas
+# (e.g., H SAF file names); "" within quotes is read as ".
+
+def read_obslog(fname):
+
+    import csv
+
+    print(f"reading from {fname}")
+
+    # keep line ends (newline=''), so that a quoted file name may contain a line break
+
+    with open(fname, 'r', newline='') as fid:
+        lines = fid.readlines()
+
+    if len(lines) < 4 or lines[-1].strip() != 'EOF':
+        raise ValueError(f"read_obslog(): ERROR reading data from {fname}")
+
+    # strict: a quote that is not closed is an error (instead of absorbing the following rows)
+
+    try:
+        rows = list(csv.reader(lines[3:-1], skipinitialspace=True, strict=True))
+    except csv.Error as err:
+        raise ValueError(f"read_obslog(): ERROR reading data from {fname}: {err}")
+
+    ana_time      = []
+    obs_descr     = []
+    read_obs_subr = []
+    N_obs_read    = []
+    obs_fname     = []
+
+    for row in rows:
+
+        if len(row) != 5:
+            raise ValueError(f"read_obslog(): ERROR reading data from {fname}: {row}")
+
+        ana_time.append(     row[0].strip())
+        obs_descr.append(    row[1].strip())
+        read_obs_subr.append(row[2].strip())
+        N_obs_read.append(   int(row[3]))
+        obs_fname.append(    row[4])
+
+    print("done reading file")
+
+    return {'ana_time'     : ana_time,
+            'obs_descr'    : obs_descr,
+            'read_obs_subr': read_obs_subr,
+            'N_obs_read'   : np.array(N_obs_read, dtype=int),
+            'obs_fname'    : obs_fname}
 
 
 

@@ -177,6 +177,9 @@ contains
          rf%xStride, rf%yStride, rf%rdlon, rf%rdlat)
     rf%ID_string = rectangle_random_fields_id(pert_param, pert_grid_f)
     
+    ! FFT lengths for nr_fft (fourn); x varies fastest in tmpdata
+    rf%fft_lens = [rf%N_x_fft, rf%N_y_fft]
+
     ! allocate memory
     allocate(rf%field1_fft(rf%N_x_fft, rf%N_y_fft))
     allocate(rf%field2_fft(rf%N_x_fft, rf%N_y_fft))
