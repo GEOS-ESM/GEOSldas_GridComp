@@ -352,7 +352,7 @@ contains
     ! ********************************************************************
     
     subroutine domain_setup(                                             &
-         tile_coord_r,                                &
+         tile_coord_r,                                                   &
          tile_grid_g,                                                    &
          exclude_path, exclude_file, include_path, include_file,         &
          work_path, exp_domain, exp_id,                                  &

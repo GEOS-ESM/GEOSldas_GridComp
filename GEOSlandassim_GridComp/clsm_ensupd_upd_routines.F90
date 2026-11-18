@@ -1704,7 +1704,7 @@ contains
 
     if ( any(obs_param(1:N_obs_param)%FOV>=FOV_threshold) )  then
        
-       ! determine tiles2obsFOV_grid_lH from tile_coord_lH and tiles2obsFOV_grid_g
+       ! determine tiles2obsFOV_grid_lH from tile_coord_lH and tiles2obsFOV_grid_g (i.e., pert_grid_g)
        
        tiles2obsFOV_grid_lH = get_minExtent_grid(                                                        &
             N_catlH, tile_coord_lH%pert_i_indg, tile_coord_lH%pert_j_indg,                               &  ! NOTE: %pert_i_indg, %pert_j_indg
