@@ -9914,7 +9914,7 @@ contains
     !                (indicates whether any of the founds obs were scaled)
     !  6 Jun 2016 - added functionality to keep obs that cannot be scaled
     !                (but will not be assimilated; SMAP/SMOS Tb only for now)
-    !  8 Nov 2026 - added input tile_grid_g_ESMF (ESMF grid associated with cube-sphere tile space) (amfox)
+    !  9 Nov 2026 - added input tile_grid_g_ESMF (ESMF grid associated with cube-sphere tile space) (amfox)
 
     implicit none
 
@@ -11431,7 +11431,7 @@ contains
     ! 31 Dec 2014 - added time stamp to Observations
     ! 21 Mar 2014 - sort Observations_l by tilenum and then species to avoid lay-out 
     !                dependency for MPI parallel execution
-    !  8 Nov 2026 - added input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space) (amfox)
+    !  9 Nov 2026 - added input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space) (amfox)
 
     implicit none
     
@@ -11938,7 +11938,7 @@ contains
     ! - reichle, 2015/02/20
     !
     ! added input tile_grid_g_ESMF (ESMF grid of cube-sphere tile space), see get_tile_num_from_latlon()
-    ! - amfox, 8 Nov 2026
+    ! - amfox, 9 Nov 2026
     
     implicit none
     

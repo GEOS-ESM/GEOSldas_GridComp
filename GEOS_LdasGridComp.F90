@@ -8,7 +8,7 @@ module GEOS_LdasGridCompMod
 
   use ESMF
   use MAPL
-  
+
   use GEOS_MetforceGridCompMod,     only: MetforceSetServices     => SetServices
   use GEOS_LandGridCompMod,         only: LandSetServices         => SetServices
   use GEOS_LandPertGridCompMod,     only: LandPertSetServices     => SetServices
@@ -39,13 +39,13 @@ module GEOS_LdasGridCompMod
   use StieglitzSnow,                only: StieglitzSnow_echo_constants
   use SurfParams,                   only: SurfParams_init
   use mapl_StateMerge_mod,          only: StateMerge
-  
+
   implicit none
 
   private
 
   ! !PUBLIC MEMBER FUNCTIONS:
-
+  
   public SetServices
 
   ! !DESCRIPTION: This gridded component (GC) combines the GridComps:
@@ -75,7 +75,7 @@ module GEOS_LdasGridCompMod
   logical :: with_lake          ! true if lake    tiles requested by config
   logical :: with_land          ! true if land    tiles requested by config
   integer :: RUN_ROUTE          ! 0:, no river routing, 1: routing w/o reservoirs, 2: routing w/ reservoirs
-  
+
 contains
 
   !BOP
@@ -531,16 +531,16 @@ contains
     call MAPL_GetResource(MAPL, grid_type,Label="GEOSldas.GRID_TYPE:",RC=STATUS)
     VERIFY_(STATUS)
 
-   ! if (trim(grid_type) == "Cubed-Sphere") then
-   !    call grid_manager%add_prototype("Cubed-Sphere", cubed_sphere_factory)
-   !    associate (method => REGRID_METHOD_BILINEAR, mgr => regridder_manager)
-   !       call mgr%add_prototype('Cubed-Sphere', 'LatLon', method, cube_to_latlon_prototype)
-   !       call mgr%add_prototype('LatLon', 'Cubed-Sphere', method, latlon_to_cube_prototype)
-   !       call mgr%add_prototype('Cubed-Sphere', 'Cubed-Sphere', method, cube_to_cube_prototype)
-   !    end associate
-   ! endif
-
-   ! Create atmospheric (single level atm grid covers all of surface) grid
+    ! if (trim(grid_type) == "Cubed-Sphere") then
+    !    call grid_manager%add_prototype("Cubed-Sphere", cubed_sphere_factory)
+    !    associate (method => REGRID_METHOD_BILINEAR, mgr => regridder_manager)
+    !       call mgr%add_prototype('Cubed-Sphere', 'LatLon', method, cube_to_latlon_prototype)
+    !       call mgr%add_prototype('LatLon', 'Cubed-Sphere', method, latlon_to_cube_prototype)
+    !       call mgr%add_prototype('Cubed-Sphere', 'Cubed-Sphere', method, cube_to_cube_prototype)
+    !    end associate
+    ! endif
+    
+    ! Create atmospheric (single level atm grid covers all of surface) grid
     call MAPL_GridCreate(gc, rc=status)
     VERIFY_(status)
 
@@ -568,10 +568,10 @@ contains
        isEASEv1 = .true.
     endif
     if( isEASEv1) then
-    ! To be implemented
+       ! To be implemented
     endif
     if( isEASEv2) then
-! Retrieve the coordinates so we can set them
+       ! Retrieve the coordinates so we can set them
        call ESMF_GridGetCoord(agrid, coordDim=1, localDE=0, &
             staggerloc=ESMF_STAGGERLOC_CENTER, &
             farrayPtr=centerX, rc=status)
@@ -698,7 +698,7 @@ contains
     call MPI_AllReduce(local_nt,total_nt,1,MPI_INT,MPI_SUM,mpicomm,mpierr);
 
     decomf = get_io_filename(trim(out_path), trim(exp_id), 'ldas_domdecomp', date_time=start_time, &
-             dir_name='rc_out', file_ext='.txt')
+         dir_name='rc_out', file_ext='.txt')
 
 
     if (IamRoot) then
@@ -707,31 +707,34 @@ contains
        deallocate(f2g)
        print*, "Number of tiles: ", N_f
        if(N_f /= total_nt) then
-         print*, "total_nt = ", total_nt
-         stop "tiles number not equal"
+          print*, "total_nt = ", total_nt
+          stop "tiles number not equal"
        endif
        open(10,file= trim(decomf), action='write')
        write(10,*) N_f
        close(10)
        call io_grid_def_type('w', logunit, tile_grid_f, 'tile_grid_f')
 
-       ! get a grid for perturbations and EnKF:
-       !
-       !  tile grid                 !  pert grid
-       !  (defines tile space)      !  (used for perturbations and as "hash" grid in EnKF analysis)
-       ! ===========================================================================================================
-       !  lat/lon                   !  same as tile_grid (i.e., lat/lon)
-       ! -----------------------------------------------------------------------------------------------------------
-       !  EASEv[X]                  !  same as tile_grid (i.e., EASE)
-       ! -----------------------------------------------------------------------------------------------------------
-       !  cube-sphere               !  lat/lon grid of resolution similar to that of (cube-sphere) tile_grid
-       
+       ! get a grid for perturbations, also used (w/ one exception, see Table) for obs2tile + tiles2obsFOV mapping in EnKF:
+
+       ! ===============================================================================================================
+       !  tile_grid            |  pert_grid                          |  obs2tile_grid     |  tiles2obsFOV_grid
+       !  (defines tile space) |  (perturbations)                    |  (obs reader)      |  (get_obs_pred)
+       ! ===============================================================================================================
+       !  lat/lon              |  =tile_grid (i.e., lat/lon)         |  =pert_grid        |  =pert_grid
+       ! ---------------------------------------------------------------------------------------------------------------
+       !  EASEv[X]             |  =tile_grid (i.e., EASE)            |  =pert_grid        |  =pert_grid
+       ! ---------------------------------------------------------------------------------------------------------------
+       !  cube-sphere (c3)     |  lat/lon grid of resolution         |  =tile_grid (c3!)  |  =pert_grid (i.e., lat/lon)
+       !                       |  similar to that of (c3) tile_grid  |                    | 
+       ! ===============================================================================================================
+
        pert_grid_g = get_pert_grid(tile_grid_g)
-       
+
        if ( .not. (pert_grid_g==tile_grid_g) ) then
 
           ! arrive here when tile_grid_g is cube-sphere and pert_grid_g is lat/lon after call to get_pert_grid() above
- 
+
           !1) get pert_i_indg, pert_j_indg for tiles in (full) domain relative to pert_grid_g
           do i = 1, N_f
              call get_ij_ind_from_latlon( pert_grid_g, tile_coord_f(i)%com_lat, tile_coord_f(i)%com_lon,  &
@@ -741,14 +744,14 @@ contains
           pert_grid_f = get_minExtent_grid( N_f, tile_coord_f%pert_i_indg, tile_coord_f%pert_j_indg,      &
                tile_coord_f%min_lon, tile_coord_f%min_lat, tile_coord_f%max_lon, tile_coord_f%max_lat,    &
                pert_grid_g)
-          
+
        else
-          
+
           pert_grid_f = tile_grid_f
 
           ! note that %pert_i_indg and %pert_j_indg were initialized to %i_indg and %j_indg
           !   in io_tile_coord_type() when tile_coord was read via io_domain_files()
-          
+
        endif
     endif
     
@@ -774,24 +777,24 @@ contains
          enddo
       enddo
       if (j /= local_nt) then
-        stop "tile distributtion is wrong. cannot find the right tile"
+         stop "tile distributtion is wrong. cannot find the right tile"
       endif
       tcinternal%tile_coord = tile_coord_f(tcinternal%l2f)
     end block
-
+    
     do i = 0, numprocs-1
-      if( i == myid) then
-         open(10,file= trim(decomf), action='write',position='append')
-         do j = 1, local_nt
-            write(10,*) local_id(j), myid
-         enddo
-         close(10)
-      endif
-      call MPI_Barrier(mpicomm,mpierr)
-    enddo   
+       if( i == myid) then
+          open(10,file= trim(decomf), action='write',position='append')
+          do j = 1, local_nt
+             write(10,*) local_id(j), myid
+          enddo
+          close(10)
+       endif
+       call MPI_Barrier(mpicomm,mpierr)
+    enddo
 
     allocate(tcinternal%tile_coord_f,source = tile_coord_f)
-    
+
     pert_grid_l = get_minExtent_grid(local_nt,                             &
          tcinternal%tile_coord%pert_i_indg, tcinternal%tile_coord%pert_j_indg,   &
          tcinternal%tile_coord%min_lon,     tcinternal%tile_coord%min_lat,       &
@@ -802,7 +805,7 @@ contains
     tcinternal%pgrid_f = pert_grid_f
     tcinternal%pgrid_l = pert_grid_l
     tcinternal%tgrid_g = tile_grid_g
-
+    
     do i = 1, NUM_ENSEMBLE
        call MAPL_GetObjectFromGC(gcs(METFORCE(i)), CHILD_MAPL, rc=status)
        VERIFY_(status) ! CHILD = METFORCE
@@ -816,7 +819,7 @@ contains
     enddo
 
     do i = 1,NUM_ENSEMBLE
-       
+
        if (with_land) then 
           call MAPL_GetObjectFromGC(gcs(LAND(i)),     CHILD_MAPL, rc=status)
           VERIFY_(status)
@@ -827,7 +830,7 @@ contains
           VERIFY_(status) ! CHILD = LANDPERT
           call MAPL_Set(CHILD_MAPL, LocStream=land_locstream,     rc=status)
           VERIFY_(status)
-          
+
           ! Add LAND's tile_coord to children's GridComps
           call ESMF_UserCompSetInternalState(gcs(LAND(i)),     'TILE_COORD', tcwrap, status)
           VERIFY_(status)
@@ -848,16 +851,16 @@ contains
           call MAPL_Set(CHILD_MAPL, LocStream=landice_locstream,  rc=status)
           VERIFY_(status)
        endif
-       
+
        if (RUN_ROUTE >= 1) then
           call MAPL_GetObjectFromGC(gcs(ROUTE(i)),    CHILD_MAPL, rc=status)
           VERIFY_(status) 
           call MAPL_Set(CHILD_MAPL, LocStream=land_locstream,     rc=status)
           VERIFY_(status)
        endif
-       
-    enddo
 
+    enddo
+    
     if (land_assim .or. mwRTM ) then
        call MAPL_GetObjectFromGC(   gcs(LANDASSIM),   CHILD_MAPL, rc=status)
        VERIFY_(status) 
@@ -867,13 +870,13 @@ contains
        call ESMF_UserCompSetInternalState(gcs(LANDASSIM), 'TILE_COORD', tcwrap, status)
        VERIFY_(status)
     endif
-    
+
     call MAPL_GetObjectFromGC(      gcs(METFORCEAVG), CHILD_MAPL, rc=status)
     VERIFY_(status) 
     ! only land_locstream is averaged.
     call MAPL_Set(      CHILD_MAPL, LocStream=land_locstream,     rc=status)
     VERIFY_(status)
-    
+
     if ( with_land) then
        call MAPL_GetObjectFromGC(   gcs(LANDAVG),     CHILD_MAPL, rc=status)
        VERIFY_(status) ! CHILD = ens_avg
@@ -892,7 +895,7 @@ contains
        call MAPL_Set(   CHILD_MAPL, LocStream=landice_locstream,  rc=status)
        VERIFY_(status)
     endif
-    
+
     !if ( RUN_ROUTE >= 1) then
     !   ! not necessary. Route Avg has its own pfaf_locstream
     !   call MAPL_GetObjectFromGC(gcs(ROUTEAVG), CHILD_MAPL, rc=status)
@@ -901,15 +904,15 @@ contains
     call MAPL_GenericInitialize(gc, import, export, clock, rc=status)
     VERIFY_(status)
 
-   ! solar alarm is created in solar gridcomp. Since GEOSldas doesnot have that gridcomp, it is created here
-   ! -create-nonsticky-alarm-
+    ! solar alarm is created in solar gridcomp. Since GEOSldas doesnot have that gridcomp, it is created here
+    ! -create-nonsticky-alarm-
     call MAPL_Get(MAPL, HEARTBEAT = DT, RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_GetResource ( MAPL, DT_Solar, Label="SOLAR_DT:", DEFAULT=DT, RC=STATUS)
     VERIFY_(STATUS)
     call ESMF_TimeIntervalSet(SOLAR_DT, s=NINT(DT_Solar), rc=status)
     VERIFY_(status)
-
+    
     SolarAlarm = ESMF_AlarmCreate(                                         &
          clock,                                                                 &
          name='SOLAR_Alarm',                                                     &
@@ -932,7 +935,7 @@ contains
 
   end subroutine Initialize
 
-
+  
   subroutine Run(gc, import, export, clock, rc)
 
     ! !ARGUMENTS:
@@ -975,8 +978,8 @@ contains
     type (ESMF_Field) :: field
     type (ESMF_State) :: merged_import 
 
-     ! Begin...
-
+    ! Begin...
+    
     ! Get component's name and setup traceback handle
     call ESMF_GridCompget(gc, name=comp_name, rc=status)
     VERIFY_(status)
@@ -1026,7 +1029,7 @@ contains
           VERIFY_(status)
           call MAPL_TimerOff(MAPL, gcnames(igc))
        enddo
-       
+
        ! Run children GridComps (in order)
        ! Generate raw perturbed force and progn
        do i  = 1,NUM_ENSEMBLE
@@ -1037,7 +1040,7 @@ contains
           call MAPL_TimerOff(MAPL, gcnames(igc))
        enddo
     endif ! with_land
-    
+
     do i = 1, NUM_ENSEMBLE
        igc = METFORCE(i)
        call MAPL_TimerOn(   MAPL, gcnames(igc))
@@ -1072,7 +1075,7 @@ contains
        endif
        call MAPL_TimerOff(MAPL, gcnames(igc))
     enddo
-
+    
     do i  = 1,NUM_ENSEMBLE
 
        if (with_land) then
@@ -1170,9 +1173,9 @@ contains
                 VERIFY_(status)
              endif
           endif
-        endif ! with_land
+       endif ! with_land
     enddo
-
+    
     if ( mwRTM .and. LSM_CHOICE == 1 ) then
        ! output_smapl4smlmc
        call ESMF_GridCompRun(gcs(LANDASSIM), importState=gim(LANDASSIM), exportState=gex(LANDASSIM), clock=clock,phase=4, userRC=status)
@@ -1194,7 +1197,7 @@ contains
           ! Extract updated exports from "cat_progn" 
           call ESMF_GridCompRun(gcs(igc), importState=gim(igc), exportState=gex(LAND(i)), clock=clock, phase=2, userRC=status)
           VERIFY_(status)
-          
+
        enddo
        call MAPL_TimerOff(MAPL, gcnames(igc))
     endif
@@ -1214,7 +1217,7 @@ contains
   ! !IROTUINE: Finalize -- finalize method for LDAS GC
 
   ! !INTERFACE:
-
+  
   subroutine Finalize(gc, import, export, clock, rc)
 
     ! !ARGUMENTS:

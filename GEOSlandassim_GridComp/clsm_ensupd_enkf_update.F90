@@ -174,7 +174,7 @@ contains
     ! reichle, 18 Oct 2005
     !
     ! added input tile_grid_g_ESMF (ESMF grid associated with tile space), needed (only) for obs-to-tile mapping in cube-sphere tile space
-    ! - amfox, 8 Nov 2026
+    ! - amfox, 9 Nov 2026
 
     implicit none
 
@@ -288,7 +288,7 @@ contains
     integer, dimension(:,:,:), pointer     :: tile_num_in_cell_ij_f
 
     ! obs2tile_grid_f is the grid that goes with N_tile_in_cell_ij_f and tile_num_in_cell_ij_f:
-    !  pert_grid_f for EASE and LatLon tile space, or tile_grid_f for cube-sphere tile space (amfox, 6 Nov 2026)
+    !  pert_grid_f for EASE and LatLon tile space, or tile_grid_f for cube-sphere tile space (amfox, 9 Nov 2026)
 
     type(grid_def_type)                    :: obs2tile_grid_f
 
@@ -409,13 +409,15 @@ contains
        !   This needs to be done only by root process because of call to read_obs() in collect_obs().
        ! 
        ! For tile2obsFOV mapping when FOV>~0, get_obs_pred() computes its own N_tile_in_cell_ij_lH and
-       !  tile_num_in_cell_ij_lH for get_tile_num_in_ellipse(); amfox, 8 Nov 2026
+       !  tile_num_in_cell_ij_lH for get_tile_num_in_ellipse(); amfox, 9 Nov 2026
+       !
+       ! See also subroutine Initialize() of GEOS_LdasGridComp.F90.
 
        call init_grid_def_type( obs2tile_grid_f )        ! initialize to undefined grid
        
        ! Cube-sphere tile space: prepare (once) the cube-sphere ESMF grid for mapping obs to
        !   tiles, which is done by root_proc only (in read_obs()).  This must be done by ALL
-       !   processes (see init_tile_grid_g_ESMF_c3()).  - amfox, 8 Nov 2026
+       !   processes (see init_tile_grid_g_ESMF_c3()).  - amfox, 9 Nov 2026
 
        if ( (index(tile_grid_g%gridtype,'c3')/=0) .and. (.not. c3_grid_initialized) ) then
 
@@ -442,7 +444,7 @@ contains
              !  (see get_obs_pert()); the extent is not used to find the cube-sphere
              !  grid cell of an obs (see get_ij_ind_from_latlon_c3())
              !
-             ! amfox, 6 Nov 2026
+             ! amfox, 9 Nov 2026
 
              obs2tile_grid_f        = tile_grid_g
 

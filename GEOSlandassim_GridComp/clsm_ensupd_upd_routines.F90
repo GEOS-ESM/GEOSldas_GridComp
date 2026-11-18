@@ -1697,10 +1697,12 @@ contains
     
 #endif
     if (allocated(tile_data_l))  deallocate(tile_data_l)
+    
     ! ----------------------------------------------------------------
     !
-    ! Get additional grid/tile information that is needed to map from tile
-    ! to obs space
+    ! Get additional grid/tile information that is needed to map from tile to obs space.
+    !
+    ! See also subroutine Initialize() of GEOS_LdasGridComp.F90.
 
     if ( any(obs_param(1:N_obs_param)%FOV>=FOV_threshold) )  then
        
