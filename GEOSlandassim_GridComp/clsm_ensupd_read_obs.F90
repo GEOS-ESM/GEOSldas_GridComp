@@ -3253,10 +3253,13 @@ contains
        
       allocate(tmp_tile_num(N_obs))
       
-      ! in M09 tile space, shift M36 obs lat/lon for proper assignment of M09 tile
+      ! shift M36 obs lat/lon for proper assignment if tile space M09/M03/M01 (tiles nest in M36)
+      ! (as for the SMAP L1C obs readers)
       
       if ( index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0 .or.         &
-           index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0       ) then
+           index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0 .or.         &       ! allow outdated grid name only for M09
+           index(obs2tile_grid_f%gridtype, 'EASEv2_M03')  /=0 .or.         &
+           index(obs2tile_grid_f%gridtype, 'EASEv2_M01')  /=0       ) then
          
          call get_tile_num_for_obs(N_catf, tile_coord_f,                   &
               obs2tile_grid_f,  tile_grid_g_ESMF,                          &
@@ -6233,10 +6236,13 @@ contains
              
              allocate(tmp_tile_num(N_obs))
 
-             ! shift M36 obs lat/lon for proper assignment of M09 tile?
-             ! (only for EASEv2 M09 model tile space, as for the SMAP L1C obs readers)
+             ! shift M36 obs lat/lon for proper assignment if tile space M09/M03/M01 (tiles nest in M36)
+             ! (as for the SMAP L1C obs readers)
 
-             if ( index(obs2tile_grid_f%gridtype, 'EASEv2_M09') /=0 .or. index(obs2tile_grid_f%gridtype, 'EASEv2-M09') /=0 ) then
+             if ( index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0 .or.         &
+                  index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0 .or.         &       ! allow outdated grid name only for M09
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M03')  /=0 .or.         &
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M01')  /=0       ) then
 
                 ! temporarily shift lat/lon of obs for computation of nearest tile to
                 ! avoid ambiguous assignment of M09 model tile within M36 obs grid cell
@@ -8320,7 +8326,7 @@ contains
 
     type(hdf5read)       :: h5r
 
-    logical              :: L1C_files, L1CE_files, hpol
+    logical              :: L1C_files, L1CE_files, hpol, use_shift
     logical              :: L1CE_thinning, keep_data_1, keep_data_2, tmp_keep, file_exists
 
     type(date_time_type) :: date_time_low,       date_time_upp
@@ -9117,10 +9123,29 @@ contains
           if (N_obs_kept(kk)>0) then
              
              allocate(tmp_tile_num(N_obs_kept(kk)))
+
+             ! shift M36 obs lat/lon for proper assignment if tile space M09/M03/M01 (tiles nest in M36)
+             ! shift M09 obs lat/lon for proper assignment if tile space     M03/M01 (tiles nest in M09)
+
+             use_shift =                                                           &
+                  (L1C_files .and.                                                 &   ! M36 obs and M09, M03, or M01 tile space
+                  (                                                                &   
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0 .or.          &
+                  index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0 .or.          &   !       (allow outdated grid name only for M09)
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M03')  /=0 .or.          &
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M01')  /=0               &
+                  )                                                                &
+                  )                                                                &
+                  .or.                                                             &   ! or
+                  (L1CE_files .and.                                                &   ! M09 obs and M03, or M01 tile space  
+                  (                                                                &
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M03')  /=0 .or.          &
+                  index(obs2tile_grid_f%gridtype, 'EASEv2_M01')  /=0               &
+                  )                                                                &                  
+                  )
+
              
-             ! shift M36 obs lat/lon for proper assignment of M09 tile?
-             
-             if ( L1C_files .and. (index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0 .or. index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0 )) then
+             if (use_shift) then
                 
                 ! temporarily shift lat/lon of obs for computation of nearest tile to
                 ! avoid ambiguous assignment of M09 model tile within M36 obs grid cell
