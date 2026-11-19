@@ -2814,6 +2814,7 @@ contains
     !
     ! A. Fox, reichle, Jan 2025 
     ! amfox, 5 Nov 2026 - added obslog output
+    ! amfox, 18 Nov 2026 - shift obs lat/lon for obs-to-tile mapping on EASEv2 M09 tile space (as in read_obs_SMAP_halforbit_Tb())
     !
     ! --------------------------------------------------------------------
 
@@ -2890,6 +2891,14 @@ contains
     real, allocatable    :: timeintervals(:,:), latitudes(:,:), longitudes(:,:), tmp_sm(:,:), tmp_sigma(:,:)
     real, allocatable    :: time(:), timeslices(:,:)
     real, allocatable    :: latitudes_m(:,:), longitudes_m(:,:)
+
+    ! temporarily shift lat/lon of obs for computation of nearest tile to
+    ! avoid ambiguous assignment of M09 model tile within M36 obs grid cell
+    ! (center of M36 grid cell is equidistant from at least two M09 model 
+    !  tiles) -- reichle, 23 Aug 2013
+
+    real,      parameter :: tmp_shift_lon = 0.01
+    real,      parameter :: tmp_shift_lat = 0.005
 
     real                 :: date_time_low_hour, date_time_up_hour
     real                 :: tmp1_lon(max_obs), tmp1_lat(max_obs), tmp1_obs(max_obs), tmp1_err(max_obs), tmp1_jtime(max_obs)
@@ -3220,11 +3229,27 @@ contains
        
       allocate(tmp_tile_num(N_obs))
       
-      call get_tile_num_for_obs(N_catd, tile_coord,                 &
-           tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
-           N_obs, tmp_lat, tmp_lon,                                 &
-           this_obs_param,                                          &
-           tmp_tile_num )
+      ! shift M36 obs lat/lon for proper assignment of M09 tile?
+      
+      if ( index(tile_grid_d%gridtype, 'EASEv2_M09')  /=0 .or.     &
+           index(tile_grid_d%gridtype, 'EASEv2-M09')  /=0       ) then
+         
+         call get_tile_num_for_obs(N_catd, tile_coord,                 &
+              tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+              N_obs, tmp_lat, tmp_lon,                                 &
+              this_obs_param,                                          &
+              tmp_tile_num,                                            &
+              tmp_shift_lat, tmp_shift_lon )
+         
+      else
+         
+         call get_tile_num_for_obs(N_catd, tile_coord,                 &
+              tile_grid_d, N_tile_in_cell_ij, tile_num_in_cell_ij,     &
+              N_obs, tmp_lat, tmp_lon,                                 &
+              this_obs_param,                                          &
+              tmp_tile_num )
+         
+      end if
       
       ! ----------------------------------------------------------------
       !
