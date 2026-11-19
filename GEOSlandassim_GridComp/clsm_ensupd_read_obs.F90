@@ -6206,19 +6206,38 @@ contains
           if (N_obs>0) then
              
              allocate(tmp_tile_num(N_obs))
-             
-             ! temporarily shift lat/lon of obs for computation of nearest tile to
-             ! avoid ambiguous assignment of M09 model tile within M36 obs grid cell
-             ! (center of M36 grid cell is equidistant from at least two M09 model 
-             !  tiles) -- reichle, 23 Aug 2013
-             
-             call get_tile_num_for_obs(N_catf, tile_coord_f,               &
-                  obs2tile_grid_f, tile_grid_g_ESMF,                       &
-                  N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
-                  N_obs, tmp_lat, tmp_lon,                                 &
-                  this_obs_param,                                          &
-                  tmp_tile_num, &
-                  tmp_shift_lat, tmp_shift_lon )
+
+             ! shift M36 obs lat/lon for proper assignment of M09 tile?
+             ! (only for EASEv2 M09 model tile space, as for the SMAP L1C obs readers)
+
+             if ( index(obs2tile_grid_f%gridtype, 'EASEv2_M09') /=0 .or. index(obs2tile_grid_f%gridtype, 'EASEv2-M09') /=0 ) then
+
+                ! temporarily shift lat/lon of obs for computation of nearest tile to
+                ! avoid ambiguous assignment of M09 model tile within M36 obs grid cell
+                ! (center of M36 grid cell is equidistant from at least two M09 model
+                !  tiles) -- reichle, 23 Aug 2013
+
+                call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+                     obs2tile_grid_f, tile_grid_g_ESMF,                       &
+                     N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
+                     N_obs, tmp_lat, tmp_lon,                                 &
+                     this_obs_param,                                          &
+                     tmp_tile_num, &
+                     tmp_shift_lat, tmp_shift_lon )
+
+             else
+
+                ! no shift in other tile spaces (e.g., cube-sphere), where shifting the obs lat/lon
+                ! can assign the obs to a tile other than the one at the obs location
+
+                call get_tile_num_for_obs(N_catf, tile_coord_f,               &
+                     obs2tile_grid_f, tile_grid_g_ESMF,                       &
+                     N_tile_in_cell_ij, tile_num_in_cell_ij,                  &
+                     N_obs, tmp_lat, tmp_lon,                                 &
+                     this_obs_param,                                          &
+                     tmp_tile_num )
+
+             end if
 
              ! --------------------------------------------------------------------------
              !

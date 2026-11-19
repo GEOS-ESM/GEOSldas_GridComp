@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ### Fixed
 - Fixed mapping of obs to tiles in cube-sphere tile space: map obs on the cube-sphere tile grid with tile bounding boxes instead of on the lat/lon perturbation grid, in whose cells the tiles do not nest (not 0-diff for cube-sphere tile space).
+- Fixed tile assignment of SMOS obs: shift obs lat/lon before the tile search only in EASEv2 M09 tile space, as for SMAP L1C obs (not 0-diff for cube-sphere tile space with SMOS obs; 0-diff for EASEv2 M36 and M09).
 - Fixed NAG build on macOS (GEOSlandassim) ([PR #244](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/244)).
 - Fixed out-of-bounds copies of per-tile data in LandPert (`i_indgs`, `j_indgs`) and LandAssim (`f_num`) when `tile_coord` contains lake and land ice tiles in addition to land tiles ([PR #254](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/254)).
 - Fixed QC of Tb obs for non-land surfaces (water, land ice) in cube-sphere tile space, where it was not applied (not 0-diff for cube-sphere tile space with Tb obs; 0-diff for EASE and lat/lon tile spaces) ([PR #249](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/249)).
