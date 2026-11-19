@@ -62,8 +62,8 @@ module LDAS_TileCoordType
      ! For cubed-sphere tile spaces, pert_[x]_indg refers to a lat-lon perturbation grid that will 
      !   be created at runtime to support efficient mapping for perturbations and the EnKF analysis.
      ! For EASE and LatLon tile spaces, pert_[x]_indg is identical to [x]_indg
-     integer :: pert_i_indg  ! i index (w.r.t. *global* pert_grid for perts and EnKF) 
-     integer :: pert_j_indg  ! j index (w.r.t. *global* pert_grid for perts and EnKF)
+     integer :: pert_i_indg  ! i index (w.r.t. *global* pert_grid for perts and obs2tile + tiles2obsFOV mapping in EnKF) 
+     integer :: pert_j_indg  ! j index (w.r.t. *global* pert_grid for perts and obs2tile + tiles2obsFOV mapping in EnKF)
      real    :: frac_cell    ! area fraction of grid cell covered by tile
      real    :: frac_pfaf    ! fraction of Pfafstetter catchment for land tiles 
      real    :: area         ! area [km^2]
@@ -386,9 +386,10 @@ contains
     integer       :: n, istat, N_tile_tmp
 
     character(len=*), parameter :: Iam = 'io_tile_coord_type'
-    character(len=400) :: err_msg
-    integer, allocatable :: tmp_int(:)
-    real , allocatable :: tmp_real(:)
+    character(len=400)          :: err_msg
+
+    integer, allocatable        :: tmp_int(:)
+    real ,  allocatable         :: tmp_real(:)
  
     ! -------------------------------------------------------------
     
