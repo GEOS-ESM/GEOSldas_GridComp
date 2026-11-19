@@ -1595,13 +1595,14 @@ contains
     !  of each tile in the local halo domain ("lH") for the QC of Tb for non-land surfaces
     !  (below); a grid cell contains several tiles, whose frac_cell add up to the land
     !  fraction of the grid cell;
+    !  this is only needed before the EnKF update;
     !  near the edge of the domain, land_frac might be underestimated if non-land tiles
     !  in a given grid cell are within the (full) domain, leading to more aggressive
     !  screening of Tb obs; this is acceptable because typically the domain is global 
     
     c3_tile_space = (index(tile_grid_g%gridtype,'c3')/=0)
     
-    if (c3_tile_space .and. get_Tb_lH) then
+    if (beforeEnKFupdate .and. c3_tile_space .and. get_Tb_lH) then
 
        ind_i_min = minval(tile_coord_f%i_indg)
        ind_i_max = maxval(tile_coord_f%i_indg)
