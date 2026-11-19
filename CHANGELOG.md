@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
 - Fixed segmentation fault in the generation of perturbations when MKL is not available (e.g., macOS builds) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
 - Fixed `process_hist.csh` for BSD `sed` (macOS) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
+- Fixed obs-to-tile mapping of CYGNSS L3 soil moisture obs on EASEv2 M09 tile space by shifting the obs lat/lon, as is done for SMAP L1C Tb obs (not 0-diff for EASEv2 M09 tile space with CYGNSS L3 obs; 0-diff for all other tile spaces) ([PR #257](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/257)).
   
 ### Removed
 - Removed support for obsolete ASCAT_MET[x]_SM obs species to avoid dependency on BUFR and NCEP_Shared ([PR #250](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/250)).
