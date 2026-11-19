@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
 ### Fixed
-- Fixed mapping of obs to tiles in cube-sphere tile space: map obs on the cube-sphere tile grid with tile bounding boxes instead of on the lat/lon perturbation grid, in whose cells the tiles do not nest (not 0-diff for cube-sphere tile space).
+- Fixed mapping of obs to tiles in cube-sphere tile space: map obs on the cube-sphere tile grid with tile bounding boxes instead of on the lat/lon perturbation grid, in whose cells the tiles do not nest (not 0-diff for cube-sphere tile space) ([PR #252](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/252)).
 - Fixed tile assignment of SMOS obs: shift obs lat/lon before the tile search only in EASEv2 M09 tile space, as for SMAP L1C obs (not 0-diff for cube-sphere tile space with SMOS obs; 0-diff for EASEv2 M36 and M09) ([PR #252](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/252)).
 - Fixed NAG build on macOS (GEOSlandassim) ([PR #244](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/244)).
 - Fixed out-of-bounds copies of per-tile data in LandPert (`i_indgs`, `j_indgs`) and LandAssim (`f_num`) when `tile_coord` contains lake and land ice tiles in addition to land tiles ([PR #254](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/254)).
