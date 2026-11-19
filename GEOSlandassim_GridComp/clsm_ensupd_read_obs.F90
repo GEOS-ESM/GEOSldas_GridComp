@@ -3255,8 +3255,8 @@ contains
       
       ! in M09 tile space, shift M36 obs lat/lon for proper assignment of M09 tile
       
-      if ( index(obs2tile_grid_d%gridtype, 'EASEv2_M09')  /=0 .or.         &
-           index(obs2tile_grid_d%gridtype, 'EASEv2-M09')  /=0       ) then
+      if ( index(obs2tile_grid_f%gridtype, 'EASEv2_M09')  /=0 .or.         &
+           index(obs2tile_grid_f%gridtype, 'EASEv2-M09')  /=0       ) then
          
          call get_tile_num_for_obs(N_catf, tile_coord_f,                   &
               obs2tile_grid_f,  tile_grid_g_ESMF,                          &
