@@ -23,20 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
 ### Fixed
-- Fixed mapping of obs to tiles in cube-sphere tile space: map obs on the cube-sphere tile grid with tile bounding boxes instead of on the lat/lon perturbation grid, in whose cells the tiles do not nest (not 0-diff for cube-sphere tile space) ([PR #252](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/252)).
-- Fixed tile assignment of SMOS obs: shift obs lat/lon before the tile search only in EASEv2 M09 tile space, as for SMAP L1C obs (not 0-diff for cube-sphere tile space with SMOS obs; 0-diff for EASEv2 M36 and M09) ([PR #252](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/252)).
+- Fixed obs-to-tile mapping in cube-sphere tile space (not 0-diff for assimilation in cube-sphere tile space) ([PR #252](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/252)).
+- Fixed obs-to-tile mapping of CYGNSS L3 soil moisture obs on EASEv2 M09 tile space (not 0-diff for EASEv2 M09 tile space with CYGNSS L3 obs) ([PR #257](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/257)).
 - Fixed NAG build on macOS (GEOSlandassim) ([PR #244](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/244)).
 - Fixed out-of-bounds copies of per-tile data in LandPert (`i_indgs`, `j_indgs`) and LandAssim (`f_num`) when `tile_coord` contains lake and land ice tiles in addition to land tiles ([PR #254](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/254)).
-- Fixed QC of Tb obs for non-land surfaces (water, land ice) in cube-sphere tile space, where it was not applied (not 0-diff for cube-sphere tile space with Tb obs; 0-diff for EASE and lat/lon tile spaces) ([PR #249](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/249)).
-- Fixed `frac_cell` and units of `area` in tile_coord when reading nc4 tile file in preprocessing (not 0-diff for nc4 tile files; 0-diff for *.til ASCII tile files) ([PR #247](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/247)).
-- Fixed double assimilation of MODIS SCF obs for tiles whose center longitude is exactly on the boundary between two assimilation windows (not 0-diff for EASEv2 M36 and CF0360) ([PR #240](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/240)).
+- Fixed QC of Tb obs for non-land surfaces (water, landice) in cube-sphere tile space (not 0-diff for cube-sphere tile space with Tb obs) ([PR #249](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/249)).
+- Fixed `frac_cell` and units of `area` in tile_coord when reading nc4 tile file in preprocessing (not 0-diff when using nc4 tile file) ([PR #247](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/247)).
+- Fixed double assimilation of MODIS SCF obs for tiles whose center longitude is exactly on the boundary between two assimilation windows (not 0-diff for MODIS SCF assimilation) ([PR #240](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/240)).
 - Fixed bugs in MATLAB obs scaling parameter scripts (not 0-diff for lat/lon grid) ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 - Fixed string and no-data obs handling in read_GEOSldas.py ([PR #228](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/228)).
 - Fixed assignment of angles in obs_param structure ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
 - Standardized units strings in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #233](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/233)).
 - Fixed segmentation fault in the generation of perturbations when MKL is not available (e.g., macOS builds) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
 - Fixed `process_hist.csh` for BSD `sed` (macOS) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
-- Fixed obs-to-tile mapping of CYGNSS L3 soil moisture obs on EASEv2 M09 tile space by shifting the obs lat/lon, as is done for SMAP L1C Tb obs (not 0-diff for EASEv2 M09 tile space with CYGNSS L3 obs; 0-diff for all other tile spaces) ([PR #257](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/257)).
   
 ### Removed
 
