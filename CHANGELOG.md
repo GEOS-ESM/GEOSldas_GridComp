@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ### Fixed
 - Fixed obs-to-tile mapping in cube-sphere tile space (not 0-diff for assimilation in cube-sphere tile space) ([PR #252](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/252)).
-- Fixed obs-to-tile mapping of SMAP Tb, SMOS Tb, and CYGNSS soil moisture obs when used with EASEv2 M09/M03/M01 tile space (not 0-diff for M09 tile space with CYGNSS obs or M03/M01 tile space with SMAP/SMOS/CYGNSS obs) ([PR #257](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/257), [PR #259](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/259)).
+- Fixed obs-to-tile mapping of SMAP Tb, SMOS Tb, and CYGNSS soil moisture obs on EASEv2 M36 when used with EASEv2 M09/M03/M01 tile space (not 0-diff for M09 tile space with CYGNSS obs or M03/M01 tile space with SMAP/SMOS/CYGNSS obs) ([PR #257](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/257), [PR #259](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/259)).
 - Fixed NAG build on macOS (GEOSlandassim) ([PR #244](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/244)).
 - Fixed out-of-bounds copies of per-tile data in LandPert (`i_indgs`, `j_indgs`) and LandAssim (`f_num`) when `tile_coord` contains lake and land ice tiles in addition to land tiles ([PR #254](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/254)).
 - Fixed QC of Tb obs for non-land surfaces (water, landice) in cube-sphere tile space (not 0-diff for cube-sphere tile space with Tb obs) ([PR #249](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/249), [PR #259](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/259)).
