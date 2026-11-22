@@ -605,9 +605,9 @@ EASEv2_M36.LM:           1
                                    'DHGLCSRF'     , 'LANDICE'  , 'ECHANGEGLCSRF' ,
                                    'DSNOMASGLC'   , 'LANDICE'  ,
                                    'ICESMB'       , 'LANDICE'  ,                  
->>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  ,
->>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  ,
->>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  ,
+>>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  , 'ICESHEETSURFELEV' , 
+>>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  , 'ICESHEETTHICK'    , 
+>>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  , 'ICESHEETVEL'      , 
                                     ::
 
   tavg24_1d_glc_Nt.descr:         'Tile-space,Daily,Time-Averaged,Single-level,Land Ice Diagnostics',
@@ -648,9 +648,9 @@ EASEv2_M36.LM:           1
                                    'DHGLCSRF'     , 'LANDICE'  , 'ECHANGEGLCSRF' ,
                                    'DSNOMASGLC'   , 'LANDICE'  , 
                                    'ICESMB'       , 'LANDICE'  ,                  
->>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  ,                  
->>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  ,                  
->>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  ,                  
+>>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  , 'ICESHEETSURFELEV' ,                 
+>>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  , 'ICESHEETTHICK'    ,                 
+>>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  , 'ICESHEETVEL'      ,                 
                                     ::
 
   tavg24_1d_route.descr:          'Catchment-space,Daily,Time-Averaged,Single-level,Runoff Routing Diagnostics',
@@ -676,13 +676,13 @@ EASEv2_M36.LM:           1
   tavg24_1d_issm_Nt.format:        'CFIO',
   tavg24_1d_issm_Nt.frequency:      240000 ,
   tavg24_1d_issm_Nt.ref_time:       000000 ,
-  tavg24_1d_issm_Nt.fields:      'ICESURF'    , 'ISSM' ,
-                                 'ICETHICK'   , 'ISSM' ,
-                                 'ICEVX'      , 'ISSM' ,
-                                 'ICEVY'      , 'ISSM' ,
-                                 'DHDT'       , 'ISSM' ,
-                                 'DIVQ'       , 'ISSM' ,
-                                 'ICESMB_ISSM', 'ISSM' ,
+  tavg24_1d_issm_Nt.fields:      'ICESURF'    , 'ISSM' , 'ICESHEETSURFELEV' ,
+                                 'ICETHICK'   , 'ISSM' , 'ICESHEETTHICK'    ,
+                                 'ICEVX'      , 'ISSM' , 'ICESHEETVELX'     ,
+                                 'ICEVY'      , 'ISSM' , 'ICESHEETVELY'     ,
+                                 'DHDT'       , 'ISSM' , 'ICESHEETDHDT'     , 
+                                 'DIVQ'       , 'ISSM' , 'ICESHEETDIVQ'     ,
+                                 'ICESMB_ISSM', 'ISSM' , 'ICESHEETSMB'      , 
                                  ::
 
 # ========================== EOF ==============================================================

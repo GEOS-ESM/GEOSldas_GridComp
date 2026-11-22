@@ -74,7 +74,7 @@ contains
     
     call MAPL_AddExportSpec(GC,                        &
          SHORT_NAME    = 'ICESMB',                     &
-         LONG_NAME     = 'ice_surface_mass_balance',   &
+         LONG_NAME     = 'ice_sheet_surface_mass_balance',   &
          UNITS         = 'kg m-2 s-1',                 &
          DIMS          = MAPL_DimsTileOnly,            &
          VLOCATION     = MAPL_VLocationNone,           &
@@ -84,7 +84,7 @@ contains
     if (DO_ISSM==1) then
        call MAPL_AddExportSpec(GC,                     &
             SHORT_NAME = 'ICESURF',                    &
-            LONG_NAME  = 'ice_surface_elevation',      &
+            LONG_NAME  = 'ice_sheet_surface_elevation',      &
             UNITS      = 'm',                          &
             DIMS       = MAPL_DimsTileOnly,            &
             VLOCATION  = MAPL_VLocationNone,           &
@@ -93,7 +93,7 @@ contains
        
        call MAPL_AddExportSpec(GC,                     &
             SHORT_NAME = 'ICEVEL',                     &
-            LONG_NAME  = 'ice_flow_speed',             &
+            LONG_NAME  = 'ice_sheet_flow_speed',             &
             UNITS      = 'm s-1',                      &
             DIMS       = MAPL_DimsTileOnly,            &
             VLOCATION  = MAPL_VLocationNone,           &
@@ -102,7 +102,7 @@ contains
        
        call MAPL_AddExportSpec(GC,                     &
             SHORT_NAME = 'ICETHICK',                   &
-            LONG_NAME  = 'ice_thickness',              &
+            LONG_NAME  = 'ice_sheet_thickness',              &
             UNITS      = 'm',                          &
             DIMS       = MAPL_DimsTileOnly,            &
             VLOCATION  = MAPL_VLocationNone,           &
