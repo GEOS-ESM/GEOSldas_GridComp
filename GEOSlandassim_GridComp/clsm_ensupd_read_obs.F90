@@ -6999,6 +6999,9 @@ contains
     !
     ! lcandre2, 26 Oct 2026
     !
+    ! amfox, 5 Nov 2026 - obs on tiles at a window boundary are assimilated only once (as for MODIS);
+    !   original file names ("granule_id") are written to the obslog (as for MODIS)
+    !
     ! ------------------------------------------------------------------------------
 
     implicit none
@@ -7042,7 +7045,7 @@ contains
     real,    parameter    :: CMG_ll_lon       = -180.  ! [degrees]  lower-left  longitude of JPSS CMG grid
     real,    parameter    :: CMG_ur_lat       =   90.  ! [degrees]  upper-right latitude  of JPSS CMG grid
     
-    character(7)          :: JPSS_product_ID
+    character(  7)        :: JPSS_product_ID
     
     character(4)          :: YYYY
     character(3)          :: DDD                       ! day of year 
@@ -7095,11 +7098,11 @@ contains
     ! determine operating time range of sensor
 
     if     (trim(this_obs_param%descr) == 'VJ110C1') then
-       date_time_obs_beg = date_time_type(2018, 1, 5, 0, 0, 0, -9999, -9999)    ! JPSS1
+       date_time_obs_beg = date_time_type(2018, 1, 5, 0, 0, 0,-9999,-9999)    ! JPSS1
     elseif (trim(this_obs_param%descr) == 'VJ210C1') then
-       date_time_obs_beg = date_time_type(2023, 2, 10, 0, 0, 0, -9999, -9999)    ! JPSS2
+       date_time_obs_beg = date_time_type(2023, 2,10, 0, 0, 0,-9999,-9999)    ! JPSS2
     elseif (trim(this_obs_param%descr) == 'VNP10C1') then
-       date_time_obs_beg = date_time_type(2012, 1, 19, 0, 0, 0, -9999, -9999)
+       date_time_obs_beg = date_time_type(2012, 1,19, 0, 0, 0,-9999,-9999)    ! S-NPP
     else
        err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -7120,7 +7123,8 @@ contains
        
     end if 
 
-    ! identify JPSS  product and overpass hour https://vlab.noaa.gov/web/towr-s/satellite-operations-updates 
+    ! identify JPSS product and overpass hour
+    !   (see https://vlab.noaa.gov/web/towr-s/satellite-operations-updates)
 
     JPSS_product_ID = this_obs_param%name(1:7)
     
@@ -7327,7 +7331,7 @@ contains
        tmp_ind_start = N_CMG_obs + 1
        tmp_ind_last  = N_CMG_obs + N_lon_vec(nn)*N_lat
        
-       call read_JPSS_SCF_hdf( fname,                                                  &
+       call read_JPSS_SCF_hdf( fname,                                                   &
             lon_min_vec(nn), lon_max_vec(nn), lat_min, lat_max,                         &
             N_good_data,                                                                &
             CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
@@ -7395,11 +7399,11 @@ contains
          tmp_tile_num    )
     
     
-    std_JPSS_obs = this_obs_param%errstd
+    std_JPSS_obs  = this_obs_param%errstd
     
-    JPSS_obs     = 0.
-    JPSS_lon     = 0.
-    JPSS_lat     = 0.
+    JPSS_obs      = 0.
+    JPSS_lon      = 0.
+    JPSS_lat      = 0.
 
     N_obs_in_tile = 0
     
@@ -8330,9 +8334,7 @@ contains
           ! (4)  Basic_QA key as in the CMG file attributes and the VNP10C1 v2 user guide;
           !       "other" = low illumination (70<=SZA<85 deg); must be kept to retain most
           !       high-latitude winter obs (as with MODIS reader); Basic_QA=1 ("poor") and 2 ("bad")
-          !       are excluded, as are flag values: comparison with MODIS (15 Jan 2020,
-          !       VJ110C1 and VNP10C1) shows that Basic_QA=1 obs agree poorly (corr 0.41,
-          !       bias +0.26, rmsd 0.43), whereas Basic_QA=3 obs agree well (corr 0.90, rmsd 0.10)
+          !       are excluded because Basic_QA=1 obs agree poorly with MODIS (15 Jan 2020 comparison)
           
           if (keep_data) then
 
