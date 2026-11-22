@@ -721,7 +721,7 @@ contains
          _RC )
 
     call MAPL_AddExportSpec(GC,                           &
-         LONG_NAME          = 'rate_of_change_in_energy_over_glaciated_surface' ,&
+         LONG_NAME          = 'rate_of_change_of_total_glacier_energy'          ,&
          UNITS              = 'W m-2'                     ,&
          SHORT_NAME         = 'DHGLC'                     ,&
          DIMS               = MAPL_DimsTileOnly           ,&
@@ -729,7 +729,7 @@ contains
          _RC )
 
     call MAPL_AddExportSpec(GC,                           &
-         LONG_NAME          = 'rate_of_change_in_energy_of_top_layer_of_ice_and_snow' ,&
+         LONG_NAME          = 'rate_of_change_of_glacier_energy_in_top_layer_snow_and_ice', &
          UNITS              = 'W m-2'                     ,&
          SHORT_NAME         = 'DHGLCSRF'                  ,&
          DIMS               = MAPL_DimsTileOnly           ,&
@@ -737,17 +737,17 @@ contains
          _RC )
 
     call MAPL_AddExportSpec(GC,                           &
-         LONG_NAME          = 'rate_of_change_in_snow_pack_mass'                      ,&
+         LONG_NAME          = 'rate_of_change_in_snowpack_mass_over_glaciated_surface' ,&
          UNITS              = 'kg m-2 s-1'                ,&
-         SHORT_NAME         = 'DMSNO'                     ,&
+         SHORT_NAME         = 'DSNOMASGLC'                ,&
          DIMS               = MAPL_DimsTileOnly           ,&
          VLOCATION          = MAPL_VLocationNone          ,&
          _RC )
 
     call MAPL_AddExportSpec(GC,                           &
-         LONG_NAME          = 'evaporation_from_snow_surface'                         ,&
+         LONG_NAME          = 'snowpack_evaporation_over_glaciated_surface'           ,&
          UNITS              = 'kg m-2 s-1'                ,&
-         SHORT_NAME         = 'EVAPSNO'                   ,&
+         SHORT_NAME         = 'EVAPSNOGLC'                ,&
          DIMS               = MAPL_DimsTileOnly           ,&
          VLOCATION          = MAPL_VLocationNone          ,&
          _RC )
@@ -976,8 +976,8 @@ contains
     real, pointer :: PRECIPGLC(:)=>null()
     real, pointer :: DHGLC(:)=>null()
     real, pointer :: DHGLCSRF(:)=>null()
-    real, pointer :: DMSNO(:)=>null()
-    real, pointer :: EVAPSNO(:)=>null()
+    real, pointer :: DSNOMASGLC(:)=>null()
+    real, pointer :: EVAPSNOGLC(:)=>null()
     real, pointer :: ITY(:)=>null()
     real, pointer :: RMELTDU001(:)=>null()
     real, pointer :: RMELTDU002(:)=>null()
@@ -1075,8 +1075,8 @@ contains
     real, pointer :: PRECIPGLC_enavg(:)=>null()
     real, pointer :: DHGLC_enavg(:)=>null()
     real, pointer :: DHGLCSRF_enavg(:)=>null()
-    real, pointer :: DMSNO_enavg(:)=>null()
-    real, pointer :: EVAPSNO_enavg(:)=>null()
+    real, pointer :: DSNOMASGLC_enavg(:)=>null()
+    real, pointer :: EVAPSNOGLC_enavg(:)=>null()
     real, pointer :: RMELTDU001_enavg(:)=>null()
     real, pointer :: RMELTDU002_enavg(:)=>null()
     real, pointer :: RMELTDU003_enavg(:)=>null()
@@ -1187,8 +1187,8 @@ contains
     call MAPL_GetPointer(import, PRECIPGLC,   'PRECIPGLC',   _RC)
     call MAPL_GetPointer(import, DHGLC,       'DHGLC',       _RC)
     call MAPL_GetPointer(import, DHGLCSRF,    'DHGLCSRF',    _RC)
-    call MAPL_GetPointer(import, DMSNO,       'DMSNO',       _RC)
-    call MAPL_GetPointer(import, EVAPSNO,     'EVAPSNO',     _RC)
+    call MAPL_GetPointer(import, DSNOMASGLC,  'DSNOMASGLC',  _RC)
+    call MAPL_GetPointer(import, EVAPSNOGLC,  'EVAPSNOGLC',  _RC)
     call MAPL_GetPointer(import, RMELTDU001,  'RMELTDU001',  _RC)
     call MAPL_GetPointer(import, RMELTDU002,  'RMELTDU002',  _RC)
     call MAPL_GetPointer(import, RMELTDU003,  'RMELTDU003',  _RC)
@@ -1286,8 +1286,8 @@ contains
     call MAPL_GetPointer(export, PRECIPGLC_enavg,   'PRECIPGLC',   _RC)
     call MAPL_GetPointer(export, DHGLC_enavg,       'DHGLC',       _RC)
     call MAPL_GetPointer(export, DHGLCSRF_enavg,    'DHGLCSRF',    _RC)
-    call MAPL_GetPointer(export, DMSNO_enavg,       'DMSNO',       _RC)
-    call MAPL_GetPointer(export, EVAPSNO_enavg,     'EVAPSNO',     _RC)
+    call MAPL_GetPointer(export, DSNOMASGLC_enavg,  'DSNOMASGLC',  _RC)
+    call MAPL_GetPointer(export, EVAPSNOGLC_enavg,  'EVAPSNOGLC',  _RC)
     call MAPL_GetPointer(export, RMELTDU001_enavg,  'RMELTDU001',  _RC)
     call MAPL_GetPointer(export, RMELTDU002_enavg,  'RMELTDU002',  _RC)
     call MAPL_GetPointer(export, RMELTDU003_enavg,  'RMELTDU003',  _RC)
@@ -1385,8 +1385,8 @@ contains
        if (associated(PRECIPGLC_enavg))   PRECIPGLC_enavg   = 0.0  
        if (associated(DHGLC_enavg))       DHGLC_enavg       = 0.0  
        if (associated(DHGLCSRF_enavg))    DHGLCSRF_enavg    = 0.0  
-       if (associated(DMSNO_enavg))       DMSNO_enavg       = 0.0  
-       if (associated(EVAPSNO_enavg))     EVAPSNO_enavg     = 0.0  
+       if (associated(DSNOMASGLC_enavg))  DSNOMASGLC_enavg  = 0.0  
+       if (associated(EVAPSNOGLC_enavg))  EVAPSNOGLC_enavg  = 0.0  
        if (associated(RMELTDU001_enavg))  RMELTDU001_enavg  = 0.0
        if (associated(RMELTDU002_enavg))  RMELTDU002_enavg  = 0.0
        if (associated(RMELTDU003_enavg))  RMELTDU003_enavg  = 0.0
@@ -1482,8 +1482,8 @@ contains
     if (associated(PRECIPGLC_enavg)   .and. associated(PRECIPGLC))     PRECIPGLC_enavg = PRECIPGLC_enavg   + PRECIPGLC
     if (associated(DHGLC_enavg)       .and. associated(DHGLC))             DHGLC_enavg = DHGLC_enavg       + DHGLC
     if (associated(DHGLCSRF_enavg)    .and. associated(DHGLCSRF))       DHGLCSRF_enavg = DHGLCSRF_enavg    + DHGLCSRF
-    if (associated(DMSNO_enavg)       .and. associated(DMSNO))             DMSNO_enavg = DMSNO_enavg       + DMSNO
-    if (associated(EVAPSNO_enavg)     .and. associated(EVAPSNO))         EVAPSNO_enavg = EVAPSNO_enavg     + EVAPSNO
+    if (associated(DSNOMASGLC_enavg)  .and. associated(DSNOMASGLC))   DSNOMASGLC_enavg = DSNOMASGLC_enavg  + DSNOMASGLC
+    if (associated(EVAPSNOGLC_enavg)  .and. associated(EVAPSNOGLC))   EVAPSNOGLC_enavg = EVAPSNOGLC_enavg  + EVAPSNOGLC
     if (associated(RMELTDU001_enavg)  .and. associated(RMELTDU001))   RMELTDU001_enavg = RMELTDU001_enavg  + RMELTDU001
     if (associated(RMELTDU002_enavg)  .and. associated(RMELTDU002))   RMELTDU002_enavg = RMELTDU002_enavg  + RMELTDU002
     if (associated(RMELTDU003_enavg)  .and. associated(RMELTDU003))   RMELTDU003_enavg = RMELTDU003_enavg  + RMELTDU003
@@ -1586,8 +1586,8 @@ contains
        if (associated(PRECIPGLC_enavg))   PRECIPGLC_enavg   = PRECIPGLC_enavg   / NUM_ENSEMBLE_LANDICE 
        if (associated(DHGLC_enavg))       DHGLC_enavg       = DHGLC_enavg       / NUM_ENSEMBLE_LANDICE 
        if (associated(DHGLCSRF_enavg))    DHGLCSRF_enavg    = DHGLCSRF_enavg    / NUM_ENSEMBLE_LANDICE 
-       if (associated(DMSNO_enavg))       DMSNO_enavg       = DMSNO_enavg       / NUM_ENSEMBLE_LANDICE 
-       if (associated(EVAPSNO_enavg))     EVAPSNO_enavg     = EVAPSNO_enavg     / NUM_ENSEMBLE_LANDICE 
+       if (associated(DSNOMASGLC_enavg))  DSNOMASGLC_enavg  = DSNOMASGLC_enavg  / NUM_ENSEMBLE_LANDICE 
+       if (associated(EVAPSNOGLC_enavg))  EVAPSNOGLC_enavg  = EVAPSNOGLC_enavg  / NUM_ENSEMBLE_LANDICE 
        if (associated(RMELTDU001_enavg))  RMELTDU001_enavg  = RMELTDU001_enavg  / NUM_ENSEMBLE_LANDICE
        if (associated(RMELTDU002_enavg))  RMELTDU002_enavg  = RMELTDU002_enavg  / NUM_ENSEMBLE_LANDICE
        if (associated(RMELTDU003_enavg))  RMELTDU003_enavg  = RMELTDU003_enavg  / NUM_ENSEMBLE_LANDICE
