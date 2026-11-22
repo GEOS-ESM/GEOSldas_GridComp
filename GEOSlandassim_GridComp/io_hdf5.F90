@@ -368,8 +368,8 @@ contains
   end subroutine readDataset2DInt
 
   ! read (fixed-length) string attribute of root group of file (e.g., global
-  ! attribute "LocalGranuleID"); returns blank if attribute does not exist,
-  ! is not a single fixed-length string, or cannot be read
+  ! attribute "LocalGranuleID"); returns blank if attribute does not exist or
+  ! cannot be read
   !
   ! meant for log output: never stops on an HDF5 error (unlike checkErrCode_())
   subroutine readAttributeChar(this, attrName, attrValue)
@@ -380,10 +380,10 @@ contains
     character(len=*), intent(out) :: attrValue
 
     ! local variables
-    integer :: hdf5err, tmperr, type_class, space_class, cset
-    logical :: attr_exists, is_vlen, is_ok
-    integer(hid_t)   :: attr_id, memtype_id, filetype_id, space_id
-    integer(hsize_t) :: dims(1), npoints
+    integer :: hdf5err, tmperr
+    logical :: attr_exists
+    integer(hid_t)   :: attr_id, memtype_id
+    integer(hsize_t) :: dims(1)
 
     ! check file state
     if (this%file_id == INVALID_HID) then
@@ -401,55 +401,17 @@ contains
 
     if (hdf5err < 0) return
 
-    ! dataspace must hold exactly one element (scalar, or simple with one point);
-    ! more than one element would overflow attrValue
-    is_ok   = .false.
-    npoints = 0_hsize_t
-
-    call h5aget_space_f(attr_id, space_id, hdf5err)
+    ! read into a fixed-length string of length len(attrValue)
+    call h5tcopy_f(H5T_FORTRAN_S1, memtype_id, hdf5err)
 
     if (hdf5err >= 0) then
-       call h5sget_simple_extent_type_f(space_id, space_class, hdf5err)
-       if (hdf5err >= 0 .and. (space_class == H5S_SCALAR_F .or. space_class == H5S_SIMPLE_F)) then
-          call h5sget_simple_extent_npoints_f(space_id, npoints, hdf5err)
-          is_ok = (hdf5err >= 0 .and. npoints == 1_hsize_t)
-       end if
-       call h5sclose_f(space_id, tmperr)
-    end if
-
-    ! datatype must be a fixed-length string; get its character set (ASCII or UTF-8),
-    ! because HDF5 does not convert between character sets
-    if (is_ok) then
-       is_ok   = .false.
-       is_vlen = .true.
-       cset    = -1
-       call h5aget_type_f(attr_id, filetype_id, hdf5err)
+       call h5tset_size_f(memtype_id, int(len(attrValue),size_t), hdf5err)
        if (hdf5err >= 0) then
-          call h5tget_class_f(filetype_id, type_class, hdf5err)
-          if (hdf5err >= 0 .and. type_class == H5T_STRING_F) then
-             call h5tis_variable_str_f(filetype_id, is_vlen, hdf5err)
-             if (hdf5err >= 0 .and. (.not. is_vlen)) then
-                call h5tget_cset_f(filetype_id, cset, hdf5err)
-                is_ok = (hdf5err >= 0)
-             end if
-          end if
-          call h5tclose_f(filetype_id, tmperr)
+          dims = 1_hsize_t
+          call h5aread_f(attr_id, memtype_id, attrValue, dims, hdf5err)
        end if
-    end if
-
-    ! read into a fixed-length string of length len(attrValue) with the character set of the attribute
-    if (is_ok) then
-       call h5tcopy_f(H5T_FORTRAN_S1, memtype_id, hdf5err)
-       if (hdf5err >= 0) then
-          call h5tset_size_f(memtype_id, int(len(attrValue),size_t), hdf5err)
-          if (hdf5err >= 0)  call h5tset_cset_f(memtype_id, cset, hdf5err)
-          if (hdf5err >= 0) then
-             dims = 1_hsize_t
-             call h5aread_f(attr_id, memtype_id, attrValue, dims, hdf5err)
-          end if
-          if (hdf5err < 0)  attrValue = ''
-          call h5tclose_f(memtype_id, tmperr)
-       end if
+       if (hdf5err < 0)  attrValue = ''
+       call h5tclose_f(memtype_id, tmperr)
     end if
 
     call h5aclose_f(attr_id, tmperr)
