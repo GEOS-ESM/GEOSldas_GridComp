@@ -89,65 +89,66 @@ module LDAS_PertTypes
   ! **********************************************************************
 
   type T_PERT
-    ! private
-     integer :: npert ! number of perturbation
+     ! private
+     integer                            :: npert ! number of perturbation
      !In situation that a processor has no tiles, this processor can still participate parallel fft
-     integer :: fft_npert
-     integer :: dtstep
-     type(ESMF_Time) :: TimePrv, TimeNxt
-     type(pert_param_type), pointer :: param(:)=>null()
-     real, allocatable :: DataPrv(:,:), DataNxt(:,:)
-   end type T_PERT
-
-  ! Internal state and its wrapper
-   type T_LANDPERT_STATE
-     !private
-      integer :: PERT_CHOICE    ! => rc variable PERTURBATIONS: 0=none, 1=rectangular, 2=sphere (see also GEOSldas_LDAS.rc) 
-      integer :: ens_id
-      integer :: NUM_ENSEMBLE
-      logical :: isCubedSphere
-
-      integer,allocatable :: i_indgs(:)
-      integer,allocatable :: j_indgs(:)
-     ! if it is cubed-sphere grid, swith to internal start
-      real,allocatable    :: fpert_ntrmdt(:,:,:)
-      real,allocatable    :: ppert_ntrmdt(:,:,:)
-      real(kind=ESMF_KIND_R8), allocatable :: pert_rseed_r8(:)
-     ! force/progn perturbations
-      type(T_PERT) :: ForcePert, PrognPert
-   end type T_LANDPERT_STATE
-   type LANDPERT_WRAP
-     type(T_LANDPERT_STATE), pointer :: ptr=>null()
-   end type LANDPERT_WRAP
+     integer                            :: fft_npert
+     integer                            :: dtstep
+     type(ESMF_Time)                    :: TimePrv, TimeNxt
+     type(pert_param_type), pointer     :: param(:)=>null()
+     real,                  allocatable :: DataPrv(:,:), DataNxt(:,:)
+  end type T_PERT
   
+  ! Internal state and its wrapper
+  type T_LANDPERT_STATE
+     !private
+     integer :: PERT_CHOICE    ! => rc variable PERTURBATIONS: 0=none, 1=rectangular, 2=sphere (see also GEOSldas_LDAS.rc) 
+     integer :: ens_id
+     integer :: NUM_ENSEMBLE
+     logical :: isCubedSphere
+     
+     integer,                 allocatable :: i_indgs(:)              ! => tilecoord%pert_i_indg
+     integer,                 allocatable :: j_indgs(:)              ! => tilecoord%pert_j_indg
+     ! if it is cubed-sphere grid, swith to internal start
+     real,                    allocatable :: fpert_ntrmdt(:,:,:)
+     real,                    allocatable :: ppert_ntrmdt(:,:,:)
+     real(kind=ESMF_KIND_R8), allocatable :: pert_rseed_r8(:)
+     ! force/progn perturbations
+     type(T_PERT)                         :: ForcePert, PrognPert
+  end type T_LANDPERT_STATE
+  
+  type LANDPERT_WRAP
+     type(T_LANDPERT_STATE), pointer :: ptr=>null()
+  end type LANDPERT_WRAP
+
 contains  
   
   subroutine allocate_pert_param(N_pert, N_x, N_y, pert_param)
-    
+
     implicit none
-    
+
     integer, intent(in) :: N_pert, N_x, N_y
-    
+
     type(pert_param_type), dimension(:), pointer :: pert_param
-    
+
     ! local variables
-    
+
     integer :: k
-    
+
     ! --------------------------------------------------------
-    
+
     nullify(pert_param)
-        
+
     allocate(pert_param(N_pert))
-    
+
     do k=1,N_pert
-       
+
        allocate(pert_param(k)%mean(N_x,N_y))
        allocate(pert_param(k)%std(N_x,N_y))
        allocate(pert_param(k)%ccorr(N_pert,N_x,N_y))
-       
+
     end do
-    
+
   end subroutine allocate_pert_param
   
   ! **********************************************************************
