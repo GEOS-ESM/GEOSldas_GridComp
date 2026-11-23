@@ -7024,9 +7024,7 @@ contains
 
   end subroutine read_obs_MODIS_VIIRS_SCF
 
-  ! *******************************************************************************************************
-
-  ! *******************************************************************************************************
+  ! *****************************************************************
 
   subroutine localtime2longitude( date_time, local_hour, longitude, delta_day )
 
@@ -7440,7 +7438,7 @@ contains
        
        if ( (dimsizes(1)/=CMG_N_lon) .or. (dimsizes(2)/=CMG_N_lat) ) then 
 
-          err_msg = 'dimensions in hdf file doe not match CMG_N_lon and/or CMG_N_lat'
+          err_msg = 'dimensions in hdf file do not match CMG_N_lon and/or CMG_N_lat'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
           
        end if
@@ -7569,7 +7567,7 @@ contains
 
   end subroutine read_MODIS_SCF_hdf
  
-! *****************************************************************
+  ! *****************************************************************
   
   subroutine read_VIIRS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
        N_good_data, CMG_lon, CMG_lat, CMG_SCF, granule_id )
@@ -7578,13 +7576,11 @@ contains
     !   - S-NPP:  https://nsidc.org/data/vnp10c1/versions/2
     !   - JPSS1:  https://nsidc.org/data/vj110c1/versions/2
     !   - JPSS2:  https://nsidc.org/data/vj210c1/versions/2
-    !   - daily data with spatial resolution of 0.05 deg on MODIS climate modeling grid (CMG)
+    !   - daily data with spatial resolution of 0.05 deg on MODIS/VIIRS climate modeling grid (CMG)
     !   - data are read for the requested lat/lon range 
     !   - apply QC
     !
-    ! adapted from read_MODIS_SCF_hdf() (reichle, 20 Oct 2023)
-    !
-    ! amfox, 2 Nov 2026 - hdf5 version for VIIRS
+    ! amfox, 2 Nov 2026 - hdf5 version for VIIRS, adapted from read_MODIS_SCF_hdf()
     !
     ! Added output of "granule_id", which is the original VIIRS file name including the production
     !  date/time stamp (global attribute "LocalGranuleID").  The VIIRS file names on Discover are
@@ -7853,13 +7849,12 @@ contains
           
           ! note: Snow_Cover >= 0 per range check above, no need to check for minimum 
           
-          keep_data =                                                  &  
-               (Snow_Cover( ii,jj) <= qc_snow_cover_max  )  .and.      &  ! 0<=SCF<=100 (1)
-               (Clear_Index(ii,jj) >  qc_clear_index_min )  .and.      &  ! sufficiently clear sky (2)
-               (Clear_Index(ii,jj) <= qc_clear_index_max )  .and.      &  ! 0<=CI<=100 (3)
-               (Basic_QA(   ii,jj) == qc_basic_qa_good   .or.          &  ! keep "good" or "other" (4)
-                Basic_QA(   ii,jj) == qc_basic_qa_other  )                !   quality only (4)
-
+          keep_data =                                                                                          &  
+               ( Snow_Cover( ii,jj) <= qc_snow_cover_max                                             )  .and.  &  ! 0<=SCF<=100            (1)
+               ( Clear_Index(ii,jj) >  qc_clear_index_min                                            )  .and.  &  ! sufficiently clear sky (2)
+               ( Clear_Index(ii,jj) <= qc_clear_index_max                                            )  .and.  &  ! 0<=CI<=100             (3)
+               ( Basic_QA(   ii,jj) == qc_basic_qa_good   .or.  Basic_QA(ii,jj) == qc_basic_qa_other )            ! keep "good" or "other" (4)
+           
           ! (1)  excludes "no decision", "night", "lake", "ocean", "fill", etc; cloud is not
           !       flagged (cloudy cells have low Clear_Index); Antarctica has Snow_Cover=100
           ! (2)  Snow_Cover and Clear_Index are percent of all obs in grid cell
@@ -7904,6 +7899,7 @@ contains
 
   
   ! *****************************************************************
+
   subroutine read_obs_SMAP_FT( date_time, N_catf, this_obs_param,            &
        dtstep_assim, tile_coord_f, obs2tile_grid_f, tile_grid_g_ESMF,        &
        N_tile_in_cell_ij, tile_num_in_cell_ij, write_obslog,                 &
