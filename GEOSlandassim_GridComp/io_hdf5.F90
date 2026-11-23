@@ -50,7 +50,7 @@ module io_hdf5
      procedure, public  :: openFile
      procedure, public  :: closeFile
      procedure, public  :: queryDataset
-     generic,   public  :: readDataset => readDataset1DReal, readDataset1DReal8, readDataset1DInt, readDataset1DChar24, readDataset2DReal, readDataset2DInt
+     generic,   public  :: readDataset   => readDataset1DReal, readDataset1DReal8, readDataset1DInt, readDataset1DChar24, readDataset2DReal, readDataset2DInt
      generic,   public  :: readAttribute => readAttributeChar
      ! private
      procedure, private :: readDataset1DReal
