@@ -6782,47 +6782,7 @@ contains
     allocate( CMG_lat(N_tmp) )
     
     
-    ! read MODIS SCF obs    
-    !
-    !   - (renamed) files currently located at /discover/nobackup/projects/S2SHMA/MODIS/MOD10C1_V61/ (2010-2022)
-    !
-    !   - in ensupd nml file, specify the file "name" according to the following template:
-    !   
-    !       %name = 'MOD10C1.Ayyyyddd.061.hdf'
-    !
-    !                         1         2
-    !                123456789012345678901234
-    ! 
-    !       MOD10C1 = MODIS product name
-    !       .A      = "acquisition time" indicator
-    !       yyyyddd = placeholder for year/day-of-year 
-    !       .061    = version (Collection) indicator
-    !       .hdf    = file name extension 
-    !
-    ! Assuming the MODIS file naming convention remains unchanged, the version can then
-    !  be specified in the nml file.
-
-    ! read VIIRS SCF obs    
-    !
-    !   - files must be renamed (production time stamp removed):
-    !       original name: VJ110C1.AYYYYDDD.002.yyyydddhhmmss.h5
-    !       renamed:       VJ110C1.AYYYYDDD.002.h5
-    !
-    !   - in ensupd nml file, specify the file "name" according to the following template:
-    !   
-    !       %name = 'VJ110C1.Ayyyyddd.002.h5'
-    !
-    !                         1         2
-    !                12345678901234567890123
-    ! 
-    !       VJ110C1 = VIIRS product name (VNP10C1, VJ110C1, or VJ210C1)
-    !       .A      = "acquisition time" indicator
-    !       yyyyddd = placeholder for year/day-of-year 
-    !       .002    = version (Collection) indicator
-    !       .h5     = file name extension 
-    !
-    ! Assuming the VIIRS file naming convention remains unchanged, the version can then
-    !  be specified in the nml file.
+    ! read MODIS/VIIRS SCF obs from hdf/h5 files
     
     N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_MODIS_SCF_hdf(), read_VIIRS_SCF_hdf()
     
@@ -6841,7 +6801,25 @@ contains
        select case (MVSCF_product_ID)
           
        case( 'MOD10C1', 'MYD10C1' )
-          
+
+          ! (renamed) files currently located at /discover/nobackup/projects/S2SHMA/MODIS/MOD10C1_V61/ (2010-2022)
+          !
+          ! in ensupd nml file, specify the file "name" according to the following template:
+          ! 
+          !     %name = 'MOD10C1.Ayyyyddd.061.hdf'
+          !
+          !                       1         2
+          !              123456789012345678901234
+          ! 
+          !     MOD10C1 = MODIS product name
+          !     .A      = "acquisition time" indicator
+          !     yyyyddd = placeholder for year/day-of-year 
+          !     .061    = version (Collection) indicator
+          !     .hdf    = file name extension 
+          ! 
+          ! assuming the MODIS file naming convention remains unchanged, the version can then
+          !  be specified in the nml file.
+
           fname =                                                                          &                                           
                trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
                this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:24)
@@ -6855,6 +6833,26 @@ contains
                granule_id                                               )
           
        case( 'VJ110C1', 'VJ210C1', 'VNP10C1')
+          
+          ! files must be renamed (production time stamp removed):
+          !   original name: VJ110C1.AYYYYDDD.002.yyyydddhhmmss.h5
+          !   renamed:       VJ110C1.AYYYYDDD.002.h5
+          !
+          ! in ensupd nml file, specify the file "name" according to the following template:
+          !
+          !     %name = 'VJ110C1.Ayyyyddd.002.h5'
+          !     
+          !                       1         2
+          !              12345678901234567890123
+          !     
+          !     VJ110C1 = VIIRS product name (VNP10C1, VJ110C1, or VJ210C1)
+          !     .A      = "acquisition time" indicator
+          !     yyyyddd = placeholder for year/day-of-year 
+          !     .002    = version (Collection) indicator
+          !     .h5     = file name extension 
+          !  
+          ! Assuming the VIIRS file naming convention remains unchanged, the version can then
+          !  be specified in the nml file.
           
           fname =                                                                          &                                           
                trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
