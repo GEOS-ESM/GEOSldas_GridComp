@@ -6594,8 +6594,8 @@ contains
 
     ! return if date_time falls outside operating time range
 
-    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return    ! date_time too early for obs
-    if (datetime_gt_refdatetime(date_time, date_time_obs_end))  return    ! date_time too late  for obs
+    if (datetime_lt_refdatetime(date_time,         date_time_obs_beg))  return    ! date_time too early for obs
+    if (datetime_lt_refdatetime(date_time_obs_end, date_time        ))  return    ! date_time too late  for obs
     
     ! ----------------------------------------------------------------------------------
     !
