@@ -680,9 +680,9 @@ EASEv2_M36.LM:           1
                                  'ICETHICK'   , 'ISSM' , 'ICESHEETTHICK'    ,
                                  'ICEVX'      , 'ISSM' , 'ICESHEETVELX'     ,
                                  'ICEVY'      , 'ISSM' , 'ICESHEETVELY'     ,
-                                 'DHDT'       , 'ISSM' , 'ICESHEETDHDT'     , 
-                                 'DIVQ'       , 'ISSM' , 'ICESHEETDIVQ'     ,
-                                 'ICESMB_ISSM', 'ISSM' , 'ICESHEETSMB'      , 
+                                 'ICEDTHICK'  , 'ISSM' , 'ICESHEETDHDT'     , 
+                                 'ICEDIVQ'    , 'ISSM' , 'ICESHEETDIVQ'     ,
+                                 'ICEEQUIVSMB', 'ISSM' , 'ICESHEETSMB'      , 
                                  ::
 
 # ========================== EOF ==============================================================
