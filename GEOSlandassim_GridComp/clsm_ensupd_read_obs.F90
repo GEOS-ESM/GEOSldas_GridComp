@@ -6453,24 +6453,31 @@ contains
 
   ! *****************************************************************
 
-  subroutine read_obs_MODIS_SCF(                                   &
+  subroutine read_obs_MODIS_VIIRS_SCF(                             &
        date_time, dtstep_assim, N_catf, tile_coord_f,              &
        obs2tile_grid_f, tile_grid_g_ESMF,                          &
        N_tile_in_cell_ij, tile_num_in_cell_ij,                     &
        this_obs_param, write_obslog,                               &
-       found_obs, MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat )
+       found_obs, MVSCF_obs, std_MVSCF_obs, MVSCF_lon, MVSCF_lat )
     
-    ! read MODIS snow cover fraction observations on MODIS 0.05-degree climate
-    ! modeling grid (CMG)
+    ! read MODIS or VIIRS snow cover fraction observations on MODIS/VIIRS 0.05-degree climate modeling grid (CMG)
     !
-    ! Terra: MOD10C1
-    ! Aqua:  MYD10C1
+    ! MODIS Terra         : MOD10C1
+    ! MODIS Aqua          : MYD10C1
+    ! VIIRS JPSS1/NOAA-20 : VJ110C1 (launched 2017)
+    ! VIIRS JPSS2/NOAA-21 : VJ210C1 (launched 2022)
+    ! VIIRS S-NPP         : VNP10C1 (launched 2011, decommissioned 2026)
     !
-    ! For now, assume that MODIS resolution is finer than Catchment tile space 
+    ! For now, assume that MODIS/VIIRS SCF resolution is finer than Catchment tile space 
     ! and super-ob data to tile space, with lat/lon coords of obs matching
     ! lat/lon coords of tiles 
     !
     ! reichle, 18 Oct 2023
+    !
+    ! amfox, 5 Nov 2026 - obs on tiles at a window boundary are assimilated only once;
+    !   original file names ("granule_id") are written to the obslog
+    !
+    ! reichle, amfox, 23 Nov 2026: unified MODIS and VIIRS SCF reader
     !
     ! ------------------------------------------------------------------------------
 
@@ -6501,7 +6508,7 @@ contains
 
     logical,                                  intent(out) :: found_obs
 
-    real,                  dimension(N_catf), intent(out) :: MODIS_obs, std_MODIS_obs, MODIS_lon, MODIS_lat
+    real,                  dimension(N_catf), intent(out) :: MVSCF_obs, std_MVSCF_obs, MVSCF_lon, MVSCF_lat
 
     ! ------------------------------------------------------------------------
     
@@ -6509,13 +6516,13 @@ contains
 
     integer, parameter    :: dtstep_assim_max = 21600  ! [seconds]  avoid assim window spanning >=180 deg lon
 
-    real,    parameter    :: CMG_dlon         = 0.05   ! [degrees]  longitude spacing    of MODIS CMG grid
-    real,    parameter    :: CMG_dlat         = 0.05   ! [degrees]  latitude  spacing    of MODIS CMG grid
+    real,    parameter    :: CMG_dlon         = 0.05   ! [degrees]  longitude spacing     of CMG grid
+    real,    parameter    :: CMG_dlat         = 0.05   ! [degrees]  latitude  spacing     of CMG grid
  
-    real,    parameter    :: CMG_ll_lon       = -180.  ! [degrees]  lower-left  longitude of MODIS CMG grid
-    real,    parameter    :: CMG_ur_lat       =   90.  ! [degrees]  upper-right latitude  of MODIS CMG grid
+    real,    parameter    :: CMG_ll_lon       = -180.  ! [degrees]  lower-left  longitude of CMG grid
+    real,    parameter    :: CMG_ur_lat       =   90.  ! [degrees]  upper-right latitude  of CMG grid
     
-    character(  7)        :: MODIS_product_ID
+    character(  7)        :: MVSCF_product_ID
     
     character(  4)        :: YYYY
     character(  3)        :: DDD                       ! day of year 
@@ -6535,14 +6542,14 @@ contains
     integer               :: N_CMG_obs, N_good_data, tmp_ind_start, tmp_ind_last
 
     type(date_time_type)  :: date_time_beg,       date_time_end
-    type(date_time_type)  :: date_time_beg_MODIS, date_time_end_MODIS
+    type(date_time_type)  :: date_time_beg_MVSCF, date_time_end_MVSCF
     type(date_time_type)  :: date_time_obs_beg
 
     real                  :: lon_beg,             lon_end
-    real                  :: lon_beg_MODIS,       lon_end_MODIS
+    real                  :: lon_beg_MVSCF,       lon_end_MVSCF
     
     integer               :: delta_day_beg,       delta_day_end
-    integer               :: delta_day_beg_MODIS, delta_day_end_MODIS
+    integer               :: delta_day_beg_MVSCF, delta_day_end_MVSCF
 
     real                  :: lat_min,             lat_max
 
@@ -6556,7 +6563,7 @@ contains
 
     integer, dimension(N_catf)             :: N_obs_in_tile
     
-    character(len=*),          parameter   :: Iam = 'read_obs_MODIS_SCF'
+    character(len=*),          parameter   :: Iam = 'read_obs_MODIS_VIIRS_SCF'
     character(len=400)                     :: err_msg
 
     ! ------------------------------------------------------------------------------------
@@ -6565,12 +6572,18 @@ contains
     
     found_obs        = .false.
     
-    ! determine operating time range of sensor
+    ! determine operating time range of platform with MODIS/VIIRS sensor
 
     if     (trim(this_obs_param%descr) == 'MOD10C1') then
        date_time_obs_beg = date_time_type(2000, 2,24, 1,31, 0,-9999,-9999)    ! Terra
     elseif (trim(this_obs_param%descr) == 'MYD10C1') then
        date_time_obs_beg = date_time_type(2002, 7, 4, 8, 0, 0,-9999,-9999)    ! Aqua
+    elseif (trim(this_obs_param%descr) == 'VJ110C1') then
+       date_time_obs_beg = date_time_type(2018, 1, 5, 0, 0, 0,-9999,-9999)    ! JPSS1
+    elseif (trim(this_obs_param%descr) == 'VJ210C1') then
+       date_time_obs_beg = date_time_type(2023, 2,10, 0, 0, 0,-9999,-9999)    ! JPSS2
+    elseif (trim(this_obs_param%descr) == 'VNP10C1') then
+       date_time_obs_beg = date_time_type(2012, 1,19, 0, 0, 0,-9999,-9999)    ! S-NPP
     else
        err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -6591,16 +6604,23 @@ contains
        
     end if 
 
-    ! identify MODIS product and overpass hour
-
-    MODIS_product_ID = this_obs_param%name(1:7)
+    ! identify MODIS/VIIRS product and overpass hour
+    !   (for VIIRS, see https://vlab.noaa.gov/web/towr-s/satellite-operations-updates)
     
-    select case (MODIS_product_ID)
+    MVSCF_product_ID = this_obs_param%name(1:7)
+    
+    select case (MVSCF_product_ID)
        
     case('MOD10C1'); overpass_hour = 10.5               ! [hours]    Terra: 10:30am local time
        
     case('MYD10C1'); overpass_hour = 13.5               ! [hours]    Aqua:   1:30pm local time
        
+    case('VJ110C1'); overpass_hour = 13.5               ! [hours]    JPSS1:  1:30pm local time
+       
+    case('VJ210C1'); overpass_hour = 13.5               ! [hours]    JPSS2:  1:30pm local time
+
+    case('VNP10C1'); overpass_hour = 13.5               ! [hours]    S-NPP:  1:30pm local time
+
     end select
     
     
@@ -6621,9 +6641,9 @@ contains
     call localtime2longitude( date_time_end, overpass_hour, lon_end, delta_day_end )
     
     
-    ! determine (rough) longitude band for which MODIS obs need to be read    
+    ! determine (rough) longitude band for which MODIS/VIIRS obs need to be read    
     !
-    ! --> because tiles have a non-zero extent, need to read MODIS obs in CMG grid cells located 
+    ! --> because tiles have a non-zero extent, need to read MODIS/VIIRS obs in CMG grid cells located 
     !     in a wider band (lon_min-delta:lon_max+delta),
     !     where delta should be somewhat larger than max( tile_coord_f%max_lon - tile_coord_f%min_lon )
     
@@ -6631,21 +6651,21 @@ contains
     
     tmp_delta = tmp_delta/360.*86400.                                                          ! [seconds]
     
-    date_time_beg_MODIS = date_time_beg
-    date_time_end_MODIS = date_time_end
+    date_time_beg_MVSCF = date_time_beg
+    date_time_end_MVSCF = date_time_end
 
-    call augment_date_time( -nint(tmp_delta), date_time_beg_MODIS )
-    call augment_date_time(  nint(tmp_delta), date_time_end_MODIS )
+    call augment_date_time( -nint(tmp_delta), date_time_beg_MVSCF )
+    call augment_date_time(  nint(tmp_delta), date_time_end_MVSCF )
    
-    call localtime2longitude( date_time_beg_MODIS, overpass_hour, lon_beg_MODIS, delta_day_beg_MODIS )
-    call localtime2longitude( date_time_end_MODIS, overpass_hour, lon_end_MODIS, delta_day_end_MODIS )
+    call localtime2longitude( date_time_beg_MVSCF, overpass_hour, lon_beg_MVSCF, delta_day_beg_MVSCF )
+    call localtime2longitude( date_time_end_MVSCF, overpass_hour, lon_end_MVSCF, delta_day_end_MVSCF )
     
-    ! adjust date_time_*_MODIS to reflect calendar date at lon_*_MODIS
+    ! adjust date_time_*_MVSCF to reflect calendar date at lon_*_MVSCF
     
-    call augment_date_time( delta_day_beg_MODIS*86400, date_time_beg_MODIS )
-    call augment_date_time( delta_day_end_MODIS*86400, date_time_end_MODIS )
+    call augment_date_time( delta_day_beg_MVSCF*86400, date_time_beg_MVSCF )
+    call augment_date_time( delta_day_end_MVSCF*86400, date_time_end_MVSCF )
         
-    ! put together arguments for call(s) to read_MODIS_SCF_hdf()
+    ! put together arguments for call(s) to read_MODIS_SCF_hdf() or read_VIIRS_SCF_hdf()
     
     lon_min_vec = MAPL_UNDEF
     lon_max_vec = MAPL_UNDEF
@@ -6655,19 +6675,19 @@ contains
 
     N_lon_vec   = 0
 
-    if (lon_end_MODIS < lon_beg_MODIS) then
+    if (lon_end_MVSCF < lon_beg_MVSCF) then
        
-       if ( date_time_end_MODIS%dofyr == date_time_beg_MODIS%dofyr ) then
+       if ( date_time_end_MVSCF%dofyr == date_time_beg_MVSCF%dofyr ) then
           
-          ! need only one daily MODIS file and longitude band 
+          ! need only one daily MODIS/VIIRS file and longitude band 
           
           N_files = 1                             
           
-          lon_min_vec(1) = lon_end_MODIS 
-          lon_max_vec(1) = lon_beg_MODIS
+          lon_min_vec(1) = lon_end_MVSCF 
+          lon_max_vec(1) = lon_beg_MVSCF
           
-          year_vec(   1) = date_time_beg_MODIS%year
-          dofyr_vec(  1) = date_time_beg_MODIS%dofyr
+          year_vec(   1) = date_time_beg_MVSCF%year
+          dofyr_vec(  1) = date_time_beg_MVSCF%dofyr
           
        else
           
@@ -6677,12 +6697,12 @@ contains
           write (logunit,*) 'date_time           = ', date_time
           write (logunit,*) 'date_time_beg       = ', date_time_beg
           write (logunit,*) 'date_time_end       = ', date_time_end
-          write (logunit,*) 'date_time_beg_MODIS = ', date_time_beg_MODIS
-          write (logunit,*) 'date_time_end_MODIS = ', date_time_end_MODIS
+          write (logunit,*) 'date_time_beg_MVSCF = ', date_time_beg_MVSCF
+          write (logunit,*) 'date_time_end_MVSCF = ', date_time_end_MVSCF
           write (logunit,*) 'lon_beg             = ', lon_beg
           write (logunit,*) 'lon_end             = ', lon_end
-          write (logunit,*) 'lon_beg_MODIS       = ', lon_beg_MODIS
-          write (logunit,*) 'lon_end_MODIS       = ', lon_end_MODIS
+          write (logunit,*) 'lon_beg_MVSCF       = ', lon_beg_MVSCF
+          write (logunit,*) 'lon_end_MVSCF       = ', lon_end_MVSCF
           
           err_msg = 'encountered unexpected condition for longitude band!!!'
           call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -6691,24 +6711,24 @@ contains
           
     else
        
-       ! longitude band wraps around dateline, two daily MODIS files are needed 
-       !   (this could also occur if lon_*_MODIS=180., which would result in an
+       ! longitude band wraps around dateline, two daily MODIS/VIIRS files are needed 
+       !   (this could also occur if lon_*_MVSCF=180., which would result in an
        !    empty first longitude band, but because of tmp_delta>0, this should
        !    never happen)
        
        N_files = 2
        
-       lon_min_vec(1) = lon_end_MODIS 
+       lon_min_vec(1) = lon_end_MVSCF 
        lon_max_vec(1) = 179.999         ! use 179.999 such that zero-based last_ind<=N_lon-1 (see below)
        
-       year_vec(   1) = date_time_end_MODIS%year
-       dofyr_vec(  1) = date_time_end_MODIS%dofyr
+       year_vec(   1) = date_time_end_MVSCF%year
+       dofyr_vec(  1) = date_time_end_MVSCF%dofyr
        
        lon_min_vec(2) = -180.                                
-       lon_max_vec(2) = lon_beg_MODIS
+       lon_max_vec(2) = lon_beg_MVSCF
        
-       year_vec(   2) = date_time_beg_MODIS%year
-       dofyr_vec(  2) = date_time_beg_MODIS%dofyr
+       year_vec(   2) = date_time_beg_MVSCF%year
+       dofyr_vec(  2) = date_time_beg_MVSCF%dofyr
        
     end if
     
@@ -6749,25 +6769,7 @@ contains
     
     N_lon        = sum( N_lon_vec(1:N_files) )
     
-
-    
-    ! ! dbg ! ! write (*,*)  '###############################################################################'
-    ! ! dbg ! ! write (*,*)  Iam // '():'
-    ! ! dbg ! ! write (*,*)  'lon_min_vec = ', lon_min_vec
-    ! ! dbg ! ! write (*,*)  'lon_max_vec = ', lon_max_vec
-    ! ! dbg ! ! write (*,*)  'start_ind   = ', start_ind
-    ! ! dbg ! ! write (*,*)  'last_ind    = ', last_ind
-    ! ! dbg ! ! write (*,*)  'lat_min     = ', lat_min
-    ! ! dbg ! ! write (*,*)  'lat_max     = ', lat_max
-    ! ! dbg ! ! write (*,*)  'year_vec    = ', year_vec
-    ! ! dbg ! ! write (*,*)  'dofyr_vec   = ', dofyr_vec
-    ! ! dbg ! ! write (*,*)  'N_lon_vec   = ', N_lon_vec
-    ! ! dbg ! ! write (*,*)  'N_lat       = ', N_lat
-    ! ! dbg ! ! write (*,*)  '###############################################################################'    
-
-
-
-    ! allocate arrays for MODIS CMG data (max size that could possibly be needed for obs from both files)
+    ! allocate arrays for MODIS/VIIRS CMG data (max size that could possibly be needed for obs from both files)
     
     N_tmp = N_lon*N_lat
 
@@ -6795,507 +6797,10 @@ contains
     !
     ! Assuming the MODIS file naming convention remains unchanged, the version can then
     !  be specified in the nml file.
-    
-    N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_MODIS_SCF_hdf()
-    
-    do nn=1,N_files     ! loop through longitude bands (i.e., files)
-       
-       ! determine MODIS file name(s)
-       
-       write (YYYY,'(i4.4)') year_vec( nn)
-       write (DDD, '(i3.3)') dofyr_vec(nn)
-       
-       fname =                                                                          &                                           
-            trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
-            this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:24)
-       
-       ! determine sub-array of CMG_* 
-       
-       tmp_ind_start = N_CMG_obs + 1
-       tmp_ind_last  = N_CMG_obs + N_lon_vec(nn)*N_lat
-       
-       call read_MODIS_SCF_hdf( fname,                                                  &
-            lon_min_vec(nn), lon_max_vec(nn), lat_min, lat_max,                         &
-            N_good_data,                                                                &
-            CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
-            CMG_lat(tmp_ind_start:tmp_ind_last),                                        &
-            CMG_obs(tmp_ind_start:tmp_ind_last),                                        &
-            granule_id                                               )
 
-       N_CMG_obs = N_CMG_obs + N_good_data
-
-       ! record number of good obs and file name for obslog
-       
-       N_good_data_list(nn) = N_good_data
-       
-       if (len_trim(granule_id)>0) then
-          
-          tmp_ind = index(trim(fname), '/', back=.true.)             ! position of last "/"
-          
-          if (tmp_ind>0) then
-             fname_list(nn) = fname(1:tmp_ind) // trim(granule_id)   ! replace file name with granule id
-          else
-             fname_list(nn) = trim(granule_id)                       ! fname was only file name (no path)
-          end if
-
-       else
-          
-          fname_list(   nn) = fname                                  ! use fname b/c granule_id is empty
-          
-       end if
-       
-    end do
-    
-    ! write "obslog" file
-    
-    if (write_obslog) then
-       
-       YYYYMMDD_HHMMSSz = date_time2string(date_time)
-       
-       tmpstr80 = trim(Iam) // '()'                                  ! name of this subroutine
-       
-       do nn=1,N_files
-          
-          write (tmpstr12,'(i12)') N_good_data_list(nn)              ! convert integer to string
-          
-          call add_to_obslog( YYYYMMDD_HHMMSSz, this_obs_param%descr, tmpstr80, &
-               tmpstr12, fname_list(nn) )
-          
-       end do
-       
-    end if
-    
-    ! return if no MODIS obs were found (found_obs=.false. per initialization above)    
-
-    if (N_CMG_obs==0)  return
-
-
-    ! map to tile space 
-    
-    allocate(tmp_tile_num(N_CMG_obs))
-    
-    call get_tile_num_for_obs( N_catf, tile_coord_f,               &
-         obs2tile_grid_f, tile_grid_g_ESMF,                        &
-         N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
-         N_CMG_obs, CMG_lat(1:N_CMG_obs), CMG_lon(1:N_CMG_obs),    &
-         this_obs_param,                                           &
-         tmp_tile_num )
-    
-    
-    std_MODIS_obs = this_obs_param%errstd
-    
-    MODIS_obs     = 0.
-    MODIS_lon     = 0.
-    MODIS_lat     = 0.
-
-    N_obs_in_tile = 0
-    
-    do kk=1,N_CMG_obs
-       
-       ind = tmp_tile_num(kk)          ! 1<=tmp_tile_num<=N_catf (unless nodata)
-       
-       if (ind>0) then                 ! this condition eliminates obs outside domain
-          
-          MODIS_obs(    ind) = MODIS_obs(    ind) + CMG_obs(kk)
-          MODIS_lon(    ind) = MODIS_lon(    ind) + CMG_lon(kk)
-          MODIS_lat(    ind) = MODIS_lat(    ind) + CMG_lat(kk)
-
-          N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
-          
-       end if
-       
-    end do
-    
-    ! normalize
-    
-    do kk=1,N_catf
-       if (N_obs_in_tile(kk)>0) then
-          
-          tmp_real      = real(N_obs_in_tile(kk))
-
-          MODIS_obs(kk) = MODIS_obs(kk)/tmp_real
-          MODIS_lon(kk) = MODIS_lon(kk)/tmp_real
-          MODIS_lat(kk) = MODIS_lat(kk)/tmp_real
-          
-       else if (N_obs_in_tile(kk)==0) then
-          
-          MODIS_obs(kk) = this_obs_param%nodata
-          MODIS_lon(kk) = this_obs_param%nodata
-          MODIS_lat(kk) = this_obs_param%nodata
-          
-       end if
-    end do
-    
-    if (any(N_obs_in_tile>0)) then
-       
-       found_obs = .true.
-       
-    else 
-       
-       found_obs = .false.
-       
-    end if
-    
-    deallocate(tmp_tile_num)
-  
-    deallocate(CMG_obs)    
-    deallocate(CMG_lon)
-    deallocate(CMG_lat)
-
-    ! to avoid double-counting of MODIS CMG obs, remove obs for tiles with center-of-mass longitude 
-    !   falling outside the longitude band associated with assimilation window
-    !
-    ! the band excludes lon_end, so that a tile with com_lon exactly on the boundary between two
-    !   assimilation windows gets its obs only once (e.g., EASEv2 M36 tiles at +-45 and +-135 deg
-    !   for windows centered at 0z, 3z, ...)
-    
-    if (lon_end < lon_beg) then
-       
-       ! need only one longitude band (keep obs when lon_end<com_lon<=lon_beg)
-       
-       do kk=1,N_catf
-          
-          if ( (tile_coord_f(kk)%com_lon<=lon_end) .or. (tile_coord_f(kk)%com_lon>lon_beg) )  &
-               MODIS_obs(kk) = this_obs_param%nodata
-          
-       end do
-       
-    else
-       
-       ! longitude band wraps around dateline (keep obs when -180<=com_lon<=lon_beg or lon_end<com_lon<=180)
-       
-       do kk=1,N_catf
-          
-          if ( (tile_coord_f(kk)%com_lon>lon_beg) .and. (tile_coord_f(kk)%com_lon<=lon_end) )  &
-               MODIS_obs(kk) = this_obs_param%nodata
-          
-       end do
-       
-    end if
-    
-
-  end subroutine read_obs_MODIS_SCF
-
-  ! *******************************************************************************************************
-
-  subroutine read_obs_JPSS_SCF(                                   &
-       date_time, dtstep_assim, N_catf, tile_coord_f,              &
-       obs2tile_grid_f, tile_grid_g_ESMF,                          &
-       N_tile_in_cell_ij, tile_num_in_cell_ij,                     &
-       this_obs_param, write_obslog,                               &
-       found_obs, JPSS_obs, std_JPSS_obs, JPSS_lon, JPSS_lat )
-    
-    ! read JPSS snow cover observations on the 0.05-degree climate
-    ! modeling grid (CMG)
-    !
-    ! JPSS1/NOAA-20:  VJ110C1 (launched 2017)
-    ! JPSS2/NOAA-21:  VJ210C1 (launched 2022)
-    ! S-NPP        :  VNP10C1 (launched 2011, decommissioned 2026)
-    !
-    !
-    ! For now, assume that VIIRS/JPSS resolution is finer than Catchment tile space 
-    ! and super-ob data to tile space, with lat/lon coords of obs matching
-    ! lat/lon coords of tiles 
-    !
-    ! lcandre2, 26 Oct 2026
-    !
-    ! amfox, 5 Nov 2026 - obs on tiles at a window boundary are assimilated only once (as for MODIS);
-    !   original file names ("granule_id") are written to the obslog (as for MODIS)
-    !
-    ! ------------------------------------------------------------------------------
-
-    implicit none
-
-    ! inputs
-
-    type(date_time_type),                    intent(in)   :: date_time
-    
-    integer,                                 intent(in)   :: dtstep_assim           ! [seconds]
-    integer,                                 intent(in)   :: N_catf
-    
-    type(tile_coord_type), dimension(:),     pointer      :: tile_coord_f             ! input
-    
-    type(grid_def_type),                     intent(in)   :: obs2tile_grid_f
-
-    type(ESMF_Grid),     intent(in) :: tile_grid_g_ESMF   ! needed for obs-to-tile mapping in cube-sphere tile space
-
-    integer,               dimension(obs2tile_grid_f%N_lon,obs2tile_grid_f%N_lat), intent(in) :: N_tile_in_cell_ij
-    
-    integer,               dimension(:,:,:), pointer      :: tile_num_in_cell_ij    ! input
-    
-    type(obs_param_type),                    intent(in)   :: this_obs_param
-    
-    logical,                                 intent(in)   :: write_obslog
-
-    ! output
-
-    logical,                                  intent(out) :: found_obs
-
-    real,                  dimension(N_catf), intent(out) :: JPSS_obs, std_JPSS_obs, JPSS_lon, JPSS_lat
-
-    ! ------------------------------------------------------------------------
-    
-    ! locals
-
-    integer, parameter    :: dtstep_assim_max = 21600  ! [seconds]  avoid assim window spanning >=180 deg lon
-
-    real,    parameter    :: CMG_dlon         = 0.05   ! [degrees]  longitude spacing    of JPSS CMG grid
-    real,    parameter    :: CMG_dlat         = 0.05   ! [degrees]  latitude  spacing    of JPSS CMG grid
- 
-    real,    parameter    :: CMG_ll_lon       = -180.  ! [degrees]  lower-left  longitude of JPSS CMG grid
-    real,    parameter    :: CMG_ur_lat       =   90.  ! [degrees]  upper-right latitude  of JPSS CMG grid
-    
-    character(  7)        :: JPSS_product_ID
-    
-    character(4)          :: YYYY
-    character(3)          :: DDD                       ! day of year 
-    
-    character( 12)        :: tmpstr12
-    character( 16)        :: YYYYMMDD_HHMMSSz
-    character( 80)        :: tmpstr80
-
-    character(400)        :: fname
-    character(256)        :: granule_id
-
-    character(400), dimension(2) :: fname_list
-
-    real                  :: overpass_hour, tmp_delta, tmp_real, max_delta_lon
-    
-    integer               :: N_files, N_lon, N_lat, N_tmp, nn, kk, ind, tmp_ind
-    integer               :: N_CMG_obs, N_good_data, tmp_ind_start, tmp_ind_last
-
-    type(date_time_type)  :: date_time_beg,       date_time_end
-    type(date_time_type)  :: date_time_beg_JPSS, date_time_end_JPSS
-    type(date_time_type)  :: date_time_obs_beg
-
-    real                  :: lon_beg,             lon_end
-    real                  :: lon_beg_JPSS,       lon_end_JPSS
-    
-    integer               :: delta_day_beg,       delta_day_end
-    integer               :: delta_day_beg_JPSS, delta_day_end_JPSS
-
-    real                  :: lat_min,             lat_max
-
-    real,    dimension(2) :: lon_min_vec,         lon_max_vec
-
-    integer, dimension(2) :: N_lon_vec, year_vec, dofyr_vec, start_ind, last_ind, N_good_data_list
-
-    real,    dimension(:),     allocatable :: CMG_obs, CMG_lon, CMG_lat
-
-    integer, dimension(:),     allocatable :: tmp_tile_num
-
-    integer, dimension(N_catf)             :: N_obs_in_tile
-
-    character(len=*),          parameter   :: Iam = 'read_obs_JPSS_SCF'
-    character(len=400)                     :: err_msg
-
-    ! ------------------------------------------------------------------------------------
-    !
-    ! initialize
-    
-    found_obs        = .false.
-    
-    ! determine operating time range of sensor
-
-    if     (trim(this_obs_param%descr) == 'VJ110C1') then
-       date_time_obs_beg = date_time_type(2018, 1, 5, 0, 0, 0,-9999,-9999)    ! JPSS1
-    elseif (trim(this_obs_param%descr) == 'VJ210C1') then
-       date_time_obs_beg = date_time_type(2023, 2,10, 0, 0, 0,-9999,-9999)    ! JPSS2
-    elseif (trim(this_obs_param%descr) == 'VNP10C1') then
-       date_time_obs_beg = date_time_type(2012, 1,19, 0, 0, 0,-9999,-9999)    ! S-NPP
-    else
-       err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-    end if
-
-    ! return if date_time falls outside operating time range
-
-    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
-
-    ! ----------------------------------------------------------------------------------
-    !
-    ! restrict assimilation time step to max allowed 
-
-    if (dtstep_assim > dtstep_assim_max) then                 
-       
-       err_msg = 'dtstep_assim exceeds max allowed'
-       call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-       
-    end if 
-
-    ! identify JPSS product and overpass hour
-    !   (see https://vlab.noaa.gov/web/towr-s/satellite-operations-updates)
-
-    JPSS_product_ID = this_obs_param%name(1:7)
-    
-    select case (JPSS_product_ID)
-       
-    case('VJ110C1'); overpass_hour = 13.5               ! [hours]    JPSS1: 13:30 local time
-       
-    case('VJ210C1'); overpass_hour = 13.5               ! [hours]    JPSS2:  13:30 local time
-
-    case('VNP10C1'); overpass_hour = 13.5               ! [hours]    S-NPP: 13:30 local time
-       
-    end select
-    
-    
-    ! determine beginning and end of assimilation window
-    
-    date_time_beg = date_time
-    date_time_end = date_time
-    
-    call augment_date_time( -dtstep_assim/2, date_time_beg )
-    call augment_date_time(  dtstep_assim/2, date_time_end )
-    
-    
-    ! determine longitude band associated with assimilation window and local overpass hour
-    !
-    ! observations will be returned only for tiles with lon_end < tile_coord_f%com_lon <= lon_beg
-    
-    call localtime2longitude( date_time_beg, overpass_hour, lon_beg, delta_day_beg )
-    call localtime2longitude( date_time_end, overpass_hour, lon_end, delta_day_end )
-    
-    
-
-    ! determine (rough) longitude band for which JPSS obs need to be read    
-    !
-    ! --> because tiles have a non-zero extent, need to read JPSS obs in CMG grid cells located 
-    !     in a wider band (lon_min-delta:lon_max+delta),
-    !     where delta should be somewhat larger than max( tile_coord_f%max_lon - tile_coord_f%min_lon )
-    
-    tmp_delta = 3.*maxval( tile_coord_f(1:N_catf)%max_lon - tile_coord_f(1:N_catf)%min_lon )   ! [degrees]
-    
-    tmp_delta = tmp_delta/360.*86400.                                                      ! [seconds]
-    
-    date_time_beg_JPSS = date_time_beg
-    date_time_end_JPSS = date_time_end
-
-    call augment_date_time( -nint(tmp_delta), date_time_beg_JPSS )
-    call augment_date_time(  nint(tmp_delta), date_time_end_JPSS )
-   
-    call localtime2longitude( date_time_beg_JPSS, overpass_hour, lon_beg_JPSS, delta_day_beg_JPSS )
-    call localtime2longitude( date_time_end_JPSS, overpass_hour, lon_end_JPSS, delta_day_end_JPSS )
-    
-    ! adjust date_time_*_JPSS to reflect calendar date at lon_*_JPSS
-    
-    call augment_date_time( delta_day_beg_JPSS*86400, date_time_beg_JPSS )
-    call augment_date_time( delta_day_end_JPSS*86400, date_time_end_JPSS )
-        
-    ! put together arguments for call(s) to read_JPSS_SCF_hdf()
-    
-    lon_min_vec = MAPL_UNDEF
-    lon_max_vec = MAPL_UNDEF
-
-    year_vec    = -9999
-    dofyr_vec   = -9999
-
-    N_lon_vec   = 0
-
-    if (lon_end_JPSS < lon_beg_JPSS) then
-       
-       if ( date_time_end_JPSS%dofyr == date_time_beg_JPSS%dofyr ) then
-          
-          ! need only one daily JPSS file and longitude band 
-          
-          N_files = 1                             
-          
-          lon_min_vec(1) = lon_end_JPSS 
-          lon_max_vec(1) = lon_beg_JPSS
-          
-          year_vec(   1) = date_time_beg_JPSS%year
-          dofyr_vec(  1) = date_time_beg_JPSS%dofyr
-          
-       else
-          
-          ! this should never happen for dtstep_assim_max=21600 and overpass_hour of  13:30
-          
-          write (logunit,*) 'overpass_hour       = ', overpass_hour
-          write (logunit,*) 'date_time           = ', date_time
-          write (logunit,*) 'date_time_beg       = ', date_time_beg
-          write (logunit,*) 'date_time_end       = ', date_time_end
-          write (logunit,*) 'date_time_beg_JPSS  = ', date_time_beg_JPSS
-          write (logunit,*) 'date_time_end_JPSS  = ', date_time_end_JPSS
-          write (logunit,*) 'lon_beg             = ', lon_beg
-          write (logunit,*) 'lon_end             = ', lon_end
-          write (logunit,*) 'lon_beg_JPSS        = ', lon_beg_JPSS
-          write (logunit,*) 'lon_end_JPSS        = ', lon_end_JPSS
-          
-          err_msg = 'encountered unexpected condition for longitude band!!!'
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-          
-       end if
-          
-    else
-       
-       ! longitude band wraps around dateline, two daily JPSS files are needed 
-       !   (this could also occur if lon_*_JPSS=180., which would result in an
-       !    empty first longitude band, but because of tmp_delta>0, this should
-       !    never happen)
-       
-       N_files = 2
-       
-       lon_min_vec(1) = lon_end_JPSS 
-       lon_max_vec(1) = 179.999         ! use 179.999 such that zero-based last_ind<=N_lon-1 (see below)
-       
-       year_vec(   1) = date_time_end_JPSS%year
-       dofyr_vec(  1) = date_time_end_JPSS%dofyr
-       
-       lon_min_vec(2) = -180.                                
-       lon_max_vec(2) = lon_beg_JPSS
-       
-       year_vec(   2) = date_time_beg_JPSS%year
-       dofyr_vec(  2) = date_time_beg_JPSS%dofyr
-       
-    end if
-    
-    ! verify that longitude bands do not exceed max expected expected width 
-    !  (add 0.1 degree of wiggle room)
-    max_delta_lon = real(dtstep_assim_max + 2*nint(tmp_delta))/86400.*360. + 0.1   ! [degree]
-    
-    do nn=1,N_files
-       
-       if ( lon_max_vec(nn) - lon_min_vec(nn) > max_delta_lon ) then
-          
-          err_msg = 'longitude band too wide'
-          call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
-          
-       end if
-
-    end do
-
-
-    ! determine latitude band covered by domain (no need to read obs outside domain)
-
-    lat_min = minval( tile_coord_f(1:N_catf)%min_lat )
-    lat_max = maxval( tile_coord_f(1:N_catf)%max_lat )
-
-    
-    ! determine N_lat and N_lon[_vec] (# CMG grid cells in lat/lon bands )
-
-    start_ind(1) = (CMG_ur_lat - lat_max )/CMG_dlat
-    last_ind(1)  = (CMG_ur_lat - lat_min )/CMG_dlat
-        
-    N_lat        = last_ind(1) - start_ind(1) + 1
-    
-    start_ind(1:N_files) = (lon_min_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
-    last_ind( 1:N_files) = (lon_max_vec(1:N_files) - CMG_ll_lon)/CMG_dlon
-    
-    N_lon_vec(1:N_files) = last_ind(1:N_files) - start_ind(1:N_files) + 1  
-    
-    N_lon        = sum( N_lon_vec(1:N_files) )
-
-    ! allocate arrays for JPSS CMG data (max size that could possibly be needed for obs from both files)
-    
-    N_tmp = N_lon*N_lat
-
-    allocate( CMG_obs(N_tmp) )
-    allocate( CMG_lon(N_tmp) )
-    allocate( CMG_lat(N_tmp) )
-    
-    
     ! read VIIRS SCF obs    
     !
-    !   - files must be renamed (production time stamp removed), as for MODIS SCF obs:
+    !   - files must be renamed (production time stamp removed):
     !       original name: VJ110C1.AYYYYDDD.002.yyyydddhhmmss.h5
     !       renamed:       VJ110C1.AYYYYDDD.002.h5
     !
@@ -7312,43 +6817,65 @@ contains
     !       .002    = version (Collection) indicator
     !       .h5     = file name extension 
     !
+    ! Assuming the VIIRS file naming convention remains unchanged, the version can then
+    !  be specified in the nml file.
     
-    N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_JPSS_SCF_hdf()
+    N_CMG_obs = 0       ! initialize counter for "good" obs returned by calls to read_MODIS_SCF_hdf(), read_VIIRS_SCF_hdf()
     
     do nn=1,N_files     ! loop through longitude bands (i.e., files)
        
-       ! determine JPSS file name(s)
+       ! determine MODIS/VIIRS file name(s)
        
        write (YYYY,'(i4.4)') year_vec( nn)
        write (DDD, '(i3.3)') dofyr_vec(nn)
-       
-       fname =                                                                          &                                           
-            trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
-            this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:23)
        
        ! determine sub-array of CMG_* 
        
        tmp_ind_start = N_CMG_obs + 1
        tmp_ind_last  = N_CMG_obs + N_lon_vec(nn)*N_lat
        
-       call read_JPSS_SCF_hdf( fname,                                                   &
-            lon_min_vec(nn), lon_max_vec(nn), lat_min, lat_max,                         &
-            N_good_data,                                                                &
-            CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
-            CMG_lat(tmp_ind_start:tmp_ind_last),                                        &
-            CMG_obs(tmp_ind_start:tmp_ind_last),                                        &
-            granule_id                                               )
+       select case (MVSCF_product_ID)
+          
+       case( 'MOD10C1', 'MYD10C1' )
+          
+          fname =                                                                          &                                           
+               trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
+               this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:24)
+          
+          call read_MODIS_SCF_hdf( fname,                                                  &
+               lon_min_vec(nn), lon_max_vec(nn), lat_min, lat_max,                         &
+               N_good_data,                                                                &
+               CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
+               CMG_lat(tmp_ind_start:tmp_ind_last),                                        &
+               CMG_obs(tmp_ind_start:tmp_ind_last),                                        &
+               granule_id                                               )
+          
+       case( 'VJ110C1', 'VJ210C1', 'VNP10C1')
+          
+          fname =                                                                          &                                           
+               trim(this_obs_param%path) // '/' // YYYY // '/' //                          &
+               this_obs_param%name(1:9) // YYYY // DDD // this_obs_param%name(17:23)
 
+          call read_VIIRS_SCF_hdf( fname,                                                  &
+               lon_min_vec(nn), lon_max_vec(nn), lat_min, lat_max,                         &
+               N_good_data,                                                                &
+               CMG_lon(tmp_ind_start:tmp_ind_last),                                        &
+               CMG_lat(tmp_ind_start:tmp_ind_last),                                        &
+               CMG_obs(tmp_ind_start:tmp_ind_last),                                        &
+               granule_id                                               )
+          
+       end select
+    
        N_CMG_obs = N_CMG_obs + N_good_data
-       
+
        ! record number of good obs and file name for obslog
-
+       
        N_good_data_list(nn) = N_good_data
-
+       
        if (len_trim(granule_id)>0) then
-
+          
           tmp_ind = index(trim(fname), '/', back=.true.)             ! position of last "/"
-
+          
           if (tmp_ind>0) then
              fname_list(nn) = fname(1:tmp_ind) // trim(granule_id)   ! replace file name with granule id
           else
@@ -7356,33 +6883,33 @@ contains
           end if
 
        else
-
+          
           fname_list(   nn) = fname                                  ! use fname b/c granule_id is empty
-
+          
        end if
-
+       
     end do
     
     ! write "obslog" file
-
+    
     if (write_obslog) then
-
+       
        YYYYMMDD_HHMMSSz = date_time2string(date_time)
-
+       
        tmpstr80 = trim(Iam) // '()'                                  ! name of this subroutine
-
+       
        do nn=1,N_files
-
+          
           write (tmpstr12,'(i12)') N_good_data_list(nn)              ! convert integer to string
-
+          
           call add_to_obslog( YYYYMMDD_HHMMSSz, this_obs_param%descr, tmpstr80, &
                tmpstr12, fname_list(nn) )
-
+          
        end do
-
+       
     end if
-
-    ! return if no JPSS obs were found (found_obs=.false. per initialization above)    
+    
+    ! return if no MODIS/VIIRS obs were found (found_obs=.false. per initialization above)    
 
     if (N_CMG_obs==0)  return
 
@@ -7396,14 +6923,14 @@ contains
          N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
          N_CMG_obs, CMG_lat(1:N_CMG_obs), CMG_lon(1:N_CMG_obs),    &
          this_obs_param,                                           &
-         tmp_tile_num    )
+         tmp_tile_num )
     
     
-    std_JPSS_obs  = this_obs_param%errstd
+    std_MVSCF_obs = this_obs_param%errstd
     
-    JPSS_obs      = 0.
-    JPSS_lon      = 0.
-    JPSS_lat      = 0.
+    MVSCF_obs     = 0.
+    MVSCF_lon     = 0.
+    MVSCF_lat     = 0.
 
     N_obs_in_tile = 0
     
@@ -7413,9 +6940,9 @@ contains
        
        if (ind>0) then                 ! this condition eliminates obs outside domain
           
-          JPSS_obs(    ind) = JPSS_obs(    ind) + CMG_obs(kk)
-          JPSS_lon(    ind) = JPSS_lon(    ind) + CMG_lon(kk)
-          JPSS_lat(    ind) = JPSS_lat(    ind) + CMG_lat(kk)
+          MVSCF_obs(    ind) = MVSCF_obs(    ind) + CMG_obs(kk)
+          MVSCF_lon(    ind) = MVSCF_lon(    ind) + CMG_lon(kk)
+          MVSCF_lat(    ind) = MVSCF_lat(    ind) + CMG_lat(kk)
 
           N_obs_in_tile(ind) = N_obs_in_tile(ind) + 1
           
@@ -7430,15 +6957,15 @@ contains
           
           tmp_real      = real(N_obs_in_tile(kk))
 
-          JPSS_obs(kk) = JPSS_obs(kk)/tmp_real
-          JPSS_lon(kk) = JPSS_lon(kk)/tmp_real
-          JPSS_lat(kk) = JPSS_lat(kk)/tmp_real
+          MVSCF_obs(kk) = MVSCF_obs(kk)/tmp_real
+          MVSCF_lon(kk) = MVSCF_lon(kk)/tmp_real
+          MVSCF_lat(kk) = MVSCF_lat(kk)/tmp_real
           
        else if (N_obs_in_tile(kk)==0) then
           
-          JPSS_obs(kk) = this_obs_param%nodata
-          JPSS_lon(kk) = this_obs_param%nodata
-          JPSS_lat(kk) = this_obs_param%nodata
+          MVSCF_obs(kk) = this_obs_param%nodata
+          MVSCF_lon(kk) = this_obs_param%nodata
+          MVSCF_lat(kk) = this_obs_param%nodata
           
        end if
     end do
@@ -7459,7 +6986,7 @@ contains
     deallocate(CMG_lon)
     deallocate(CMG_lat)
 
-    ! to avoid double-counting of JPSS CMG obs, remove obs for tiles with center-of-mass longitude 
+    ! to avoid double-counting of MODIS/VIIRS CMG obs, remove obs for tiles with center-of-mass longitude 
     !   falling outside the longitude band associated with assimilation window
     !
     ! the band excludes lon_end, so that a tile with com_lon exactly on the boundary between two
@@ -7473,7 +7000,7 @@ contains
        do kk=1,N_catf
           
           if ( (tile_coord_f(kk)%com_lon<=lon_end) .or. (tile_coord_f(kk)%com_lon>lon_beg) )  &
-               JPSS_obs(kk) = this_obs_param%nodata
+               MVSCF_obs(kk) = this_obs_param%nodata
           
        end do
        
@@ -7484,14 +7011,16 @@ contains
        do kk=1,N_catf
           
           if ( (tile_coord_f(kk)%com_lon>lon_beg) .and. (tile_coord_f(kk)%com_lon<=lon_end) )  &
-               JPSS_obs(kk) = this_obs_param%nodata
+               MVSCF_obs(kk) = this_obs_param%nodata
           
        end do
        
     end if
     
 
-  end subroutine read_obs_JPSS_SCF
+  end subroutine read_obs_MODIS_VIIRS_SCF
+
+  ! *******************************************************************************************************
 
   ! *******************************************************************************************************
 
@@ -7658,7 +7187,7 @@ contains
     ! Added output of "granule_id", which is the original MODIS file name including the production
     !  date/time stamp.  The MODIS file names on Discover were stripped of the production date/time
     !  stamp to make the file names predictable. The "granule_id" is returned so the information
-    !  can be added into the "obslog" file by the calling subroutine read_obs_MODIS_SCF()
+    !  can be added into the "obslog" file by the calling subroutine read_obs_MODIS_VIIRS_SCF()
     ! - amfox, reichle, 4 Nov 2026
     !
     ! -------------------------------------------------------------------------------------------------
@@ -7891,7 +7420,7 @@ contains
     end if
     
     ! get original file name (incl. production time stamp) because files are renamed; returned to
-    ! read_obs_MODIS_SCF() for the obslog, identifies the exact obs file version used in an experiment
+    ! read_obs_MODIS_VIIRS_SCF() for the obslog, identifies the exact obs file version used in an experiment
 
     call get_MODIS_granule_id( sd_id, granule_id )
 
@@ -8038,7 +7567,7 @@ contains
  
 ! *****************************************************************
   
-  subroutine read_JPSS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
+  subroutine read_VIIRS_SCF_hdf( fname, lon_min, lon_max, lat_min, lat_max,   &
        N_good_data, CMG_lon, CMG_lat, CMG_SCF, granule_id )
     
     ! read snow cover area fraction (SCF) obs from daily VIIRS V[NP|J1|J2]10C1, version 2 (hdf5)
@@ -8057,7 +7586,7 @@ contains
     !  date/time stamp (global attribute "LocalGranuleID").  The VIIRS file names on Discover are
     !  stripped of the production date/time stamp to make the file names predictable. The
     !  "granule_id" is returned so the information can be added into the "obslog" file by the
-    !  calling subroutine read_obs_JPSS_SCF(), as for MODIS
+    !  calling subroutine read_obs_MODIS_VIIRS_SCF()
     ! - amfox, 5 Nov 2026
     !
     ! -------------------------------------------------------------------------------------------------
@@ -8143,7 +7672,7 @@ contains
     integer,            dimension(:,:), allocatable :: Clear_Index
     integer,            dimension(:,:), allocatable :: Basic_QA
 
-    character(len=*),                     parameter :: Iam = 'read_JPSS_SCF_hdf'
+    character(len=*),                     parameter :: Iam = 'read_VIIRS_SCF_hdf'
     character(len=400)                              :: err_msg
     
     ! -------------------------------------------------------------------------
@@ -8367,7 +7896,7 @@ contains
     deallocate(Clear_Index)
     deallocate(Basic_QA   )
 
-  end subroutine read_JPSS_SCF_hdf
+  end subroutine read_VIIRS_SCF_hdf
 
   
   ! *****************************************************************
@@ -11175,18 +10704,9 @@ contains
           
        end if
        
-    case ('MOD10C1','MYD10C1')
+    case ('MOD10C1','MYD10C1','VNP10C1','VJ110C1','VJ210C1')
        
-       call read_obs_MODIS_SCF(                                       &
-            date_time, dtstep_assim, N_catf, tile_coord_f,            &
-            obs2tile_grid_f, tile_grid_g_ESMF,                        &
-            N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
-            this_obs_param, write_obslog,                             &
-            found_obs, tmp_obs, tmp_std_obs, tmp_lon, tmp_lat )
-
-    case ('VNP10C1','VJ110C1','VJ210C1')
-       
-       call read_obs_JPSS_SCF(                                        &
+       call read_obs_MODIS_VIIRS_SCF(                                 &
             date_time, dtstep_assim, N_catf, tile_coord_f,            &
             obs2tile_grid_f, tile_grid_g_ESMF,                        &
             N_tile_in_cell_ij, tile_num_in_cell_ij,                   &
