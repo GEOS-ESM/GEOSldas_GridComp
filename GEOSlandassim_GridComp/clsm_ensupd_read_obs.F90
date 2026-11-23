@@ -6543,7 +6543,7 @@ contains
 
     type(date_time_type)  :: date_time_beg,       date_time_end
     type(date_time_type)  :: date_time_beg_MVSCF, date_time_end_MVSCF
-    type(date_time_type)  :: date_time_obs_beg
+    type(date_time_type)  :: date_time_obs_beg,   date_time_obs_end
 
     real                  :: lon_beg,             lon_end
     real                  :: lon_beg_MVSCF,       lon_end_MVSCF
@@ -6574,6 +6574,8 @@ contains
     
     ! determine operating time range of platform with MODIS/VIIRS sensor
 
+    date_time_obs_end = date_time_type(9999, 1, 1, 1, 1, 1,-9999,-9999)       ! default: no end date
+    
     if     (trim(this_obs_param%descr) == 'MOD10C1') then
        date_time_obs_beg = date_time_type(2000, 2,24, 1,31, 0,-9999,-9999)    ! Terra
     elseif (trim(this_obs_param%descr) == 'MYD10C1') then
@@ -6584,6 +6586,7 @@ contains
        date_time_obs_beg = date_time_type(2023, 2,10, 0, 0, 0,-9999,-9999)    ! JPSS2
     elseif (trim(this_obs_param%descr) == 'VNP10C1') then
        date_time_obs_beg = date_time_type(2012, 1,19, 0, 0, 0,-9999,-9999)    ! S-NPP
+       date_time_obs_end = date_time_type(2026,11, 3, 0, 0, 0,-9999,-9999)   
     else
        err_msg = 'Unknown obs_param%descr: ' // trim(this_obs_param%descr)
        call ldas_abort(LDAS_GENERIC_ERROR, Iam, err_msg)
@@ -6591,8 +6594,9 @@ contains
 
     ! return if date_time falls outside operating time range
 
-    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return
-
+    if (datetime_lt_refdatetime(date_time, date_time_obs_beg))  return    ! date_time too early for obs
+    if (datetime_gt_refdatetime(date_time, date_time_obs_end))  return    ! date_time too late  for obs
+    
     ! ----------------------------------------------------------------------------------
     !
     ! restrict assimilation time step to max allowed 
