@@ -7786,7 +7786,7 @@ contains
     call h5r%openFile(trim(fname))
     
     ! get original file name (incl. production time stamp) because files are renamed; returned to
-    ! read_obs_JPSS_SCF() for the obslog, identifies the exact obs file version used in an experiment
+    ! read_obs_MODIS_VIIRS_SCF() for the obslog, identifies the exact obs file version used in an experiment
     ! (blank if the attribute is missing or cannot be read)
 
     call h5r%readAttribute('LocalGranuleID', granule_id)
