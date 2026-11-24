@@ -604,7 +604,7 @@ EASEv2_M36.LM:           1
                                    'DHGLC'        , 'LANDICE'  , 'ECHANGEGLC'    ,
                                    'DHGLCSRF'     , 'LANDICE'  , 'ECHANGEGLCSRF' ,
                                    'DSNOMASGLC'   , 'LANDICE'  ,
-                                   'ICESMB'       , 'LANDICE'  ,                  
+                                   'ICESMB'       , 'LANDICE'  , 'ICESMBGLC'     ,                 
 >>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  , 'ICESHEETSURFELEV' , 
 >>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  , 'ICESHEETTHICK'    , 
 >>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  , 'ICESHEETVEL'      , 
@@ -647,8 +647,8 @@ EASEv2_M36.LM:           1
                                    'DHGLC'        , 'LANDICE'  , 'ECHANGEGLC'    ,
                                    'DHGLCSRF'     , 'LANDICE'  , 'ECHANGEGLCSRF' ,
                                    'DSNOMASGLC'   , 'LANDICE'  , 
-                                   'ICESMB'       , 'LANDICE'  ,                  
->>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  , 'ICESHEETSURFELEV' ,                 
+                                   'ICESMB'       , 'LANDICE'  , 'ICESMBGLC'     ,
+>>>HIST_ISSM<<<                    'ICESURF'      , 'LANDICE'  , 'ICESHEETSURFELEV' ,
 >>>HIST_ISSM<<<                    'ICETHICK'     , 'LANDICE'  , 'ICESHEETTHICK'    ,                 
 >>>HIST_ISSM<<<                    'ICEVEL'       , 'LANDICE'  , 'ICESHEETVEL'      ,                 
                                     ::
@@ -682,7 +682,7 @@ EASEv2_M36.LM:           1
                                  'ICEVY'      , 'ISSM' , 'ICESHEETVELY'     ,
                                  'ICEDTHICK'  , 'ISSM' , 'ICESHEETDTHICK'   , 
                                  'ICEDIVQ'    , 'ISSM' , 'ICESHEETDIVQ'     ,
-                                 'ICEEQUIVSMB', 'ISSM' , 
+                                 'ICEEQUIVSMB', 'ISSM' , 'ICESHEETEQUIVSMB' ,
                                  ::
 
 # ========================== EOF ==============================================================
