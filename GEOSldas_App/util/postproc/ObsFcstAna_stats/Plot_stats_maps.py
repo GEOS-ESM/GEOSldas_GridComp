@@ -187,12 +187,15 @@ def Main_OmF_maps():
             grid_data, lat_2d, lon_2d = tile_to_latlongrid(tile_data, tc, my_res)
 
 
-            # compute spatial avg of metric (directly from tile_data; no weighting)
-            mean    = np.nanmean(       tile_data )
-            absmean = np.nanmean(np.abs(tile_data))
+            # compute spatial avg of metric (directly from tile_data; weighted by tile area)
+            valid   = ~np.isnan(tile_data)
+            data    = tile_data[ valid]
+            area    = tc['area'][valid].astype(np.float64)
+            mean    = np.sum(area*       data )/np.sum(area)
+            absmean = np.sum(area*np.abs(data))/np.sum(area)
             
             if 'normalized' in title_txt:
-                absmean = np.nanmean(np.abs(tile_data-1.) )
+                absmean = np.sum(area*np.abs(data-1.))/np.sum(area)
 
             if 'normalized' in title_txt and 'stdv' in title_txt:
                 title_txt = title_txt + '\n' + "avg=%.3f, avg(abs(nstdv-1))=%.3f" % (mean, absmean)+' '+units
