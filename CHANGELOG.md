@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added ISSM variables (ICEDIVQ,ICEDTHICK,ICEEQUIVSMB) to GEOSldas_HIST.rc to support mass budget calculations ([PR #236](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/236)).
+- Added land ice precip and sno variables to GEOSldas_HIST.rc to support mass closure ([PR #236](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/236)).
 - Added obslog output for H SAF ASCAT and CYGNSS L3 soil moisture, with quoted filenames where needed ([PR #242](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/242)).
 - Added functionality to generate perturbations on sphere ([PR #187](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/187)).
 - Added assimilation of VIIRS snow cover fraction obs (VJ110C1, VJ210C1, VNP10C1; hdf5 reader); original obs file names are written to the obslog ([PR #260](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/260)).
