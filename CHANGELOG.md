@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `process_hist.csh` for BSD `sed` (macOS) ([PR #255](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/255)).
   
 ### Removed
+- Removed support for obsolete ASCAT_MET[x]_SM obs species to avoid dependency on BUFR and NCEP_Shared ([PR #250](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/250)).
 
 ### Deprecated
  
