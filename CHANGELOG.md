@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  
 ### Changed
 - Refactored ldas_setup
+- Changed Python ObsFcstAna stats maps (`tile_to_latlongrid.py`, `Plot_stats_maps.py`) to weight tiles by area (changes plots and spatial averages only) ([PR #262](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/262)).
 - Changed MATLAB obs scaling scripts to read nc4 ObsFcstAna files ([PR #227](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/227)).
 - Updated [x,y]corr values for HSAF ASCAT soil moisture obs in LDASsa_DEFAULT_inputs_ensupd.nml ([PR #235](https://github.com/GEOS-ESM/GEOSldas_GridComp/pull/235)).
   
