@@ -24,6 +24,9 @@ set (scripts
    ens_forcing/enpert_forc.csh
    util/config/rewind_GEOSldas.csh
    lenkf_j_template.py
+   ldas_config.py
+   ldas_staging.py
+   ldas_rc.py
    )
 
 install (

@@ -1,11 +1,125 @@
 #!/usr/bin/env python3
 
+"""
+Helper functions used by ldas_setup and ldas.py
+"""
+
 import os
 import sys
+import glob
+import shlex
+import shutil
+import linecache
+import subprocess as sp
 
 from collections import OrderedDict
 from datetime    import timedelta
 
+
+# -----------------------------------------------------------------------------------
+# error handling and small helpers
+# -----------------------------------------------------------------------------------
+
+class LdasSetupError(Exception):
+   """
+    Error raised for invalid user inputs or missing files during ldas_setup.
+    Caught in ldas_setup, which prints the message and exits with non-zero status.
+   """
+   pass
+
+def require(condition, message):
+   """
+    Raise LdasSetupError with `message` if `condition` is False.
+    (Unlike `assert`, this check is not removed when python runs with -O.)
+   """
+   if not condition:
+      raise LdasSetupError(message)
+
+def run_cmd(cmd, check=False):
+   """
+    Print and run a shell command given as a single string (no shell interpretation).
+    A non-zero return code triggers a WARNING, or an LdasSetupError if check=True.
+    Returns the return code.
+   """
+   print ("cmd:   " + cmd)
+   rc = sp.call(shlex.split(cmd))
+   if rc != 0:
+      msg = "command returned non-zero status %d: %s" % (rc, cmd)
+      require(not check, msg)
+      print ("WARNING: " + msg)
+   return rc
+
+def glob_first(pattern, what):
+   """
+    Return first match of glob `pattern`; raise LdasSetupError if there is none.
+   """
+   files = glob.glob(pattern)
+   require(len(files) > 0, "Cannot find %s: no file matches [%s]" % (what, pattern))
+   return files[0]
+
+def bcs_version_from_path(bcs_path):
+   """
+    BCS_VERSION is the trailing dir name of BCS_PATH
+   """
+   return os.path.basename(bcs_path.rstrip('/'))
+
+def ym_dir(dt):
+   """
+    'Yyyyy/Mmm' sub-directory for datetime dt (as used in output/*/rs, ana, diag, rc_out)
+   """
+   return 'Y%4d/M%02d' % (dt.year, dt.month)
+
+def ymd_hm(dt):
+   """
+    'yyyymmdd_hhmm' time stamp for datetime dt (as used in restart file names)
+   """
+   return '%4d%02d%02d_%02d%02d' % (dt.year, dt.month, dt.day, dt.hour, dt.minute)
+
+def read_gridname(tilefile):
+   """
+    Read the grid name from a tile file (*.til or *.nc4, optionally with trailing '.domain').
+   """
+   tilefile = os.path.realpath(tilefile)
+   root, extension = os.path.splitext(tilefile)
+   if extension == '.domain':
+      extension = os.path.splitext(root)[1]
+   if extension == '.til':
+      gridname = linecache.getline(tilefile, 3).strip()
+   else:
+      import netCDF4
+      with netCDF4.Dataset(tilefile, 'r') as nc_file:
+         gridname = nc_file.getncattr('Grid_Name')
+   # in case it is an old name: SMAP-EASEvx-Mxx
+   return gridname.replace('SMAP-','').replace('-M','_M')
+
+def copy_with_suffix(srcfile, dstdir):
+   """
+    Copy srcfile into dstdir.  If a file with the same name already exists in dstdir,
+    append .1, .2, ... to the file name.  Returns the path of the copy.
+   """
+   basename = os.path.basename(srcfile.rstrip('/'))
+   newname  = basename
+   ctr = 0
+   while os.path.isfile(os.path.join(dstdir, newname)):
+      ctr += 1
+      newname = basename + '.%d' % ctr
+   dst = dstdir + '/' + newname
+   shutil.copy(srcfile, dst)
+   return dst
+
+def replace_in_file(filename, old, new):
+   """
+    In-place string replacement in a text file (trailing whitespace of each line is stripped).
+   """
+   with open(filename) as fin:
+      lines = [line.rstrip().replace(old, new) for line in fin]
+   with open(filename, 'w') as fout:
+      for line in lines:
+         fout.write(line + '\n')
+
+# -----------------------------------------------------------------------------------
+# input files
+# -----------------------------------------------------------------------------------
 
 def generate_echo(inpfile, ladas_cpl = 0):
    """
@@ -29,7 +143,7 @@ def parseInputFile(inpfile, ladas_cpl=0):
      Output  : dict, if inpfile does not exist, return empty {}
    """ 
    if not os.path.exists(inpfile):
-     assert ladas_cpl > 0, " No exeinput file only if ladas_cpl > 0"
+     require(ladas_cpl > 0, "Input file [%s] does not exist (allowed only if ladas_cpl > 0)" % inpfile)
      return {}
         
    inpdict = OrderedDict()
@@ -51,17 +165,15 @@ def parseInputFile(inpfile, ladas_cpl=0):
         line = line[:position]
      # we expect a line to be of the form
      # key : value
-     assert ':' in line, errstr % (linenum, inpfile)
-                                                             
+     require(':' in line, errstr % (linenum, inpfile))
+
      key, val = line.split(':',1)
      key = key.strip()
      val = val.strip()
      if not key or not val:
        print ("WARNING: " + errstr % (linenum, inpfile))
        continue
-     #raise Exception(errstr % (linenum, inpfile))
-     if key in inpdict:
-       raise Exception('Duplicate key [%s] in [%s]' % (key, inpfile))
+     require(key not in inpdict, 'Duplicate key [%s] in [%s]' % (key, inpfile))
      inpdict[key] = val.strip()
    return inpdict
 
@@ -242,7 +354,7 @@ def getExeKeys(option):
                            'BCS_RESOLUTION']
                 }
 
-   assert option == '0' or option == '1', '"%s" option is not recognized ' % option
+   require(option in rqdExeInpKeys, '"%s" option is not recognized ' % option)
    return rqdExeInpKeys[option]
 
 def getResourceKeys(option):
@@ -252,7 +364,7 @@ def getResourceKeys(option):
    RmInpKeys ={'required' : ['account', 'walltime', 'ntasks_model'],
                'optional' : ['job_name', 'qos', 'oserver_nodes', 'writers-per-node', 'ntasks-per-node', 'constraint']
               }
-   assert option in ['required', 'optional'],' "%s" option is not supported' % option
+   require(option in RmInpKeys, ' "%s" option is not supported' % option)
 
    return RmInpKeys[option]
  
@@ -308,11 +420,11 @@ def printInputSampleFile(cmdLineArgs):
    elif cmdLineArgs['batinp']:
       printResourceInputSampleFile()
    else:
-      raise Exception('unrecognized sample option')
+      raise LdasSetupError('unrecognized sample option')
 
 def printDictionary(d):
     """     
-    Private method: print a 'flat' dictionary
+    print a 'flat' dictionary
     """     
             
     for key, val in d.items():
