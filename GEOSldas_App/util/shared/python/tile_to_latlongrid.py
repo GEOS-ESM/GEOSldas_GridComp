@@ -7,13 +7,15 @@ def tile_to_latlongrid( tile_data, tile_coord, resolution, nodata=1.e15, nodata_
     
     """
     Map (1d) tile-space data onto (2d) regular lat/lon grid of arbitrary "resolution".
+    The value of a grid cell is the area-weighted mean of the tiles whose center-of-mass
+    falls into the grid cell.
 
     Use "tile2grid.py" to map tile data onto the grid that is associated with the tile space.
     
     Parameters:
     ----------
     tile_data       : Array in tile space, shape (N_tile, N_fields)
-    tile_coord      : Dictionary containing tile coordinate information
+    tile_coord      : Dictionary containing tile coordinate information (incl. 'area')
     resolution      : Target grid resolution
     nodata          : Value for missing data
     nodata_tol_frac : Tolerance fraction for comparing values to nodata
@@ -45,20 +47,21 @@ def tile_to_latlongrid( tile_data, tile_coord, resolution, nodata=1.e15, nodata_
     lon_2d, lat_2d = np.meshgrid(lon_grid, lat_grid)
 
     grid_data = np.zeros((len(lat_grid), len(lon_grid), nf))
-    N_tilecnt = np.zeros((len(lat_grid), len(lon_grid), nf))
+    wgrid     = np.zeros((len(lat_grid), len(lon_grid), nf))
 
           
     for k in range(tile_coord['N_tile']):
         for v in range(nf):
-            if ~np.isnan(tile_data[k,v]):
+            if ~np.isnan(tile_data[k,v]) and tile_coord['area'][k] > 0:   # zero weight would give 0/0
                 j = np.searchsorted(lat_grid + resolution/2., tile_coord['com_lat'][k])
                 i = np.searchsorted(lon_grid + resolution/2., tile_coord['com_lon'][k])
-                # grid value takes the mean of all tiles within
-                # new_mean = old_mean + (new_value - old_mean)/count
-                N_tilecnt[j,i,v] += 1
-                grid_data[j,i,v] = grid_data[j,i,v] + (tile_data[k,v]-grid_data[j,i,v])/N_tilecnt[j,i,v]
+                # grid value takes the area-weighted mean of all tiles within
+                # new_mean = old_mean + (new_value - old_mean)*weight/sum_of_weights
+                w             = tile_coord['area'][k]
+                wgrid[j,i,v] += w
+                grid_data[j,i,v] = grid_data[j,i,v] + (tile_data[k,v]-grid_data[j,i,v])*w/wgrid[j,i,v]
 
-    grid_data[N_tilecnt == 0] = np.nan
+    grid_data[wgrid == 0] = np.nan
     
     return grid_data.squeeze(), lat_2d, lon_2d
 
